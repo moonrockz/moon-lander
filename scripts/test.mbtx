@@ -1,0 +1,87 @@
+///|
+/// Run the tests of every workspace member for one or more targets.
+///
+/// Usage: `mise run test [-- <target>...]`, or `moonx scripts/test.mbtx <target>...`.
+/// With no target, it tests wasm, wasm-gc, js and native.
+///
+/// Run from the workspace root so Moon discovers all members and nested packages.
+/// Moon applies module and package target restrictions, including legacy arrays
+/// and target-set expressions; do not duplicate its manifest parsing here.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  let targets = args.filter(fn(arg) { !arg.has_prefix("--") })
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  for target in targets {
+    println("🧪 Testing for \{target}...")
+    let code = @process.run(
+      "moon",
+      ["test", "--target", target],
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    )
+    if code != 0 {
+      println("❌ Tests failed for \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+  }
+  println("✅ All tests passed")
+}
+
+///|
+async test "workspace test gate delegates discovery and target filtering to moon" {
+  let script = @fs.realpath("test.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-targets")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.mkdir("\{dir}/lib/nested", recursive=true)
+  @fs.mkdir("\{dir}/lib/array_only", recursive=true)
+  @fs.mkdir("\{dir}/lib/expression_only", recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  @fs.write_file("\{dir}/moon.work", "members = [\n  \".\",\n  \"./lib\",\n]\n")
+  @fs.write_file(
+    "\{dir}/lib/moon.mod",
+    "name = \"fixture/lib\"\nversion = \"0.0.1\"\n",
+  )
+  for pkg in ["lib", "lib/nested", "lib/array_only", "lib/expression_only"] {
+    @fs.write_file("\{dir}/\{pkg}/moon.pkg", "")
+    @fs.write_file(
+      "\{dir}/\{pkg}/smoke_test.mbt",
+      "test \"fixture\" { assert_true(true) }\n",
+    )
+  }
+  @fs.write_file(
+    "\{dir}/lib/array_only/moon.pkg",
+    "options(\"supported-targets\": [\"native\"])\n",
+  )
+  @fs.write_file(
+    "\{dir}/lib/expression_only/moon.pkg",
+    "supported_targets = \"+all-js-wasm-gc-wasm\"\n",
+  )
+  for (target, count) in [("wasm", 2), ("native", 4)] {
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, target],
+      cwd=dir,
+    )
+    assert_eq(code, 0, msg=out.text() + err.text())
+    assert_true(
+      out.text().contains("Total tests: \{count}, passed: \{count}, failed: 0."),
+      msg=out.text(),
+    )
+  }
+}

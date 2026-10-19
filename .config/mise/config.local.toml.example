@@ -1,0 +1,2 @@
+# Copy to config.local.toml for local overrides. The copy is gitignored.
+# Keep shared tool versions and tasks in config.toml.

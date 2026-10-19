@@ -1,0 +1,10 @@
+import {
+  "moonrockz/notebooks",
+  "moonrockz/notebooks/nbformat",
+  "moonrockz/notebooks/dib",
+  "moonrockz/expect",
+  "moonrockz/ion/ion" @ion,
+  "moonbitlang/core/debug",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/quickcheck/shrink",
+} for "wbtest"

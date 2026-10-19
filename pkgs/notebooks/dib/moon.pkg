@@ -1,0 +1,15 @@
+import {
+  "moonbit-community/toml",
+  "moonbit-community/yaml",
+  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/text" @ion_text,
+  "moonrockz/ion/json" @ion_json,
+  "moonbitlang/core/bigint",
+  "moonrockz/notebooks",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/notebooks/dib",
+  "moonrockz/expect",
+} for "test"

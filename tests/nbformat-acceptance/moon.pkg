@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/async",
+  "moonrockz/notebooks/nbformat",
+  "moonrockz/moonspec",
+  "moonrockz/expect",
+} for "wbtest"
+
+supported_targets = "js+native"

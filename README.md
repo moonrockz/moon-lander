@@ -56,16 +56,45 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, initially `0.0.1`.
+- `moon.mod` holds the shared version, currently `0.1.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its initial `version()` export provides a build and test smoke check.
+- `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
+  migrated from Moonbase with its existing module name and package paths. It
+  provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
+  and shared traversal, with runnable usage guides for all four targets.
+- `tests/` is an unpublished workspace module containing the notebook acceptance
+  suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `.config/mise/config.toml` pins the tools and declares tasks.
 - `.github/workflows/ci.yml` checks lint, validation, builds, tests, and task scripts.
   The `ci-ok` job is the aggregate check for branch protection.
 
 The application model, host adapters, and CLI remain to be designed. No UI packages
 are included. CI has read-only permissions and no publishing or release workflow.
-Module and CLI names must be confirmed before publishing. Nothing has been released.
+
+## Releases
+
+The `0.1.0` release moves `moonrockz/notebooks` here and adds MIME queries,
+runtime cell capability inspection, and Ion-backed metadata with JSON, YAML,
+TOML and Ion DIB inputs. See [the changelog](CHANGELOG.md) for API migration notes.
+
+Release versions are shared across workspace members. Only `pkgs/notebooks`
+is published to mooncakes.io; the framework name remains provisional. The
+workspace root and `tests` are not published. GitHub releases identify the
+corresponding source commit with a version tag.
+
+After setting the version with `scripts/versions.mbtx`, run the full check
+and validate the package before publishing:
+
+```shell
+mise run format
+mise run check
+mise exec -- moon -C pkgs/notebooks publish --dry-run
+mise exec -- moon -C pkgs/notebooks publish
+```
+
+Publishing is manual and requires an explicit release request. No workflow
+publishes automatically.
 
 License: Apache-2.0.

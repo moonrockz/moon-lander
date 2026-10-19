@@ -1,0 +1,122 @@
+///|
+/// Run the tests of every workspace member for one or more targets.
+///
+/// Usage: `mise run test [-- <target>...]`, or `moonx scripts/test.mbtx <target>...`.
+/// With no target, it tests wasm, wasm-gc, js and native.
+///
+/// `moon test <path>` tests only the package at exactly that path, not its
+/// sub-packages, so packages are discovered from `moon.work` recursively.
+/// Packages declare target restrictions in their `moon.pkg`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// Active workspace members, excluding the package-less workspace root.
+fn members(work : String) -> Array[String] {
+  let paths = []
+  for line in work.split("\n") {
+    let line = line.trim_start()
+    guard line.has_prefix("\"") else { continue }
+    guard line[1:].find("\"") is Some(end) else { continue }
+    let path = line[1:1 + end].to_owned()
+    let path = if path.has_prefix("./") { path[2:].to_owned() } else { path }
+    if path != "." && !path.is_empty() {
+      paths.push(path)
+    }
+  }
+  paths
+}
+
+///|
+/// A package's optional target restriction, in moon.pkg's target expression.
+fn supports(config : String, target : String) -> Bool {
+  for line in config.split("\n") {
+    let line = line.trim_start()
+    guard line.has_prefix("supported_targets") else { continue }
+    guard line.find("\"") is Some(start) &&
+      line.rev_find("\"") is Some(end) &&
+      end > start else {
+      return false
+    }
+    return line[start + 1:end].split("+").any(t => t == target)
+  }
+  true
+}
+
+///|
+/// Find each package once, including newly added and internal packages.
+async fn packages(dir : String, target : String, out : Array[String]) -> Unit {
+  let manifest = "\{dir}/moon.pkg"
+  if @fs.exists(manifest) && supports(@fs.read_file(manifest).text(), target) {
+    out.push(dir)
+  }
+  let entries = @fs.readdir(dir)
+  entries.sort()
+  for entry in entries {
+    guard !entry.has_prefix(".") && entry != "_build" && entry != "node_modules" else {
+      continue
+    }
+    let path = "\{dir}/\{entry}"
+    if @fs.kind(path) is Directory {
+      packages(path, target, out)
+    }
+  }
+}
+
+///|
+async fn moon_test(paths : Array[String], target : String) -> Int32 {
+  let args = ["test"]
+  args.append(paths)
+  args.push("--target")
+  args.push(target)
+  @process.run("moon", args, stdout=@stdio.stdout, stderr=@stdio.stderr)
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  let targets = args.filter(fn(arg) { !arg.has_prefix("--") })
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  for target in targets {
+    println("🧪 Testing for \{target}...")
+    let paths = []
+    for module_path in members(@fs.read_file("moon.work").text()) {
+      packages(module_path, target, paths)
+    }
+    if paths.is_empty() {
+      println("No test packages for \{target}")
+      @sys.exit(1)
+    }
+    let code = moon_test(paths, target)
+    if code != 0 {
+      println("❌ Tests failed for \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+  }
+  println("✅ All tests passed")
+}
+
+///|
+test "workspace members ignore commented paths and the workspace root" {
+  assert_eq(
+    members("members = [\n  \".\",\n  # \"./skip\",\n  \"./pkgs/new\",\n]"),
+    ["pkgs/new"],
+  )
+}
+
+///|
+test "package target restrictions preserve native and wasm only" {
+  assert_true(supports("supported_targets = \"native+wasm\"", "native"))
+  assert_true(supports("supported_targets = \"native+wasm\"", "wasm"))
+  assert_false(supports("supported_targets = \"native+wasm\"", "wasm-gc"))
+  assert_true(supports("", "js"))
+}

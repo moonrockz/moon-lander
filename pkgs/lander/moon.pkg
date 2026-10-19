@@ -1,0 +1,7 @@
+import {
+  "moonrockz/moon-lander" @lander,
+} for "test"
+
+options(
+  "is-main": false,
+)

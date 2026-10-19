@@ -1,0 +1,23 @@
+---
+extends: default
+
+ignore:
+  - _build/
+  - .mooncakes/
+  - node_modules/
+  - .git/
+  - .dev/  # gitignored scratch area
+  - .superpowers/  # gitignored agent notes
+  - .beads/  # bd rewrites config.yaml with its own indentation
+
+rules:
+  line-length:
+    max: 120
+    level: warning
+  indentation:
+    spaces: 2
+  comments:
+    min-spaces-from-content: 1
+  document-start: disable
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']

@@ -15,6 +15,7 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
   "moonrockz/moonspec@0.11.0",
@@ -273,8 +274,11 @@ async fn read_text(path : String) -> String {
 ///|
 /// Every file that holds the version, as `(path, text)`.
 async fn workspace_files() -> Array[(String, String)] {
-  let files = []
+  let files = [("moon.mod", read_text("moon.mod"))]
   for dir in members(read_text("moon.work")) {
+    if dir == "." {
+      continue
+    }
     let path = mod_path(dir)
     files.push((path, read_text(path)))
   }
@@ -290,7 +294,7 @@ async fn check(expected : String?) -> Unit {
   let expected = match expected {
     Some(v) => v
     None =>
-      match mod_version(files[0].1) {
+      match mod_version(read_text("moon.mod")) {
         Some(v) => v
         None => {
           fail_with("The root moon.mod has no version line.")
@@ -432,4 +436,59 @@ async test "versions feature" {
     ]),
   )
   |> ignore
+}
+
+///|
+async test "root version is authoritative regardless of workspace member order" {
+  let script = @fs.realpath("versions.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-versions")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.mkdir("\{dir}/pkgs/lander", recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/lander/moon.mod",
+    "name = \"fixture/lib\"\nversion = \"0.0.2\"\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/lander/version.mbt",
+    "pub fn version() -> String {\n  \"0.0.2\"\n}\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/lander/version_test.mbt",
+    "inspect(@lander.version(), content=\"0.0.2\")\n",
+  )
+  for
+    work in [
+      "members = [\n  \"./pkgs/lander\",\n  \".\",\n]\n", "members = [\n  \"./pkgs/lander\",\n]\n",
+    ] {
+    @fs.write_file("\{dir}/moon.work", work)
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, "check"],
+      cwd=dir,
+    )
+    assert_not_eq(code, 0, msg=out.text() + err.text())
+    assert_true(
+      (out.text() + err.text()).contains(
+        "pkgs/lander/moon.mod: found 0.0.2, expected 0.0.1",
+      ),
+      msg=out.text() + err.text(),
+    )
+  }
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "set", "0.0.3"],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  assert_eq(mod_version(@fs.read_file("\{dir}/moon.mod").text()), Some("0.0.3"))
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "check"],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
 }

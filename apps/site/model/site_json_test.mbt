@@ -58,6 +58,15 @@ test "every problem is reported" {
 }
 
 ///|
+test "packages must be an array of strings" {
+  for value in ["\"notebooks\"", "{}", "[\"notebooks\", 1]"] {
+    @expect.expect(
+      problems_of(site_json().replace(old="[\"notebooks\"]", new=value)),
+    ).to_equal(["site/site.json: `packages` must be an array of strings"])
+  }
+}
+
+///|
 test "the configuration must be a JSON object" {
   @expect.expect(problems_of("[]")).to_equal([
     "site/site.json: must be a JSON object",

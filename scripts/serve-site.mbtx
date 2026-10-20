@@ -31,8 +31,8 @@ let usage : String = "Usage: serve-site.mbtx [--port <n>] [--no-watch]"
 let site_dir : String = "_site"
 
 ///|
-/// The source directories that the watch polls, relative to the workspace root.
-let watched : Array[String] = ["docs", "site", "apps/site", "pkgs/notebooks"]
+/// The source directories that the watch always polls, relative to the workspace root.
+let watched : Array[String] = ["docs", "site", "apps/site"]
 
 ///|
 /// Directory names that the watch skips: build output and installed packages.
@@ -182,6 +182,33 @@ fn base_path(text : String) -> String raise Failure {
 }
 
 ///|
+/// The directories that the watch polls: `watched`, the directory `pkgs/<name>` of each package in
+/// `packages`, and each module directory in `api` of `site/site.json`, in that order without repeats.
+fn watched_dirs(text : String) -> Array[String] raise Failure {
+  let json = @json.parse(text) catch {
+    error => raise Failure("site/site.json: not valid JSON: \{error}")
+  }
+  let dirs = watched.copy()
+  guard json is Object(fields) else { return dirs }
+  let add = fn(dir : String) { if !dirs.contains(dir) { dirs.push(dir) } }
+  if fields.get("packages") is Some(Array(items)) {
+    for item in items {
+      if item is String(name) {
+        add("pkgs/\{name}")
+      }
+    }
+  }
+  if fields.get("api") is Some(Array(items)) {
+    for item in items {
+      if item is String(dir) {
+        add(dir)
+      }
+    }
+  }
+  dirs
+}
+
+///|
 fn header(
   name : String,
   value : String,
@@ -266,8 +293,14 @@ async fn snapshot(dir : String) -> (Int64, Int32) {
 ///|
 async fn sources_snapshot() -> Array[(Int64, Int32)] {
   let out = []
-  for dir in watched {
-    out.push(snapshot(dir))
+  // Read the configuration on each poll, so a package added to `packages` is watched at once.
+  let dirs = watched_dirs(@fs.read_file("site/site.json").text()) catch {
+    _ => watched
+  }
+  for dir in dirs {
+    if @fs.exists(dir) {
+      out.push(snapshot(dir))
+    }
   }
   out
 }
@@ -398,6 +431,17 @@ test "options" {
     _ => ""
   }
   assert_eq(message, "unknown option `--watch`. \{usage}")
+}
+
+///|
+test "the watch follows the packages and API modules of site/site.json" {
+  assert_eq(
+    watched_dirs(
+      "{\"packages\": [\"notebooks\", \"lander\"], \"api\": [\"pkgs/lander\", \"pkgs/notebooks\"]}",
+    ),
+    ["docs", "site", "apps/site", "pkgs/notebooks", "pkgs/lander"],
+  )
+  assert_eq(watched_dirs("{}"), ["docs", "site", "apps/site"])
 }
 
 ///|

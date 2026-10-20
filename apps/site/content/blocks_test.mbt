@@ -113,3 +113,11 @@ test "example of a proposed API" {
     [],
   )
 }
+
+///|
+test "a fence inside a block quote, a callout or a list is checked" {
+  let problems = @content.check_moonbit_fences(
+    "docs/a.md", "> [!NOTE]\n> ```moonbit\n> let x = 1\n> ```\n\n- Item:\n\n  ```mbt\n  let y = 2\n  ```\n\n1. Step\n   ```moonbit notest\n   let z = 3\n   ```\n",
+  )
+  assert_eq(problems.map(p => p.line), [2, 8])
+}

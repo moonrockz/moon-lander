@@ -121,6 +121,45 @@ pub fn render_layers(file : String, html : String) -> LayersPass {
 }
 
 ///|
+/// The length of a list item marker at the start of `text`, such as `- `, `* `, `+ `, `1. ` or `1) `,
+/// or 0.
+fn list_marker(text : String) -> Int {
+  if text.has_prefix("- ") || text.has_prefix("* ") || text.has_prefix("+ ") {
+    return 2
+  }
+  let mut n = 0
+  while n < text.length() && text[n] >= '0' && text[n] <= '9' {
+    n += 1
+  }
+  if n > 0 &&
+    n + 1 < text.length() &&
+    (text[n] == '.' || text[n] == ')') &&
+    text[n + 1] == ' ' {
+    n + 2
+  } else {
+    0
+  }
+}
+
+///|
+/// `line` without its leading white space, block quote markers and list item markers, so a fence
+/// inside a block quote, a callout or a list item is found too.
+fn without_containers(line : String) -> String {
+  let mut rest = line
+  while true {
+    let trimmed = rest.trim_start(chars=" \t").to_owned()
+    if trimmed.has_prefix(">") {
+      rest = trimmed[1:].to_owned()
+    } else if list_marker(trimmed) is n && n > 0 {
+      rest = trimmed[n:].to_owned()
+    } else {
+      return trimmed
+    }
+  }
+  rest
+}
+
+///|
 /// Check the MoonBit fences of a Markdown source that `moon test` does not compile: each fence whose
 /// language is `moonbit` or `mbt` must have the word `notest` after the language. `first_line` is the
 /// line number of the first line of `source` in the file.
@@ -132,8 +171,7 @@ pub fn check_moonbit_fences(
   let problems = []
   let mut fence : String? = None
   for i, line in source.split("\n").collect() {
-    let trimmed = line.trim_start(chars=" ").to_owned()
-    let indent = line.length() - trimmed.length()
+    let trimmed = without_containers(line.to_owned())
     let marker = if trimmed.has_prefix("```") {
       "```"
     } else if trimmed.has_prefix("~~~") {
@@ -141,7 +179,7 @@ pub fn check_moonbit_fences(
     } else {
       ""
     }
-    if marker == "" || indent > 3 {
+    if marker == "" {
       continue
     }
     match fence {

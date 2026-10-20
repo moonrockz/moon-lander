@@ -95,15 +95,13 @@ pub fn SiteConfig::parse(
   let site_url = text_field("site_url")
   let repo_url = text_field("repo_url")
   let packages = match fields.get("packages") {
-    Some(Array(items)) =>
-      items.filter_map(item => {
-        if item is String(name) {
-          Some(name)
-        } else {
-          None
-        }
-      })
-    _ => []
+    None => []
+    Some(Array(items)) if items.iter().all(item => item is String(_)) =>
+      items.filter_map(item => if item is String(name) { Some(name) } else { None })
+    Some(_) => {
+      problems.push(problem(file, "`packages` must be an array of strings"))
+      []
+    }
   }
   if base_path != "" &&
     !(base_path.has_prefix("/") && base_path.has_suffix("/")) {

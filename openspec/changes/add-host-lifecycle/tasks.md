@@ -3,7 +3,8 @@
 Epic: lander-4us.5
 
 Do group 1 first. It is a feasibility spike for the native signal stub. If any task in
-group 1 fails, use the owner's fallback: write the stub in C as a normal `native-stub`. Groups 2 to 5, 10 and 13 need only the core tracer bullet. Groups 6 to 9 and 14 start
+group 1 fails, use the owner's fallback: write the stub in C as a normal `native-stub`. Groups 2 to 4, 10 and 13 need only the core tracer bullet. Group 5 also needs core
+group 14, which declares the `Decode` case and `BindFailure`. Groups 6 to 9 and 14 start
 after the `add-configuration-conventions` and `add-configuration-binding` integration
 checks. The bead dependencies record this order. Run `mise run check`
 after each group. Run `mise run format` before each commit. The windows-latest CI leg

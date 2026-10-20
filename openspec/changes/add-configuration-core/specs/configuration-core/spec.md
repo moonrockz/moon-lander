@@ -791,9 +791,8 @@ adapters do that.
 
 The file tree SHALL hold directory listings, file text, and a `complete` flag. The
 pure load MUST give either a list of file requests (directory listings and files
-that the tree does not hold) or the configuration. With a complete tree, the pure
-load MUST NOT give file requests and MUST treat a path that the tree does not hold
-as absent.
+that the tree does not hold) or the configuration. With a complete tree, the pure load MUST NOT give file requests and MUST treat a path that the tree
+does not hold as absent.
 
 #### Scenario: Incomplete tree asks for files
 
@@ -814,6 +813,22 @@ as absent.
 
 - **WHEN** a wasm application loads an environment source with `Discover` and gives no process variables
 - **THEN** the source adds no key and reports `not-found`
+
+### Requirement: File tree absence records
+
+The file tree SHALL record a path as missing on request. A missing directory MUST
+make every path under it missing. The pure load MUST NOT ask for a held path or a
+missing path.
+
+#### Scenario: Absence record answers a request
+
+- **WHEN** the tree is not complete, an explicit file source names `/w/app.toml`, and the tree records `/w/app.toml` as missing with `with_missing`
+- **THEN** the pure load gives no file request for `/w/app.toml` and raises the file-not-found error for the explicit file
+
+#### Scenario: Missing directory answers its children
+
+- **WHEN** the tree is not complete and records the directory `/w/.config` as missing
+- **THEN** the pure load gives no request for `/w/.config` or for any path under it
 
 ### Requirement: Paths use forward slashes
 

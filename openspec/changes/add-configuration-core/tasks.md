@@ -47,7 +47,7 @@ Bead: lander-4us.2.5
 
 - [ ] 5.1 Add `SourceSelection[T]`, `SourceKind`, `FileRole`, `ConfigBuilder`, `add`, and the defaults source; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
 - [ ] 5.2 Add display priorities with the defaults by kind and role, the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities" and "Decreasing priority" scenarios.
-- [ ] 5.3 Add `FileTree`, `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files" and "Complete tree never asks" scenarios.
+- [ ] 5.3 Add `FileTree` (with `with_listing`, `with_file`, and `with_missing`), `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files", "Complete tree never asks", "Absence record answers a request", and "Missing directory answers its children" scenarios.
 - [ ] 5.4 Add `Platform`, `LoadContext`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
 - [ ] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), `base_dir`, and the explicit file source over a `FileTree`; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the base directory".
 - [ ] 5.6 Add the candidate-list file source, the exact-name existence check over listings, and `ConfigError::Ambiguous(display~, location~, candidates~)` with its message; verify the candidate ambiguity scenarios and "Name match is exact".

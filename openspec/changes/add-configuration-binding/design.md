@@ -163,8 +163,13 @@ pub fn[T : FromJson + ToJson] bind_or(
 ) -> T raise ConfigError
 ```
 
-Steps: write `default` with `ToJson`, convert the `Json` to a `ConfigValue`,
-merge the section over it with the core merge function, then decode. The core
+Steps: write `default` with `ToJson`, place it as the only field of a synthetic
+root struct, place the section under the same field of a second synthetic root,
+merge the two roots with the core merge function, take the field back out, then
+decode. **Call (review)**: the synthetic roots keep the core rule that a tree root
+is a struct, so a scalar or list default works: `bind_or(config, "mode", "safe")`
+and `bind_or(config, "targets", ["js"])` are valid. A configured scalar or list
+replaces the default; an absent or `null` section keeps it. The core
 rules apply: tables merge, lists replace, a `null` overlay does not change the
 default. Leaves that come from the default get the blame `Default` (D4). A `None`
 field in the default is not written (observed), so a configured value fills it.
@@ -453,9 +458,18 @@ them. Defaults come from `bind_or`.
 ### D12. Optional unknown-key check (Call (this change))
 
 `FromJson` ignores unknown keys (observed), so a misspelled key has no effect. For
-`T : ToJson + FromJson`, `bind_or` takes `unknown? : UnknownKeys = Allow`. With
-`Reject`, binding writes the decoded value back with `ToJson` and compares the key
-sets. A configured key that is not in the result is a failure with its blame. All
+`T : ToJson + FromJson`, `bind_or` takes `unknown? : UnknownKeys = Allow`, where
+`UnknownKeys = Allow | Reject | RejectExcept(Array[String])`. With `Reject`,
+binding writes the decoded value back with `ToJson` and compares the key sets.
+
+**Call (review)**: `Reject` is correct only when `ToJson` writes every key that
+`FromJson` accepts, under the same name. A derived `FromJson` and `ToJson` pair with
+the same arguments meets this. A hand-written pair may not: a decoder can accept an
+alias (`port`) that the encoder writes as another name (`endpoint`), or accept a
+key that the encoder leaves out. For such a type, the application uses
+`RejectExcept(keys)`, which also accepts the listed relative key paths (for
+example `"port"` or `"server.port"`). The package documentation states this
+precondition. A configured key that is not in the result is a failure with its blame. All
 unknown keys are reported in one `Validation` error. The default is `Allow`, to match
 `FromJson`. A `None` field is not written by `ToJson`, but a configured value
 makes it `Some`, so the check stays correct.

@@ -26,7 +26,7 @@ Bead: lander-4us.4.1
 
 Bead: lander-4us.4.2
 
-- [ ] 2.1 Add `bind_or` for `T : FromJson + ToJson`: write the default with `ToJson`, convert it to a value tree, merge the section over it with the core merge, decode; verify tests for unset keys, a replaced list, a `null` overlay and an absent section
+- [ ] 2.1 Add `bind_or` for `T : FromJson + ToJson`: write the default with `ToJson`, wrap the default and the section as the field of two synthetic root structs, merge them with the core merge, take the field out, decode; verify tests for unset keys, a replaced list, a scalar default, a list default, a `null` overlay and an absent section
 - [ ] 2.2 Mark leaves that the default supplies with blame `Default`; verify a bad default gives `Decode` text that says `from the bind default`
 - [ ] 2.3 Add acceptance scenarios for "Bind over a default value" and "Decode errors for tables, unset and default values"; verify they pass on all four targets
 - [ ] 2.4 Document `bind_or`, and the observed `FromJson` limits (`Int` truncation, `Int64` text only, `null` in an `Option` field), in the package README; verify the README examples run
@@ -72,9 +72,9 @@ Bead: lander-4us.4.6
 
 Bead: lander-4us.4.7
 
-- [ ] 7.1 Add `UnknownKeys` (`Allow`, `Reject`) and the `unknown?` argument of `bind_or`; compare configured keys with the `ToJson` form of the result; verify tests for a misspelled key, a `None` field and a map field
+- [ ] 7.1 Add `UnknownKeys` (`Allow`, `Reject`, `RejectExcept`) and the `unknown?` argument of `bind_or`; compare configured keys with the `ToJson` form of the result plus the listed keys; verify tests for a misspelled key, a `None` field, a map field and a hand-written alias with `RejectExcept`
 - [ ] 7.2 Add acceptance scenarios for "Optional unknown-key check"; verify they pass
-- [ ] 7.3 Document the check in the package README; verify the example runs
+- [ ] 7.3 Document the check in the package README, including that `Reject` needs a `ToJson` that writes every key `FromJson` accepts; verify the README example runs
 
 ## 8. Integration check
 

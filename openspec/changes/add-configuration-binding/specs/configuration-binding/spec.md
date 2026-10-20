@@ -71,6 +71,12 @@ SHALL NOT change.
 - **AND** the configuration sets only `ir.strict_mode = true`
 - **THEN** the result has `layout = "single-file"` and `strict_mode = true`
 
+#### Scenario: Scalar default
+
+- **WHEN** the default for `mode` is the text `safe`
+- **AND** the configuration does not set `mode`
+- **THEN** binding gives `safe`, and with `mode = "fast"` set it gives `fast`
+
 #### Scenario: Configured list replaces default list
 - **WHEN** the default has `components = ["parse", "typecheck"]`
 - **AND** the configuration sets `pipeline.components = ["parse"]`
@@ -179,12 +185,20 @@ secret reference.
 For a target type that implements both `ToJson` and `FromJson`, the system SHALL
 offer a check that finds configured keys that the decoded value does not contain.
 The check SHALL be off by default. When on, each unknown key SHALL be reported
-with its key path and origin.
+with its key path and origin. The check SHALL also accept the relative key paths
+that the application lists, for decoders that accept keys their encoder does not
+write.
 
 #### Scenario: Unknown key ignored by default
 - **WHEN** the configuration sets `ir.strict_mod = true` (a misspelled key)
 - **AND** the application binds `ir` with the check off
 - **THEN** binding succeeds and ignores `ir.strict_mod`
+
+#### Scenario: Accepted alias listed
+
+- **WHEN** a type with a hand-written decoder accepts `port` and its encoder writes `endpoint`
+- **AND** the configuration sets `server.port` and the application binds `server` over a default with `RejectExcept(["port"])`
+- **THEN** binding succeeds and reports no unknown key
 
 #### Scenario: Unknown key rejected
 - **WHEN** the configuration file `/repo/morphir.toml` sets `ir.strict_mod = true`

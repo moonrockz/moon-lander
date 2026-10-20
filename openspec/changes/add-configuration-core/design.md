@@ -680,8 +680,14 @@ pub(all) enum LoadStep[T] {
 
 - `FileTree` holds listings with the real names and file text, keyed by path.
   `FileTree::with_listing` and `FileTree::with_file` return a new tree.
-- When `complete` is true, a path that is not in the tree is absent. When it is
-  false, the path is unknown, and the load asks for it.
+- **Call (review)**: `FileTree::with_missing(path)` returns a new tree that records
+  `path` as absent. The host adapter uses it when a read or a listing finds no file
+  or directory. A path under a missing directory is also absent. An absence record
+  answers a request, so the next round does not ask for that path again, and the
+  tree can stay incomplete for paths that later rounds find.
+- A path is in one of three states: held (listing or file text), missing (an
+  absence record, or any path when `complete` is true), or unknown. The load asks
+  only for unknown paths.
 - **Call (R1)**: a complete tree never gives `Need`.
 - **Call (this change)**: the existence check for a candidate reads the listing of
   its directory and compares exact names. A probe on a case-insensitive file system
@@ -699,8 +705,9 @@ pub(all) enum LoadStep[T] {
   base directory to the working directory (`base_dir`) and the `Platform`
   (`platform`), and then
   runs the request loop: call `@config.load`, answer each `Need`, add the answers
-  to the tree, and call again. When it reads an answer, a missing path is recorded
-  as absent, so each round makes progress.
+  to the tree, and call again. When a read or a listing finds no file or directory,
+  the loop adds `with_missing(path)`, so each round makes progress and never asks
+  for the same path twice.
 - Hosting `run` calls these entry points. A wasm or wasm-gc host gives the tree
   with `|> @hosting.files(tree)` and gets the result from `@config.load` with a
   complete tree.

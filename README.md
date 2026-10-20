@@ -62,7 +62,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 - `moon.mod` holds the shared version, currently `0.1.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
-  as `@lander`. Its initial `version()` export provides a build and test smoke check.
+  as `@lander`. Its `version()` export provides a build and test smoke check. Its
+  `config` packages hold the configuration core, which is in progress.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors

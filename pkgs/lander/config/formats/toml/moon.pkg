@@ -1,0 +1,10 @@
+import {
+  "moonrockz/moon-lander/config",
+  "moonbit-community/toml" @toml_lib,
+  "moonrockz/ion/ion" @ion,
+  "moonbitlang/core/bigint",
+}
+
+import {
+  "moonrockz/expect",
+} for "test"

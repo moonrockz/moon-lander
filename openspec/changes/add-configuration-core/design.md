@@ -38,8 +38,9 @@ Decisions from the reconciliation addendum of 2026-10-20 show their item number:
 **Owner (O2)** for an owner answer, **Call (R1)** for a reconciliation call. The
 addendum replaces earlier text where they disagree.
 
-**Owner (2026-10-20)** marks two later owner decisions: the local override layer
-(D4) and one variable set and one working directory for each run (D4a, D13).
+**Owner (2026-10-20)** marks later owner decisions: the local override layer (D4),
+one variable set and one working directory for each run (D4a, D13), and format
+trimming with a virtual package (D15).
 
 ## Goals / Non-Goals
 
@@ -73,6 +74,8 @@ addendum replaces earlier text where they disagree.
 | `config/formats/json5` | `.json` and `.json5` format | all |
 | `config/formats/ion` | Ion text format | all |
 | `config/host` | the request loop: read files; fill a missing variable set or working directory from the process | native, js |
+| `formats` (virtual) | `formats()`: the linked format set; the default implementation links the four format packages (D15) | all |
+| `formats/toml` | an implementation of `formats` with TOML only (D15) | all |
 
 **Call (R1)**: `config/host` is the one configuration adapter package, with one
 file for each target. Conventions has no host package of its own. The adapter
@@ -81,7 +84,9 @@ and for conventions discovery. wasm and wasm-gc have no adapter. They take an
 injected `FileTree` (D13).
 
 Each format package depends on `@config`. `@config` depends on no format package.
-An application imports only the formats it uses (Call).
+On the bare path, an application imports and registers only the formats it uses
+(Call). Under the `@lander` entry of `add-host-lifecycle`, the `formats` virtual
+package gives the linked set, and the application trims it with one override (D15).
 
 ### D2. Value tree: `ConfigValue` over `@ion.Ion`
 
@@ -387,7 +392,8 @@ pub(all) struct Format {
 ```
 
 The application registers the formats it uses on the builder with
-`|> @config.format(...)`. The file extension selects the format, compared in
+`|> @config.format(...)`, or the `@lander` entry registers the linked set of the
+`formats` virtual package (D15). The file extension selects the format, compared in
 lowercase.
 
 **Call (R11)**: the builder is the format registry for all changes.
@@ -796,6 +802,66 @@ From morphir-moonbit `config.mbt`:
 Not kept: `TomlValue` as the model, `Document::text/strings/boolean` lookups with
 fallbacks (binding replaces them), and `Invalid(String)`.
 
+### D15. Format trimming with a virtual package (Owner (2026-10-20); verified by probe)
+
+Owner: formats must be trimmable "in a minimal manner". A program that uses only TOML
+must not link the YAML, JSON5 and Ion parsers.
+
+- The virtual package `moonrockz/moon-lander/formats` has
+  `options("virtual": { "has-default": true })` in its `moon.pkg` and a hand-written
+  `pkg.mbti`:
+
+  ```moonbit
+  package "moonrockz/moon-lander/formats"
+
+  import {
+    "moonrockz/moon-lander/config",
+  }
+
+  // Values
+  fn formats() -> Array[@config.Format]
+  ```
+
+- The default implementation imports `config/formats/toml`, `config/formats/yaml`,
+  `config/formats/json5` and `config/formats/ion`, and gives their formats in that
+  order. Call (this change): these four packages cover the five formats, because the
+  JSON5 package gives one format for `.json` and `.json5` (D7). The order sets only
+  the order of candidates in reports (conventions D3).
+- The shipped implementation package `moonrockz/moon-lander/formats/toml` has
+  `options("implement": "moonrockz/moon-lander/formats")` and gives TOML only. For
+  another mix, the application writes a small implementation package of its own.
+- An application trims with one line in its own main `moon.pkg` and no code change:
+
+  ```moonbit
+  options(
+    "is-main": true,
+    overrides: [ "moonrockz/moon-lander/formats/toml" ],
+  )
+  ```
+
+- `@config` does not import `formats`. Only the `@lander` entry of
+  `add-host-lifecycle` imports it. The bare path stays as in D1.
+
+Probe evidence (`moonc v0.10.15`, scratchpad, 2026-10-20). A library package called
+the virtual package. The probe interface gave `Array[String]` with three stand-in
+parsers:
+
+- The default app printed three formats. The trimmed app printed one.
+- Output sizes, default and trimmed: wasm 6018 and 5649 bytes, wasm-gc 2233 and 1982
+  bytes, js 1934 and 1210 bytes, native 284880 and 284400 bytes.
+- Unique marker strings of the unused parsers were absent from all four trimmed
+  outputs.
+- A separate consumer module in a `moon.work` workspace overrode the virtual package
+  of the library module on all four targets.
+
+Not verified:
+
+- An override from a consumer that gets `moonrockz/moon-lander` from mooncakes.io and
+  not from a workspace. A pre-publish task checks it (see Risks).
+- A hand-written `pkg.mbti` that names a type of another package
+  (`@config.Format`). The probe used `Array[String]`. The first task of the story
+  checks it.
+
 ### Decisions made in this change (not in the brief)
 
 1. `SourceSelection[T]` with a type parameter (D4).
@@ -823,6 +889,8 @@ fallbacks (binding replaces them), and `Invalid(String)`.
 18. Synchronous `node:fs` calls in the TypeScript adapter; source in
     `pkgs/lander/adapters/node/`; checked-in generated bundle (D13).
 19. A relative explicit path joins the working directory of the builder (D13).
+20. The default `formats` implementation links the four format packages in the order
+    TOML, YAML, JSON5, Ion (D15).
 
 ## Risks / Trade-offs
 
@@ -848,6 +916,14 @@ fallbacks (binding replaces them), and `Invalid(String)`.
   adapter task is a spike. If it fails, stop and return to the owner.
 - [Windows path forms (drive, UNC, `\`) can leak into reports] → the adapter
   converts at the boundary (O3), and the windows-latest CI leg tests it.
+- [The `formats` override is verified only inside a `moon.work` workspace. A
+  consumer that gets `moonrockz/moon-lander` from mooncakes.io may not be able to
+  override it] → A pre-publish task checks the override from a registry consumer.
+  If it fails, tell the owner before the first publish. The fallback is the bare
+  path: the application registers its formats itself.
+- [A hand-written `pkg.mbti` can drift from the default implementation] → The build
+  checks each implementation against the interface. The CI size and marker
+  check builds both a default app and a trimmed app on all four targets.
 - [Substring redaction hides some safe keys, for example `tokenizer_mode`] →
   this matches Morphir and errs on the safe side.
 

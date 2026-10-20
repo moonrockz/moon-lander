@@ -35,6 +35,12 @@ hard-code the Morphir file layout.
 - Add format parsers, each in its own package: TOML, YAML (with an optional
   Morphir strict profile), JSON (through `moonbitlang/x/json5`), JSON5, and Ion.
   The builder is the format registry that the conventions change reads.
+- Add the virtual package `moonrockz/moon-lander/formats` (Owner, 2026-10-20). Its
+  function `formats()` gives the formats that a program links. The default
+  implementation links all five formats. The implementation package
+  `moonrockz/moon-lander/formats/toml` links TOML only. An application trims its
+  formats with one `overrides` line in its main `moon.pkg` and no code change. The
+  batteries-included `@lander` entry of `add-host-lifecycle` registers this set.
 - Add a pure merge. The Morphir merge rules are the default. A `MergePolicy` can
   select list append or list merge-by-key for a source or a key path. A null
   overlay value does not change the base value.
@@ -86,7 +92,7 @@ hard-code the Morphir file layout.
 ### New Capabilities
 
 - `configuration-core`: the configuration value tree, key paths, typed sources,
-  format parsers, merge rules and policies, secret references, provenance,
+  format parsers, the linked format set and its trimming, merge rules and policies, secret references, provenance,
   source reports, typed errors, and the pure helpers for get, show, and path.
 
 ### Modified Capabilities
@@ -97,7 +103,8 @@ None.
 
 - New packages in module `moonrockz/moon-lander` (`pkgs/lander`):
   `config` (`@config`), `config/formats/toml`, `config/formats/yaml`,
-  `config/formats/json5`, `config/formats/ion`, and `config/host` (native and js).
+  `config/formats/json5`, `config/formats/ion`, `config/host` (native and js), the
+  virtual package `formats` with a hand-written `pkg.mbti`, and `formats/toml`.
 - New dependencies of `pkgs/lander`: `moonrockz/ion@0.6.0`,
   `moonbit-community/toml@0.5.0`, `moonbit-community/yaml@0.0.8` (these are
   already in the workspace through `pkgs/notebooks`), `moonbitlang/x` for

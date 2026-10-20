@@ -6,7 +6,8 @@ Do group 1 first. It is a feasibility spike for the native signal stub. If any t
 group 1 fails, use the owner's fallback: write the stub in C as a normal `native-stub`. Groups 2 to 4, 10 and 13 need only the core tracer bullet. Group 5 also needs core
 group 14, which declares the `Decode` case and `BindFailure`. Groups 6 to 9 and 14 start
 after the `add-configuration-conventions` and `add-configuration-binding` integration
-checks. The bead dependencies record this order. Run `mise run check`
+checks. Group 16 starts after groups 6 to 13 and core group 18 (the `formats` virtual
+package). The bead dependencies record this order. Run `mise run check`
 after each group. Run `mise run format` before each commit. The windows-latest CI leg
 and the bun pin come from `add-configuration-core`.
 
@@ -82,7 +83,7 @@ Bead: lander-4us.5.7
 - [ ] 7.2 Compose the core environment-variable source at priority 600 with reserved `<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and `@hosting.reserve_env` names; verify that reserved names do not become keys and the source report shows 600
 - [ ] 7.3 Add `@hosting.env_vars(vars)`, which replaces the variable set of the run, and `@hosting.skip_env_source()`, which skips only the `<PREFIX>_*` source (design D12); verify the "A later env_vars step replaces the set" scenario and a skipped source report on all four targets
 - [ ] 7.4 Add `@hosting.app_dirs()`, which gives the application name and the prefix to `@conventions.app_dirs`; verify `$<PREFIX>_HOME` and the variable source use one prefix
-- [ ] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
+- [ ] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli` and `@hosting.builder`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
 - [ ] 7.6 Add the trait `IntoEnvVars` with implementations for `Map[String, String]` and `Json` and the JSON rules of design D14; verify the "Map literal", "JSON fixture", "Mixed values", "Null value" and "Root that is not an object" scenarios on all four targets
 
 ## 8. Host environment
@@ -151,8 +152,21 @@ Bead: lander-4us.5.14
 
 Bead: lander-4us.5.15
 
-- [ ] 15.1 Add an acceptance test in `tests/` that builds a Morphir-like host (conventions preset, prefix `MORPHIR`, reserved `MORPHIR_LOG_DIR`, standard flags, telemetry `stopping` flush, argparse overrides) and verify exit codes 0, 1, 2 and 130 and one flush per run
+- [ ] 15.1 Add an acceptance test in `tests/` that builds a Morphir-like host on the bare `@hosting.builder` (conventions preset, prefix `MORPHIR`, reserved `MORPHIR_LOG_DIR`, standard flags, telemetry `stopping` flush, argparse overrides) and verify exit codes 0, 1, 2 and 130 and one flush per run
 - [ ] 15.2 Run `mise run check` and `mise run test:native-zig`; verify both pass
+
+## 16. Batteries-included @lander defaults
+
+Bead: lander-4us.5.16
+
+- [ ] 16.1 Add the bare entry `@hosting.builder(name, args, env_vars?, working_dir?, environment?)`, and make `@lander.cli` give `HostBuilder[Unit]` with the defaults of design D15 on: the formats from `moonrockz/moon-lander/formats`, `app_dirs(name, prefix~)`, the standard flags and environment-file discovery; verify the "Smallest program" and "Bare builder" scenarios and the two "Environment files under the batteries entry" scenarios
+- [ ] 16.2 Add `@lander.formats`, `@lander.conventions`, `@lander.no_standard_flags` and `@lander.no_environments`, add the standard flags to the root argparse command without duplicates, and add the `pub using` re-exports of D15; verify the five "Change or turn off a default" scenarios and that `moon info` lists the re-exports in the `@lander` interface
+- [ ] 16.3 Add `@lander.build(factory)`, which changes `HostBuilder[Unit]` to `HostBuilder[S]` and keeps earlier settings and hosted services; verify the "No build step" and "Build after other steps" scenarios on all four targets
+- [ ] 16.4 Add `@lander.run(command)` as a synchronous function with one file per target group: the console driver on native and js, the embedded driver on wasm and wasm-gc; verify that one `fn main` source builds on all four targets and the two "Driver selection by target" scenarios. If the native or js call to the `moonbitlang/async` entry fails, use the fallback in D15 and tell the owner
+- [ ] 16.5 Add the smallest program as a doc test in `pkgs/lander/README.md`, and write every batteries example in the README in the one `@lander` style of D15; verify that `mise run test` compiles the examples
+- [ ] 16.6 Add acceptance tests in `tests/` for "No file present", "Empty file", "One-key partial file" and "Partial user override", with the show and explain helper output and the origin kind `defaults`; verify them on native, js and wasm-gc (with an injected tree)
+- [ ] 16.7 Add the `Program` trait and `run_app(factory)` in `@hosting`, re-export both from `@lander` with `pub using`; verify the "Services record runs as the program" and "Same result as the lambda form" scenarios on all four targets
+- [ ] 16.8 Run `mise run check` and `mise run test:native-zig`; verify both pass
 
 ## Workflow follow-up
 

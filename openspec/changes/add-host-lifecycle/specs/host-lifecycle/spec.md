@@ -45,10 +45,11 @@ No configuration file read and no hosted-service hook MUST occur before that exi
 
 ### Requirement: Standard flags
 
-The argparse adapter SHALL supply the opt-in standard flags `--environment <name>`,
-`--config <path>`, `--isolated` and `--project <path|name>`. Each flag MUST be global
-to subcommands. The host MUST NOT copy a standard flag value into a configuration
-layer.
+The argparse adapter SHALL supply the standard flags `--environment <name>`,
+`--config <path>`, `--isolated` and `--project <path|name>`. Under `@lander` they MUST
+be on. On the bare `@hosting.builder` the application MUST add each one. Each flag
+MUST be global to subcommands. The host MUST NOT copy a standard flag value into a
+configuration layer.
 
 #### Scenario: Environment flag after a subcommand
 
@@ -91,7 +92,7 @@ error with exit code 2 before any file read.
 
 The host SHALL give a host environment that holds the application name, an optional
 environment name, and the content root. The application name MUST be the name given
-to `@lander.cli` or the builder. The content root MUST be the value the builder sets.
+to `@lander.cli` or `@hosting.builder`. The content root MUST be the value the builder sets.
 Without that value, it MUST be the working directory of the run. The content root MUST
 use `/` as the separator on every platform.
 
@@ -151,7 +152,8 @@ name as an input.
 
 ### Requirement: Application name and variable prefix
 
-The application name SHALL be given one time, in `@lander.cli(name, args)`. The
+The application name SHALL be given one time, in `@lander.cli(name, args)` or
+`@hosting.builder(name, args)`. The
 variable prefix MUST default to the application name in upper case, with `-` changed
 to `_`. `@hosting.env_prefix` MUST change the prefix. The host MUST give the name and
 the prefix to the conventions parts.
@@ -187,8 +189,8 @@ the source.
 
 ### Requirement: Host starting settings
 
-`@lander.cli` SHALL accept the optional labelled arguments `env_vars`, `working_dir`
-and `environment`. On native and js, an omitted `env_vars` or `working_dir` MUST come
+`@lander.cli` and `@hosting.builder` SHALL accept the optional labelled arguments
+`env_vars`, `working_dir` and `environment`. On native and js, an omitted `env_vars` or `working_dir` MUST come
 from the process. On wasm and wasm-gc, an omitted `env_vars` MUST be the empty set and
 an omitted `working_dir` MUST be `/`. When both are given, the host MUST NOT read the
 process environment or the process working directory.
@@ -619,3 +621,153 @@ another value type.
 
 - **WHEN** the count flag `-v` maps to `log.verbosity`, and the arguments contain `-vvv`
 - **THEN** the configuration holds the integer 3 at `log.verbosity`
+
+### Requirement: Batteries-included entry
+
+`@lander.cli` SHALL start a builder with these defaults on: the formats of the
+`formats` virtual package, the `app_dirs` convention set with the host name and
+prefix, the standard flags, and environment-file discovery. `@hosting.builder` SHALL
+start a bare builder with none of them on. Both MUST compose the environment-variable
+source and MUST use a 30-second shutdown timeout.
+
+#### Scenario: Smallest program
+
+- **WHEN** a native program is `@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })`, it starts in `/w`, `/w/acme.toml` sets `log.format = "text"`, and the arguments are `--environment Staging`
+- **THEN** the run accepts the flag, the environment name is `Some("Staging")`, the configuration holds `log.format = "text"`, and the exit code is 0
+
+#### Scenario: Bare builder
+
+- **WHEN** a program starts with `@hosting.builder("acme", ["--environment", "Staging"])` and has no `command` step
+- **THEN** the run ends with a usage error and exit code 2, and no configuration file is read
+
+### Requirement: Change or turn off a default
+
+Each `@lander` default SHALL have one step that changes it or turns it off.
+`@lander.formats(names)` MUST keep only the named formats of the linked set.
+`@lander.conventions(f)` MUST use the set that `f` gives for the default set.
+`@lander.no_standard_flags()` MUST remove the standard flags.
+`@lander.no_environments()` MUST turn environment-file discovery off.
+
+#### Scenario: Narrow the formats
+
+- **WHEN** the pipeline contains `@lander.formats(["toml"])`, and `/w` holds only `acme.yaml`
+- **THEN** discovery searches only `.toml` candidates, the project source reports `not-found`, and the configuration holds no value from `acme.yaml`
+
+#### Scenario: Unknown format name
+
+- **WHEN** the pipeline contains `@lander.formats(["xml"])`, and the linked set has no format named `xml`
+- **THEN** the run ends before any file read with exit code 1, and standard error names `xml` and the linked format names
+
+#### Scenario: No standard flags
+
+- **WHEN** the pipeline contains `@lander.no_standard_flags()`, and the arguments are `--environment Staging`
+- **THEN** the run ends with a usage error and exit code 2
+
+#### Scenario: No environments
+
+- **WHEN** the pipeline contains `@lander.no_environments()`, the variable set holds `ACME_ENVIRONMENT=Staging`, and `acme.Staging.toml` sits next to `acme.toml`
+- **THEN** no environment-file source exists, and the environment name is `Some("Staging")`
+
+#### Scenario: Replace the convention set
+
+- **WHEN** the pipeline contains `@lander.conventions(fn(_) { @conventions.base("acme") })`, and `/etc/acme/acme.toml` exists
+- **THEN** no source loads `/etc/acme/acme.toml`
+
+### Requirement: Environment files under the batteries entry
+
+Under `@lander`, environment-file discovery SHALL be on with no default name.
+Environment files MUST load only when the run has an environment name. The bare
+`@hosting.builder` and the Morphir preset MUST keep environment files off until the
+application enables them.
+
+#### Scenario: No name gives no environment file
+
+- **WHEN** an application uses `@lander.cli` with no `--environment` flag, no `ACME_ENVIRONMENT` variable and no default, and `acme.Staging.toml` sits next to `acme.toml`
+- **THEN** no environment-file source loads, and the environment name is `None`
+
+#### Scenario: Variable selects the environment file
+
+- **WHEN** an application uses `@lander.cli`, the variable set holds `ACME_ENVIRONMENT=Staging`, and `acme.Staging.toml` sits next to `acme.toml`
+- **THEN** the configuration contains the layer from `acme.Staging.toml`
+
+### Requirement: Services default to Unit
+
+Under `@lander`, when the application does not call `@lander.build`, the services
+record SHALL be `Unit`. `@lander.build(factory)` MUST set the services record type
+`S` and MUST keep every earlier setting and hosted service.
+
+#### Scenario: No build step
+
+- **WHEN** an application uses `@lander.cli` and `@lander.run` with no `@lander.build` step
+- **THEN** the program compiles, and the command gets `ctx.services` as `()`
+
+#### Scenario: Build after other steps
+
+- **WHEN** the pipeline contains `@lander.shutdown_timeout(5_000)` and then `@lander.build(factory)`
+- **THEN** the factory runs one time, the command gets the `S` that it gives, and the shutdown timeout is 5000 ms
+
+### Requirement: Driver selection by target
+
+`@lander.run(command)` SHALL build the host and run it with the console driver on
+native and js, and with the embedded driver on wasm and wasm-gc. One program source
+MUST build on all four targets. `@hosting.run` MUST stay available for tests and
+MUST NOT end the process.
+
+#### Scenario: Console driver on native
+
+- **WHEN** a native program uses `@lander.run`, and the process gets SIGINT during the command
+- **THEN** every started service gets its stop hooks, and the exit code is 130
+
+#### Scenario: Embedded driver on wasm-gc
+
+- **WHEN** the same program source builds for wasm-gc, and its command calls `stop_application()` and returns
+- **THEN** the build passes, the stop phase runs, and the run ends with exit code 0
+
+### Requirement: Program trait and run_app
+
+The host SHALL give a `Program` trait with one method,
+`async run(Self, Context[Self]) -> Unit raise`. `run_app(factory)` SHALL build the
+services record with the factory and run its `Program` implementation with the same
+driver selection as `run`. The lambda form `run(command)` MUST stay available.
+
+#### Scenario: Services record runs as the program
+
+- **WHEN** an application defines `App` with an implementation of `Program` and calls `@lander.run_app(App::new)`
+- **THEN** the host builds `App` with the factory, calls its `run` with a context whose services are that `App`, and runs the stop phase after it
+
+#### Scenario: Same result as the lambda form
+
+- **WHEN** one program uses `run_app(App::new)` and another uses `build(App::new)` and `run(fn(ctx) { ctx.services.run(ctx) })` with the same inputs
+- **THEN** both give the same hook order, output and exit code
+
+### Requirement: No configuration file is required
+
+An application under `@lander` SHALL run when no configuration file exists. Each
+discovered location MUST report `not-found`. Each option MUST take its default from
+the defaults source or from `bind_or`. An empty configuration file MUST be valid and
+MUST add no value. The show helper MUST give the effective values.
+
+#### Scenario: No file present
+
+- **WHEN** the defaults source sets `log.format = "text"`, and no configuration file exists at any discovered location
+- **THEN** the exit code is 0, each file source reports `not-found`, the show helper output holds `log.format = "text"`, and the explain helper gives it the origin kind `defaults`
+
+#### Scenario: Empty file
+
+- **WHEN** `acme.toml` exists and is empty, and the defaults source sets `log.format = "text"`
+- **THEN** the project source reports `loaded`, and the configuration holds `log.format = "text"` with the origin kind `defaults`
+
+### Requirement: A partial file changes only its keys
+
+A configuration file at any position in the source list SHALL set only the keys
+that it holds. Every other key MUST keep the value of a lower source or its default.
+
+#### Scenario: One-key partial file
+
+- **WHEN** the defaults source sets `log.format = "text"` and `log.level = "info"`, and `acme.toml` holds only `log.level = "debug"`
+- **THEN** the configuration holds `log.level = "debug"` from `acme.toml` and `log.format = "text"` with the origin kind `defaults`
+
+#### Scenario: Partial user override
+
+- **WHEN** `acme.toml` sets `log.format = "text"` and `log.level = "info"`, and `acme.user.toml` holds only `log.level = "debug"`
+- **THEN** the configuration holds `log.level = "debug"` and `log.format = "text"`

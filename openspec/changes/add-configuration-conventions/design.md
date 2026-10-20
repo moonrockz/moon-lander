@@ -111,6 +111,11 @@ A sketch only (not compiled). Hosting builds this pipeline for an application (D
   hosting uses (Call (this change)).
 - Call (this change): `display` defaults to the name. The Morphir preset gives
   `Morphir`.
+- Owner (2026-10-20): under the batteries-included `@lander` entry of
+  `add-host-lifecycle`, `app_dirs(name, prefix~)` with the host name and prefix is on
+  by default. `|> @lander.conventions(fn(c) { ... })` changes or replaces it. The bare
+  `@hosting.builder` and the Morphir preset add their convention set explicitly
+  (host-lifecycle D15).
 - Call (this change): `app_dirs` is the standard set, and `base` with single parts gives
   full control. Alternative: one fixed `standard(app)` function with no way to remove a
   part. Rejected because each application needs to drop or add parts.
@@ -267,6 +272,10 @@ have no provenance.
 - Environments are opt-in for each application. `|> @conventions.environments()`
   enables them. `|> @hosting.default_environment(name)` sets a default and also
   enables them (Call (R8)). The Morphir preset leaves them off.
+- Owner (2026-10-20): the batteries-included `@lander` entry of `add-host-lifecycle`
+  enables environments with no default, so environment files load only when the run
+  has a name. `|> @lander.no_environments()` turns them off. Conventions itself keeps
+  environments off until a caller enables them.
 - The name is `Option[String]` with no default. The sources, from high to low: the
   name in `DiscoveryOptions` (hosting fills it from `--environment`),
   `<PREFIX>_ENVIRONMENT` from the variable set of the run, the default from
@@ -284,7 +293,8 @@ have no provenance.
   }
   ```
 
-  Call: hosting fills `project` from its opt-in `--project <path|name>` flag. An
+  Call: hosting fills `project` from its `--project <path|name>` flag (on under
+  `@lander`, opt-in on the bare `@hosting.builder`). An
   application without hosting sets the field itself. All fields default to "not given".
 - Call (R3): an empty `--environment` value is a hosting `UsageError`. Conventions
   raises no usage error.

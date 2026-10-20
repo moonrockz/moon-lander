@@ -6,13 +6,17 @@ this change adds. The owner can change a Call without a change to the Owner deci
 Items O1 to O3 and R1 to R12 come from the reconciliation addendum of 2026-10-20.
 They replace earlier text where the two disagree. "Owner (2026-10-20)" marks the
 later owner decisions on host starting settings (D13), the `IntoEnvVars` input (D14),
-and the local override layer of `configuration-conventions`.
+the local override layer of `configuration-conventions`, and the batteries-included
+`@lander` entry (D15).
 
 ## Context
 
 See proposal.md (Why). This section gives only the facts that shape the design.
 
 - Moon-Lander has no host today. `pkgs/lander` exports only `version()`.
+- Owner (2026-10-20): "lean on minimal config and sane defaults". The root package
+  `@lander` is the batteries-included entry. `@hosting.builder` is the bare entry
+  (D15).
 - This change depends on `add-configuration-core` (`ConfigBuilder`, sources, the
   overrides source, `FileTree`, `LoadStep`, `@config.load`, `@config/host.load`,
   `Config`, `ConfigError`), `add-configuration-conventions` (`@conventions.add`,
@@ -132,9 +136,12 @@ pub struct Context[S] {
 loads the configuration, builds `S`, and runs the phases. So the same `Host[S]` value
 works with each driver.
 
+This example is the bare path (D15). Morphir uses `@hosting.builder`, so it turns on
+each part itself and reproduces Morphir exactly. The batteries path is in D15.
+
 ```moonbit
 async fn main {
-  @lander.cli("morphir", @env.args())
+  @hosting.builder("morphir", @env.args())
   |> @hosting_argparse.command(fn(name) {
     @argparse.Command(name,
       options=[
@@ -155,6 +162,7 @@ async fn main {
   ])
   |> @hosting.configure(fn(sources) {
     sources
+    |> @config.format(@toml.format())   // the bare builder registers no format
     |> @config.defaults(Defaults::default())
   })
   |> @hosting.app_dirs()   // = @conventions.add(@conventions.app_dirs(name, prefix~)) with host values
@@ -179,17 +187,19 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
 }
 ```
 
-- Call (R8): the application name occurs one time, in `@lander.cli(name, args)`.
-  `@lander.cli` calls `@hosting.builder`. The argparse command gets the name through
-  the `fn(name)` argument.
+- Call (R8): the application name occurs one time, in `@lander.cli(name, args)` or
+  `@hosting.builder(name, args)`. `@lander.cli` calls `@hosting.builder` and then
+  turns on the defaults of D15. The argparse command gets the name through the
+  `fn(name)` argument.
 - Call (R8): the variable prefix defaults to the application name in upper case, with
   `-` changed to `_`. `|> @hosting.env_prefix("...")` changes it.
 - Call (R8): the host composes the environment-variable source itself (D12). The
   application does not add `@config.env`.
 - Call (R1, R8): `@conventions.app_dirs(name, prefix?, display?)` keeps a required name,
-  so it works without a host. Inside a host, `|> @hosting.app_dirs()` adds
+  so it works without a host. On the bare builder, `|> @hosting.app_dirs()` adds
   `@conventions.add(@conventions.app_dirs(name, prefix~))` with the name from
-  `@lander.cli` and the host prefix. The application gives the name one time.
+  `@hosting.builder` and the host prefix. Under `@lander`, this set is on by default
+  (D15). The application gives the name one time.
 - Call (this change): `@hosting.configure(fn(sources) { ... })` takes the
   `ConfigBuilder` pipeline of `configuration-core`. If core gives a builder trait,
   `HostBuilder[S]` implements it, and the direct form `|> @config.defaults(...)` also
@@ -197,8 +207,8 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
 - Call (R1): on wasm and wasm-gc, the application gives the file snapshot with
   `|> @hosting.files(tree)`. On native and js, the host reads files itself.
 - Owner (2026-10-20): the variable set and the working directory of the run are
-  host starting settings (D13). The application gives them to `@lander.cli` or with
-  later steps. Each omitted value comes from the process on native and js.
+  host starting settings (D13). The application gives them to `@lander.cli` or
+  `@hosting.builder`, or with later steps. Each omitted value comes from the process on native and js.
 
 ### D3. Run order (Owner: .NET model; Call (R7): argparse runs first)
 
@@ -446,6 +456,10 @@ pub fn HostEnvironment::is_production(self : HostEnvironment) -> Bool
 - Call (R8): `|> @hosting.default_environment("Production")` sets the default and
   also enables environment files. `|> @conventions.environments()` enables the files
   without a default.
+- Owner (2026-10-20): under `@lander`, environment-file discovery is on with no
+  default name, so files load only when the run has a name. `|> @lander.no_environments()`
+  turns it off. The bare `@hosting.builder` and the Morphir preset keep environment
+  files off (D15).
 - Call (this change): the `is_*` checks compare without case, as .NET does. With no
   name, all give `false`. File matches stay exact (conventions).
 - Call (this change): the content root is the builder value, else the working
@@ -465,8 +479,15 @@ pub fn map(option : String, key : String, parse? : (String) -> @config.ConfigVal
 pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @config.ConfigSource
 ```
 
-- Call (R7): the standard flags are opt-in. The application adds each one to its
-  argparse command. The host knows them by their ids.
+- Call (R7): on the bare `@hosting.builder`, the standard flags are opt-in. The
+  application adds each one to its argparse command. The host knows them by their
+  ids.
+- Owner (2026-10-20): under `@lander`, the standard flags are on.
+  `|> @lander.no_standard_flags()` turns them off (D15).
+- Call (this change): when the standard flags are on, the host adds the four flags
+  to the root argparse command: the command from the `command` step, or the empty
+  command named after the application. The host does not add a flag that the
+  application already added with the same id.
 - Call (R7): the host fills the conventions `DiscoveryOptions` from the flags. A flag
   that is not given leaves its field at "not given".
   - `--environment <name>` sets `environment` and the host environment name (D3).
@@ -502,10 +523,14 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 | `moonrockz/moon-lander/hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
 | `moonrockz/moon-lander/hosting/console` | native, js | Zig signal stub and native driver; js driver over the TypeScript adapter; process exit |
 | `moonrockz/moon-lander/hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
-| `moonrockz/moon-lander` (`@lander`) | all | `cli` shortcut with the starting settings |
+| `moonrockz/moon-lander` (`@lander`) | all | Batteries-included entry (D15): `cli` with the starting settings, the default steps (`formats`, `conventions`, `no_standard_flags`, `no_environments`, `build`, `run`) and `pub using` re-exports of `@hosting` steps |
 
 - `hosting` imports `config`, `config/conventions`, `config/host` (native and js) and
   `moonbitlang/core/argparse` (for `Context[S].args`).
+- `@lander` imports `hosting`, `hosting/argparse`, `hosting/console` (native and js),
+  `config/conventions` and the virtual package `moonrockz/moon-lander/formats` of
+  `add-configuration-core`. `hosting` does not import `formats`, so the bare path
+  links no format that the application does not register.
 - Call (O1): AGENTS.md gets a narrow exception: the native signal handlers in
   `hosting/console` use a Zig stub. All other process and filesystem work stays with
   `moonbitlang/async`. A task in this change makes that edit. The TypeScript exception
@@ -522,7 +547,7 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   `<PREFIX>_ENVIRONMENT` and the conventions directory resolution read the same set.
 - Call (this change): one API for the variable set. It keeps the three earlier
   selections:
-  - `Process`: no step. The set is the one from `@lander.cli`, which is the process
+  - `Process`: no step. The set is the one from `@lander.cli` or `@hosting.builder`, which is the process
     variables on native and js when `env_vars` is omitted, and empty on wasm.
   - `Explicit(vars)`: `|> @hosting.env_vars(vars)` with `vars : &IntoEnvVars`. It
     replaces the set for every reader, not only for this source.
@@ -534,13 +559,23 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 ### D13. Host starting settings (Owner (2026-10-20): like .NET `HostApplicationBuilderSettings`)
 
 ```moonbit
-pub fn[S] cli(
+// @lander: the batteries-included entry (D15)
+pub fn cli(
   name : String,
   args : Array[String],
   env_vars? : &@hosting.IntoEnvVars,
   working_dir? : String,
   environment? : String,
-) -> @hosting.HostBuilder[S]
+) -> @hosting.HostBuilder[Unit]
+
+// @hosting: the bare entry, with the same starting settings
+pub fn[S] builder(
+  name : String,
+  args : Array[String],
+  env_vars? : &IntoEnvVars,
+  working_dir? : String,
+  environment? : String,
+) -> HostBuilder[S]
 
 pub fn[S] env_vars(self : HostBuilder[S], vars : &IntoEnvVars) -> HostBuilder[S]
 pub fn[S] working_dir(self : HostBuilder[S], path : String) -> HostBuilder[S]
@@ -610,12 +645,149 @@ JSON rules (Call):
 - A nested object is not flattened into `__` names.
 - Keys stay exactly as written.
 
+### D15. Batteries-included `@lander` entry (Owner (2026-10-20); Call (this change): API shape)
+
+Owner: "lean on minimal config and sane defaults". There are two entry layers:
+
+- `@lander.cli(name, args, env_vars?, working_dir?, environment?)` in the root package
+  `moonrockz/moon-lander` (`pkgs/lander`) is batteries-included. It turns on the
+  defaults below. Each default can be turned off or changed.
+- `@hosting.builder(name, args, env_vars?, working_dir?, environment?)` is bare, like
+  .NET `Host.CreateEmptyApplicationBuilder`. It turns on no default of the table. The
+  Morphir preset builds on it, so it reproduces Morphir exactly (D2).
+
+| Default | `@lander.cli` | Change or turn off | `@hosting.builder` |
+| --- | --- | --- | --- |
+| Formats | The set from the `formats` virtual package of `add-configuration-core` (default: TOML, YAML, JSON through JSON5, JSON5, Ion) | `\|> @lander.formats(["toml", "yaml"])` | None. The application registers formats. |
+| Conventions | `app_dirs(name, prefix~)`: system, XDG, application home, three layouts, local and user overrides, walk-up | `\|> @lander.conventions(fn(c) { ... })` | None. `\|> @hosting.app_dirs()` adds them. |
+| Standard flags | `--config`, `--environment`, `--isolated`, `--project` on | `\|> @lander.no_standard_flags()` | Opt-in (D10) |
+| Environment files | Discovery on. Files load only when the run has an environment name. | `\|> @lander.no_environments()` | Off |
+| Variables source | `<PREFIX>_*` at 600; `<PREFIX>_HOME` and `<PREFIX>_ENVIRONMENT` reserved | `\|> @lander.env_prefix(...)`, `\|> @lander.skip_env_source()` | Same (D12) |
+| Services | `S = Unit` when the application does not call `build` | `\|> @lander.build(factory)` | `\|> @hosting.build(factory)` gives `Host[S]` |
+| Driver | Console driver on native and js, embedded driver on wasm and wasm-gc | `\|> @lander.run(command)` | The application selects a driver |
+| Shutdown timeout | 30 s, as in .NET | `\|> @lander.shutdown_timeout(ms)` | Same (D6) |
+
+The smallest program:
+
+```moonbit
+fn main {
+  @lander.cli("acme", @env.args())
+  |> @lander.run(fn(ctx) { ... })
+}
+```
+
+A larger program in the one batteries style. It uses only `@lander` steps:
+
+```moonbit
+fn main {
+  @lander.cli("acme", @env.args())
+  |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
+  |> @lander.build(fn(b) { App::new(b.config) })
+  |> @lander.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @lander.shutdown_timeout(5_000)
+  |> @lander.run(fn(ctx) { acme_command(ctx) })
+}
+```
+
+- Owner: the defaults in the table. This supersedes, for the `@lander` entry only, the
+  earlier calls "standard flags are opt-in" (D10, R7) and "environments are opt-in"
+  (D9, conventions D10). The bare builder and the Morphir preset keep both off.
+- Call (this change): a `@lander` step that has the same behavior as a `@hosting`
+  step is an alias: a `pub using` re-export, so one function has one document. The
+  re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
+  `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
+  `error_report` and `shutdown_timeout` from `@hosting`, and `command` and `map` from
+  `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
+  `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.
+  So a batteries application writes only `@lander` steps. Probe (`moonc v0.10.15`,
+  scratchpad, 2026-10-20): `pub using @hosting {shutdown_timeout}` re-exported a
+  generic top-level function on wasm, wasm-gc, js and native, and `moon info` listed
+  it in the `@lander` interface. `fnalias` no longer parses.
+- Call (this change): `@lander.cli` gives `HostBuilder[Unit]`. `@lander.build(factory)`
+  gives `HostBuilder[S]` and keeps every earlier setting. A hosted service that the
+  application registered before `build` keeps its place in the order and gets a
+  context whose `services` value is `()`. The same probe showed that a step that
+  changes the type parameter compiles on all four targets. `@hosting.build` keeps its
+  shape: it gives `Host[S]` for the bare path.
+- Call (this change): `@lander.formats(names)` keeps the linked formats whose `name`
+  is in `names`, in linked order. These formats are the builder registry, so
+  discovery searches and explicit files parse only them. A name that the linked set
+  does not hold is a fault in the program: the run ends before any file read with
+  exit code 1, and the report names the unknown name and the linked names.
+- Call (this change): `@lander.conventions(f)` takes
+  `(@conventions.Conventions) -> @conventions.Conventions`. `f` gets the default set
+  `app_dirs(name, prefix~)`, so the name stays in `@lander.cli`. For example,
+  `fn(c) { c |> @conventions.without(...) }` removes one part, and
+  `fn(_) { @conventions.base("acme") |> ... }` replaces the set.
+- Call (this change): `@lander.run(command)` uses one file per target group. On native
+  and js it builds the host and runs `@hosting_console.run`. On wasm and wasm-gc it runs
+  `@hosting.run_embedded`. It is a synchronous function on all four targets, so one
+  `fn main` source builds everywhere: wasm-gc has no `async fn main` (Platform
+  findings). On native and js, it starts the `moonbitlang/async` event loop through
+  the entry that `async fn main` uses (`run_async_main` in 0.22.5). That entry is
+  hidden and marked "do not call directly" (see Risks). `@hosting.run` stays for
+  tests. It returns a `RunOutcome` and does not end the process.
+- Owner: the users of an application need no configuration file. Under `@lander`,
+  a run with no file uses the defaults, and each discovered location reports
+  `not-found`. An empty file is valid. A file at any position in the source list sets
+  only the keys that it holds. Each option has a default, from the defaults source or
+  from `bind_or` (`configuration-binding`).
+- Call (this change): the owner's "origin `default`" is the core report kind name
+  `defaults` (core D4). `@config.show` and `@config.explain` read only the `Config`.
+  A `bind_or` default is not in the `Config`, so they cannot show it. An application
+  that wants `config show` to list a default with its origin puts it in the defaults
+  source with `@lander.configure`.
+
+### D16. Program trait and `run_app` (Owner (2026-10-20): run takes a lambda or an object; Call: shape)
+
+The owner asked that `@lander.run` take an object that implements a trait, as well
+as a lambda. A probe with `moonc v0.10.15` on all four targets fixed the shape:
+
+- MoonBit has no generic traits (`trait Command[S]` does not parse), no method type
+  parameters (`run[S](...)` does not parse), no trait implementation for a function
+  type (error 4053), and no function overloading. So one `run` cannot take both
+  forms, and a command trait cannot be generic over `S`.
+- `async` trait methods, `&Trait` objects and `fn[C : Trait]` bounds work.
+- A context typed by the implementer works:
+  `trait Program { async run(Self, Context[Self]) -> Unit raise }`.
+
+Decision (Call): the services record is the program.
+
+```moonbit
+pub(open) trait Program {
+  async run(Self, Context[Self]) -> Unit raise
+}
+
+struct App { logs : TelemetrySession }
+impl @lander.Program for App with run(self, ctx) -> Unit raise {
+  self.logs.info("start")
+  build_all(ctx)                         // ctx.services is this App
+}
+
+// lambda form
+@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })
+
+// object form
+@lander.cli("morphir", @env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
+```
+
+- `run_app(factory)` is `build(factory)` followed by
+  `run(fn(ctx) { ctx.services.run(ctx) })`. Both forms use one engine and the same
+  driver selection.
+- `@hosting` holds the trait and `run_app` for the bare builder. `@lander`
+  re-exports both with `pub using`.
+- An application with subcommands matches on `ctx.args` inside `run`, or keeps
+  one handler object for each subcommand in `S`.
+- Limit: a command object that is separate from `S` cannot be typed against
+  `Context[S]`. Revisit if MoonBit adds generic traits.
+
 ### Mapping from .NET and starbase
 
 | .NET | starbase 0.13.3 | Moon-Lander |
 | --- | --- | --- |
-| `Host.CreateApplicationBuilder(args)` | `App::default()` | `@lander.cli(name, args)` |
-| `HostApplicationBuilderSettings` | (none) | Optional labelled arguments of `@lander.cli` (`env_vars?`, `working_dir?`, `environment?`) |
+| `Host.CreateApplicationBuilder(args)` | `App::default()` | `@lander.cli(name, args)` (defaults on, D15) |
+| `Host.CreateEmptyApplicationBuilder(settings)` | (none) | `@hosting.builder(name, args)` (no defaults, D15) |
+| `HostApplicationBuilderSettings` | (none) | Optional labelled arguments of `@lander.cli` and `@hosting.builder` (`env_vars?`, `working_dir?`, `environment?`) |
 | `builder.Configuration.Add*` | Session loads its own config | `@hosting.configure(...)`, `@hosting_argparse.command(...)` |
 | `builder.Services` (DI) | `AppSession` fields | Services record `S` from `@hosting.build(factory)` |
 | `IHost` | `App` plus session | `Host[S]` |
@@ -625,7 +797,7 @@ JSON rules (Call):
 | `ApplicationStarted`, `ApplicationStopping`, `ApplicationStopped` | (none) | `on_started`, `on_stopping`, `on_stopped` |
 | `StopApplication()` | (none) | `Lifetime::stop_application(exit_code?)` |
 | `stoppingToken` | (none) | `ctx.cancelled()`, `StopToken` and task cancellation |
-| `ConsoleLifetime` | (none); Morphir calls `exit(130)` | `@hosting_console.run` |
+| `ConsoleLifetime` | (none); Morphir calls `exit(130)` | `@hosting_console.run`, or `@lander.run` (D15) |
 | `HostOptions.ShutdownTimeout` (30 s) | (none) | `@hosting.shutdown_timeout(ms)` (30 s) |
 | `IHostEnvironment` | (none) | `HostEnvironment` |
 | Host configuration (`DOTNET_` variables, args) | (none) | argparse first, then `<PREFIX>_ENVIRONMENT` |
@@ -663,6 +835,17 @@ JSON rules (Call):
   inside argparse, not the variable set of the run] → The standard flags have no
   environment source. Document that an application option with one breaks the
   "no process read" rule for explicit runs.
+- [`@lander.run` calls the hidden `moonbitlang/async` entry `run_async_main`, which
+  its source marks "do not call directly"] → Keep the call in the native and js file
+  of `@lander.run`. A task verifies it. Fallback: on native and js, `@lander.run` is
+  `async`, and the program uses `async fn main` there and a per-target main file for
+  wasm and wasm-gc. Tell the owner if the fallback applies.
+- [The `formats` virtual package override is verified only inside a `moon.work`
+  workspace, not from a consumer that gets `moonrockz/moon-lander` from mooncakes.io]
+  → `add-configuration-core` owns the risk and a pre-publish check (core D15).
+- [Defaults on by default can surprise an application that expects nothing] → Each
+  default has one step that turns it off, and the bare `@hosting.builder` turns on
+  nothing.
 - [`moonbitlang/async` is experimental] → Pin an exact version (0.22.5 was read for
   this design). Keep all use in drivers. The engine does not import it.
 

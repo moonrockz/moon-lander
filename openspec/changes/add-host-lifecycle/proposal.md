@@ -19,7 +19,8 @@ supply layered configuration. This change connects that configuration to a lifec
     configuration sources, the services factory, the hosted services, the default
     environment name, the variable prefix and the shutdown timeout.
   - Host starting settings, like .NET `HostApplicationBuilderSettings`:
-    `@lander.cli(name, args, env_vars?, working_dir?, environment?)`. An omitted
+    `@lander.cli(name, args, env_vars?, working_dir?, environment?)` and the bare
+    `@hosting.builder` with the same arguments. An omitted
     variable set or working directory comes from the process on native and js. On
     wasm and wasm-gc, an omitted variable set is empty and an omitted working
     directory is `/`. `|> @hosting.env_vars(vars)` and
@@ -73,12 +74,29 @@ supply layered configuration. This change connects that configuration to a lifec
   spike fails, the work stops and goes back to the owner.
 - Add an embedded driver for wasm and wasm-gc. The lifetime stops through
   `stop_application` or through a stop probe that the embedder supplies.
-- Add the package `moonrockz/moon-lander/hosting/argparse`. It gives the opt-in
-  standard flags `--environment`, `--config`, `--isolated` and `--project`, and maps
+- Add the package `moonrockz/moon-lander/hosting/argparse`. It gives the standard
+  flags `--environment`, `--config`, `--isolated` and `--project` (on under `@lander`,
+  opt-in on the bare `@hosting.builder`), and maps
   them to the environment name and the conventions `DiscoveryOptions`. It turns mapped
   options into the overrides source of the configuration core (priority 700).
-- Add the `@lander.cli(name, args, env_vars?, working_dir?, environment?)` shortcut
-  that starts a `HostBuilder[S]`. The application name occurs only there.
+- Add two entry layers (Owner, 2026-10-20: "lean on minimal config and sane
+  defaults"). The application name occurs only in the entry call.
+  - `@lander.cli(name, args, env_vars?, working_dir?, environment?)` is
+    batteries-included. It turns on these defaults: the formats from the `formats`
+    virtual package of `add-configuration-core` (all five formats unless the
+    application trims them), the `app_dirs` conventions, the standard flags,
+    environment-file discovery (files load only when the run has an environment
+    name), `S = Unit` until `|> @lander.build(factory)`, and a 30-second shutdown
+    timeout. `|> @lander.formats(...)`, `|> @lander.conventions(...)`,
+    `|> @lander.no_standard_flags()`, `|> @lander.no_environments()` and
+    `|> @lander.shutdown_timeout(ms)` change or turn off a default.
+  - `|> @lander.run(command)` selects the console driver on native and js and the
+    embedded driver on wasm and wasm-gc. The smallest program is
+    `@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })`.
+  - `@hosting.builder` is bare: it turns on none of these defaults. The Morphir preset
+    builds on it.
+  - The users of an application need no configuration file. A run with no file uses
+    the defaults. An empty file is valid. A file sets only the keys that it holds.
 - Add a narrow AGENTS.md exception for the Zig signal stub.
 
 ## Capabilities
@@ -89,7 +107,8 @@ supply layered configuration. This change connects that configuration to a lifec
   run order, the host environment, the environment-variable source, standard flags,
   hosted-service start and stop order, lifecycle hooks and events, stop requests and
   cancellation checks, signal handling per platform and target, the shutdown timeout,
-  exit codes, and the argparse adapter.
+  exit codes, the argparse adapter, and the batteries-included `@lander` entry with
+  its defaults.
 
 ### Modified Capabilities
 
@@ -99,7 +118,9 @@ None. This change depends on `configuration-core`, `configuration-conventions` a
 ## Impact
 
 - New packages in the `moonrockz/moon-lander` module: `hosting`, `hosting/console`,
-  `hosting/argparse`. The root package `@lander` gets the `cli` shortcut.
+  `hosting/argparse`. The root package `@lander` gets the batteries-included entry:
+  `cli`, its default steps, `run`, and `pub using` re-exports of `@hosting` steps.
+  `@lander` imports the `formats` virtual package of `add-configuration-core`.
 - New dependencies: `moonbitlang/async` (task groups, cancellation, timeouts),
   `moonbitlang/core/argparse` and `moonbitlang/core/env`. The native build of
   `hosting/console` needs the pinned Zig 0.17.0. The js driver uses the TypeScript

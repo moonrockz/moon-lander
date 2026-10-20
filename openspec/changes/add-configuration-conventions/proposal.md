@@ -43,7 +43,8 @@ behavior with no copied code.
   member layers and inherited layers. The filters use the core `exclude` operation.
 - Add environments in the .NET style. The environment name is optional. Its sources
   are the name from the host, then `<PREFIX>_ENVIRONMENT`, then a default. Environment
-  files sit next to each primary. Each application must opt in. The names `user` and
+  files sit next to each primary. Each application must opt in. The
+  batteries-included `@lander` entry of `add-host-lifecycle` opts in by default. The names `user` and
   `local` are reserved in any letter case, so an override file is never an
   environment file.
 - Take the host inputs as plain values (`DiscoveryOptions`: environment name, explicit

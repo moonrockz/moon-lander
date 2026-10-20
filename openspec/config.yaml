@@ -1,0 +1,47 @@
+schema: spec-driven
+
+context: |
+  Moon-Lander is a MoonBit application framework with no UI. Code must build and
+  test on the wasm, wasm-gc, js and native targets. Process, signal and filesystem
+  I/O stay in host adapters that use moonbitlang/async; domain logic is pure over
+  explicit inputs and immutable public values.
+  finos/morphir-moonbit is the first consumer and will move onto this framework.
+  Beads (bd) tracks implementation work. OpenSpec holds requirements and design.
+  Write all artifacts in ASD-STE100 Simplified Technical English.
+
+rules:
+  tasks:
+    - Group tasks into story-sized units. Each group names its beads issue ID once one exists.
+  proposal:
+    - State what is out of scope.
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

@@ -15,6 +15,9 @@ yamllint = "1.38.0"
 # Git hooks manager; the hooks are in lefthook.yml
 lefthook = "2.1.1"
 
+# Spec-driven change proposals under openspec/; needs Node.js 20.19 or later
+"npm:@fission-ai/openspec" = "1.14.1"
+
 # C compiler used through the external moonrockz/zig-cross tool
 zig = "0.17.0"
 

@@ -36,6 +36,9 @@ Pre-commit checks formatting and compiler warnings. Pre-push runs lint, workspac
 validation, and tests. Local tool overrides belong in
 `.config/mise/config.local.toml`, which is gitignored.
 
+Changes to behavior start as OpenSpec changes and are tracked in beads. See
+[the contributing guide](CONTRIBUTING.md).
+
 ## Tasks
 
 Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
@@ -66,11 +69,14 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   and shared traversal, with runnable usage guides for all four targets.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
+- `openspec/` holds the requirements (`specs/`) and the changes in progress
+  (`changes/`). The hosting and configuration framework is proposed there.
 - `.config/mise/config.toml` pins the tools and declares tasks.
 - `.github/workflows/ci.yml` checks lint, validation, builds, tests, and task scripts.
   The `ci-ok` job is the aggregate check for branch protection.
 
-The application model, host adapters, and CLI remain to be designed. No UI packages
+The application model, host adapters, and CLI are proposed in `openspec/changes/`
+and are not implemented yet. No UI packages
 are included. CI has read-only permissions and no publishing or release workflow.
 
 ## Releases

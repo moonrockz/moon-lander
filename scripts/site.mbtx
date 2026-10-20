@@ -1,9 +1,10 @@
 ///|
 /// Build the docs site of `apps/site` into `_site/`.
 ///
-/// Usage: `mise run build:site [-- --main]`, or `moonx scripts/site.mbtx build [--main]`.
+/// Usage: `mise run build:site [-- --main]` and `mise run check:site`, or
+/// `moonx scripts/site.mbtx build [--main]` and `moonx scripts/site.mbtx check`.
 /// `build` removes `_site/`, then runs the steps in order. It stops at the first step that fails,
-/// prints the name of that step, and exits with a non-zero code.
+/// prints the name of that step, and exits with a non-zero code. `check` checks the built `_site/`.
 /// Run it from the workspace root.
 import {
   "moonbitlang/async@0.22.5",
@@ -15,7 +16,7 @@ import {
 }
 
 ///|
-let usage : String = "Usage: site.mbtx build [--main]"
+let usage : String = "Usage: site.mbtx build [--main] | check"
 
 ///|
 /// The output directory, relative to the workspace root.
@@ -45,6 +46,24 @@ fn build_steps(args : Array[String]) -> Array[Step] raise Failure {
     generate_args.push("--main")
   }
   [{ name: "generate", command: "moon", args: generate_args, }]
+}
+
+///|
+/// The steps of `check`.
+fn check_steps(args : Array[String]) -> Array[Step] raise Failure {
+  if args is [arg, ..] {
+    raise Failure("unknown option `\{arg}`. \{usage}")
+  }
+  [
+    {
+      name: "check",
+      command: "moon",
+      args: [
+        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
+        ".", "--dir", out_dir,
+      ],
+    },
+  ]
 }
 
 ///|
@@ -99,6 +118,20 @@ async fn main {
       }
       println("✅ Built \{out_dir}/")
     }
+    "check" => {
+      let steps = check_steps(rest) catch {
+        Failure(message) => {
+          eprintln("❌ \{message}")
+          @sys.exit(2)
+          return
+        }
+      }
+      let code = run_steps(steps)
+      if code != 0 {
+        @sys.exit(code)
+      }
+      println("✅ Checked \{out_dir}/")
+    }
     _ => {
       eprintln("❌ unknown command `\{command}`. \{usage}")
       @sys.exit(2)
@@ -134,6 +167,26 @@ test "an unknown option fails" {
     _ => ""
   }
   assert_eq(message, "unknown option `--mian`. \{usage}")
+}
+
+///|
+test "check runs the check executable on _site" {
+  assert_eq(check_steps([]), [
+    {
+      name: "check",
+      command: "moon",
+      args: [
+        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
+        ".", "--dir", "_site",
+      ],
+    },
+  ])
+  let message = try check_steps(["--main"]) catch {
+    Failure(message) => message
+  } noraise {
+    _ => ""
+  }
+  assert_eq(message, "unknown option `--main`. \{usage}")
 }
 
 ///|

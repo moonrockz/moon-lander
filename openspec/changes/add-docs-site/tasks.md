@@ -18,7 +18,7 @@ Bead: lander-4us.7.1
 - [x] 1.4 Add a first `scripts/site.mbtx build` that runs `generate` through `moonbitlang/async/process` and exits with a non-zero code on failure, and the mise task `build:site`; verify that `mise run build:site` writes `_site/index.html` and that a failed step gives a non-zero exit code.
 - [x] 1.5 Add `_site/` to `.gitignore`.
 - [x] 1.6 Verify that `mise run lint` checks `apps/site` on `native` and `js` (risk R4); if it does not, extend `scripts/lint-moonbit.mbtx` and its test.
-- [ ] 1.7 Add `.github/workflows/site-build.yml` (build and upload when `pages` is true), `.github/workflows/site.yml` (deploy job with job-level `pages: write` and `id-token: write`), and a `site` job in `ci.yml` that `ci-ok` needs (design D17); verify with `mise run lint:yaml`, a green pull request run, and a deploy from `main` that serves `https://moonrockz.github.io/moon-lander/`. The owner sets the Pages source to "GitHub Actions" before the merge (risk R7).
+- [x] 1.7 Add `.github/workflows/site-build.yml` (build and upload when `pages` is true), `.github/workflows/site.yml` (deploy job with job-level `pages: write` and `id-token: write`), and a `site` job in `ci.yml` that `ci-ok` needs (design D17); verify with `mise run lint:yaml`, a green pull request run, and a deploy from `main` that serves `https://moonrockz.github.io/moon-lander/`. The owner sets the Pages source to "GitHub Actions" before the merge (risk R7).
 
 ## 2. Build script and local preview
 

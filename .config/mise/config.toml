@@ -74,6 +74,15 @@ run = "moonx scripts/site.mbtx build"
 description = "Check the built docs site in _site/"
 run = "moonx scripts/site.mbtx check"
 
+[tasks."test:site"]
+description = "Test the docs site packages and the highlight step"
+run = "moonx scripts/site.mbtx test"
+
+[tasks."dev:site"]
+description = "Build the docs site, serve it at http://127.0.0.1:4173/moon-lander/ and build again on change (args: --port <n>, --no-watch)"
+depends = ["build:site"]
+run = "moonx scripts/serve-site.mbtx"
+
 [tasks.test]
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
 run = "moonx scripts/test.mbtx"

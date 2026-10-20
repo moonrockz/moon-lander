@@ -1,14 +1,18 @@
 ///|
-/// Build the docs site of `apps/site` into `_site/`.
+/// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
 ///
-/// Usage: `mise run build:site [-- --main]` and `mise run check:site`, or
-/// `moonx scripts/site.mbtx build [--main]` and `moonx scripts/site.mbtx check`.
-/// `build` removes `_site/`, then runs the steps in order. It stops at the first step that fails,
-/// prints the name of that step, and exits with a non-zero code. `check` checks the built `_site/`.
+/// Usage: `mise run build:site [-- --main]`, `mise run check:site` and `mise run test:site`, or
+/// `moonx scripts/site.mbtx build [--main]`, `moonx scripts/site.mbtx check` and
+/// `moonx scripts/site.mbtx test`.
+/// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
+/// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
+/// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step.
 /// Run it from the workspace root.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/gzip",
+  "moonbitlang/async@0.22.5/io",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/core/env",
@@ -16,19 +20,54 @@ import {
 }
 
 ///|
-let usage : String = "Usage: site.mbtx build [--main] | check"
+let usage : String = "Usage: site.mbtx build [--main] | check | test"
 
 ///|
 /// The output directory, relative to the workspace root.
 let out_dir : String = "_site"
 
 ///|
-/// One command of a site task.
+/// The islands bundle that `moon build` writes, relative to the workspace root.
+let islands_build : String = "_build/js/release/build/moonrockz/moon-lander-site/islands/islands.js"
+
+///|
+/// The bundled islands in the output directory.
+let islands_bundle : String = "\{out_dir}/assets/islands.js"
+
+///|
+/// The gzip size of the islands bundle that gives a warning (design D13).
+let islands_target : Int32 = 25 * 1024
+
+///|
+/// The gzip size of the islands bundle that fails the build (design D13).
+let islands_limit : Int32 = 27 * 1024
+
+///|
+/// What one step does.
+enum Action {
+  /// Run the command with the arguments.
+  Run(String, Array[String])
+  /// Check the gzip size of the file against the islands budget.
+  GzipBudget(String)
+} derive(Eq, Debug)
+
+///|
+/// One step of a site task.
 struct Step {
   name : String
-  command : String
-  args : Array[String]
+  action : Action
 } derive(Eq, Debug)
+
+///|
+fn run(name : String, command : String, args : Array[String]) -> Step {
+  { name, action: Run(command, args), }
+}
+
+///|
+/// The step that installs the npm packages of `apps/site` from `bun.lock`.
+let install_step : Step = run("install site dependencies", "bun", [
+  "install", "--frozen-lockfile", "--cwd", "apps/site",
+])
 
 ///|
 /// The steps of `build`. `--main` marks a build for the deployed site.
@@ -45,7 +84,26 @@ fn build_steps(args : Array[String]) -> Array[Step] raise Failure {
   if args.contains("--main") {
     generate_args.push("--main")
   }
-  [{ name: "generate", command: "moon", args: generate_args, }]
+  [
+    install_step,
+    run("build islands", "moon", [
+      "build", "--target", "js", "--release", "apps/site/islands",
+    ]),
+    run("bundle islands", "bun", [
+      "build",
+      islands_build,
+      "--minify",
+      "--format",
+      "esm",
+      "--target",
+      "browser",
+      "--outdir",
+      "\{out_dir}/assets",
+    ]),
+    { name: "check islands size", action: GzipBudget(islands_bundle), },
+    run("generate", "moon", generate_args),
+    run("highlight", "bun", ["apps/site/scripts/highlight.ts", out_dir]),
+  ]
 }
 
 ///|
@@ -55,15 +113,154 @@ fn check_steps(args : Array[String]) -> Array[Step] raise Failure {
     raise Failure("unknown option `\{arg}`. \{usage}")
   }
   [
-    {
-      name: "check",
-      command: "moon",
-      args: [
-        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
-        ".", "--dir", out_dir,
-      ],
-    },
+    run("check", "moon", [
+      "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
+      ".", "--dir", out_dir,
+    ]),
   ]
+}
+
+///|
+/// The module name of `apps/site`.
+let site_module : String = "moonrockz/moon-lander-site"
+
+///|
+/// The full names of the site packages that run on native. `packages` holds the directory name and the
+/// `moon.pkg` text of each package below `apps/site`, in order. A package whose `supported_targets` is
+/// `"js"` only, such as `islands`, does not run on native.
+fn native_packages(packages : Array[(String, String)]) -> Array[String] {
+  packages
+  .filter(entry => !entry.1.contains("supported_targets = \"js\""))
+  .map(entry => "\{site_module}/\{entry.0}")
+}
+
+///|
+/// Each package below `apps/site`: the directory name and the `moon.pkg` text.
+async fn site_packages() -> Array[(String, String)] {
+  let found = []
+  for name in @fs.readdir("apps/site", sort=true) {
+    let pkg = "apps/site/\{name}/moon.pkg"
+    if @fs.kind("apps/site/\{name}") is Directory && @fs.exists(pkg) {
+      found.push((name, @fs.read_file(pkg).text()))
+    }
+  }
+  found
+}
+
+///|
+/// The steps of `test` for the native site packages `packages`. The browser test of task 7.2 comes
+/// after the highlight test.
+fn test_steps(
+  args : Array[String],
+  packages : Array[String],
+) -> Array[Step] raise Failure {
+  if args is [arg, ..] {
+    raise Failure("unknown option `\{arg}`. \{usage}")
+  }
+  [
+    install_step,
+    run(
+      "test site packages (native)",
+      "moon",
+      ["test", "--target", "native", "-p", ..packages],
+    ),
+    run("test site model (js)", "moon", [
+      "test", "--target", "js", "-p", "moonrockz/moon-lander-site/model",
+    ]),
+    run("test highlight", "node", [
+      "--test", "apps/site/scripts/highlight.test.ts",
+    ]),
+  ]
+}
+
+///|
+/// The result of the islands size rule.
+enum Budget {
+  Within
+  /// Above the target: the message names the size and the target.
+  Warn(String)
+  /// Above the limit: the message names the size and the limit.
+  Fail(String)
+} derive(Eq, Debug)
+
+///|
+/// Check the gzip size `size` of `file` against the islands budget: a warning above 25 KB, a failure
+/// above 27 KB.
+fn islands_budget(file : String, size : Int32) -> Budget {
+  if size > islands_limit {
+    Fail(
+      "\{file} is \{size} bytes gzip, above the 27 KB limit (\{islands_limit} bytes)",
+    )
+  } else if size > islands_target {
+    Warn(
+      "\{file} is \{size} bytes gzip, above the 25 KB target (\{islands_target} bytes)",
+    )
+  } else {
+    Within
+  }
+}
+
+///|
+/// The size of `data` after gzip compression.
+async fn gzip_size(data : Bytes) -> Int32 {
+  let (r, w) = @io.pipe()
+  @async.with_task_group() <| group => {
+    group.spawn_bg() <| () => {
+      defer w.close()
+      @gzip.Encoder(w)..write(data).end()
+    }
+    defer r.close()
+    r.read_all().binary().length()
+  }
+}
+
+///|
+/// Run one step. Returns 0, or a positive exit code.
+async fn run_step(step : Step) -> Int32 {
+  match step.action {
+    Run(command, args) => {
+      let code = @process.run(
+        command,
+        args,
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      ) catch {
+        error => {
+          eprintln("❌ \{step.name}: \{error}")
+          return 1
+        }
+      }
+      if code > 0 {
+        code
+      } else if code < 0 {
+        1
+      } else {
+        0
+      }
+    }
+    GzipBudget(file) => {
+      let size = gzip_size(@fs.read_file(file).binary()) catch {
+        error => {
+          eprintln("❌ \{step.name}: \{error}")
+          return 1
+        }
+      }
+      match islands_budget(file, size) {
+        Within => {
+          println("\{file} is \{size} bytes gzip")
+          0
+        }
+        Warn(message) => {
+          println("warning: \{message}")
+          0
+        }
+        Fail(message) => {
+          eprintln("error: \{message}")
+          1
+        }
+      }
+    }
+  }
 }
 
 ///|
@@ -72,20 +269,10 @@ fn check_steps(args : Array[String]) -> Array[Step] raise Failure {
 async fn run_steps(steps : Array[Step]) -> Int32 {
   for step in steps {
     println("🔨 \{step.name}")
-    let code = @process.run(
-      step.command,
-      step.args,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    ) catch {
-      error => {
-        eprintln("❌ \{step.name}: \{error}")
-        return 1
-      }
-    }
+    let code = run_step(step)
     if code != 0 {
       eprintln("❌ Step failed: \{step.name}")
-      return if code > 0 { code } else { 1 }
+      return code
     }
   }
   0
@@ -100,63 +287,65 @@ async fn main {
     return
   }
   let rest = rest.to_owned()
-  match command {
-    "build" => {
-      let steps = build_steps(rest) catch {
-        Failure(message) => {
-          eprintln("❌ \{message}")
-          @sys.exit(2)
-          return
-        }
-      }
-      if @fs.exists(out_dir) {
-        @fs.rmdir(out_dir, recursive=true)
-      }
-      let code = run_steps(steps)
-      if code != 0 {
-        @sys.exit(code)
-      }
-      println("✅ Built \{out_dir}/")
+  let (steps, done) = try {
+    match command {
+      "build" => (build_steps(rest), "✅ Built \{out_dir}/")
+      "check" => (check_steps(rest), "✅ Checked \{out_dir}/")
+      "test" =>
+        (
+          test_steps(rest, native_packages(site_packages())),
+          "✅ Site tests passed",
+        )
+      _ => raise Failure("unknown command `\{command}`. \{usage}")
     }
-    "check" => {
-      let steps = check_steps(rest) catch {
-        Failure(message) => {
-          eprintln("❌ \{message}")
-          @sys.exit(2)
-          return
-        }
-      }
-      let code = run_steps(steps)
-      if code != 0 {
-        @sys.exit(code)
-      }
-      println("✅ Checked \{out_dir}/")
-    }
-    _ => {
-      eprintln("❌ unknown command `\{command}`. \{usage}")
+  } catch {
+    Failure(message) => {
+      eprintln("❌ \{message}")
       @sys.exit(2)
+      return
+    }
+    error => {
+      eprintln("❌ \{error}")
+      @sys.exit(1)
+      return
     }
   }
+  if command == "build" && @fs.exists(out_dir) {
+    @fs.rmdir(out_dir, recursive=true)
+  }
+  let code = run_steps(steps)
+  if code != 0 {
+    @sys.exit(code)
+  }
+  println(done)
 }
 
 ///|
-test "build runs generate into _site" {
-  assert_eq(build_steps([]), [
-    {
-      name: "generate",
-      command: "moon",
-      args: [
-        "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
-        ".", "--out", "_site",
-      ],
-    },
+test "build runs the steps of design D6 in order" {
+  assert_eq(build_steps([]).map(step => step.name), [
+    "install site dependencies", "build islands", "bundle islands", "check islands size",
+    "generate", "highlight",
   ])
+  assert_eq(build_steps([])[4], {
+    name: "generate",
+    action: Run("moon", [
+      "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
+      ".", "--out", "_site",
+    ]),
+  })
+  assert_eq(build_steps([])[3].action, GzipBudget("_site/assets/islands.js"))
 }
 
 ///|
 test "--main reaches generate" {
-  let steps = build_steps(["--main"])
-  assert_eq(steps[0].args[steps[0].args.length() - 1], "--main")
+  guard build_steps(["--main"])[4].action is Run(_, args) else {
+    fail("generate is not a command")
+  }
+  assert_eq(args[args.length() - 1], "--main")
+  guard build_steps([])[4].action is Run(_, args) else {
+    fail("generate is not a command")
+  }
+  assert_false(args.contains("--main"))
 }
 
 ///|
@@ -174,11 +363,10 @@ test "check runs the check executable on _site" {
   assert_eq(check_steps([]), [
     {
       name: "check",
-      command: "moon",
-      args: [
+      action: Run("moon", [
         "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
         ".", "--dir", "_site",
-      ],
+      ]),
     },
   ])
   let message = try check_steps(["--main"]) catch {
@@ -190,15 +378,73 @@ test "check runs the check executable on _site" {
 }
 
 ///|
+test "test runs the site package tests and the highlight test" {
+  let steps = test_steps([], ["moonrockz/moon-lander-site/model"])
+  assert_eq(steps.map(step => step.name), [
+    "install site dependencies", "test site packages (native)", "test site model (js)",
+    "test highlight",
+  ])
+  assert_eq(
+    steps[1].action,
+    Run("moon", [
+      "test", "--target", "native", "-p", "moonrockz/moon-lander-site/model",
+    ]),
+  )
+}
+
+///|
+test "js-only packages do not run on native" {
+  assert_eq(
+    native_packages([
+      ("check", "supported_targets = \"native\"\n"),
+      ("islands", "supported_targets = \"js\"\n"),
+      ("model", "import {}\n"),
+    ]),
+    ["moonrockz/moon-lander-site/check", "moonrockz/moon-lander-site/model"],
+  )
+}
+
+///|
+test "the islands budget warns above 25 KB and fails above 27 KB" {
+  assert_eq(islands_budget("a.js", 25 * 1024), Within)
+  assert_eq(
+    islands_budget("a.js", 25 * 1024 + 1),
+    Warn("a.js is 25601 bytes gzip, above the 25 KB target (25600 bytes)"),
+  )
+  assert_eq(
+    islands_budget("a.js", 27 * 1024),
+    Warn("a.js is 27648 bytes gzip, above the 25 KB target (25600 bytes)"),
+  )
+  assert_eq(
+    islands_budget("a.js", 28 * 1024),
+    Fail("a.js is 28672 bytes gzip, above the 27 KB limit (27648 bytes)"),
+  )
+}
+
+///|
+async test "gzip size is the size of the compressed data" {
+  let size = gzip_size(Bytes::make(10000, b'a'))
+  assert_true(size > 18 && size < 1000, msg="size \{size}")
+}
+
+///|
 async test "a failed step stops the build with a non-zero code" {
   let code = run_steps([
-    { name: "fails", command: "moon", args: ["no-such-command"], },
-    { name: "never runs", command: "moon", args: ["version"], },
+    run("fails", "moon", ["no-such-command"]),
+    run("never runs", "moon", ["version"]),
   ])
   assert_true(code != 0)
 }
 
 ///|
+async test "a missing bundle fails the size step" {
+  let code = run_steps([
+    { name: "size", action: GzipBudget("no-such-dir/islands.js"), },
+  ])
+  assert_eq(code, 1)
+}
+
+///|
 async test "steps that pass give 0" {
-  assert_eq(run_steps([{ name: "ok", command: "moon", args: ["version"], }]), 0)
+  assert_eq(run_steps([run("ok", "moon", ["version"])]), 0)
 }

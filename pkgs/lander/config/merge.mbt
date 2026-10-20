@@ -10,8 +10,9 @@ pub fn merge(base : ConfigValue, overlay : ConfigValue) -> ConfigValue {
   }
   let merged = base_fields.copy()
   for field in overlay_fields {
+    // Field names always have text, so names compare by text.
     let name = field.name()
-    match merged.search_by(existing => existing.name() == name) {
+    match merged.search_by(existing => existing.name().text() == name.text()) {
       Some(index) => {
         let value = merge(
           { ion: merged[index].value() },

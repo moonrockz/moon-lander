@@ -103,6 +103,12 @@ the invariants once, so the merge does not check them again:
 `ConfigValue::from_ion` checks the invariants. `ConfigValue::to_ion` gives the
 Ion value. `ConfigValue::from_json` converts `Json` through `@ion.ToIon`.
 
+**Call (this change)**: `from_ion` raises `DuplicateKey` for a repeated field name
+and `Parse` with the format `Ion` for a field name with no text. The key path of a
+field in a list item holds only the struct field names. The `fields` constructor
+does not raise: when a name occurs more than once, the last value wins at the
+position of the first.
+
 Why Ion and not `Json` or `TomlValue`: Ion holds every type of the five formats
 without loss (decimals, timestamps, big integers, symbols, annotations). JSON
 loses big integers and timestamps. `TomlValue` has no null and no decimal.
@@ -120,6 +126,10 @@ reads the dotted text form. `KeyPath::to_string` writes it.
 **Call (this change)**:
 
 - A name with `.` or `"` uses TOML-style double quotes: `servers."eu.west".port`.
+- In a quoted name, `\"` gives `"` and `\\` gives `\`. Other escapes, a missing
+  closing quote, text after a closing quote, and a `"` inside a bare name raise
+  `InvalidKeyPath`. `KeyPath::from_names` builds a key path from names and checks
+  the same rules.
 - Name compare is exact and case-sensitive. The environment source writes
   lowercase names, so environment keys still match lowercase file keys.
 - A key path does not index into lists. Morphir `config get` does not index lists,
@@ -606,7 +616,7 @@ error types. Each case uses labelled fields:
 | `Parse` | format, origin, message, line?, column? | core formats |
 | `UnsupportedYaml` | origin, feature, line, column | core YAML format |
 | `InvalidRoot` | origin, found type | core formats |
-| `DuplicateKey` | origin, key path | core formats |
+| `DuplicateKey` | origin, key path | core formats, `ConfigValue::from_ion` |
 | `FileNotFound` | path | core explicit file |
 | `UnsupportedFormat` | path, registered extensions | core registry |
 | `Ambiguous` | `display~`, `location~`, `candidates~` | core and conventions (R2) |

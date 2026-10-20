@@ -28,9 +28,9 @@ Bead: lander-4us.2.2
 
 Bead: lander-4us.2.3
 
-- [ ] 3.1 Enforce the `ConfigValue` invariants (text field names, unique fields, struct root), keep field order, and add `from_json` and `to_ion`; verify the "Root is not a struct" and "Field order stays" scenarios.
-- [ ] 3.2 Complete `KeyPath`: quoted names, escapes, `to_string` round trip, and `ConfigError::InvalidKeyPath`; verify the key path scenarios and a parse/print round-trip property test.
-- [ ] 3.3 Treat `sexp` as a list and apply the struct annotation rule (design D2); verify with unit tests.
+- [x] 3.1 Enforce the `ConfigValue` invariants (text field names, unique fields, struct root), keep field order, and add `from_json` and `to_ion`; verify the "Root is not a struct" and "Field order stays" scenarios.
+- [x] 3.2 Complete `KeyPath`: quoted names, escapes, `to_string` round trip, and `ConfigError::InvalidKeyPath`; verify the key path scenarios and a parse/print round-trip property test.
+- [x] 3.3 Treat `sexp` as a list and apply the struct annotation rule (design D2); verify with unit tests.
 
 ## 4. Complete merge rules and provenance
 

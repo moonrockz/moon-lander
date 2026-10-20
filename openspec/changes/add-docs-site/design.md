@@ -514,9 +514,14 @@ through `scripts/versions.mbtx`, runs `build:site -- --main --tree <minor>` and
 workflow artifact. A future release workflow calls it and attaches the file to the
 release. This change does not create that workflow or a release (`AGENTS.md`).
 
-Call: `site.mbtx assemble` runs only in the deploy. It lists the releases with
-`gh release list` and selects, for each minor line, the newest release by semantic
-version. It downloads `site-<minor>.tar.gz` from each with `gh release download`
+Call: `site.mbtx assemble` runs only in the deploy. It reads every release with
+`gh api --paginate repos/{owner}/{repo}/releases`, so no page or count limit drops a
+release (a bare `gh release list` returns at most 30 by default). It skips drafts and
+prereleases. It also skips each release whose minor line is below `versions.since` in
+`site.json`, the first minor line that ships site assets. `v0.1.0` exists with no
+site asset, so `versions.since` starts at the first minor line released after this
+change (Call: `0.2`). From the remaining releases it selects, for each minor line, the
+newest release by semantic version. It downloads `site-<minor>.tar.gz` from each with `gh release download`
 and the `GITHUB_TOKEN` with `contents: read`. A selected release without the asset,
 or an archive that does not unpack, fails the deploy with the release tag. Each
 kept minor line is in the site; a later change can limit the count (risk R13).
@@ -528,8 +533,8 @@ root, and changes the tree base path to the new base path in each `.html`, `.xml
 path (D5), so the change is a prefix change. Alternative: redirect pages at the
 root and `/latest/`. Rejected: a canonical link must point to a real page.
 
-Call: before the first release, `assemble` copies the `next` tree to the root and
-writes no `/latest/` tree. Every root page and every `/next/` page then shows the
+Call: before the first release at or above `versions.since`, `assemble` copies the
+`next` tree to the root and writes no `/latest/` tree. Every root page and every `/next/` page then shows the
 banner "Pre-release docs. No version is released yet. These pages show `main`."
 
 Call: banners and canonical links are written by `assemble`, not by the build,

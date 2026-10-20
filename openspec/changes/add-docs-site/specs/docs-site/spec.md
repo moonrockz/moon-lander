@@ -525,12 +525,26 @@ together. It MUST NOT rebuild a release from its tag. A missing or corrupt asset
 MUST fail the deploy with the release tag.
 
 #### Scenario: Missing asset
-- **WHEN** the newest release of a minor line has no `site-<minor>.tar.gz`
+- **WHEN** the newest release of a minor line at or above `versions.since` has no `site-<minor>.tar.gz`
 - **THEN** the deploy fails with a message that names the release tag, and nothing deploys
+
+### Requirement: Release selection
+
+The deploy SHALL read every release through a paginated API call and MUST NOT depend
+on a default result limit. It MUST skip draft releases, prereleases, and releases
+whose minor line is below `versions.since` in `site.json`.
+
+#### Scenario: Release before site assets
+- **WHEN** `versions.since` is `0.2` and the only release is `v0.1.0`, which has no site asset
+- **THEN** the deploy succeeds and the root shows the `main` docs with the pre-release banner
+
+#### Scenario: More than 30 releases
+- **WHEN** the repository has 45 releases and the newest release of the line `0.2` is the 40th newest
+- **THEN** the assembled site has a `/v/0.2/` tree from that release
 
 ### Requirement: Root before the first release
 
-Before the first release with a site asset, the root SHALL show the `main` build,
+Before the first release at or above `versions.since`, the root SHALL show the `main` build,
 and each root and `/next/` page SHALL show the banner "Pre-release docs. No version
 is released yet. These pages show `main`." The site MUST NOT have a `/latest/` tree
 then.

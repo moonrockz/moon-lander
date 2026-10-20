@@ -1,8 +1,9 @@
 import {
   "moonrockz/moon-lander-site/model",
-  "moonrockz/moon-lander-site/views",
+  "moonrockz/moon-lander-site/site",
   "moonbitlang/async",
   "moonbitlang/async/fs",
+  "moonbitlang/async/process",
   "moonbitlang/core/env",
   "moonbitlang/x/sys",
 }

@@ -8,7 +8,6 @@
   "api": ["pkgs/lander", "pkgs/notebooks"],
   "nav": [
     { "group": "Design", "items": ["design/"] },
-    { "group": "Packages", "items": ["packages/"] },
-    { "group": "Contribute", "items": ["WRITING_FOR_THE_SITE.md"] }
+    { "group": "Packages", "items": ["packages/"] }
   ]
 }

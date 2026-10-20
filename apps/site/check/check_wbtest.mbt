@@ -32,11 +32,16 @@ async test "a built site with valid links passes" {
 ///|
 async test "broken internal link" {
   let dir = site_dir("broken", [
-    ("index.html", "<a href=\"/fixture/missing/\">m</a><a href=\"/elsewhere/\">e</a>"),
+    (
+      "index.html", "<a href=\"/fixture/missing/\">m</a><a href=\"/elsewhere/\">e</a><a href=\"/fixture/assets\">a</a><a href=\"/fixture/../index.html\">p</a>",
+    ),
+    ("assets/site.css", ""),
   ])
   assert_eq(check_site("fixtures/content", dir).map(p => p.render()), [
     "index.html: broken internal link `/fixture/missing/`",
-    "index.html: link `/elsewhere/` does not start with the base path `/fixture/`",
+    "index.html: link `/elsewhere/` leaves the base path `/fixture/`",
+    "index.html: broken internal link `/fixture/assets`",
+    "index.html: link `/fixture/../index.html` leaves the base path `/fixture/`",
   ])
 }
 

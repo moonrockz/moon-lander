@@ -15,8 +15,15 @@ async fn html_files(dir : String, prefix~ : String = "") -> Array[String] {
 }
 
 ///|
+/// Whether `path` is a regular file. A directory does not count, because the host does not serve it
+/// without `index.html`.
+async fn is_file(path : String) -> Bool {
+  @fs.exists(path) && @fs.kind(path) is Regular
+}
+
+///|
 /// Check the built site in `dir` against the configuration of the repository at `root`. Returns the
-/// problems: a missing `index.html`, and each internal link that leaves the base path or has no file.
+/// problems: a missing `index.html`, and each internal link that leaves the base path or has no regular file.
 async fn check_site(root : String, dir : String) -> Array[@model.Problem] {
   let config = @model.SiteConfig::parse(
     "site/site.json",
@@ -34,11 +41,11 @@ async fn check_site(root : String, dir : String) -> Array[@model.Problem] {
           problems.push(
             @model.problem(
               page,
-              "link `\{link}` does not start with the base path `\{config.base_path}`",
+              "link `\{link}` leaves the base path `\{config.base_path}`",
             ),
           )
         Some(file) =>
-          if !@fs.exists("\{dir}/\{file}") {
+          if !is_file("\{dir}/\{file}") {
             problems.push(@model.problem(page, "broken internal link `\{link}`"))
           }
       }

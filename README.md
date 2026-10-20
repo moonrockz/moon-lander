@@ -54,8 +54,10 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run lint` | Check YAML, MoonBit formatting, and compiler warnings |
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
-| `mise run build:site` | Build the docs site into `_site/` |
+| `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
+| `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
+| `mise run test:site` | Test the docs site packages and the code highlight step |
 | `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.1.2` |
 | `mise run clean` | Remove build artifacts |
 

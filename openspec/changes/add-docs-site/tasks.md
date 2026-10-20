@@ -24,11 +24,11 @@ Bead: lander-4us.7.1
 
 Bead: lander-4us.7.2
 
-- [ ] 2.1 Complete `scripts/site.mbtx build [--main]` with the steps of design D6 except `moon doc` (Bun install, islands build, Bun bundle, gzip budget, generate, highlight; task 10.1 adds `moon doc`); verify the "Step fails" scenario and that `--main` reaches `generate`.
-- [ ] 2.2 Add `apps/site/package.json` (private, `0.1.0`, `shiki` and `playwright` of design D3), `bun.lock`, and `apps/site/scripts/highlight.ts` ported from the model with `mbt` mapped to `moonbit`; verify the "Known language" and "Unknown language" scenarios with a test of `highlightHtml`.
-- [ ] 2.3 Add `scripts/serve-site.mbtx` with `moonbitlang/async/http`, the path rules of design D6, `--port`, `--no-watch`, and `mtime` polling that runs the build again; add `dev:site`; verify the "Directory request", "Path outside the base" and "Path escape" scenarios with tests of the pure path function.
-- [ ] 2.4 Add `site.mbtx check` and `site.mbtx test` with the tasks `check:site` and `test:site`; add the tests of the pure parts of both scripts to `mise run test:scripts`; verify that `mise run test:scripts` passes.
-- [ ] 2.5 Document the four tasks in the `README.md` task table; verify that each documented command runs as written.
+- [x] 2.1 Complete `scripts/site.mbtx build [--main]` with the steps of design D6 except `moon doc` (Bun install, islands build, Bun bundle, gzip budget, generate, highlight; task 10.1 adds `moon doc`); verify the "Step fails" scenario and that `--main` reaches `generate`.
+- [x] 2.2 Add `apps/site/package.json` (private, `0.1.0`, `shiki` and `playwright` of design D3), `bun.lock`, and `apps/site/scripts/highlight.ts` ported from the model with `mbt` mapped to `moonbit`; verify the "Known language" and "Unknown language" scenarios with a test of `highlightHtml`.
+- [x] 2.3 Add `scripts/serve-site.mbtx` with `moonbitlang/async/http`, the path rules of design D6, `--port`, `--no-watch`, and `mtime` polling that runs the build again; add `dev:site`; verify the "Directory request", "Path outside the base" and "Path escape" scenarios with tests of the pure path function.
+- [x] 2.4 Add `site.mbtx check` and `site.mbtx test` with the tasks `check:site` and `test:site`; add the tests of the pure parts of both scripts to `mise run test:scripts`; verify that `mise run test:scripts` passes.
+- [x] 2.5 Document the four tasks in the `README.md` task table; verify that each documented command runs as written.
 
 ## 3. Content pipeline
 

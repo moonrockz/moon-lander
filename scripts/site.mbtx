@@ -1,0 +1,151 @@
+///|
+/// Build the docs site of `apps/site` into `_site/`.
+///
+/// Usage: `mise run build:site [-- --main]`, or `moonx scripts/site.mbtx build [--main]`.
+/// `build` removes `_site/`, then runs the steps in order. It stops at the first step that fails,
+/// prints the name of that step, and exits with a non-zero code.
+/// Run it from the workspace root.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let usage : String = "Usage: site.mbtx build [--main]"
+
+///|
+/// The output directory, relative to the workspace root.
+let out_dir : String = "_site"
+
+///|
+/// One command of a site task.
+struct Step {
+  name : String
+  command : String
+  args : Array[String]
+} derive(Eq, Debug)
+
+///|
+/// The steps of `build`. `--main` marks a build for the deployed site.
+fn build_steps(args : Array[String]) -> Array[Step] raise Failure {
+  for arg in args {
+    if arg != "--main" {
+      raise Failure("unknown option `\{arg}`. \{usage}")
+    }
+  }
+  let generate_args = [
+    "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
+    ".", "--out", out_dir,
+  ]
+  if args.contains("--main") {
+    generate_args.push("--main")
+  }
+  [{ name: "generate", command: "moon", args: generate_args, }]
+}
+
+///|
+/// Run `steps` in order and stop at the first failure. Returns 0, or the exit code of the failed step
+/// (1 when that code is not positive).
+async fn run_steps(steps : Array[Step]) -> Int32 {
+  for step in steps {
+    println("🔨 \{step.name}")
+    let code = @process.run(
+      step.command,
+      step.args,
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    ) catch {
+      error => {
+        eprintln("❌ \{step.name}: \{error}")
+        return 1
+      }
+    }
+    if code != 0 {
+      eprintln("❌ Step failed: \{step.name}")
+      return if code > 0 { code } else { 1 }
+    }
+  }
+  0
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:]
+  guard args is [command, .. rest] else {
+    eprintln(usage)
+    @sys.exit(2)
+    return
+  }
+  let rest = rest.to_owned()
+  match command {
+    "build" => {
+      let steps = build_steps(rest) catch {
+        Failure(message) => {
+          eprintln("❌ \{message}")
+          @sys.exit(2)
+          return
+        }
+      }
+      if @fs.exists(out_dir) {
+        @fs.rmdir(out_dir, recursive=true)
+      }
+      let code = run_steps(steps)
+      if code != 0 {
+        @sys.exit(code)
+      }
+      println("✅ Built \{out_dir}/")
+    }
+    _ => {
+      eprintln("❌ unknown command `\{command}`. \{usage}")
+      @sys.exit(2)
+    }
+  }
+}
+
+///|
+test "build runs generate into _site" {
+  assert_eq(build_steps([]), [
+    {
+      name: "generate",
+      command: "moon",
+      args: [
+        "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
+        ".", "--out", "_site",
+      ],
+    },
+  ])
+}
+
+///|
+test "--main reaches generate" {
+  let steps = build_steps(["--main"])
+  assert_eq(steps[0].args[steps[0].args.length() - 1], "--main")
+}
+
+///|
+test "an unknown option fails" {
+  let message = try build_steps(["--mian"]) catch {
+    Failure(message) => message
+  } noraise {
+    _ => ""
+  }
+  assert_eq(message, "unknown option `--mian`. \{usage}")
+}
+
+///|
+async test "a failed step stops the build with a non-zero code" {
+  let code = run_steps([
+    { name: "fails", command: "moon", args: ["no-such-command"], },
+    { name: "never runs", command: "moon", args: ["version"], },
+  ])
+  assert_true(code != 0)
+}
+
+///|
+async test "steps that pass give 0" {
+  assert_eq(run_steps([{ name: "ok", command: "moon", args: ["version"], }]), 0)
+}

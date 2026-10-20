@@ -12,12 +12,12 @@ is still open.
 
 Bead: lander-4us.7.1
 
-- [ ] 1.1 Create `apps/site/moon.mod` (`moonrockz/moon-lander-site`, version `0.1.0`, imports of design D3) and the packages `model`, `views` and `generate` with the `supported_targets` of design D2; add `./apps/site` to `moon.work`; verify that `mise run validate` passes and that the resolver selects `moonbitlang/async` `0.22.5` with Rabbita `0.16.5` (risk R1).
-- [ ] 1.2 Add `site/site.json` (design D4) and `SiteConfig::parse` with the `base_path` check and `href`; verify the "Bad base path" and "Links use the base path" scenarios with unit tests on all four targets.
-- [ ] 1.3 Add a minimal Rabbita `layout` and a `generate` executable that writes `_site/index.html` from `site/pages/index.html` and `_site/assets/site.css`; verify the "Route file" scenario with a native test that reads the output.
-- [ ] 1.4 Add a first `scripts/site.mbtx build` that runs `generate` through `moonbitlang/async/process` and exits with a non-zero code on failure, and the mise task `build:site`; verify that `mise run build:site` writes `_site/index.html` and that a failed step gives a non-zero exit code.
-- [ ] 1.5 Add `_site/` to `.gitignore`.
-- [ ] 1.6 Verify that `mise run lint` checks `apps/site` on `native` and `js` (risk R4); if it does not, extend `scripts/lint-moonbit.mbtx` and its test.
+- [x] 1.1 Create `apps/site/moon.mod` (`moonrockz/moon-lander-site`, version `0.1.0`, imports of design D3) and the packages `model`, `views` and `generate` with the `supported_targets` of design D2; add `./apps/site` to `moon.work`; verify that `mise run validate` passes and that the resolver selects `moonbitlang/async` `0.22.5` with Rabbita `0.16.5` (risk R1).
+- [x] 1.2 Add `site/site.json` (design D4) and `SiteConfig::parse` with the `base_path` check and `href`; verify the "Bad base path" and "Links use the base path" scenarios with unit tests on all four targets.
+- [x] 1.3 Add a minimal Rabbita `layout` and a `generate` executable that writes `_site/index.html` from `site/pages/index.html` and `_site/assets/site.css`; verify the "Route file" scenario with a native test that reads the output.
+- [x] 1.4 Add a first `scripts/site.mbtx build` that runs `generate` through `moonbitlang/async/process` and exits with a non-zero code on failure, and the mise task `build:site`; verify that `mise run build:site` writes `_site/index.html` and that a failed step gives a non-zero exit code.
+- [x] 1.5 Add `_site/` to `.gitignore`.
+- [x] 1.6 Verify that `mise run lint` checks `apps/site` on `native` and `js` (risk R4); if it does not, extend `scripts/lint-moonbit.mbtx` and its test.
 - [ ] 1.7 Add `.github/workflows/site-build.yml` (build and upload when `pages` is true), `.github/workflows/site.yml` (deploy job with job-level `pages: write` and `id-token: write`), and a `site` job in `ci.yml` that `ci-ok` needs (design D17); verify with `mise run lint:yaml`, a green pull request run, and a deploy from `main` that serves `https://moonrockz.github.io/moon-lander/`. The owner sets the Pages source to "GitHub Actions" before the merge (risk R7).
 
 ## 2. Build script and local preview

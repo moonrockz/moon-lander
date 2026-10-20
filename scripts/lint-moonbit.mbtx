@@ -1,6 +1,10 @@
 ///|
 /// Check MoonBit formatting and run the type checker across the workspace.
 ///
+/// The type checker runs for all targets. Without `--target all`, moon checks each module for its
+/// preferred target only, so it skips a package whose `supported_targets` excludes that target, such as
+/// a js-only package in a module that prefers native.
+///
 /// Usage: `mise run lint:moonbit`, or `moonx scripts/lint-moonbit.mbtx`.
 import {
   "moonbitlang/async@0.22.5",
@@ -30,10 +34,32 @@ async fn main {
     @sys.exit(if fmt > 0 { fmt } else { 1 })
   }
   println("🔍 Checking MoonBit code...")
-  let check = moon(["check", "--deny-warn"])
+  let check = moon(["check", "--deny-warn", "--target", "all"])
   if check != 0 {
     println("❌ moon check reported problems.")
     @sys.exit(if check > 0 { check } else { 1 })
   }
   println("✅ MoonBit lint complete")
+}
+
+///|
+async test "moon check covers a package outside the preferred target" {
+  let script = @fs.realpath("lint-moonbit.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-lint")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.mkdir("\{dir}/scripts")
+  @fs.mkdir("\{dir}/js_only")
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\npreferred_target = \"native\"\n",
+  )
+  @fs.write_file("\{dir}/js_only/moon.pkg", "supported_targets = \"js\"\n")
+  @fs.write_file(
+    "\{dir}/js_only/unused.mbt",
+    "///|\nfn unused() -> Unit {\n  ()\n}\n",
+  )
+  let (code, out, err) = @process.collect_output("moonx", [script], cwd=dir)
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("Unused function 'unused'"), msg=output)
 }

@@ -124,13 +124,22 @@ jobs:
       - name: Test
         run: mise run test -- ${{ matrix.target }}
 
+  # The docs site. It runs on each pull request with no path filter, because a path-filtered
+  # required check stays pending on other pull requests. It builds the site and does not deploy it.
+  site:
+    name: Site
+    needs: [lint]
+    uses: ./.github/workflows/site-build.yml
+    with:
+      pages: false
+
   # A single required check for branch protection.
   ci-ok:
     name: ci-ok
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, test, test-native-zig, test-scripts, windows]
+    needs: [lint, build, test, test-native-zig, test-scripts, windows, site]
     steps:
       - name: Require every job to succeed
         env:

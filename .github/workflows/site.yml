@@ -1,0 +1,39 @@
+name: Site
+
+# Deploys the docs site from main. Pull requests and the merge queue build the site through CI
+# (site-build.yml) and do not deploy it.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/site-build.yml
+    with:
+      pages: ${{ github.ref == 'refs/heads/main' }}
+
+  # Only this job can write to GitHub Pages.
+  deploy:
+    name: Deploy site
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

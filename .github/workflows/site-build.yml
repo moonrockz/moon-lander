@@ -1,0 +1,37 @@
+name: Site build
+
+# Builds the docs site. CI calls it for each pull request with `pages: false`, so ci-ok covers it.
+# The Site workflow calls it on main with `pages: true` and deploys the result.
+on:
+  workflow_call:
+    inputs:
+      pages:
+        description: Upload _site as the GitHub Pages artifact
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build site
+        run: mise run build:site -- --main
+      - name: Upload Pages artifact
+        if: inputs.pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site

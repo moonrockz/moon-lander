@@ -1,5 +1,6 @@
 members = [
   ".",
+  "./apps/site",
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./tests",

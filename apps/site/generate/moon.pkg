@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-site/model",
+  "moonrockz/moon-lander-site/views",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
+}
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")

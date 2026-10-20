@@ -12,12 +12,12 @@ is still open.
 
 Bead: lander-4us.7.1
 
-- [ ] 1.1 Create `apps/site/moon.mod` (`moonrockz/moon-lander-site`, version `0.1.0`, imports of design D3) and the packages `model`, `views` and `generate` with the `supported_targets` of design D2; add `./apps/site` to `moon.work`; verify that `mise run validate` passes and that the resolver selects `moonbitlang/async` `0.22.5` with Rabbita `0.16.5` (risk R1).
-- [ ] 1.2 Add `site/site.json` (design D4) and `SiteConfig::parse` with the `base_path` check and `href`; verify the "Bad base path" and "Links use the base path" scenarios with unit tests on all four targets.
-- [ ] 1.3 Add a minimal Rabbita `layout` and a `generate` executable that writes `_site/index.html` from `site/pages/index.html` and `_site/assets/site.css`; verify the "Route file" scenario with a native test that reads the output.
-- [ ] 1.4 Add a first `scripts/site.mbtx build` that runs `generate` through `moonbitlang/async/process` and exits with a non-zero code on failure, and the mise task `build:site`; verify that `mise run build:site` writes `_site/index.html` and that a failed step gives a non-zero exit code.
-- [ ] 1.5 Add `_site/` to `.gitignore`.
-- [ ] 1.6 Verify that `mise run lint` checks `apps/site` on `native` and `js` (risk R4); if it does not, extend `scripts/lint-moonbit.mbtx` and its test.
+- [x] 1.1 Create `apps/site/moon.mod` (`moonrockz/moon-lander-site`, version `0.1.0`, imports of design D3) and the packages `model`, `views` and `generate` with the `supported_targets` of design D2; add `./apps/site` to `moon.work`; verify that `mise run validate` passes and that the resolver selects `moonbitlang/async` `0.22.5` with Rabbita `0.16.5` (risk R1).
+- [x] 1.2 Add `site/site.json` (design D4) and `SiteConfig::parse` with the `base_path` check and `href`; verify the "Bad base path" and "Links use the base path" scenarios with unit tests on all four targets.
+- [x] 1.3 Add a minimal Rabbita `layout` and a `generate` executable that writes `_site/index.html` from `site/pages/index.html` and `_site/assets/site.css`; verify the "Route file" scenario with a native test that reads the output.
+- [x] 1.4 Add a first `scripts/site.mbtx build` that runs `generate` through `moonbitlang/async/process` and exits with a non-zero code on failure, and the mise task `build:site`; verify that `mise run build:site` writes `_site/index.html` and that a failed step gives a non-zero exit code.
+- [x] 1.5 Add `_site/` to `.gitignore`.
+- [x] 1.6 Verify that `mise run lint` checks `apps/site` on `native` and `js` (risk R4); if it does not, extend `scripts/lint-moonbit.mbtx` and its test.
 - [ ] 1.7 Add `.github/workflows/site-build.yml` (build and upload when `pages` is true), `.github/workflows/site.yml` (deploy job with job-level `pages: write` and `id-token: write`), and a `site` job in `ci.yml` that `ci-ok` needs (design D17); verify with `mise run lint:yaml`, a green pull request run, and a deploy from `main` that serves `https://moonrockz.github.io/moon-lander/`. The owner sets the Pages source to "GitHub Actions" before the merge (risk R7).
 
 ## 2. Build script and local preview
@@ -84,7 +84,7 @@ Bead: lander-4us.7.7
 
 Bead: lander-4us.7.8
 
-- [ ] 8.1 Add the narrow exception to `AGENTS.md`: Rabbita is allowed only in the unpublished module `apps/site`, a docs tool; the published library stays UI-free; verify by review that "Do not add UI packages" still holds for every other module.
+- [x] 8.1 Add the narrow exception to `AGENTS.md`: Rabbita is allowed only in the unpublished module `apps/site`, a docs tool; the published library stays UI-free; verify by review that "Do not add UI packages" still holds for every other module.
 - [ ] 8.2 Add the same exception to the `context` of `openspec/config.yaml` and to the "No UI packages" text of `README.md`; add `apps/site` to the README layout list; verify with `mise exec -- openspec validate --all --strict`.
 - [ ] 8.3 Make `scripts/validate-packages.mbtx` fail when a module other than `apps/site` imports `moonbit-community/rabbita`; verify the "UI import in the library" scenario with a script test and the "Workspace targets" scenario with `mise run check`.
 

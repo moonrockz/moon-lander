@@ -77,6 +77,10 @@ lefthook-local.yml
 
 dist/
 
+# Docs site output (mise run build:site)
+
+_site/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

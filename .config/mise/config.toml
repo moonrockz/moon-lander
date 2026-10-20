@@ -66,6 +66,10 @@ run = "moonx scripts/build.mbtx js"
 description = "Build all workspace members for native in release mode"
 run = "moonx scripts/build.mbtx native --release"
 
+[tasks."build:site"]
+description = "Build the docs site into _site/ (args: --main)"
+run = "moonx scripts/site.mbtx build"
+
 [tasks.test]
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
 run = "moonx scripts/test.mbtx"

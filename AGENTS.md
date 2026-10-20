@@ -47,6 +47,8 @@ committing MoonBit changes. Use Conventional Commits without AI attribution.
 ## Publishing
 
 The module name `moonrockz/moon-lander` is provisional. There is no CLI yet.
-Do not add UI packages or a separate regolith module. Consume `zig-cross` through
+Do not add UI packages or a separate regolith module. One exception: the unpublished
+docs tool `apps/site` can use Rabbita. No other module can import it, and the
+published library stays UI-free. Consume `zig-cross` through
 `moonx`; do not vendor it. Ask before cutting a GitHub release or publishing to
 mooncakes.io. The initial setup intentionally has no publishing workflow.

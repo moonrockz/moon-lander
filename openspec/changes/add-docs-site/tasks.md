@@ -84,7 +84,7 @@ Bead: lander-4us.7.7
 
 Bead: lander-4us.7.8
 
-- [ ] 8.1 Add the narrow exception to `AGENTS.md`: Rabbita is allowed only in the unpublished module `apps/site`, a docs tool; the published library stays UI-free; verify by review that "Do not add UI packages" still holds for every other module.
+- [x] 8.1 Add the narrow exception to `AGENTS.md`: Rabbita is allowed only in the unpublished module `apps/site`, a docs tool; the published library stays UI-free; verify by review that "Do not add UI packages" still holds for every other module.
 - [ ] 8.2 Add the same exception to the `context` of `openspec/config.yaml` and to the "No UI packages" text of `README.md`; add `apps/site` to the README layout list; verify with `mise exec -- openspec validate --all --strict`.
 - [ ] 8.3 Make `scripts/validate-packages.mbtx` fail when a module other than `apps/site` imports `moonbit-community/rabbita`; verify the "UI import in the library" scenario with a script test and the "Workspace targets" scenario with `mise run check`.
 

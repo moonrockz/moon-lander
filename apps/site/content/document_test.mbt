@@ -72,3 +72,29 @@ test "the first word of a fence's info string is its language" {
   assert_true(doc.html.contains("class=\"language-mbt\""))
   assert_true(doc.html.contains("class=\"language-scheme\""))
 }
+
+///|
+test "a GitHub Markdown table renders as an HTML table" {
+  let doc = @content.render_markdown(
+    "docs/a.md", "| Code | Meaning |\n| --- | --- |\n| 0 | Success |\n| 130 | Interrupted |\n",
+  )
+  inspect(
+    doc.html,
+    content=(
+      #|<div role="region"><table>
+      #|<tr>
+      #|<th>Code</th>
+      #|<th>Meaning</th>
+      #|</tr>
+      #|<tr>
+      #|<td>0</td>
+      #|<td>Success</td>
+      #|</tr>
+      #|<tr>
+      #|<td>130</td>
+      #|<td>Interrupted</td>
+      #|</tr>
+      #|</table></div>
+    ),
+  )
+}

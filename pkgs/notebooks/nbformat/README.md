@@ -27,7 +27,7 @@ The library release number does not belong in the notebook's version fields.
 
 ## Read and write
 
-```moonbit
+```moonbit notest
 let book = @nbformat.parse(source)
 let first_cell = book.cell(0) // Cell?, with None at an invalid index
 let code_cell = book.cell_by_id(@nbformat.CellId("calculation"))
@@ -55,7 +55,7 @@ order or the input's division into lines.
 
 ## Construct values
 
-```moonbit
+```moonbit notest
 let cell = @nbformat.Cell::Cell(
   @nbformat.Markdown(source="# Results", attachments=None),
   id=Some(@nbformat.CellId("intro")),
@@ -142,7 +142,7 @@ base64, render Markdown, validate timestamp syntax or implement notebook trust.
 
 ## Navigation
 
-```moonbit
+```moonbit notest
 let root = book.cursor()
 let first = root.first_child()
 @nbformat.walk_cursor(book.root(), cursor => {

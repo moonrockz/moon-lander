@@ -15,14 +15,30 @@ supply layered configuration. This change connects that configuration to a lifec
 
 - Add the package `moonrockz/moon-lander/hosting` (`@hosting`):
   - `HostBuilder[S]`, composed with pipelines (`|>`). It holds the application name,
-    the arguments, the configuration sources, the services factory, the hosted
-    services, the default environment name, the variable prefix and the shutdown
-    timeout.
+    the arguments, the starting variable set, the working directory, the
+    configuration sources, the services factory, the hosted services, the default
+    environment name, the variable prefix and the shutdown timeout.
+  - Host starting settings, like .NET `HostApplicationBuilderSettings`:
+    `@lander.cli(name, args, env_vars?, working_dir?, environment?)`. An omitted
+    variable set or working directory comes from the process on native and js. On
+    wasm and wasm-gc, an omitted variable set is empty and an omitted working
+    directory is `/`. `|> @hosting.env_vars(vars)` and
+    `|> @hosting.working_dir(path)` replace them before the build.
+  - One variable set and one working directory for each run. Nothing else reads the
+    process environment or the process working directory. The set feeds the
+    environment-variable source, the environment-name bootstrap, the conventions
+    directory resolution and the core `config/host` adapter. Walk-up discovery
+    starts at the working directory. `BuildContext` and `Context[S]` show both
+    values.
+  - The trait `IntoEnvVars`, with implementations for `Map[String, String]` and
+    `Json`, so a test can give the variable set as a map literal or as a JSON
+    fixture.
   - `Host[S]` and `Context[S]`. The application defines a typed services record `S`.
     The host builds `S` once. Each command, hook and event handler gets the same
     `Context[S]`. There is no dependency-injection container.
   - A fixed run order. The host parses the arguments first with
-    `moonbitlang/core/argparse`. Then it finds the environment name, loads the
+    `moonbitlang/core/argparse`. Then it fixes the variable set and the working
+    directory, finds the environment name, loads the
     configuration through `@config/host.load` (native, js) or `@config.load` over an
     injected `FileTree` (wasm, wasm-gc, `|> @hosting.files(tree)`), and builds `S`.
   - The environment-variable source. The host adds it with the prefix (default: the
@@ -61,8 +77,8 @@ supply layered configuration. This change connects that configuration to a lifec
   standard flags `--environment`, `--config`, `--isolated` and `--project`, and maps
   them to the environment name and the conventions `DiscoveryOptions`. It turns mapped
   options into the overrides source of the configuration core (priority 700).
-- Add the `@lander.cli(name, args)` shortcut that starts a `HostBuilder[S]`. The
-  application name occurs only there.
+- Add the `@lander.cli(name, args, env_vars?, working_dir?, environment?)` shortcut
+  that starts a `HostBuilder[S]`. The application name occurs only there.
 - Add a narrow AGENTS.md exception for the Zig signal stub.
 
 ## Capabilities

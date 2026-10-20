@@ -6,7 +6,7 @@ The configuration core (change `add-configuration-core`) merges sources, but eac
 application must still find its files. Command-line tools use the same patterns
 again and again: a system directory, an XDG user directory, an application home,
 walk-up discovery from the working directory, `.config/<app>/` folders, workspaces
-with members, and personal `*.user.*` overrides. finos/morphir-moonbit has these rules
+with members, personal `*.user.*` overrides, and per-checkout `*.local.*` overrides. finos/morphir-moonbit has these rules
 hard-coded for Morphir, and it has known faults: an ancestor configuration leaks into
 temporary test roots (bead o6vm.10), YAML files are found but cannot load, and
 discovery is mixed with file I/O. Moon-Lander must supply these patterns as generic,
@@ -22,20 +22,30 @@ behavior with no copied code.
   - A global user directory: `$XDG_CONFIG_HOME` only when absolute, else the
     platform directory (`~/.config`, `~/Library/Application Support`, `%APPDATA%`).
   - An application home: `~/.<app>`, which `$<PREFIX>_HOME` replaces.
+  - Directory variables (`HOME`, `XDG_CONFIG_HOME`, `APPDATA`, `PROGRAMDATA`,
+    `USERPROFILE`, `<PREFIX>_HOME`) come only from the one variable set of the run.
+    Discovery never reads the process environment.
   - Three candidate layouts per location: `<app>.*`, `.<app>/<app>.*` and
     `.config/<app>/config.*`.
   - Searched extensions that come from the formats the builder registers.
-  - Adjacent `*.user.*` overrides.
+  - Adjacent `*.local.*` overrides (`config.local.*` in the `.config/<app>/`
+    layout) at priority 390. A local file is for one checkout, and git ignores it.
+    `app_dirs` includes this part. The Morphir preset leaves it off.
+  - Adjacent `*.user.*` overrides at priority 400. A user file holds the
+    preference of one person.
   - Ambiguity detection when more than one candidate exists at one location. It
     raises the core error `ConfigError::Ambiguous`.
   - An optional legacy fallback file.
-- Add walk-up root discovery with an explicit stop boundary and an isolated mode.
+- Add walk-up root discovery from the working directory of the run, with an
+  explicit stop boundary and an isolated mode.
 - Add workspace and member selection with `*` and `**` globs, confinement rules,
   an enclosing-workspace search, explicit project selection, and key filters for
   member layers and inherited layers. The filters use the core `exclude` operation.
 - Add environments in the .NET style. The environment name is optional. Its sources
   are the name from the host, then `<PREFIX>_ENVIRONMENT`, then a default. Environment
-  files sit next to each primary. Each application must opt in.
+  files sit next to each primary. Each application must opt in. The names `user` and
+  `local` are reserved in any letter case, so an override file is never an
+  environment file.
 - Take the host inputs as plain values (`DiscoveryOptions`: environment name, explicit
   configuration file, isolated mode, project selector). Hosting parses the arguments.
   Conventions never reads them.

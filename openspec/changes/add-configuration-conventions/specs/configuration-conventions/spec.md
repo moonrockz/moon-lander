@@ -63,7 +63,7 @@ A convention set MAY name one legacy fallback file name with its own format. The
 format SHALL NOT add to the searched extensions. Discovery SHALL use the legacy file at
 a location only when no primary candidate exists at that location.
 A legacy file SHALL count as a root marker. A legacy file SHALL NOT have an adjacent
-user override or environment file.
+local override, user override or environment file.
 
 #### Scenario: Legacy file used when no primary exists
 - **WHEN** the legacy name is `acme.json` and the directory contains only `acme.json`
@@ -75,7 +75,8 @@ user override or environment file.
 
 ### Requirement: Walk-up root discovery
 
-Discovery SHALL start at the start directory and move to each parent directory. The
+Discovery SHALL start at the start directory, which is the working directory of the
+run, and move to each parent directory. The
 first directory that contains a primary candidate or a legacy file SHALL be the
 project root. Discovery SHALL NOT stop at a version-control directory such as `.git`.
 
@@ -114,12 +115,12 @@ the file-system root.
 
 Isolated mode SHALL be on when the `isolated` value of `DiscoveryOptions` is true. In
 isolated mode, the convention sources for the system directory, the global user
-directory and adjacent user overrides SHALL have the selection `Skip`. Project,
-workspace, member and environment-variable sources SHALL stay unchanged. Their reports
-SHALL show the status skipped.
+directory, adjacent local overrides and adjacent user overrides SHALL have the
+selection `Skip`. Their reports SHALL show the status skipped. Project, workspace,
+member and environment-variable sources SHALL stay unchanged.
 
 #### Scenario: Isolated mode skips user and machine files
-- **WHEN** a global user file, a system file and `acme.user.toml` exist, and isolated mode is on
+- **WHEN** a global user file, a system file, `acme.local.toml` and `acme.user.toml` exist, and isolated mode is on
 - **THEN** only the defaults, the project primary and the environment-variable source contribute values
 
 #### Scenario: Isolated mode keeps environment variables
@@ -186,6 +187,16 @@ prefix of the convention set. The candidates SHALL be `<app>.<ext>` in that dire
 - **WHEN** `ACME_HOME` is set to an empty value and `HOME=/home/alice`
 - **THEN** a global candidate is `/home/alice/.acme/acme.toml`
 
+### Requirement: Directory variables come from the run variable set
+
+Discovery SHALL read `HOME`, `XDG_CONFIG_HOME`, `APPDATA`, `PROGRAMDATA`,
+`USERPROFILE` and `<PREFIX>_HOME` only from the variable set of the run in the core
+load context. Discovery SHALL NOT read the process environment.
+
+#### Scenario: Directories come only from the given set
+- **WHEN** the platform is Linux, the variable set is `HOME=/home/test` and `XDG_CONFIG_HOME=/srv/test/config`, and the process environment has other values for `HOME` and `XDG_CONFIG_HOME`
+- **THEN** the global candidates are `/srv/test/config/acme/acme.toml` and `/home/test/.acme/acme.toml`, on every target
+
 ### Requirement: One global user configuration
 
 The configuration-directory candidates and the application-home candidates SHALL be
@@ -215,12 +226,46 @@ More than one existing override for one primary SHALL be an ambiguity error.
 - **WHEN** `acme.toml`, `acme.user.toml` and `acme.user.yaml` exist
 - **THEN** discovery fails with an ambiguity error that names both override files
 
+### Requirement: Adjacent local overrides
+
+For a primary in the layout `<app>.<ext>` or `.<app>/<app>.<ext>`, the local override
+candidates SHALL be `<app>.local.<ext>` in the same directory. For
+`.config/<app>/config.<ext>` they SHALL be `config.local.<ext>` in the same
+directory. The extensions SHALL come from the registered formats. More than one
+existing local override for one primary SHALL be an ambiguity error.
+
+#### Scenario: Local file loads between environment file and user override
+- **WHEN** the name is `Production`, `acme.toml` sets `ui.theme = "base"`, `acme.Production.toml` sets `"prod"`, `acme.local.toml` sets `"local"`, and `acme.user.toml` sets `"mine"`
+- **THEN** the effective value of `ui.theme` is `mine`, without `acme.user.toml` it is `local`, and the local report has the kind name `local-override` and priority 390
+
+#### Scenario: Dot-config local override
+- **WHEN** `.config/acme/config.toml` sets `ui.theme = "shared"` and `.config/acme/config.local.toml` sets `ui.theme = "local"`
+- **THEN** the effective value of `ui.theme` is `local`
+
+#### Scenario: Sibling local override serializations
+- **WHEN** `acme.toml`, `acme.local.toml` and `acme.local.yaml` exist
+- **THEN** discovery fails with an ambiguity error that names both local override files
+
+### Requirement: Local overrides in the standard set
+
+The convention set from `app_dirs` SHALL include the local override part. A convention
+set from `base` SHALL NOT include it until the application adds it. `without` SHALL
+remove it.
+
+#### Scenario: Standard set loads a local file
+- **WHEN** the convention set is `app_dirs("acme")` and `acme.toml` and `acme.local.toml` exist
+- **THEN** a local override source loads `acme.local.toml`
+
+#### Scenario: Base set has no local layer
+- **WHEN** the convention set is `base("acme")` with the layouts and user overrides, and `acme.toml` and `acme.local.toml` exist
+- **THEN** no source loads `acme.local.toml`
+
 ### Requirement: Explicit primary file
 
 When the `config` value of `DiscoveryOptions` is `Explicit(path)`, discovery SHALL use that
 file and SHALL NOT walk up for a root. The enclosing-workspace search SHALL still apply.
-When the file path matches a standard layout, the override and environment-file rules
-SHALL apply. Other explicit files SHALL have no implicit override or environment file.
+When the file path matches a standard layout, the local override, user override and
+environment-file rules SHALL apply. Other explicit files SHALL have no implicit override or environment file.
 
 #### Scenario: Explicit file from another directory
 - **WHEN** the start directory is `elsewhere` and the explicit path is `../configs/project.yaml`
@@ -331,13 +376,17 @@ than one name match SHALL raise `ConfigError::AmbiguousProject`. No match SHALL 
 ### Requirement: Project layer order
 
 The project-tier sources SHALL load in this order: workspace primary, member primary,
-workspace environment file, member environment file, workspace user override, member
-user override. A member layer and its override SHALL not load until that member is
-selected.
+workspace environment file, member environment file, workspace local override, member
+local override, workspace user override, member user override. A member layer and its
+overrides SHALL not load until that member is selected.
 
 #### Scenario: Member user override wins last
 - **WHEN** the workspace primary sets `ui.theme = "workspace"`, the member primary sets `"member"`, the workspace override sets `"workspace-user"`, and the member override sets `"member-user"`
 - **THEN** the effective value of `ui.theme` is `member-user`
+
+#### Scenario: Member local override order
+- **WHEN** the workspace local override sets `ui.theme = "workspace-local"`, the member local override sets `"member-local"`, and the workspace user override sets `"workspace-user"`
+- **THEN** the effective value of `ui.theme` is `workspace-user`, and without the workspace user override it is `member-local`
 
 #### Scenario: Member primary wins over workspace primary
 - **WHEN** the workspace primary sets `ui.theme = "workspace"` and the selected member primary sets `ui.theme = "member"`, with no overrides
@@ -375,8 +424,8 @@ variables SHALL stay complete. The removal SHALL give no warning.
 
 Environments SHALL be off unless the application enables them. When enabled, the
 environment name SHALL be optional. Its value SHALL come from the `environment` value of
-`DiscoveryOptions`, then from `<PREFIX>_ENVIRONMENT`, then from the default of the
-convention set. An empty variable SHALL count as unset. With none of these, the name
+`DiscoveryOptions`, then from `<PREFIX>_ENVIRONMENT` in the variable set of the run,
+then from the default of the convention set. An empty variable SHALL count as unset. With none of these, the name
 SHALL be absent.
 
 #### Scenario: Option wins
@@ -412,12 +461,16 @@ Discovery SHALL NOT read the process arguments. Discovery SHALL NOT raise a usag
 ### Requirement: Environment name validation
 
 An environment name SHALL be non-empty. It SHALL NOT contain `/`, `\`, `.` or a control
-character. It SHALL NOT equal `user` in any letter case. An invalid name SHALL be a
+character. It SHALL NOT equal `user` or `local` in any letter case. An invalid name SHALL be a
 `ConfigError::InvalidEnvironmentName` that names the source of the name.
 
 #### Scenario: Reserved name rejected
 - **WHEN** `ACME_ENVIRONMENT=User`
 - **THEN** discovery raises `ConfigError::InvalidEnvironmentName` that names `ACME_ENVIRONMENT`
+
+#### Scenario: Reserved name local rejected
+- **WHEN** the `environment` value of `DiscoveryOptions` is `Local`
+- **THEN** discovery raises `ConfigError::InvalidEnvironmentName` that names the discovery options as the source
 
 #### Scenario: Path name rejected
 - **WHEN** the `environment` value of `DiscoveryOptions` is `../prod`
@@ -454,7 +507,7 @@ legacy file or an explicit file outside the standard layouts.
 ### Requirement: Pure discovery over the core load protocol
 
 Discovery SHALL be a pure, synchronous function of explicit inputs: the core
-`FileTree`, the platform, the environment variables, the start directory, the registered
+`FileTree`, the platform, the variable set, the working directory, the registered
 formats, the convention set and the `DiscoveryOptions`. With the same inputs it SHALL
 give the same result on every target. It SHALL return the core `LoadStep`. When the
 tree does not contain an entry that discovery needs, discovery SHALL return
@@ -516,14 +569,18 @@ path such as `C:foo` SHALL NOT be absolute. Member and workspace entries SHALL r
 
 Each convention source SHALL produce a `SourceReport` with its kind, priority, loaded
 path, every candidate it checked, and the status loaded, not found or skipped. The kind
-SHALL be `File` with the core `FileRole` of the source. The priorities SHALL be system
-100, global 200, workspace or project primary 300, member primary 350, environment file
-375 and user override 400. The reports SHALL be in merge order, and the priorities
-SHALL not decrease along that order.
+SHALL be `File` with the core `FileRole` of the source. The reports SHALL be in merge
+order.
 
 #### Scenario: Not-found global source lists candidates
 - **WHEN** no global user file exists
 - **THEN** the global report has the status not found and lists every global candidate
+
+### Requirement: Convention source priorities
+
+The priorities SHALL be system 100, global 200, workspace or project primary 300,
+member primary 350, environment file 375, local override 390 and user override 400.
+The priorities SHALL not decrease along the merge order.
 
 #### Scenario: Reports in merge order
 - **WHEN** discovery loads defaults, a project primary and environment variables
@@ -537,8 +594,8 @@ SHALL not decrease along that order.
 
 The acceptance suite SHALL contain a Morphir preset built only from public convention
 parts. With the application `morphir`, the registered formats TOML and YAML limited to
-`.yaml`, legacy file `morphir.json`, prefix `MORPHIR` and environments off, it SHALL give
-Morphir's sources:
+`.yaml`, legacy file `morphir.json`, prefix `MORPHIR`, environments off and no local
+override part, it SHALL give Morphir's sources:
 defaults 0, system 100, global 200, project 300, member 350, user override 400 and
 environment 600.
 
@@ -569,3 +626,7 @@ environment 600.
 #### Scenario: Legacy morphir.json fallback
 - **WHEN** a directory contains only `morphir.json`
 - **THEN** the preset selects `morphir.json` as the project primary with no user override candidates
+
+#### Scenario: Preset has no local layer
+- **WHEN** a directory contains `morphir.toml` and `morphir.local.toml`
+- **THEN** no source loads `morphir.local.toml`, and no report has the kind name `local-override`

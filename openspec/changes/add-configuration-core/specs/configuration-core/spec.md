@@ -79,16 +79,24 @@ an integer display priority. The merge MUST NOT read the priority.
 
 When the application gives no priority, the priority SHALL come from the kind and
 file role: defaults 0, system 100, global 200, workspace, explicit, and legacy
-files 300, member 350, environment file 375, user override 400, environment
-variables 600, and overrides 700. An in-memory source with no priority MUST take
-the priority of the source before it, or 0 when it is first. The builder MUST raise
-a source-order error when a priority is lower than the priority of the source
-before it.
+files 300, member 350, environment file 375, local override 390, user override 400,
+environment variables 600, and overrides 700. An in-memory source with no priority
+MUST take the priority of the source before it, or 0 when it is first.
 
 #### Scenario: Default priorities
 
 - **WHEN** an application adds a defaults source, an explicit file source, an in-memory source, an environment source, and an overrides source, with no priorities
 - **THEN** the source reports show the priorities 0, 300, 300, 600, and 700
+
+#### Scenario: Override file priorities
+
+- **WHEN** an application adds an environment file source, a local override file source, and a user override file source, with no priorities
+- **THEN** the source reports show the priorities 375, 390, and 400
+
+### Requirement: Source order check
+
+The builder SHALL raise a source-order error when the priority of a source is lower
+than the priority of the source before it. Equal priorities MUST be allowed.
 
 #### Scenario: Decreasing priority
 
@@ -104,19 +112,19 @@ values that the host or the conventions supply.
 
 #### Scenario: Skip a source
 
-- **WHEN** an environment source has the selection `Skip` and the process environment holds `APP_IR__LAYOUT=tree`
+- **WHEN** an environment source has the selection `Skip` and the variable set of the builder holds `APP_IR__LAYOUT=tree`
 - **THEN** the merged configuration does not hold `ir.layout` and the source report shows the status `skipped`
 
 #### Scenario: Explicit environment variables
 
-- **WHEN** an environment source has the selection `Explicit` with the variables `APP_A=1`, and the process environment holds `APP_B=2`
+- **WHEN** an environment source has the selection `Explicit` with the variables `APP_A=1`, and the variable set of the builder holds `APP_B=2`
 - **THEN** the merged configuration holds `a = 1` and does not hold `b`
 
 ### Requirement: Source providers
 
 The builder SHALL accept a source provider at any position. During the load, the
 system MUST call each provider with a load context that holds the file tree, the
-platform when known, the process variables, the base directory, and the registered
+platform when known, the variable set, the working directory, and the registered
 formats. The provider MUST give either file requests or a list of sources, and
 those sources MUST take the place of the provider in merge order.
 
@@ -175,7 +183,7 @@ MUST NOT need a filesystem.
 ### Requirement: File source at an explicit path
 
 The system SHALL load a file source with the selection `Explicit(path)` from the
-text that the file tree holds for that path. A relative path MUST join the base
+text that the file tree holds for that path. A relative path MUST join the working
 directory of the builder when one is set. The file extension MUST select the
 format from the formats that the application registers. A missing explicit file
 MUST be an error.
@@ -195,9 +203,9 @@ MUST be an error.
 - **WHEN** an application registers only the TOML format and adds the explicit file `app.ion`
 - **THEN** the system raises an unsupported-format configuration error that names `app.ion` and the registered extensions
 
-#### Scenario: Relative path joins the base directory
+#### Scenario: Relative path joins the working directory
 
-- **WHEN** the base directory is `/w` and an explicit file source names `conf/app.toml`
+- **WHEN** the working directory of the builder is `/w` and an explicit file source names `conf/app.toml`
 - **THEN** the system reads `/w/conf/app.toml` and the source report shows that path
 
 ### Requirement: Candidate ambiguity
@@ -634,13 +642,14 @@ candidate paths, the status `loaded`, `not-found`, or `skipped`, and the warning
 
 Reports SHALL show Morphir kind names: `defaults`, `system`, `global`, `project`
 (for workspace, explicit, and legacy files), `workspace-member`,
-`environment-file`, `user-override`, and `environment`. In-memory and overrides
-sources MUST show `in-memory` and `overrides`.
+`environment-file`, `user-override`, and `environment`. A local override file MUST
+show `local-override`. In-memory and overrides sources MUST show `in-memory` and
+`overrides`.
 
 #### Scenario: File role names
 
-- **WHEN** the sources are a member primary file and a user override file
-- **THEN** their reports show the kind names `workspace-member` and `user-override`
+- **WHEN** the sources are a member primary file, a local override file, and a user override file
+- **THEN** their reports show the kind names `workspace-member`, `local-override`, and `user-override`
 
 ### Requirement: Display redaction
 
@@ -777,10 +786,10 @@ people.
 ### Requirement: Pure core with explicit inputs
 
 The system SHALL load a configuration from explicit inputs only: the builder with
-its sources, formats, process variables, and base directory, and a file tree. The
+its sources, formats, variable set, and working directory, and a file tree. The
 load MUST give the same result for the same inputs on the wasm, wasm-gc, js, and
-native targets. The core MUST NOT read files or the process environment. Host
-adapters do that.
+native targets. The core MUST NOT read files, the process environment, or the
+process working directory. Host adapters do that.
 
 #### Scenario: Same result on all targets
 
@@ -806,13 +815,25 @@ does not hold as absent.
 
 #### Scenario: Host adapter fills the inputs
 
-- **WHEN** a native or js application uses the host adapter with an explicit file and a `Discover` environment source
-- **THEN** the adapter reads that file, the process environment, and the working directory, and the configuration holds the values from both sources
+- **WHEN** a native or js application uses the host adapter with an explicit file and a `Discover` environment source, and the builder holds no variable set and no working directory
+- **THEN** the adapter reads that file, the process environment, and the process working directory, and the configuration holds the values from both sources
 
 #### Scenario: Discover environment with no host
 
-- **WHEN** a wasm application loads an environment source with `Discover` and gives no process variables
+- **WHEN** a wasm application loads an environment source with `Discover` and gives no variable set
 - **THEN** the source adds no key and reports `not-found`
+
+### Requirement: Host adapter uses the given run values
+
+When the builder holds a variable set, the host adapter SHALL use only that set and
+MUST NOT read the process environment. When the builder holds a working directory,
+the host adapter SHALL use only that directory and MUST NOT read the process
+working directory.
+
+#### Scenario: Adapter uses the given values
+
+- **WHEN** a native application uses the host adapter with a `Discover` environment source with the prefix `APP`, the builder holds the variable set `APP_A=1` and the working directory `/w`, and the process environment holds `APP_B=2`
+- **THEN** the configuration holds `a = 1` and does not hold `b`, and a relative explicit file joins `/w`
 
 ### Requirement: File tree absence records
 

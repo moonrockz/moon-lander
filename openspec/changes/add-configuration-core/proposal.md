@@ -25,7 +25,8 @@ hard-code the Morphir file layout.
   The argparse adapter in `add-host-lifecycle` supplies the overrides layer.
 - Add the shared source kinds `SourceKind` and `FileRole`, so reports show
   Morphir's kind names (`system`, `global`, `project`, `workspace-member`,
-  `environment-file`, `user-override`).
+  `environment-file`, `user-override`) and the kind name `local-override` for the
+  per-checkout local override layer at priority 390.
 - Add `SourceSelection` (`Discover | Explicit | Skip`) for each source.
 - Make list order the merge order. Each source has a display priority, and the
   builder raises an error when priorities decrease along the list.
@@ -48,15 +49,16 @@ hard-code the Morphir file layout.
   redact, and explain the origin of a value.
 - Add a source-provider entry point on the builder, so conventions discovery runs
   inside the pure load, and a load context that carries the file tree, `Platform`,
-  the process variables, the base directory, and the registered formats.
+  the variable set, the working directory, and the registered formats.
 - Add the file snapshot `FileTree` and the pure load protocol
   `LoadStep = Need(Array[FileRequest]) | Done(T)`, with
   `@config.load(builder, tree)` on all targets.
 - Add the host adapter package `config/host`: `load(builder)` drives the request
   loop on native (through `moonbitlang/async`) and on js (through a TypeScript
-  adapter over `node:fs`, bundled with Bun). Environment variables and the working
-  directory come from `moonbitlang/core/env`. wasm and wasm-gc take an injected
-  `FileTree`.
+  adapter over `node:fs`, bundled with Bun). It uses the variable set and the
+  working directory that the builder holds. Only when the builder holds no value
+  does it read that value from the process through `moonbitlang/core/env`. wasm and
+  wasm-gc take an injected `FileTree`.
 - Support Windows from the first story: a windows-latest CI leg, and paths shown
   with `/` on every platform.
 

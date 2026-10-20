@@ -32,7 +32,7 @@ Bead: lander-4us.3.2
 Bead: lander-4us.3.3
 
 - [ ] 3.1 Add `boundary(dir)` and make the walk-up inclusive of the boundary, and verify the three "Explicit stop boundary" scenarios, including `ConfigError::OutsideBoundary`.
-- [ ] 3.2 Read isolated mode from `DiscoveryOptions` and set system, global and user-override selections to `Skip` with skipped reports, and verify the two "Isolated mode" scenarios.
+- [ ] 3.2 Read isolated mode from `DiscoveryOptions` and set system, global, local-override and user-override selections to `Skip` with skipped reports, and verify the two "Isolated mode" scenarios.
 - [ ] 3.3 Document the boundary and isolated mode in the package README with a test-root example, and verify the example runs.
 
 ## 4. System, global user and application-home directories on every platform
@@ -45,6 +45,7 @@ Bead: lander-4us.3.4
 - [ ] 4.4 Treat all global candidates as one source and report every candidate, and verify the "Two global files" and "Not-found global source lists candidates" scenarios.
 - [ ] 4.5 Add the `/`-form path value with drive and UNC absolute checks and `\` to `/` conversion of path-valued variables on Windows, and verify the "Path handling on Windows" scenarios with tests that give `Platform::Windows` on every target.
 - [ ] 4.6 Add `app_dirs(name, prefix?, display?)` as `base` plus the standard parts, and `without(part)`, and verify a test that removes the system part.
+- [ ] 4.7 Read every directory variable only from the `env_vars` set of the core load context, never from the process, and verify the "Directories come only from the given set" scenario on all four targets with a set that gives `HOME` and `XDG_CONFIG_HOME` explicitly.
 
 ## 5. User overrides and explicit primary files
 
@@ -52,6 +53,7 @@ Bead: lander-4us.3.5
 
 - [ ] 5.1 Add `user_overrides` for the three layouts with ambiguity checks, and verify the three "Adjacent user overrides" scenarios.
 - [ ] 5.2 Read `Explicit(path)` from the `config` value of `DiscoveryOptions` with layout detection by path, and verify the two "Explicit primary file" scenarios.
+- [ ] 5.3 Add `local_overrides` (`<app>.local.<ext>` and `config.local.<ext>` next to each primary, role `LocalOverride`, priority 390, ambiguity checks), include it in `app_dirs` and not in `base`, and verify the three "Adjacent local overrides" scenarios and the two "Local overrides in the standard set" scenarios.
 
 ## 6. Workspaces and member selection
 
@@ -62,7 +64,7 @@ Bead: lander-4us.3.6
 - [ ] 6.3 Add the enclosing-workspace search that parses ancestors through the core parse and merge with the registered formats, obeys the boundary, and passes over unreadable, ambiguous and non-workspace files, and verify the three "Enclosing workspace discovery" scenarios.
 - [ ] 6.4 Add automatic member selection (enclosing, default, single) with key paths from the application, and verify the four "Automatic member selection" scenarios and the "Listed member is missing" scenario.
 - [ ] 6.5 Add explicit project selection from the `project` value of `DiscoveryOptions`, by path then by name, with `UnknownProject` and `AmbiguousProject`, and verify the three "Explicit project selection" scenarios.
-- [ ] 6.6 Order the project-tier sources with roles `Workspace`, `Member` and `UserOverride` and priorities 300, 350 and 400, and verify the two "Project layer order" scenarios and the "Reports in merge order" and "Member roles" scenarios.
+- [ ] 6.6 Order the project-tier sources with roles `Workspace`, `Member`, `LocalOverride` and `UserOverride` and priorities 300, 350, 390 and 400, and verify the three "Project layer order" scenarios and the "Reports in merge order" and "Member roles" scenarios.
 
 ## 7. Member-scope and inherited-layer key filters
 
@@ -76,7 +78,7 @@ Bead: lander-4us.3.7
 Bead: lander-4us.3.8
 
 - [ ] 8.1 Add `environments(default?)` and resolve the name from `DiscoveryOptions`, then `<PREFIX>_ENVIRONMENT`, then the default, and verify the "Environment name resolution" and "Discovery options from the host" scenarios.
-- [ ] 8.2 Add name validation with `ConfigError::InvalidEnvironmentName`, and verify the two "Environment name validation" scenarios.
+- [ ] 8.2 Add name validation with `ConfigError::InvalidEnvironmentName`, with `user` and `local` reserved in any letter case, and verify the three "Environment name validation" scenarios.
 - [ ] 8.3 Add environment-file candidates for project-tier primaries with role `EnvironmentFile` at priority 375, and verify the three "Environment files" scenarios and the "No environment file for global configuration" scenario.
 - [ ] 8.4 Document environments, the opt-in and the reserved names that an application without hosting must give, in the package README, and verify that the README example runs.
 
@@ -94,7 +96,7 @@ Bead: lander-4us.3.9
 
 Bead: lander-4us.3.10
 
-- [ ] 10.1 Build the Morphir preset in `tests/` from public parts only (design D16), with YAML limited to `.yaml` and the JSON5 format only on the legacy part, and verify the "Six primary candidates" scenario.
+- [ ] 10.1 Build the Morphir preset in `tests/` from public parts only (design D16), with YAML limited to `.yaml`, the JSON5 format only on the legacy part, and no local override part, and verify the "Six primary candidates" and "Preset has no local layer" scenarios.
 - [ ] 10.2 Port the discovery, precedence, member and ambiguity cases of Morphir's `config.feature` to `tests/config-conventions-acceptance/features/morphir.feature`, and verify they pass with moonspec on js and native.
 - [ ] 10.3 Add the merge-rules cases (global ambiguity, `MORPHIR_HOME`, `MORPHIR_LOG_DIR`, relative XDG, macOS and Windows directories, `C:/ProgramData`, legacy `morphir.json`), and verify the "Morphir preset reproduces Morphir" scenarios.
 - [ ] 10.4 Run the same cases as snapshot tests in `tests/config-conventions-laws` on all four targets, and verify `mise run test` passes.

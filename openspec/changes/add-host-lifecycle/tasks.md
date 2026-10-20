@@ -80,8 +80,10 @@ Bead: lander-4us.5.7
 
 - [ ] 7.1 Derive the prefix from the application name (upper case, `-` to `_`) and add `@hosting.env_prefix`; verify the default and the override
 - [ ] 7.2 Compose the core environment-variable source at priority 600 with reserved `<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and `@hosting.reserve_env` names; verify that reserved names do not become keys and the source report shows 600
-- [ ] 7.3 Add `@hosting.env_vars` with `Process` (default on native and js, through `moonbitlang/core/env`), `Explicit(vars)` and `Skip`; verify each on its targets
+- [ ] 7.3 Add `@hosting.env_vars(vars)`, which replaces the variable set of the run, and `@hosting.skip_env_source()`, which skips only the `<PREFIX>_*` source (design D12); verify the "A later env_vars step replaces the set" scenario and a skipped source report on all four targets
 - [ ] 7.4 Add `@hosting.app_dirs()`, which gives the application name and the prefix to `@conventions.app_dirs`; verify `$<PREFIX>_HOME` and the variable source use one prefix
+- [ ] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
+- [ ] 7.6 Add the trait `IntoEnvVars` with implementations for `Map[String, String]` and `Json` and the JSON rules of design D14; verify the "Map literal", "JSON fixture", "Mixed values", "Null value" and "Root that is not an object" scenarios on all four targets
 
 ## 8. Host environment
 
@@ -90,7 +92,7 @@ Bead: lander-4us.5.8
 - [ ] 8.1 Add `HostEnvironment` with `is_environment`, `is_development`, `is_staging`, `is_production`; verify tests with `None` and with mixed-case names
 - [ ] 8.2 Resolve the name from `--environment`, `<PREFIX>_ENVIRONMENT` and `default_environment`, and check it with the conventions name rules; verify the resolution-order tests and that an invalid name gives code 2 with no hook run
 - [ ] 8.3 Make `@hosting.default_environment` also enable environment files; verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`
-- [ ] 8.4 Set the content root (builder value, working directory, or `.`) with `/` separators; verify one test per target group and one Windows test
+- [ ] 8.4 Set the content root (builder value, else the working directory of the run) with `/` separators; verify one test per target group and one Windows test
 
 ## 9. Configuration load and services factory
 
@@ -99,7 +101,7 @@ Bead: lander-4us.5.9
 - [ ] 9.1 Add `@hosting.configure` over the `ConfigBuilder` pipeline, and the builder trait if core gives one; verify an example with `|> @conventions.add(@conventions.app_dirs("acme"))`
 - [ ] 9.2 Load through `@config/host.load(builder)` on native and js; verify the factory reads a merged value
 - [ ] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
-- [ ] 9.4 Add `BuildContext` and `Context[S].config`; verify that the factory runs one time and that hooks and the command get the same `S`
+- [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
 
 ## 10. Shutdown timeout
 

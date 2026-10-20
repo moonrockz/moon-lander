@@ -22,6 +22,8 @@ Labels in this document:
   refer to the reconciliation calls of 2026-10-20.
 - **Call (this change)**: a decision made while this change was written. The brief and
   the reconciliation calls do not cover it. The owner must review it.
+- **Owner (2026-10-20)**: a later owner decision of 2026-10-20: the local override
+  layer (D17) and one variable set and one working directory for each run (D6, D12).
 
 ### Current state that this design replaces
 
@@ -75,11 +77,12 @@ immutable `Conventions` value and these parts:
 | Part | Result |
 | --- | --- |
 | `base(name, prefix?, display?)` | An empty convention set with the app name, the variable prefix and the display name |
-| `app_dirs(name, prefix?, display?)` | `base` plus the standard parts below: system, user configuration directory, application home, three layouts, user overrides, walk-up |
+| `app_dirs(name, prefix?, display?)` | `base` plus the standard parts below: system, user configuration directory, application home, three layouts, local overrides, user overrides, walk-up |
 | `system_dir()` | System candidates (`/etc/<app>`, `%PROGRAMDATA%/<app>`) |
 | `user_config_dir()` | XDG, macOS and Windows configuration-directory candidates |
 | `app_home()` | `~/.<app>` or `$<PREFIX>_HOME` candidates |
 | `layouts()` | The three primary layouts |
+| `local_overrides()` | `*.local.*` candidates next to each primary (D17) |
 | `user_overrides()` | `*.user.*` candidates next to each primary |
 | `without(part)` | Removes one standard part |
 | `legacy(name, format~, decode~)` | An optional legacy fallback file, its format and its decoder |
@@ -148,14 +151,22 @@ existing path in report order. The core renders the message
 - Call (this change): there is no environment variable for the boundary. An application
   can add one. Alternative: a `GIT_CEILING_DIRECTORIES`-style variable. Rejected for now
   because it adds a second, hidden input.
-- Isolated mode copies Morphir's `--isolated`. It sets the system, global and
-  user-override sources to `Skip`. Project, member and environment-variable sources
+- Isolated mode copies Morphir's `--isolated`. It sets the system, global,
+  local-override and user-override sources to `Skip`. Call (this change): isolated
+  mode also skips local overrides, because git ignores them and they are not part of
+  the shared project configuration. Morphir has no local layer. Project, member and environment-variable sources
   stay. Isolated mode does not set the boundary, because Morphir's isolated mode does
   not (Call (this change)). An application can set both.
 - Call (R7): conventions never reads the arguments. Hosting parses `--isolated` and
   gives the value in `DiscoveryOptions` (D10).
 
 ### D6. Global user directory and application home (Call; Owner (O3): Windows directories)
+
+- Owner (2026-10-20): every directory variable (`HOME`, `XDG_CONFIG_HOME`, `APPDATA`,
+  `PROGRAMDATA`, `USERPROFILE`, `<PREFIX>_HOME`) comes from the one variable set of
+  the run, which the core load context gives as `env_vars`. Discovery never reads the
+  process environment. A test gives `HOME` and `XDG_CONFIG_HOME` in that set and gets
+  the same candidates on every target.
 
 - Linux and macOS: `$XDG_CONFIG_HOME` only when non-empty and absolute; else
   `$HOME/.config` (Linux) or `$HOME/Library/Application Support` (macOS).
@@ -216,13 +227,16 @@ applications get the same numbers as Morphir:
 | 300 | Project or workspace primary | `File(Workspace)`, `File(Legacy)` | `File(Explicit)` for `Explicit(path)` |
 | 350 | Selected member primary | `File(Member)` | |
 | 375 | Environment files | `File(EnvironmentFile)` | Workspace, then member |
+| 390 | Local overrides | `File(LocalOverride)` | Workspace, then member (D17) |
 | 400 | User overrides | `File(UserOverride)` | Workspace, then member |
 | 600 | Environment variables | `Environment` | Core source |
 | 700 | Overrides (argparse) | `Overrides` | Hosting |
 
 The 375 value puts environment files between primaries and user overrides. That is the
-Owner-accepted order "primary, environment file, `*.user.*`". With environments off, no
-375 source exists, so the Morphir preset keeps exactly Morphir's priorities.
+Owner-accepted order "primary, environment file, `*.user.*`". The 390 value puts local
+overrides between environment files and user overrides (Owner (2026-10-20)). With
+environments and local overrides off, no 375 or 390 source exists, so the Morphir
+preset keeps exactly Morphir's priorities.
 
 Report and `path_json` kind names come from the core mapping of `FileRole` to Morphir's
 names. Conventions only assigns the role.
@@ -236,12 +250,14 @@ Conventions declares the filters on the sources it makes with the core operation
 have no provenance.
 
 - Member-scope keys, with `warn=true`: key paths that only the workspace can set. They
-  are removed from member primaries, member environment files and member overrides.
-  Morphir uses `workspace.out_dir` (Rust loader `LayerScope::Member`).
+  are removed from member primaries, member environment files, member local overrides
+  and member user overrides. Morphir uses `workspace.out_dir` (Rust loader
+  `LayerScope::Member`).
 - Inherited filter, with `warn=false`: top-level keys that a layer does not pass to
   scopes it does not own. When a member is selected, the filter removes them from the
-  system, global, workspace primary, workspace environment-file and workspace override
-  layers. This is morphir-moonbit `shared()` with `["project", "workspace"]`.
+  system, global, workspace primary, workspace environment-file, workspace
+  local-override and workspace user-override layers. This is morphir-moonbit
+  `shared()` with `["project", "workspace"]`.
 - The Morphir preset uses both. The Rust loader has only the member-scope filter. The
   inherited filter changes no ported `config.feature` case. It is recorded here as a
   known difference from the Rust loader.
@@ -253,7 +269,8 @@ have no provenance.
   enables them (Call (R8)). The Morphir preset leaves them off.
 - The name is `Option[String]` with no default. The sources, from high to low: the
   name in `DiscoveryOptions` (hosting fills it from `--environment`),
-  `<PREFIX>_ENVIRONMENT` from the environment map, the default from `environments`.
+  `<PREFIX>_ENVIRONMENT` from the variable set of the run, the default from
+  `environments`.
   An empty variable counts as unset.
 - Call (R7): hosting parses the arguments one time with argparse, before any file
   loads. Conventions never reads the arguments. It takes the results as plain input:
@@ -276,7 +293,9 @@ have no provenance.
 - Call (this change): a name must be non-empty, must not contain `/`, `\`, `.` or a
   control character, and must not equal `user` in any case. `user` would make
   `<app>.user.<ext>` both an override and an environment file. Case-insensitive file
-  systems make `User` the same file, so the check ignores case. An invalid name raises
+  systems make `User` the same file, so the check ignores case.
+- Owner (2026-10-20): `local` is also a reserved name in any case, so
+  `<app>.local.<ext>` is never an environment file. An invalid name raises
   `ConfigError::InvalidEnvironmentName` that names the source of the name.
 - Call (R8): hosting adds `<PREFIX>_ENVIRONMENT` and `<PREFIX>_HOME` to the reserved
   names of the environment-variable source. Conventions does not change that source. An
@@ -300,9 +319,11 @@ the real names.
 Discovery is a pure, synchronous function. It runs over the core `FileTree` and returns
 the core `LoadStep`:
 
-- Inputs: the `FileTree`, `Platform`, the environment map and the start directory (from
-  the core load context), the registered formats (from the builder), and the
-  `Conventions` value with its `DiscoveryOptions`.
+- Inputs: the `FileTree`, `Platform`, the variable set (`env_vars`) and the working
+  directory (`working_dir`) from the core load context, the registered formats (from
+  the builder), and the `Conventions` value with its `DiscoveryOptions`.
+- Owner (2026-10-20): walk-up starts at the working directory of the run. This
+  document calls it the start directory.
 - `Done(result)`: ordered `ConfigSource` values with their filters, `SourceReport`
   values, warnings, the environment name, the workspace root and the member root.
 - `Need(requests)`: the `FileRequest` values (directory listings and file contents)
@@ -323,11 +344,11 @@ file-system root.
 This change has no host package. File reading is in the core package
 `moonrockz/moon-lander/config/host`, with per-target files:
 
-| Target | File access | Environment and working directory |
+| Target | File access | Variable set and working directory |
 | --- | --- | --- |
-| native | `moonbitlang/async` fs | `moonbitlang/core/env` |
-| js | The TypeScript adapter on `node:fs`, built with Bun (Owner (O2)) | `moonbitlang/core/env` |
-| wasm, wasm-gc | No adapter. The host gives a `FileTree` with `\|> @hosting.files(tree)` | Injected |
+| native | `moonbitlang/async` fs | The builder values; else `config/host` reads `moonbitlang/core/env` |
+| js | The TypeScript adapter on `node:fs`, built with Bun (Owner (O2)) | The builder values; else `config/host` reads `moonbitlang/core/env` |
+| wasm, wasm-gc | No adapter. The host gives a `FileTree` with `\|> @hosting.files(tree)` | The builder values |
 
 This change tests discovery through that adapter on native and js, and through an
 injected tree on wasm and wasm-gc. The AGENTS.md exception for the TypeScript adapter
@@ -355,7 +376,7 @@ belongs to the `config/host` js story in `add-configuration-core` (Call (R12)).
 ### D15. Legacy fallback (Call)
 
 A legacy file is a root marker and a primary only when no primary candidate exists at
-that location. It has no user override and no environment file. The application gives a
+that location. It has no local override, no user override and no environment file. The application gives a
 decoder from the parsed value to a layer, because the legacy format is application
 specific. Call (this change): the legacy part takes its own `Format` value. That format
 is not registered with the builder, so its extensions do not join the searched
@@ -377,7 +398,9 @@ The preset is in `tests/` and uses only public parts:
   `["project", "workspace"]`;
 - reserved environment names `MORPHIR_HOME` and `MORPHIR_LOG_DIR` given to the core
   environment source, because the fixture does not use hosting;
-- environments off.
+- environments off;
+- local overrides off (`without` the local override part), because Morphir has no
+  local layer (Owner (2026-10-20)).
 
 Ported `config.feature` cases: dotted-key lookup after discovery; walk-up from
 `src/nested`; explicit `--config ../configs/project.yaml` from `elsewhere` (given as
@@ -397,6 +420,23 @@ also run as plain snapshot tests in `tests/config-conventions-laws` on all four 
 so wasm and wasm-gc are covered (Call (this change)). A small subset runs over a real
 temporary directory on native and js, also on Windows, to check discovery through the
 core adapter.
+
+### D17. Local overrides (Owner (2026-10-20); Call: part of `app_dirs`)
+
+- A local override is for one checkout, and git ignores it. A user override is the
+  preference of one person. Both sit next to the chosen primary.
+- Candidates: `<app>.local.<ext>` next to a primary in the `<app>.<ext>` or
+  `.<app>/<app>.<ext>` layout, and `config.local.<ext>` next to
+  `.config/<app>/config.<ext>`. The extensions come from the registered formats, as
+  for user overrides. More than one existing candidate for one primary is an
+  ambiguity error.
+- Role `File(LocalOverride)`, report name `local-override`, priority 390.
+- Order for a workspace member: workspace local, member local, then workspace user,
+  member user.
+- Explicit primaries in a standard layout get local overrides. Legacy files and other
+  explicit files do not.
+- Call: `app_dirs` includes `local_overrides()`. `base` does not. The Morphir preset
+  removes it, so the preset still reproduces Morphir exactly.
 
 ## Risks / Trade-offs
 

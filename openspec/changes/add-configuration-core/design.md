@@ -38,6 +38,9 @@ Decisions from the reconciliation addendum of 2026-10-20 show their item number:
 **Owner (O2)** for an owner answer, **Call (R1)** for a reconciliation call. The
 addendum replaces earlier text where they disagree.
 
+**Owner (2026-10-20)** marks two later owner decisions: the local override layer
+(D4) and one variable set and one working directory for each run (D4a, D13).
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -69,7 +72,7 @@ addendum replaces earlier text where they disagree.
 | `config/formats/yaml` | YAML format, default and strict profiles | all |
 | `config/formats/json5` | `.json` and `.json5` format | all |
 | `config/formats/ion` | Ion text format | all |
-| `config/host` | the request loop: read files, the process environment, and the working directory | native, js |
+| `config/host` | the request loop: read files; fill a missing variable set or working directory from the process | native, js |
 
 **Call (R1)**: `config/host` is the one configuration adapter package, with one
 file for each target. Conventions has no host package of its own. The adapter
@@ -141,6 +144,7 @@ pub(all) enum FileRole {
   Workspace
   Member
   EnvironmentFile
+  LocalOverride
   UserOverride
   Legacy
 } derive(Eq, Show)
@@ -166,6 +170,7 @@ changes. Reports and `path_json` show Morphir's kind names through the role:
 | `File(Workspace)`, `File(Explicit)`, `File(Legacy)` | `project` |
 | `File(Member)` | `workspace-member` |
 | `File(EnvironmentFile)` | `environment-file` |
+| `File(LocalOverride)` | `local-override` |
 | `File(UserOverride)` | `user-override` |
 | `Environment` | `environment` |
 | `Overrides` | `overrides` |
@@ -174,6 +179,11 @@ changes. Reports and `path_json` show Morphir's kind names through the role:
 Morphir loads `--config` and its legacy file as the project layer. `in-memory` and
 `overrides` have no Morphir name. These report names are final for all four
 changes. They match the serialized names of the Morphir Rust loader.
+
+**Owner (2026-10-20)**: `File(LocalOverride)` is the local override layer. A local
+file is for one checkout and git ignores it. A user override is the preference of
+one person. The report name is `local-override`. Morphir has no local layer, so
+this name has no Morphir equivalent, and the Morphir preset does not use the role.
 
 **Call (R2)**: `SourceSelection[T]` stays in core. It keeps one name for the Morphir
 `Discover | Explicit(path) | Skip` and `Process | Explicit(vars) | Skip` choices.
@@ -184,8 +194,8 @@ changes. They match the serialized names of the Morphir Rust loader.
   explicit candidate list at one location. `Skip` gives a source with no input
   and the status `skipped`.
 - An environment source uses `SourceSelection[Map[String, String]]`. `Discover`
-  means the process environment, which the host supplies (D13). `Explicit(vars)`
-  uses only `vars`.
+  means the variable set of the builder, which the host supplies (D13).
+  `Explicit(vars)` uses only `vars`.
 
 `ConfigSource` is an immutable struct: kind, display name, priority, an optional
 list `MergePolicy`, key filters (R9, below), and the input. Constructors use
@@ -219,6 +229,7 @@ are:
 | Workspace primary, explicit file, legacy file | 300 |
 | Member primary | 350 |
 | Environment file | 375 |
+| Local override (Owner (2026-10-20)) | 390 |
 | User override | 400 |
 | Environment variables | 600 |
 | Overrides (argparse) | 700 |
@@ -268,8 +279,8 @@ pub(all) enum Platform {
 pub(all) struct LoadContext {
   tree : FileTree
   platform : Platform?               // None when no host gave it
-  env : Map[String, String]          // the process variables, else empty
-  base_dir : String?                 // the working directory from the host
+  env_vars : Map[String, String]     // the variable set of the run, else empty
+  working_dir : String?              // the working directory of the run
   formats : Array[Format]            // the registry (R11)
 }
 
@@ -305,6 +316,11 @@ pub fn provider(builder : ConfigBuilder, p : SourceProvider) -> ConfigBuilder
   With no value, a provider decides its own fallback.
 - Other discovery results (the environment name, the workspace root, the member
   root) belong to the conventions change. The core does not model them.
+- **Owner (2026-10-20)**: each run has one variable set and one working directory.
+  `@config.env_vars(builder, vars)` and `@config.working_dir(builder, dir)` set them.
+  The load context gives the same values to every provider. A provider reads
+  variables only from `env_vars` and starts its search at `working_dir`. It never
+  reads the process.
 
 ### D5. In-memory, defaults, and overrides sources
 
@@ -346,11 +362,10 @@ keep their source text (`repr`), so the conversion to Ion keeps integers exact.
 in morphir-moonbit. An environment source with no matching variables reports
 `loaded`, because the source was read.
 
-**Call (this change)**: a `Discover` environment source reads the process
-variables that the host gives to the builder with
-`@config.process_env(builder, vars)`. `config/host` does this on native and js
-(D13). When no host gave them (for example on wasm with no hosting), the source
-adds no key and reports `not-found`.
+**Call (this change)**: a `Discover` environment source reads the variable set of
+the builder (`@config.env_vars(builder, vars)`, D4a). When the builder holds no
+variable set (for example on wasm with no hosting), the source adds no key and
+reports `not-found`.
 
 **Call (R8)**: the core takes the reserved-name list as an input. Hosting composes
 the environment source by default, with the uppercase application name as the
@@ -701,9 +716,10 @@ pub(all) enum LoadStep[T] {
   it builds and gives `Done(config)`. The same inputs give the same result on every
   target.
 - `@config/host.load(builder) -> Config raise` is `async` and runs on native and
-  js. It gives the process environment to the builder (`process_env`), sets the
-  base directory to the working directory (`base_dir`) and the `Platform`
-  (`platform`), and then
+  js. It uses the variable set and the working directory that the builder holds.
+  **Call**: only when the builder holds no variable set does the adapter read the
+  process variables, and only when it holds no working directory does it read the
+  process working directory. It sets the `Platform` (`platform`), and then
   runs the request loop: call `@config.load`, answer each `Need`, add the answers
   to the tree, and call again. When a read or a listing finds no file or directory,
   the loop adds `with_missing(path)`, so each round makes progress and never asks
@@ -712,19 +728,23 @@ pub(all) enum LoadStep[T] {
   with `|> @hosting.files(tree)` and gets the result from `@config.load` with a
   complete tree.
 
-**Call (this change)**: `@config.base_dir(builder, dir)` sets the directory that a
-relative explicit path joins. With no base directory, the path stays as given.
+**Call (this change)**: a relative explicit path joins the working directory of the
+builder (`@config.working_dir`). With no working directory, the path stays as given.
 Reports and origins show the joined path.
 
-**Call (R1)**: environment variables and the working directory come from
-`moonbitlang/core/env` (`get_env_vars`, `current_dir`) on native and js, because
-`moonbitlang/async` has no environment API.
+**Owner (2026-10-20)**: one variable set and one working directory for each run.
+Nothing reads the process environment or the process working directory, except
+where a host fills a value that nobody gave. In a hosted run, hosting fills both
+values one time and gives them to the builder, so `config/host` reads nothing from
+the process. **Call (R1)**: a process read uses `moonbitlang/core/env`
+(`get_env_vars`, `current_dir`) on native and js, because `moonbitlang/async` has no
+environment API.
 
-| Target | Files | Environment and working directory |
+| Target | Files | Variable set and working directory |
 | --- | --- | --- |
-| native | `moonbitlang/async` `fs` | `moonbitlang/core/env` |
-| js | TypeScript adapter over `node:fs` (O2) | `moonbitlang/core/env` |
-| wasm, wasm-gc | injected `FileTree` | injected by the host |
+| native | `moonbitlang/async` `fs` | the builder values, else `moonbitlang/core/env` |
+| js | TypeScript adapter over `node:fs` (O2) | the builder values, else `moonbitlang/core/env` |
+| wasm, wasm-gc | injected `FileTree` | the builder values from the host |
 
 **Owner (O2)**: js file access uses a TypeScript adapter against `node:fs`,
 `node:path`, and `node:process`, built and bundled with Bun. Bun is pinned in
@@ -785,8 +805,8 @@ fallbacks (binding replaces them), and `Invalid(String)`.
 4. In-memory pairs: list order, no type inference (D5).
 5. Reserved environment names compare without case (D6).
 6. Empty-key environment variable is an error; an empty environment reports
-   `loaded`; a `Discover` environment with no process variables reports
-   `not-found` (D6).
+   `loaded`; a `Discover` environment with no variable set reports `not-found`
+   (D6).
 7. KeyPath quoting and exact case (D3).
 8. Sexp as list; annotation rule for merged structs (D2).
 9. Format selection by extension; `.yml` accepted; Ion text only (D7).
@@ -802,6 +822,7 @@ fallbacks (binding replaces them), and `Invalid(String)`.
 17. Candidate existence from exact names in directory listings (D13).
 18. Synchronous `node:fs` calls in the TypeScript adapter; source in
     `pkgs/lander/adapters/node/`; checked-in generated bundle (D13).
+19. A relative explicit path joins the working directory of the builder (D13).
 
 ## Risks / Trade-offs
 

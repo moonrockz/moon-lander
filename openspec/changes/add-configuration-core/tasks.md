@@ -39,17 +39,17 @@ Bead: lander-4us.2.4
 - [ ] 4.1 Add null-overlay handling and null-field removal from the result; verify the "Null does not unset" and "Null with no base value" scenarios.
 - [ ] 4.2 Make merge copy only changed paths and keep inputs unchanged; verify "Inputs do not change" and "New keys follow base keys", plus an associativity property test over generated trees.
 - [ ] 4.3 Add `Origin`, the provenance map, and stale-record removal ported from morphir-moonbit `merge`; verify the "Winning origins" and "Stale records go" scenarios.
-- [ ] 4.4 Add `SourceReport` with kind, name, priority, path, candidates, status, and warnings, and the Morphir kind names; verify the "Report order and status" and "File role names" scenarios.
+- [ ] 4.4 Add `SourceReport` with kind, name, priority, path, candidates, status, and warnings, the Morphir kind names, and `local-override`; verify the "Report order and status" and "File role names" scenarios.
 
 ## 5. Source model: selection, file source, ambiguity, exclusion
 
 Bead: lander-4us.2.5
 
-- [ ] 5.1 Add `SourceSelection[T]`, `SourceKind`, `FileRole`, `ConfigBuilder`, `add`, and the defaults source; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
-- [ ] 5.2 Add display priorities with the defaults by kind and role, the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities" and "Decreasing priority" scenarios.
+- [ ] 5.1 Add `SourceSelection[T]`, `SourceKind`, `FileRole` (with `LocalOverride`), `ConfigBuilder`, `add`, and the defaults source; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
+- [ ] 5.2 Add display priorities with the defaults by kind and role (local override 390), the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities", "Override file priorities", and "Decreasing priority" scenarios.
 - [ ] 5.3 Add `FileTree` (with `with_listing`, `with_file`, and `with_missing`), `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files", "Complete tree never asks", "Absence record answers a request", and "Missing directory answers its children" scenarios.
-- [ ] 5.4 Add `Platform`, `LoadContext`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
-- [ ] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), `base_dir`, and the explicit file source over a `FileTree`; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the base directory".
+- [ ] 5.4 Add `Platform`, `LoadContext` (with `env_vars` and `working_dir`), `@config.env_vars`, `@config.working_dir`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
+- [ ] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), and the explicit file source over a `FileTree` that joins a relative path to the working directory; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the working directory".
 - [ ] 5.6 Add the candidate-list file source, the exact-name existence check over listings, and `ConfigError::Ambiguous(display~, location~, candidates~)` with its message; verify the candidate ambiguity scenarios and "Name match is exact".
 - [ ] 5.7 Add `ConfigSource::exclude(paths, warn~)`, `ConfigWarning::KeyRemoved`, and `SourceReport.warnings`; verify the three source subtree exclusion scenarios.
 - [ ] 5.8 Document the source model in `pkgs/lander/README.md` with an example that runs as a doc test; verify with `mise run test`.
@@ -60,7 +60,7 @@ Bead: lander-4us.2.6
 
 - [ ] 6.1 Port the environment key mapping (prefix in any case, leading `_`, `__`, lowercase, empty segment error) and reserved names; verify all environment name and reserved name scenarios.
 - [ ] 6.2 Port value typing and the shorter-path-wins order from morphir-moonbit; verify the "Typed values", "JSON list value", "Invalid JSON stays text", "Integer out of range", and both shorter-path scenarios, the last with two input orders.
-- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, and read `Discover` variables from `process_env`; verify "Environment origin names the variable", "Explicit environment variables", and "Discover environment with no host".
+- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, and read `Discover` variables from the builder variable set (`@config.env_vars`); verify "Environment origin names the variable", "Explicit environment variables", and "Discover environment with no host".
 - [ ] 6.4 Add the overrides source; verify the "Overrides beat the environment" scenario.
 
 ## 7. TOML date and time mapping
@@ -128,9 +128,9 @@ Bead: lander-4us.2.14
 
 Bead: lander-4us.2.15
 
-- [ ] 15.1 Add the `config/host` package with the native `load(builder)` request loop over `moonbitlang/async` `fs`, with process variables and the working directory from `moonbitlang/core/env`; verify "Host adapter fills the inputs" with a native test over a temporary directory.
+- [ ] 15.1 Add the `config/host` package with the native `load(builder)` request loop over `moonbitlang/async` `fs`. It uses the variable set and the working directory of the builder, and reads a value from `moonbitlang/core/env` only when the builder holds none. Verify "Host adapter fills the inputs" and "Adapter uses the given values" with native tests over a temporary directory.
 - [ ] 15.2 Convert Windows paths to the `/` form at the adapter boundary and back for file-system calls; verify "Windows path in a report" in the windows-latest CI leg.
-- [ ] 15.3 Document the wasm and wasm-gc path (an injected `FileTree` and process variables) in `pkgs/lander/README.md`; verify that the README example runs as a doc test.
+- [ ] 15.3 Document the wasm and wasm-gc path (an injected `FileTree`, a variable set, and a working directory) in `pkgs/lander/README.md`; verify that the README example runs as a doc test.
 
 ## 16. js host adapter in TypeScript
 
@@ -138,7 +138,7 @@ Bead: lander-4us.2.16
 
 - [ ] 16.1 Spike: bundle a small TypeScript module over `node:fs` with Bun through a moonx task script, call it from MoonBit `extern "js"` functions, and run it on Node and Bun on Linux, macOS, and Windows; verify that a js test reads one file. If the spike fails, stop and return to the owner.
 - [ ] 16.2 Add `scripts/build-node-adapter.mbtx` and a mise task that bundle `pkgs/lander/adapters/node/` with Bun into the checked-in generated js file of `config/host`, and add a check to `mise run check` that the generated file is current; verify that the check fails after an edit to the TypeScript source.
-- [ ] 16.3 Add the js request loop of `config/host` with synchronous `node:fs` reads and only `node:*` APIs that Node and Bun both support; verify "Host adapter fills the inputs" on the js target on Linux and Windows CI.
+- [ ] 16.3 Add the js request loop of `config/host` with synchronous `node:fs` reads and only `node:*` APIs that Node and Bun both support; verify "Host adapter fills the inputs" and "Adapter uses the given values" on the js target on Linux and Windows CI.
 - [ ] 16.4 Add a narrow AGENTS.md exception: js file access uses the TypeScript adapter over `node:fs`, built with Bun through a moonx task script; verify that `mise run check` passes.
 
 ## 17. Integration check

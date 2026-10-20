@@ -4,7 +4,9 @@ Labels: "Owner" marks a decision of the project owner. "Call" marks a designer
 decision that the owner did not reject. "Call (this change)" marks a decision that
 this change adds. The owner can change a Call without a change to the Owner decisions.
 Items O1 to O3 and R1 to R12 come from the reconciliation addendum of 2026-10-20.
-They replace earlier text where the two disagree.
+They replace earlier text where the two disagree. "Owner (2026-10-20)" marks the
+later owner decisions on host starting settings (D13), the `IntoEnvVars` input (D14),
+and the local override layer of `configuration-conventions`.
 
 ## Context
 
@@ -109,11 +111,14 @@ pub struct Context[S] {
   environment : HostEnvironment
   lifetime : Lifetime
   args : @argparse.Matches
+  env_vars : Map[String, String]   // the one variable set of the run (D13)
+  working_dir : String             // the one working directory of the run (D13)
 }
 ```
 
-- Call (this change): the factory gets a `BuildContext` (configuration, environment
-  and parsed arguments), not `Context[S]`, because `S` does not exist yet.
+- Call (this change): the factory gets a `BuildContext` (configuration, environment,
+  parsed arguments, `env_vars` and `working_dir`), not `Context[S]`, because `S` does
+  not exist yet.
 - Call (this change): `Context[S]` is immutable. Mutable state lives in the
   services that `S` holds. The stop phase gets the same `Context[S]` value. This fixes
   the starbase fault where shutdown saw a copy of the session.
@@ -191,10 +196,9 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
   works.
 - Call (R1): on wasm and wasm-gc, the application gives the file snapshot with
   `|> @hosting.files(tree)`. On native and js, the host reads files itself.
-- Call (R1): variables and the working directory come from `moonbitlang/core/env` on
-  native and js. On wasm and wasm-gc the application gives the variables with
-  `|> @hosting.env_vars(Explicit(vars))`. With no value there, the variable source is
-  empty.
+- Owner (2026-10-20): the variable set and the working directory of the run are
+  host starting settings (D13). The application gives them to `@lander.cli` or with
+  later steps. Each omitted value comes from the process on native and js.
 
 ### D3. Run order (Owner: .NET model; Call (R7): argparse runs first)
 
@@ -202,20 +206,25 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
    error or a misused standard flag ends the run with `UsageError` and exit code 2,
    before any file read. `--help` and `--version` end the process inside argparse with
    code 0.
-2. The host finds the environment name for `HostEnvironment`: the `--environment`
-   value, then the `<PREFIX>_ENVIRONMENT` variable, then the builder default. This is
-   the same order that conventions uses, so both give the same name. It checks the
-   name with the name rules of `configuration-conventions`. A bad name raises
-   `ConfigError::InvalidEnvironmentName` (exit code 2).
-3. The host makes `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`)
+2. The host fixes the variable set and the working directory of the run (D13). It
+   converts a given `IntoEnvVars` value (D14), and fills each omitted value from the
+   process on native and js. A conversion error ends the run with `UsageError` and
+   exit code 2, before any file read. The host gives both values to the core builder
+   (`@config.env_vars`, `@config.working_dir`).
+3. The host finds the environment name for `HostEnvironment`: the `--environment`
+   value, then `<PREFIX>_ENVIRONMENT` in the variable set of the run, then the builder
+   default. This is the same order that conventions uses, so both give the same name.
+   It checks the name with the name rules of `configuration-conventions`. A bad name
+   raises `ConfigError::InvalidEnvironmentName` (exit code 2).
+4. The host makes `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`)
    from the standard flags (D10), and gives it to the conventions parts.
-4. The host loads the configuration. Native and js: `@config/host.load(builder)`.
+5. The host loads the configuration. Native and js: `@config/host.load(builder)`.
    wasm and wasm-gc: `@config.load(builder, tree)` with the tree from
    `@hosting.files`. The merge order is the application sources, then the
    environment variables (priority 600), then the argparse overrides (priority 700).
    A `ConfigError` ends the run with exit code 2 before any hook.
-5. The host makes `HostEnvironment` and the factory builds `S`.
-6. Start phase, started event, command, stop phase, exit.
+6. The host makes `HostEnvironment` and the factory builds `S`.
+7. Start phase, started event, command, stop phase, exit.
 
 - Call (R7): conventions never reads `argv`. It gets the flag values only through
   `DiscoveryOptions`. The conventions bootstrap read of raw arguments is not used.
@@ -440,7 +449,7 @@ pub fn HostEnvironment::is_production(self : HostEnvironment) -> Bool
 - Call (this change): the `is_*` checks compare without case, as .NET does. With no
   name, all give `false`. File matches stay exact (conventions).
 - Call (this change): the content root is the builder value, else the working
-  directory on native and js, else `.` on wasm targets.
+  directory of the run (D13). On wasm and wasm-gc with no `working_dir`, that is `/`.
 - Call (O3): the content root uses `/` as separator on every platform. The host
   converts a Windows working directory at the boundary.
 
@@ -462,8 +471,9 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   that is not given leaves its field at "not given".
   - `--environment <name>` sets `environment` and the host environment name (D3).
   - `--config <path>` sets `config` to `Explicit(path)` for the primary file.
-  - `--isolated` sets `isolated`. Conventions then skips the system, global and
-    user-override layers and keeps the environment variables, as in Morphir.
+  - `--isolated` sets `isolated`. Conventions then skips the system, global,
+    local-override and user-override layers and keeps the environment variables, as
+    in Morphir.
   - Call (this change, coordinator item): `--project <path|name>` sets `project`.
     Conventions selects the member with Morphir `--project` rules: a path match
     before a name match. An ambiguous name raises `ConfigError::AmbiguousProject`, and
@@ -489,10 +499,10 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 
 | Package | Targets | Contents |
 | --- | --- | --- |
-| `moonrockz/moon-lander/hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
+| `moonrockz/moon-lander/hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
 | `moonrockz/moon-lander/hosting/console` | native, js | Zig signal stub and native driver; js driver over the TypeScript adapter; process exit |
 | `moonrockz/moon-lander/hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
-| `moonrockz/moon-lander` (`@lander`) | all | `cli` shortcut |
+| `moonrockz/moon-lander` (`@lander`) | all | `cli` shortcut with the starting settings |
 
 - `hosting` imports `config`, `config/conventions`, `config/host` (native and js) and
   `moonbitlang/core/argparse` (for `Context[S].args`).
@@ -508,17 +518,104 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   overrides.
 - The reserved names always include `<PREFIX>_ENVIRONMENT` and `<PREFIX>_HOME`.
   `|> @hosting.reserve_env([...])` adds more names, for example `MORPHIR_LOG_DIR`.
-- `|> @hosting.env_vars(selection)` selects `Process` (default on native and js),
-  `Explicit(vars)` (tests and wasm), or `Skip`. The bootstrap read of
-  `<PREFIX>_ENVIRONMENT` uses the same variables.
+- The source reads the one variable set of the run (D13). The bootstrap read of
+  `<PREFIX>_ENVIRONMENT` and the conventions directory resolution read the same set.
+- Call (this change): one API for the variable set. It keeps the three earlier
+  selections:
+  - `Process`: no step. The set is the one from `@lander.cli`, which is the process
+    variables on native and js when `env_vars` is omitted, and empty on wasm.
+  - `Explicit(vars)`: `|> @hosting.env_vars(vars)` with `vars : &IntoEnvVars`. It
+    replaces the set for every reader, not only for this source.
+  - `Skip`: `|> @hosting.skip_env_source()`. The `<PREFIX>_*` source loads nothing and
+    reports `skipped`. The set stays for the bootstrap and the directories.
 - `@conventions.app_dirs` gets the application name and the prefix from the host, so
   `$<PREFIX>_HOME` and the variable source use one prefix.
+
+### D13. Host starting settings (Owner (2026-10-20): like .NET `HostApplicationBuilderSettings`)
+
+```moonbit
+pub fn[S] cli(
+  name : String,
+  args : Array[String],
+  env_vars? : &@hosting.IntoEnvVars,
+  working_dir? : String,
+  environment? : String,
+) -> @hosting.HostBuilder[S]
+
+pub fn[S] env_vars(self : HostBuilder[S], vars : &IntoEnvVars) -> HostBuilder[S]
+pub fn[S] working_dir(self : HostBuilder[S], path : String) -> HostBuilder[S]
+```
+
+- Owner: each run has one starting variable set and one working directory. Nothing
+  reads the process environment or the process working directory, except where the
+  host fills an omitted value.
+- Owner: on native and js, an omitted `env_vars` or `working_dir` comes from the
+  process through `moonbitlang/core/env`. Call: on wasm and wasm-gc, an omitted
+  `env_vars` is the empty set and an omitted `working_dir` is `/`.
+- Call (this change): the host fills omitted values one time, in run step 2 (D3), and
+  only for values that no step gave. Explicit values therefore give no process read,
+  and the same inputs give the same result on every target.
+- Call: an explicit `environment?` is the builder default name, the same as
+  `|> @hosting.default_environment(name)`, so it also enables environment files. The
+  resolution order stays: `--environment`, then `<PREFIX>_ENVIRONMENT`, then the
+  default.
+- Owner: a later step can change the values before `build`.
+  `|> @hosting.env_vars(vars)` replaces the set (D12). Call:
+  `|> @hosting.working_dir(path)` replaces the working directory. The last step wins.
+- Owner: the one set feeds the `<PREFIX>_*` environment source (600, D12), the
+  environment-name bootstrap (D3), all directory resolution in conventions (`HOME`,
+  `XDG_CONFIG_HOME`, `APPDATA`, `PROGRAMDATA`, `USERPROFILE`, `<PREFIX>_HOME`), and the
+  core `config/host` adapter. The host gives the set and the directory to the core
+  builder, so `config/host` reads nothing from the process. Walk-up discovery starts at
+  the working directory.
+- Owner: `BuildContext.env_vars`, `BuildContext.working_dir`, `Context[S].env_vars`
+  and `Context[S].working_dir` show the values. `env_vars` is an immutable
+  `Map[String, String]`: the host makes it one time and never changes it.
+- Call (O3): the working directory uses `/` as the separator on every platform. The
+  host converts a Windows process working directory at the boundary.
+
+### D14. Variable set from a map or JSON (Owner idea; Call on shape, verified with a `moonc v0.10.15` probe)
+
+```moonbit
+pub trait IntoEnvVars {
+  into_env_vars(Self) -> Map[String, String] raise
+}
+pub impl IntoEnvVars for Map[String, String]
+pub impl IntoEnvVars for Json
+```
+
+The parameter type is `&IntoEnvVars`. Probe results:
+
+- A brace literal with only string values, given to `&IntoEnvVars`, becomes a `Map`.
+- A literal with mixed values needs `({ ... } : Json)`. Without it, the compiler
+  reports "has type: Int, wanted: String".
+- A `Json` value, for example a fixture from `@json.parse`, passes directly.
+- An empty `{}` is ambiguous. Use `Map([])`.
+
+```moonbit
+@lander.cli("acme", ["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
+@lander.cli("acme", [], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
+@lander.cli("acme", [], env_vars=fixture)   // fixture : Json from @json.parse
+@lander.cli("acme", [], env_vars=Map([]))
+```
+
+JSON rules (Call):
+
+- The root must be an object. Any other root raises `UsageError` (exit code 2).
+- A string value stays as it is.
+- A Boolean or a number becomes its JSON text, for example `true` and `1`.
+- An array or an object becomes its JSON text. The core environment source parses a
+  value that starts with `[` or `{` as JSON, so the value comes back the same.
+- `null` means that the variable is not set.
+- A nested object is not flattened into `__` names.
+- Keys stay exactly as written.
 
 ### Mapping from .NET and starbase
 
 | .NET | starbase 0.13.3 | Moon-Lander |
 | --- | --- | --- |
 | `Host.CreateApplicationBuilder(args)` | `App::default()` | `@lander.cli(name, args)` |
+| `HostApplicationBuilderSettings` | (none) | Optional labelled arguments of `@lander.cli` (`env_vars?`, `working_dir?`, `environment?`) |
 | `builder.Configuration.Add*` | Session loads its own config | `@hosting.configure(...)`, `@hosting_argparse.command(...)` |
 | `builder.Services` (DI) | `AppSession` fields | Services record `S` from `@hosting.build(factory)` |
 | `IHost` | `App` plus session | `Host[S]` |
@@ -562,6 +659,10 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   one console host runs per process.
 - [A cancelled command can leave partial output] → `defer` and `protect_from_cancel`
   are the tools. The stop hooks see the same state (D1).
+- [An argparse option with an environment source reads the process environment
+  inside argparse, not the variable set of the run] → The standard flags have no
+  environment source. Document that an application option with one breaks the
+  "no process read" rule for explicit runs.
 - [`moonbitlang/async` is experimental] → Pin an exact version (0.22.5 was read for
   this design). Keep all use in drivers. The engine does not import it.
 

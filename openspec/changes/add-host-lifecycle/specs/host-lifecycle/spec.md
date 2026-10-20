@@ -92,8 +92,8 @@ error with exit code 2 before any file read.
 The host SHALL give a host environment that holds the application name, an optional
 environment name, and the content root. The application name MUST be the name given
 to `@lander.cli` or the builder. The content root MUST be the value the builder sets.
-Without that value, it MUST be the process working directory on native and js, and `.`
-on wasm and wasm-gc. The content root MUST use `/` as the separator on every platform.
+Without that value, it MUST be the working directory of the run. The content root MUST
+use `/` as the separator on every platform.
 
 #### Scenario: No environment name
 
@@ -118,8 +118,8 @@ on wasm and wasm-gc. The content root MUST use `/` as the separator on every pla
 ### Requirement: Environment name resolution order
 
 The host SHALL take the environment name from the first of these that has a value:
-the `--environment` argument, the `<PREFIX>_ENVIRONMENT` variable, the builder
-default. The host MUST check the name with the name rules of
+the `--environment` argument, the `<PREFIX>_ENVIRONMENT` variable in the variable set
+of the run, the builder default. The host MUST check the name with the name rules of
 `configuration-conventions`. An invalid name MUST stop the run with exit code 2
 before any hosted-service hook.
 
@@ -127,6 +127,11 @@ before any hosted-service hook.
 
 - **WHEN** the arguments contain `--environment Staging` and `ACME_ENVIRONMENT=Production` exists
 - **THEN** the environment name is `Some("Staging")`
+
+#### Scenario: Starting environment is the default
+
+- **WHEN** the application calls `@lander.cli("acme", args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
+- **THEN** the environment name is `Some("Staging")`, and without that variable it is `Some("Production")`
 
 #### Scenario: Invalid name
 
@@ -167,7 +172,8 @@ The host SHALL add the environment-variable source of `configuration-core` with 
 variable prefix, at priority 600, after the application sources and before the
 overrides source. Its reserved names MUST include `<PREFIX>_ENVIRONMENT` and
 `<PREFIX>_HOME`, and each name that the application adds with `@hosting.reserve_env`.
-The application MUST be able to give explicit variables or to skip the source.
+The source MUST read the variable set of the run. The application MUST be able to skip
+the source.
 
 #### Scenario: Reserved names are not keys
 
@@ -178,6 +184,96 @@ The application MUST be able to give explicit variables or to skip the source.
 
 - **WHEN** `acme.toml` sets `log.format = "text"`, and `ACME_LOG__FORMAT=json` exists
 - **THEN** the configuration holds `log.format = "json"`, and the source report shows the variable source with priority 600
+
+### Requirement: Host starting settings
+
+`@lander.cli` SHALL accept the optional labelled arguments `env_vars`, `working_dir`
+and `environment`. On native and js, an omitted `env_vars` or `working_dir` MUST come
+from the process. On wasm and wasm-gc, an omitted `env_vars` MUST be the empty set and
+an omitted `working_dir` MUST be `/`. When both are given, the host MUST NOT read the
+process environment or the process working directory.
+
+#### Scenario: Explicit settings on every target
+
+- **WHEN** the application gives `env_vars` with `ACME_LOG__FORMAT=json` and `HOME=/home/test`, and `working_dir` `/w`, and `/w/acme.toml` exists (on wasm and wasm-gc, in the injected complete tree)
+- **THEN** wasm, wasm-gc, js and native give equal configuration and reports, and the host reads no process variable and no process working directory
+
+#### Scenario: Omitted settings on native
+
+- **WHEN** a native or js application omits `env_vars` and `working_dir`, starts in `/work/repo`, and the process holds `ACME_LOG__FORMAT=json`
+- **THEN** the working directory is `/work/repo`, and the configuration holds `log.format = "json"`
+
+#### Scenario: Omitted settings on wasm
+
+- **WHEN** a wasm-gc application omits `env_vars` and `working_dir`
+- **THEN** the variable set is empty, and the working directory is `/`
+
+### Requirement: Later steps replace the starting settings
+
+A `@hosting.env_vars` step SHALL replace the variable set of the run. A
+`@hosting.working_dir` step SHALL replace the working directory. The last step before
+the build MUST win.
+
+#### Scenario: A later env_vars step replaces the set
+
+- **WHEN** `@lander.cli` gets `env_vars` with `ACME_A=1`, and a later step `@hosting.env_vars` gives `ACME_B=2`
+- **THEN** the configuration holds `b = 2`, does not hold `a`, and `ctx.env_vars` holds only `ACME_B`
+
+#### Scenario: A later working_dir step
+
+- **WHEN** `@lander.cli` gets `working_dir` `/a`, and a later step `@hosting.working_dir("/b")` follows
+- **THEN** walk-up discovery starts at `/b`, and `ctx.working_dir` is `/b`
+
+### Requirement: One variable set and one working directory per run
+
+The variable set of the run SHALL feed the environment-variable source, the
+environment-name bootstrap, the conventions directory resolution and the core
+`config/host` adapter. Walk-up discovery MUST start at the working directory of the
+run. `BuildContext` and `Context[S]` MUST give both values as `env_vars` and
+`working_dir`. The host MUST NOT change them after the run starts.
+
+#### Scenario: Every reader sees one set
+
+- **WHEN** the variable set holds `ACME_ENVIRONMENT=Staging`, `ACME_LOG__FORMAT=json` and `HOME=/home/test`, and the process holds other values for these names
+- **THEN** the environment name is `Some("Staging")`, `log.format` is `"json"`, a global candidate is `/home/test/.acme/acme.toml`, and `ctx.env_vars` equals the given set
+
+### Requirement: Variable set from a map or JSON
+
+The `hosting` package SHALL give the trait `IntoEnvVars` with the method
+`into_env_vars(Self) -> Map[String, String] raise`, and implementations for
+`Map[String, String]` and `Json`. The `env_vars` arguments MUST take `&IntoEnvVars`.
+
+#### Scenario: Map literal
+
+- **WHEN** the application gives `env_vars={ "ACME_LOG__FORMAT": "json" }`
+- **THEN** the variable set holds `ACME_LOG__FORMAT=json`
+
+#### Scenario: JSON fixture
+
+- **WHEN** a test parses the fixture `{"ACME_LOG__FORMAT": "json"}` with `@json.parse` and gives the result as `env_vars`
+- **THEN** the variable set holds `ACME_LOG__FORMAT=json`
+
+### Requirement: JSON variable rules
+
+The root of a JSON variable set SHALL be an object, else the run MUST end with a
+`UsageError` and exit code 2. A string value MUST stay as it is. A Boolean, a number,
+an array or an object MUST become its JSON text. `null` MUST mean that the variable is
+not set. Nested objects MUST NOT be flattened. Keys MUST stay exactly as written.
+
+#### Scenario: Mixed values
+
+- **WHEN** the application gives `env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true, "ACME_TAGS": ["a", "b"] } : Json)`
+- **THEN** the variable set holds `ACME_PORT=8080`, `ACME_DEBUG=true` and `ACME_TAGS=["a","b"]`, and the configuration holds `port = 8080`, `debug = true` and `tags` as the list `["a", "b"]`
+
+#### Scenario: Null value
+
+- **WHEN** the JSON variable set holds `"ACME_PORT": null`
+- **THEN** the variable set does not hold `ACME_PORT`
+
+#### Scenario: Root that is not an object
+
+- **WHEN** the application gives the JSON array `["ACME_PORT"]` as `env_vars`
+- **THEN** the run ends with a usage error and exit code 2, and no configuration file is read
 
 ### Requirement: Configuration from an injected file tree on wasm
 

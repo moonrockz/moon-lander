@@ -13,6 +13,14 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   the tracked `.gitignore`. Preserve local files if removing them from an unpushed
   commit.
 
+## Planning and specifications
+
+- Follow `CONTRIBUTING.md` for the OpenSpec and beads workflow. Changes to behavior,
+  public APIs or requirements start as an OpenSpec change in `openspec/changes/`.
+- Each task group in a change's `tasks.md` is one beads story; its `Bead:` line holds
+  the ID. Tick the tasks in `tasks.md` and close the bead when the group is verified.
+- Run `mise exec -- openspec validate --all --strict` after you edit `openspec/`.
+
 ## Toolchain and tasks
 
 - Pin tools in `.config/mise/config.toml`. Run `mise trust` and `mise install`.

@@ -15,7 +15,7 @@ pub fn parse(
   let document = @toml_lib.parse(text) catch {
     error => raise parse_error(origin, error.to_string())
   }
-  @config.ConfigValue::from_ion(to_ion(document, origin))
+  @config.ConfigValue::from_ion(to_ion(document, origin), origin~)
 }
 
 ///|

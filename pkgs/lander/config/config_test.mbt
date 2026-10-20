@@ -7,11 +7,7 @@ fn key(text : String) -> @config.KeyPath {
 
 ///|
 fn tree(fields : Array[(String, @config.ConfigValue)]) -> @config.ConfigValue {
-  @config.ConfigValue::from_ion(
-    @ion.Ion::from_fields(
-      fields.map(field => @ion.field(field.0, field.1.to_ion())),
-    ),
-  )
+  @config.fields(fields)
 }
 
 ///|
@@ -231,4 +227,14 @@ test "a merged struct keeps the base annotations when the overlay has none" {
   @expect.expect(merged.to_ion().annotations().map(token => token.text())).to_equal(
     [Some("app")],
   )
+}
+
+///|
+test "a value tree from Ion must have a struct root" {
+  try @config.ConfigValue::from_ion(@ion.Ion::list([]), origin="numbers") catch {
+    error =>
+      @expect.expect(error).to_equal(InvalidRoot(origin="numbers", found="list"))
+  } noraise {
+    _ => fail("expected a list root to raise")
+  }
 }

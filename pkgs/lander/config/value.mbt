@@ -6,9 +6,15 @@ pub struct ConfigValue {
 } derive(@debug.Debug)
 
 ///|
-/// Wrap an Ion value.
-pub fn ConfigValue::from_ion(ion : @ion.Ion) -> ConfigValue {
-  { ion, }
+/// A source tree from an Ion value. The root must be a struct, else this
+/// raises `InvalidRoot` with `origin`.
+pub fn ConfigValue::from_ion(
+  ion : @ion.Ion,
+  origin? : String = "value",
+) -> ConfigValue raise ConfigError {
+  let value = { ion, }
+  value.check_root(origin)
+  value
 }
 
 ///|

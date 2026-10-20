@@ -12,6 +12,8 @@ pub(all) suberror ConfigError {
   )
   /// The root of a source tree is not a struct.
   InvalidRoot(origin~ : String, found~ : String)
+  /// A struct in a source tree holds the same field name twice.
+  DuplicateKey(origin~ : String, key~ : KeyPath)
   /// The text is not a valid key path.
   InvalidKeyPath(text~ : String, reason~ : String)
   /// No value is at the key path.
@@ -40,6 +42,8 @@ pub fn ConfigError::message(self : ConfigError) -> String {
     }
     InvalidRoot(origin~, found~) =>
       "The configuration root of \{origin} must be a struct, not a \{found}"
+    DuplicateKey(origin~, key~) =>
+      "Duplicate configuration key \{key} in \{origin}"
     InvalidKeyPath(text~, reason~) =>
       "Invalid configuration key path \"\{text}\": \{reason}"
     KeyNotFound(key) => "Configuration key not found: \{key}"

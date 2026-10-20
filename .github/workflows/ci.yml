@@ -99,13 +99,38 @@ jobs:
       - name: Test task scripts
         run: mise run test:scripts
 
+  # Windows support is a project requirement, so PRs build and test native and js there.
+  windows:
+    name: Windows (${{ matrix.target }})
+    runs-on: windows-latest
+    needs: [lint]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [js, native]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up the MSVC compiler for native builds
+        if: matrix.target == 'native'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        run: mise run build -- ${{ matrix.target }}
+      - name: Test
+        run: mise run test -- ${{ matrix.target }}
+
   # A single required check for branch protection.
   ci-ok:
     name: ci-ok
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, test, test-native-zig, test-scripts]
+    needs: [lint, build, test, test-native-zig, test-scripts, windows]
     steps:
       - name: Require every job to succeed
         env:

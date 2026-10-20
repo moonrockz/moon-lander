@@ -10,19 +10,19 @@ Run `mise run format` before each commit.
 
 Bead: lander-4us.2.1
 
-- [ ] 1.1 Add a windows-latest leg to `.github/workflows/ci.yml` that builds and tests the native and js targets, with the MoonBit core library installed by the Windows installer; verify that the leg passes on the current code.
-- [ ] 1.2 Pin Bun in `.config/mise/config.toml` with a comment that says the js host adapter build uses it; verify that `mise install` installs it on Linux, macOS, and Windows CI.
+- [x] 1.1 Add a windows-latest leg to `.github/workflows/ci.yml` that builds and tests the native and js targets, with the MoonBit core library installed by the Windows installer; verify that the leg passes on the current code.
+- [x] 1.2 Pin Bun in `.config/mise/config.toml` with a comment that says the js host adapter build uses it; verify that `mise install` installs it on Linux, macOS, and Windows CI.
 
 ## 2. Tracer bullet: in-memory and TOML sources, merge, get
 
 Bead: lander-4us.2.2
 
-- [ ] 2.1 Add `moonrockz/ion@0.6.0` and `moonbit-community/toml@0.5.0` to `pkgs/lander/moon.mod`, create the packages `config` and `config/formats/toml`, and verify that `mise run validate` and `mise run build` pass.
-- [ ] 2.2 Add a minimal `ConfigValue` over `@ion.Ion` with a struct-root check, a dotted `KeyPath::parse` without quoting, and `Config::get`; verify with unit tests for a hit and a miss.
-- [ ] 2.3 Add an in-memory source from a value tree and from flat key-path pairs; verify the "Flat key-path pairs" and "Later pair wins" scenarios with unit tests.
-- [ ] 2.4 Add the TOML format for strings, integers, floats, Booleans, arrays, and tables, with `ConfigError::Parse`; verify with unit tests.
-- [ ] 2.5 Add the default merge (overlay wins, structs merge, lists replace) and `build` over an ordered list of sources; verify the "Later source wins" and "Structs merge and arrays replace" scenarios.
-- [ ] 2.6 Add a `get_text` helper and one moonspec acceptance scenario in `tests/` that merges an in-memory source over a TOML snapshot and gets `project.name`; verify that the scenario passes on all four targets.
+- [x] 2.1 Add `moonrockz/ion@0.6.0` and `moonbit-community/toml@0.5.0` to `pkgs/lander/moon.mod`, create the packages `config` and `config/formats/toml`, and verify that `mise run validate` and `mise run build` pass.
+- [x] 2.2 Add a minimal `ConfigValue` over `@ion.Ion` with a struct-root check, a dotted `KeyPath::parse` without quoting, and `Config::get`; verify with unit tests for a hit and a miss.
+- [x] 2.3 Add an in-memory source from a value tree and from flat key-path pairs; verify the "Flat key-path pairs" and "Later pair wins" scenarios with unit tests.
+- [x] 2.4 Add the TOML format for strings, integers, floats, Booleans, arrays, and tables, with `ConfigError::Parse`; verify with unit tests.
+- [x] 2.5 Add the default merge (overlay wins, structs merge, lists replace) and `build` over an ordered list of sources; verify the "Later source wins" and "Structs merge and arrays replace" scenarios.
+- [x] 2.6 Add a `get_text` helper and one moonspec acceptance scenario in `tests/` that merges an in-memory source over a TOML snapshot and gets `project.name`; verify that the scenario passes on all four targets.
 
 ## 3. Value tree and key path rules
 

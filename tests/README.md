@@ -1,14 +1,20 @@
 # Tests
 
 This unpublished workspace module contains acceptance tests and domain laws.
-Its suites exercise the public notebook APIs migrated from Moonbase.
+Its suites exercise the public notebook APIs migrated from Moonbase and the
+configuration core.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
+| `config-acceptance` | An in-memory source merged over a TOML snapshot, read with `get_text` | All four |
 | `nbformat-acceptance` | Jupyter cells, outputs, attachments, extensions, cursor paths and validation errors | JavaScript, native |
 | `nbformat-laws` | JSON and text round trips, traversal agreement and cursor navigation | All four |
 | `notebooks-acceptance` | Shared Jupyter and DIB navigation, JSON/YAML/TOML/Ion metadata, kernel aliases, directives, specialized payloads and runtime capability inspection in mixed cell collections | JavaScript, native |
 | `notebooks-laws` | Cross-format source observations, cursor paths, DIB normalization, native Ion metadata round trips, pruning, stopping and consumer-defined node types | All four |
+
+The `config-acceptance` feature text is in its test file, because wasm and
+wasm-gc have no file system. `@moonspec.run_or_fail` is async and wasm-gc has no
+async test entry, so the suite runs the synchronous moonspec runner steps.
 
 Property generators and shrinkers preserve valid inputs. Each property declares
 its seed, case count, size and shrink limits. Acceptance feature paths are

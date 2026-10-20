@@ -1,0 +1,10 @@
+import {
+  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/json" @ion_json,
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/expect",
+  "moonrockz/ion/ion" @ion,
+} for "test"

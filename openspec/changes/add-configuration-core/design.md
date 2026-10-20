@@ -1,0 +1,840 @@
+# Design: add-configuration-core
+
+## Context
+
+See `proposal.md` for the motivation. The requirements are in
+`specs/configuration-core/spec.md`.
+
+Current state:
+
+- `pkgs/lander` (`moonrockz/moon-lander`, imported as `@lander`) holds only a
+  `version()` smoke export.
+- `pkgs/notebooks` already depends on `moonrockz/ion@0.6.0`,
+  `moonbit-community/toml@0.5.0`, and `moonbit-community/yaml@0.0.8`. Its
+  `dib/metadata_codec.mbt` maps TOML and YAML values to `@ion.Ion`. This design
+  reuses that TOML date-time mapping so that the repository has one rule.
+- `tests/` is an unpublished module. It already uses `moonrockz/moonspec` for
+  acceptance suites and `moonbitlang/async@0.22.5`.
+- morphir-moonbit `pkgs/morphir-engine/config/config.mbt` holds the merge,
+  provenance, and environment code that this design ports. Its tests
+  (`config_test.mbt`) and the Morphir `config.feature` cases are the source of
+  most spec scenarios.
+
+Constraints: all code builds and tests on wasm, wasm-gc, js, and native, on Linux,
+macOS, and Windows. Domain code is pure over explicit inputs and immutable public
+values. Only host adapters do I/O: `moonbitlang/async` on native, a TypeScript
+adapter over `node:fs` on js, and `moonbitlang/core/env` for environment variables
+and the working directory.
+
+Labels in this document:
+
+- **Owner**: the project owner made the decision.
+- **Call**: the designer made the decision in the design conversation. The owner
+  did not reject it.
+- **Call (this change)**: the author of this change made the decision. The owner
+  did not review it yet. Each one is in the list at the end of "Decisions".
+
+Decisions from the reconciliation addendum of 2026-10-20 show their item number:
+**Owner (O2)** for an owner answer, **Call (R1)** for a reconciliation call. The
+addendum replaces earlier text where they disagree.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- One value model and one merge engine for all formats and sources.
+- A pure build: the same inputs give the same `Config` on all four targets.
+- Morphir behaviour as the default, so the Morphir preset in
+  `add-configuration-conventions` can reproduce Morphir without special code in
+  the core.
+- Typed errors that a host can map to exit codes without string compares.
+
+**Non-Goals:**
+
+- File discovery, layouts, and environment names (`add-configuration-conventions`).
+- Binding to typed values (`add-configuration-binding`).
+- The host, commands, and exit codes (`add-host-lifecycle`).
+- Exact preservation of source text (comments, whitespace) for round trips.
+
+## Decisions
+
+### D1. Package layout
+
+**Call** (shared names). All packages are in module `moonrockz/moon-lander`:
+
+| Package | Contents | Targets |
+| --- | --- | --- |
+| `config` (`@config`) | `ConfigValue`, `KeyPath`, sources, merge, provenance, secrets, errors, render helpers | all |
+| `config/formats/toml` | TOML format | all |
+| `config/formats/yaml` | YAML format, default and strict profiles | all |
+| `config/formats/json5` | `.json` and `.json5` format | all |
+| `config/formats/ion` | Ion text format | all |
+| `config/host` | the request loop: read files, the process environment, and the working directory | native, js |
+
+**Call (R1)**: `config/host` is the one configuration adapter package, with one
+file for each target. Conventions has no host package of its own. The adapter
+answers every `FileRequest` that `@config.load` returns, both for explicit files
+and for conventions discovery. wasm and wasm-gc have no adapter. They take an
+injected `FileTree` (D13).
+
+Each format package depends on `@config`. `@config` depends on no format package.
+An application imports only the formats it uses (Call).
+
+### D2. Value tree: `ConfigValue` over `@ion.Ion`
+
+**Call**: one shared Ion-based value tree. Every format parses into it before the
+merge.
+
+`ConfigValue` is an opaque struct that wraps `@ion.Ion`. The constructors check
+the invariants once, so the merge does not check them again:
+
+- every struct field name has text (no unresolved symbol IDs);
+- field names are unique in each struct;
+- the root of a source tree is a struct.
+
+`ConfigValue::from_ion` checks the invariants. `ConfigValue::to_ion` gives the
+Ion value. `ConfigValue::from_json` converts `Json` through `@ion.ToIon`.
+
+Why Ion and not `Json` or `TomlValue`: Ion holds every type of the five formats
+without loss (decimals, timestamps, big integers, symbols, annotations). JSON
+loses big integers and timestamps. `TomlValue` has no null and no decimal.
+morphir-moonbit used `TomlValue` and had to reject JSON nulls and dates.
+
+**Call (this change)**: an Ion `sexp` behaves as a list in merge and render.
+Annotations stay on scalars and lists. When two structs merge, the result keeps the
+overlay annotations if the overlay has any, else the base annotations.
+
+### D3. `KeyPath`
+
+`KeyPath` holds a non-empty `Array[String]` of non-empty names. `KeyPath::parse`
+reads the dotted text form. `KeyPath::to_string` writes it.
+
+**Call (this change)**:
+
+- A name with `.` or `"` uses TOML-style double quotes: `servers."eu.west".port`.
+- Name compare is exact and case-sensitive. The environment source writes
+  lowercase names, so environment keys still match lowercase file keys.
+- A key path does not index into lists. Morphir `config get` does not index lists,
+  and provenance treats a list as one leaf.
+
+**Call (R5)**: these rules are the one `KeyPath` for all four changes. A key path
+is never empty and never indexes a list. Binding uses `bind_root(config)` for the
+root. A decode error inside a value uses `DecodePath` (D12): a `KeyPath` plus a
+suffix of field names and list indexes.
+
+### D4. Sources, kinds, order, and selection
+
+**Call**: sources are ordered typed values. **Call (R6)**: list order is merge
+order: low first, high last, as in .NET `ConfigurationBuilder`.
+
+```moonbit
+pub(all) enum SourceSelection[T] {
+  Discover
+  Explicit(T)
+  Skip
+} derive(Eq, Show)
+
+pub(all) enum FileRole {
+  Explicit
+  System
+  Global
+  Workspace
+  Member
+  EnvironmentFile
+  UserOverride
+  Legacy
+} derive(Eq, Show)
+
+pub(all) enum SourceKind {
+  Defaults
+  InMemory
+  File(FileRole)
+  Environment
+  Overrides
+} derive(Eq, Show)
+```
+
+**Call (R4)**: `SourceKind` and `FileRole` are the shared kinds of all four
+changes. Reports and `path_json` show Morphir's kind names through the role:
+
+| Kind | Report name |
+| --- | --- |
+| `Defaults` | `defaults` |
+| `InMemory` | `in-memory` |
+| `File(System)` | `system` |
+| `File(Global)` | `global` |
+| `File(Workspace)`, `File(Explicit)`, `File(Legacy)` | `project` |
+| `File(Member)` | `workspace-member` |
+| `File(EnvironmentFile)` | `environment-file` |
+| `File(UserOverride)` | `user-override` |
+| `Environment` | `environment` |
+| `Overrides` | `overrides` |
+
+**Call (this change)**: `File(Explicit)` and `File(Legacy)` show `project`, because
+Morphir loads `--config` and its legacy file as the project layer. `in-memory` and
+`overrides` have no Morphir name. These report names are final for all four
+changes. They match the serialized names of the Morphir Rust loader.
+
+**Call (R2)**: `SourceSelection[T]` stays in core. It keeps one name for the Morphir
+`Discover | Explicit(path) | Skip` and `Process | Explicit(vars) | Skip` choices.
+
+- A file location uses `SourceSelection[String]`. The conventions change resolves
+  `Discover` into file sources (R2). Core gives the file sources that it resolves
+  to: `file(path)` for one explicit file and `candidates(paths, display~)` for an
+  explicit candidate list at one location. `Skip` gives a source with no input
+  and the status `skipped`.
+- An environment source uses `SourceSelection[Map[String, String]]`. `Discover`
+  means the process environment, which the host supplies (D13). `Explicit(vars)`
+  uses only `vars`.
+
+`ConfigSource` is an immutable struct: kind, display name, priority, an optional
+list `MergePolicy`, key filters (R9, below), and the input. Constructors use
+labelled and optional arguments:
+
+```moonbit
+let builder = @config.builder()
+  |> @config.format(@toml.format())
+  |> @config.defaults(Defaults::default().to_json())
+  |> @config.file("conf/app.toml", name="project")
+  |> @config.env(prefix="MORPHIR", reserved=["MORPHIR_HOME", "MORPHIR_LOG_DIR"])
+  |> @config.overrides([("ir.layout", @config.string("single-file"))])
+let step = builder |> @config.load(tree)  // LoadStep[Config], raise ConfigError
+```
+
+`ConfigBuilder` is an immutable list of sources and a list of registered formats
+(D7). Each function returns a new builder. `@config.add(builder, source)` adds a
+source that another package built, for example a conventions file source. The
+hosting change can wrap these functions for `HostBuilder[S]`.
+
+**Call (R6)**: each source has an `Int` priority for display. The merge never reads
+it. The builder raises `ConfigError::SourceOrder` when a priority is lower than the
+priority of the source before it. Equal priorities are allowed. The shared values
+are:
+
+| Source | Priority |
+| --- | --- |
+| Defaults | 0 |
+| System file | 100 |
+| Global user file | 200 |
+| Workspace primary, explicit file, legacy file | 300 |
+| Member primary | 350 |
+| Environment file | 375 |
+| User override | 400 |
+| Environment variables | 600 |
+| Overrides (argparse) | 700 |
+
+**Call (this change)**: each constructor takes `priority?`. When it is absent, the
+value comes from the kind and role in the table. An in-memory source has no row: it
+takes the priority of the source before it, or 0 when it is first, so it can be at
+any position. The conventions parts set the same values for generic apps (R6).
+
+**Call (R2)**: the ambiguity rule over an explicit candidate list is in core.
+Zero existing candidates gives `not-found`, one gives `loaded`, more gives
+`ConfigError::Ambiguous(display~, location~, candidates~)`. A candidate exists when
+the listing of its directory in the `FileTree` holds its exact name as a file
+(D13). The conventions change applies the same rule during discovery, with its own
+skip rules for ancestors.
+
+**Call (R9)**: key filters. `ConfigSource::exclude(self, paths, warn~ : Bool)`
+gives a source a list of key paths to remove. Core applies the filters after the
+parse and before the merge, inside the build. When `warn` is true, each removed key
+that existed adds `ConfigWarning::KeyRemoved(path, origin)` to
+`SourceReport.warnings`. When `warn` is false, the removal is silent. Removed values
+have no provenance. The conventions change declares the filters: member-layer
+removal with a warning (the Rust loader drops `workspace.out_dir`) and
+inherited-layer removal without a warning (morphir-moonbit `Document::shared()`).
+
+```moonbit
+pub(all) enum ConfigWarning {
+  KeyRemoved(KeyPath, Origin)
+  Note(source~ : String, message~ : String)   // provider warnings (D4a)
+} derive(Eq, Show)
+```
+
+### D4a. Source providers and the load context
+
+**Call (R1, R2)**: conventions discovery plugs into the core builder as a source
+provider. The pure `@config.load` runs each provider at its position in the list.
+The provider gives the file sources that it resolved from `Discover`, or the file
+requests that it still needs.
+
+```moonbit
+pub(all) enum Platform {
+  Linux
+  MacOs
+  Windows
+} derive(Eq, Show)
+
+pub(all) struct LoadContext {
+  tree : FileTree
+  platform : Platform?               // None when no host gave it
+  env : Map[String, String]          // the process variables, else empty
+  base_dir : String?                 // the working directory from the host
+  formats : Array[Format]            // the registry (R11)
+}
+
+pub(all) struct Expansion {
+  sources : Array[ConfigSource]      // in merge order
+  warnings : Array[ConfigWarning]
+}
+
+pub(all) struct SourceProvider {
+  name : String
+  expand : (LoadContext) -> LoadStep[Expansion] raise ConfigError
+}
+
+pub fn provider(builder : ConfigBuilder, p : SourceProvider) -> ConfigBuilder
+```
+
+- `@conventions.add(...)` calls `@config.provider` with a provider that runs pure
+  discovery. The core does not know conventions rules.
+- `@config.load` collects the `Need` requests of all providers and file sources in
+  one pass and gives them in one `Need`. With a complete tree, a provider must give
+  `Done`.
+- The sources of an `Expansion` take the place of the provider in merge order. The
+  core then checks priorities (`SourceOrder`) over the expanded list. A provider can
+  give `skipped` and `not-found` sources (`@config.skipped`, candidate lists with no
+  existing file), so every location has a report.
+- Expansion warnings go to `Config::warnings()`. **Call (this change)**:
+  `ConfigWarning` has a second case, `Note(source~ : String, message~ : String)`,
+  for provider warnings such as a skipped workspace member glob.
+- **Call (this change)**: `Platform` is in core, so that the load context can carry
+  it as an explicit input for pure discovery. `@config.platform(builder, p)` sets
+  it. `config/host` detects it (native: the target operating system; js:
+  `process.platform` in the TypeScript adapter). A wasm or wasm-gc host gives it.
+  With no value, a provider decides its own fallback.
+- Other discovery results (the environment name, the workspace root, the member
+  root) belong to the conventions change. The core does not model them.
+
+### D5. In-memory, defaults, and overrides sources
+
+**Owner**: an in-memory source like .NET `AddInMemoryCollection`. **Call**: it
+takes a value tree or flat key-path pairs and can be at any position.
+
+**Call (this change)**: pairs apply in list order with the merge rules, so a later
+pair wins. Pair values keep their type. There is no string type inference, because
+the caller already has typed values. Only the environment source infers types.
+
+**Call (this change)**: the overrides source has the same input forms as the
+in-memory source. It has its own kind so that `config path` and provenance show
+`overrides` (for example, CLI flags). The argparse adapter in `add-host-lifecycle`
+gives typed values. Its default priority is 700 (R6).
+
+### D6. Environment source
+
+**Call**: prefix, `__` nesting, Morphir typing rules, and a reserved-name list.
+
+Ported from morphir-moonbit `environment` and the Morphir merge-rules spec:
+
+1. Keep a variable when its name, in uppercase, starts with `PREFIX_` and the name
+   is not reserved. Reserved names compare in uppercase (**Call (this change)**,
+   because Windows variable names ignore case).
+2. Skip all `_` after the prefix. Split the rest at `__`. Write each segment in
+   lowercase. An empty segment raises `ConfigError::InvalidEnvKey`.
+3. Type the value: `true`/`false` in any case to Bool; `[+-]?[0-9]+` that fits
+   `Int64` to Int (leading zeros allowed: `+003` is 3); text that starts with `[`
+   or `{` and parses as JSON to a list or a struct; else String. `1.5` stays a
+   string, as in Morphir.
+4. Sort the keys by depth, deepest first, then by name. Merge each one-key tree in
+   that order. This makes "shorter path wins" independent of iteration order.
+5. Each leaf origin holds the variable name.
+
+The JSON value in step 3 uses `@json.parse` from `moonbitlang/core`. Its numbers
+keep their source text (`repr`), so the conversion to Ion keeps integers exact.
+
+**Call (this change)**: a variable named only `PREFIX_` (empty key) is an error, as
+in morphir-moonbit. An environment source with no matching variables reports
+`loaded`, because the source was read.
+
+**Call (this change)**: a `Discover` environment source reads the process
+variables that the host gives to the builder with
+`@config.process_env(builder, vars)`. `config/host` does this on native and js
+(D13). When no host gave them (for example on wasm with no hosting), the source
+adds no key and reports `not-found`.
+
+**Call (R8)**: the core takes the reserved-name list as an input. Hosting composes
+the environment source by default, with the uppercase application name as the
+prefix, and adds `<PREFIX>_ENVIRONMENT` and `<PREFIX>_HOME` to the list.
+
+### D7. Formats and type mapping
+
+**Owner**: formats JSON, TOML, YAML, JSON5, and Ion. `.json` files use
+`moonbitlang/x/json5` so that JSON files can hold comments.
+
+Each format package exports one `Format` value:
+
+```moonbit
+pub(all) struct Format {
+  name : String
+  extensions : Array[String]
+  parse : (String, origin~ : String) -> ConfigValue raise ConfigError
+}
+```
+
+The application registers the formats it uses on the builder with
+`|> @config.format(...)`. The file extension selects the format, compared in
+lowercase.
+
+**Call (R11)**: the builder is the format registry for all changes.
+`ConfigBuilder::formats()` gives the registered formats in registration order.
+`@config.parse_file(formats, path, text)` selects the format by extension and
+parses. The conventions change reads `formats()` to derive its candidate extension
+lists, and parses ancestor candidates with `parse_file` and `merge` to find
+`[workspace]` tables. So conventions depends on core only, and format packages
+come in through the registry. A preset chooses its formats when it registers them.
+
+**Call (this change)**: the YAML format registers `.yaml` and `.yml`. The JSON5
+package exports one format for `.json` and `.json5`. The Ion format reads `.ion`
+text only.
+
+Type mapping and precision issues:
+
+| Format | Input | Tree value | Notes |
+| --- | --- | --- | --- |
+| TOML | integer (`Int64`) | Int | exact |
+| TOML | float | Float | `inf` and `nan` stay floats |
+| TOML | offset date-time | Timestamp with offset | fraction kept as Ion decimal |
+| TOML | local date-time | Timestamp, offset unknown (`-00:00`) | Ion has no "local" timestamp; unknown offset is the closest |
+| TOML | local date | Timestamp, day precision | |
+| TOML | local time | String with annotation `toml_local_time` | Ion has no time-only type; same rule as `pkgs/notebooks` |
+| YAML | plain integer | Int | **Call (this change)**: integers above `Int64` become exact Int; the library gives a lossy Double |
+| YAML | plain float | Float | text such as `1.10` loses its trailing zero |
+| YAML | `yes`, `no`, `on`, `off` | String | YAML 1.2 core schema, as the library does |
+| YAML | date-like plain text | String | no implicit timestamps |
+| YAML | `~`, `null`, empty | Null | strict profile rejects it |
+| YAML | quoted scalar | String | |
+| JSON/JSON5 | number | Int when integral and `abs <= 2^53`, else Float | `json5` gives `Double` only, with no source text. Integers above 2^53 lose precision. `Infinity` and `NaN` become floats |
+| JSON/JSON5 | duplicate key | last value wins | `json5` keeps no duplicate information; the core cannot detect it |
+| Ion | decimal | Decimal | exact |
+| Ion | timestamp | Timestamp | precision and offset kept |
+| Ion | symbol | Symbol | renders as a string in JSON and TOML; binding decides decode |
+| Ion | annotations | kept | dropped in JSON and TOML render |
+| Ion | blob, clob | Blob, Clob | render: base64 text in JSON and TOML |
+| Ion | repeated field | error | Ion allows it; configuration does not |
+| Ion | more than one top-level value | error | |
+
+Parse errors and positions:
+
+- TOML 0.5.0 `parse` raises an untyped error. Its message holds the token
+  location as text. `ConfigError::Parse` keeps the message. Line and column are
+  `None`.
+- YAML 0.0.8 raises `YamlError` with a `Marker` (line, column). The format keeps
+  them.
+- `json5` raises `ParseError` with `Position` (line, column) for most cases.
+  `InvalidEof` has no position.
+- Ion text raises `IonError::Syntax(String)` with no structured position.
+
+YAML implementation: the format reads events with `Parser::load` and a
+`MarkedEventReceiver`, and builds the tree from the events. Reasons: the strict
+profile needs anchors, aliases, tags, and document events, which the
+`Yaml` tree hides (the library expands aliases silently); each error needs a
+line and a column; and integers above `Int64` stay exact. Scalar resolution
+copies the library rules for plain scalars.
+
+**Call (this change)**: the default YAML profile also accepts only one document,
+because more than one document has no defined merge. It rejects merge keys (`<<`)
+because the library does not apply them. Without this, `<<` becomes a literal key
+with no warning.
+
+**Reference** (Morphir spec): the strict profile: one document, no
+anchors/aliases/merge keys/custom tags/duplicate keys, no null, mapping root. The
+YAML format takes `profile=Strict` as an option. The default is `Default`.
+
+### D8. Merge
+
+**Owner**: the Morphir merge rules are the default. The owner believes they are
+HOCON-like. The one HOCON difference: in HOCON a null replaces the value and
+Typesafe Config treats the key as missing. Morphir ignores a null overlay. This
+design follows Morphir.
+
+`merge(base, overlay, policy)` is a pure function over `ConfigValue`:
+
+1. Overlay field is null: keep the base value and its provenance.
+2. Base or overlay is a secret reference: overlay replaces.
+3. Both are structs: merge field by field. Base field order first, new overlay
+   fields after.
+4. Both are lists and a policy applies: use the policy.
+5. Else the overlay replaces.
+
+The merge copies only the changed path. It shares unchanged subtrees. Inputs do not
+change.
+
+**Call**: `MergePolicy` selects list behaviour per source or per key path:
+
+```moonbit
+pub(all) enum MergePolicy {
+  Replace         // default
+  Append          // like HOCON +=
+  MergeByKey(String)
+} derive(Eq, Show)
+```
+
+A key-path policy beats a source policy. `MergeByKey(name)`: each item must be a
+struct with a scalar field `name`. Items with equal key values deep-merge in base
+position. Other overlay items append. A missing key field or a repeated key value
+in one list raises `ConfigError::MergeKey`. **Call**: no .NET index-based list
+merge and no explicit unset.
+
+**Call (this change)**: the build removes null struct fields from the result. So
+`Config` never holds a null field, and a single source with `a = null` gives no
+`a`. Nulls inside lists stay.
+
+### D9. Provenance
+
+**Call**: per-leaf provenance and a per-source report.
+
+```moonbit
+pub(all) struct Origin {
+  kind : SourceKind
+  source : String        // display name
+  priority : Int
+  location : String?     // file path or variable name
+} derive(Eq, Show)
+```
+
+`Config` holds `Map[KeyPath, Array[Origin]]`. The map uses the same update rules as
+morphir-moonbit `merge`: a new leaf removes records at, below, and above its path,
+then adds its own. After the merge, records for paths that are not in the tree go.
+
+**Call (R10)**: the value is an array of origins and is never empty. It has one
+origin for a replaced leaf or a replaced list. An `Append` or `MergeByKey` list has
+every contributing origin in merge order. Binding shows this array as its blame for
+a list (`Set(Array[Origin])`). A struct has no record of its own, as in the Morphir
+spec. An empty struct therefore has no origin.
+
+`SourceReport` holds `kind`, `name`, `priority`, `path : String?`,
+`candidates : Array[String]`, `status : SourceStatus` (`Loaded`, `NotFound`,
+`Skipped`), and `warnings : Array[ConfigWarning]` (R9). The build gives the reports
+in merge order (R6).
+
+### D10. Secrets
+
+**Call**: secret references are leaves. A host-supplied resolver resolves them
+lazily. Morphir shapes: `{ env = "NAME" }`, `{ file = "path" }`,
+`{ command = ["argv", ...] }`, `{ keyring = { service = "...", account = "..." } }`.
+
+- Recognition: a struct with exactly one field from that list (morphir-moonbit
+  rule). `SecretSyntax::standard()` is the default. `SecretSyntax::none()` turns
+  recognition off (**Call (this change)**, because an app can have a real key
+  named `env` in a one-field table).
+- **Call (this change)**: the build checks the payload shape. A wrong shape raises
+  `ConfigError::InvalidSecret` at load time, not at resolve time.
+- `SecretResolver` is a trait with one method:
+  `resolve(Self, SecretRef, Origin) -> Secret raise SecretError`. The origin lets a
+  file resolver anchor a relative path to the directory of the declaring file.
+- `Config::secret(key, resolver)` resolves one key. A plain string at the key is a
+  literal secret. The resolver is not called.
+- `Secret` is opaque. `Show` writes `<redacted>`. Only `Secret::expose()` gives the
+  text.
+- `SecretError` classes (from Morphir `config.feature`): `MissingConfigKey`,
+  `EmptyEnvironment`, `FileRead`, `InvalidSecretValue`, `CommandFailed`,
+  `KeyringLookupFailed`. Messages never hold the secret or backend output.
+- **Call (this change)**: the core ships one resolver, `env_resolver(vars)`, over an
+  explicit variable map. File, command, and keyring resolvers do I/O, so they are
+  host adapters in a later change.
+- **Call (this change)**: display shows a secret reference as the reference, for
+  example `{env = "TOKEN"}`, because the reference holds no secret. Key-name
+  redaction still applies on top.
+
+The Morphir spec also lists "a secret string" (a schema `secretValue` position)
+as a leaf. Morphir schema version 1 uses no such position. This design does not
+model it. Binding can add it.
+
+### D11. Redaction and command helpers
+
+**Call**: helpers for `config get`, `config show`, and `config path`, with
+redaction. All are pure functions that return `String` or `Json`. The host change
+prints them.
+
+- `redact(value)` follows Morphir `redact_secrets`: lowercase, `-` to `_`,
+  substring match on the nine fragments, replace the whole subtree with
+  `<redacted>`. The fragment list is a parameter with the Morphir list as default
+  (**Call (this change)**).
+- `get_text(config, key)` and `get_json(config, key)` redact first, then look up,
+  as Morphir does, so a get on a parent struct is safe too.
+- `show(config, format)` with `ShowFormat` `Toml`, `Json`, or `Ion`.
+  **Call (this change)**: Ion is added because it is the native tree and loses
+  nothing. TOML render converts to `@toml.TomlValue` and uses its writer.
+- `path_text(reports)` and `path_json(reports)` follow the Morphir layout:
+  heading `Configuration sources (in priority order):`, highest priority first,
+  `[✓]` for loaded and `[✗]` for others, then `Path:`, `Status:`, `Priority:`
+  lines. JSON lists sources in ascending priority. Priorities never decrease along
+  the list (R6), so the text form is the reverse merge order and the JSON form is
+  the merge order. Each report shows its kind name from the table in D4 (R4) and
+  its warnings.
+- `explain(config, key)` gives `Array[(KeyPath, Array[Origin])]`.
+
+Render mapping for JSON and TOML: Int and Decimal keep their exact text, Timestamp
+becomes ISO 8601 text (TOML: a date-time value), Symbol becomes a string, Blob and
+Clob become base64 text, annotations go. A null in a list raises
+`ConfigError::Render` for TOML. NaN and infinity raise `ConfigError::Render` for
+JSON.
+
+### D12. Errors
+
+**Reference** (morphir-moonbit pain point): it has one `Invalid(String)` error and
+maps exit codes by string compare.
+
+**Call (R3)**: `ConfigError` is one `suberror` in core. It holds every
+configuration case of the four changes, so a host matches one type. Core declares
+all cases. The conventions and binding changes raise their cases and do not add
+error types. Each case uses labelled fields:
+
+| Case | Data | Raised by |
+| --- | --- | --- |
+| `Parse` | format, origin, message, line?, column? | core formats |
+| `UnsupportedYaml` | origin, feature, line, column | core YAML format |
+| `InvalidRoot` | origin, found type | core formats |
+| `DuplicateKey` | origin, key path | core formats |
+| `FileNotFound` | path | core explicit file |
+| `UnsupportedFormat` | path, registered extensions | core registry |
+| `Ambiguous` | `display~`, `location~`, `candidates~` | core and conventions (R2) |
+| `InvalidKeyPath` | text, reason | core |
+| `InvalidEnvKey` | variable name | core environment source |
+| `MergeKey` | key path, item index, source | core merge |
+| `InvalidSecret` | key path, origin, reason | core secrets |
+| `KeyNotFound` | key path | core helpers |
+| `Render` | format, key path, reason | core helpers |
+| `SourceOrder` | source, priority, previous source, previous priority | core builder (R6) |
+| `OutsideBoundary` | start directory, boundary | conventions |
+| `InvalidEnvironmentName` | name, reason | conventions |
+| `UnknownProject` | selector, workspace | conventions |
+| `AmbiguousProject` | selector, matches | conventions |
+| `Decode` | `BindFailure` | binding |
+| `Validation` | `Array[BindFailure]` | binding |
+
+The `Ambiguous` message is `Ambiguous <display> configuration; found: <paths>`, so
+the Morphir preset keeps `Ambiguous Morphir configuration`.
+
+**Call (R3)**: core declares `BindFailure` and the types in it, so `ConfigError`
+is complete in the first change. The binding change fills the values and owns
+their meaning:
+
+```moonbit
+pub(all) enum DecodeStep {
+  Field(String)
+  Index(Int)
+} derive(Eq, Debug)
+
+pub(all) struct DecodePath {
+  key : KeyPath?               // None: the root of the bound tree (bind_root)
+  suffix : Array[DecodeStep]   // empty, or starts with Index
+} derive(Eq, Debug)            // renders as text, for example targets[1].level
+
+pub(all) enum Blame {
+  Set(Array[Origin])     // the sources that set this leaf or list; never empty (R10)
+  Table(Array[Origin])   // the key is a table; the sources that set keys in it
+  Default                // the value came from the bind default
+  Unset                  // no source sets this key
+} derive(Eq, Debug)
+
+pub(all) struct Located {
+  path : DecodePath
+  blame : Blame
+} derive(Eq, Debug)
+
+pub(all) struct BindFailure {
+  at : Array[Located]    // one or more paths; never empty
+  detail : String
+} derive(Eq, Debug)
+```
+
+**Call (R3, R5, R10)**: these names and shapes match the
+`add-configuration-binding` design exactly. `key` holds the leading names up to the
+first list index; `suffix` holds the steps from that index on. Core declares the
+types and renders `DecodePath` as text. If the binding change refines a field, it
+records the change in its own design, and the core task that declares the types
+follows it.
+
+`ConfigError::message()` gives text for people, with paths in the `/` form (D13).
+Hosting owns `UsageError` for CLI misuse, for example an empty `--environment`
+value (R3). Every `ConfigError` is a usage error; `add-host-lifecycle` maps it to
+exit code 2 (**Call**).
+
+### D13. Pure load, file tree, and host adapter
+
+**Call**: pure core over explicit inputs (morphir-moonbit ADR 0002: sync core,
+async hosts prepare snapshots).
+
+**Call (R1)**: core defines the one snapshot type, `FileTree`. Explicit file
+sources and conventions discovery both read it.
+
+```moonbit
+pub(all) enum EntryKind { File; Directory; Other } derive(Eq, Show)
+
+pub(all) struct DirEntry { name : String; kind : EntryKind } derive(Eq, Show)
+
+// Opaque and immutable: directory listings, file text, and a `complete` flag.
+pub struct FileTree { .. }
+
+pub(all) enum FileRequest {
+  ListDir(String)
+  ReadFile(String)
+} derive(Eq, Hash, Show)
+
+pub(all) enum LoadStep[T] {
+  Need(Array[FileRequest])
+  Done(T)
+} derive(Eq, Show)
+```
+
+- `FileTree` holds listings with the real names and file text, keyed by path.
+  `FileTree::with_listing` and `FileTree::with_file` return a new tree.
+- When `complete` is true, a path that is not in the tree is absent. When it is
+  false, the path is unknown, and the load asks for it.
+- **Call (R1)**: a complete tree never gives `Need`.
+- **Call (this change)**: the existence check for a candidate reads the listing of
+  its directory and compares exact names. A probe on a case-insensitive file system
+  would find `App.toml` for `app.toml`. The conventions change uses the same rule.
+
+**Call (R1)**: entry points.
+
+- `@config.load(builder, tree) -> LoadStep[Config] raise ConfigError` is pure and
+  runs on all targets. It asks for the listings and files that its file sources
+  need and that the tree does not hold, all in one `Need`. With all inputs present,
+  it builds and gives `Done(config)`. The same inputs give the same result on every
+  target.
+- `@config/host.load(builder) -> Config raise` is `async` and runs on native and
+  js. It gives the process environment to the builder (`process_env`), sets the
+  base directory to the working directory (`base_dir`) and the `Platform`
+  (`platform`), and then
+  runs the request loop: call `@config.load`, answer each `Need`, add the answers
+  to the tree, and call again. When it reads an answer, a missing path is recorded
+  as absent, so each round makes progress.
+- Hosting `run` calls these entry points. A wasm or wasm-gc host gives the tree
+  with `|> @hosting.files(tree)` and gets the result from `@config.load` with a
+  complete tree.
+
+**Call (this change)**: `@config.base_dir(builder, dir)` sets the directory that a
+relative explicit path joins. With no base directory, the path stays as given.
+Reports and origins show the joined path.
+
+**Call (R1)**: environment variables and the working directory come from
+`moonbitlang/core/env` (`get_env_vars`, `current_dir`) on native and js, because
+`moonbitlang/async` has no environment API.
+
+| Target | Files | Environment and working directory |
+| --- | --- | --- |
+| native | `moonbitlang/async` `fs` | `moonbitlang/core/env` |
+| js | TypeScript adapter over `node:fs` (O2) | `moonbitlang/core/env` |
+| wasm, wasm-gc | injected `FileTree` | injected by the host |
+
+**Owner (O2)**: js file access uses a TypeScript adapter against `node:fs`,
+`node:path`, and `node:process`, built and bundled with Bun. Bun is pinned in
+`.config/mise/config.toml`. A moonx task script runs the build, as AGENTS.md
+requires. MoonBit `extern "js"` functions call the bundled module. The js console
+lifetime of `add-host-lifecycle` (signals through `process.on`) lives in the same
+TypeScript adapter.
+
+**Call (O2)**: the TypeScript uses only `node:*` APIs that both Node and Bun
+support, so the bundle runs on Node (the js tests use the pinned Node) and on Bun.
+
+**Call (this change)**: the adapter uses the synchronous `node:fs` calls
+(`readdirSync`, `readFileSync`, `statSync`). The MoonBit side then needs no promise
+bridge, and one loop round reads all requests at once. Configuration files are
+small, so blocking reads are acceptable.
+
+**Call (this change)**: the TypeScript source is in `pkgs/lander/adapters/node/`.
+The moonx task script bundles it and writes the bundle as a generated MoonBit js
+file in `config/host`, which is checked in. So `moon build` and `moon test` do not
+need Bun, and CI checks that the generated file is current. Feasibility of this
+link step is not verified yet; the first js adapter task is a spike that proves it.
+
+**Owner (O2)**: AGENTS.md says to use `moonbitlang/async` for file-system work. A
+task adds a narrow exception for the TypeScript adapter on js (R12).
+
+**Owner (O3)**: Windows has full support in the first stories. A windows-latest CI
+leg builds and tests native and js. The native adapter is tested on Windows.
+
+**Call (O3)**: `FileTree`, reports, origins, and errors use paths with `/` on every
+platform, Windows included. An absolute path starts with `/`, a drive prefix
+(`C:/`), or a UNC prefix (`//server/share`). The Windows adapter converts `\` to `/`
+when it reads the working directory, listings, and paths, and converts back only
+for file-system calls. The Morphir Rust loader shows native separators on Windows;
+this is a known display difference.
+
+### D14. Morphir code worth keeping
+
+From morphir-moonbit `config.mbt`:
+
+- `merge_value` and the provenance update in `merge` (rules D8 and D9).
+- `secret` recognition (D10).
+- `environment` and `environment_value` (D6), including the sort that makes the
+  shorter path win and the `+003` integer rule.
+- `Document::shared` as the generic exclude list (D4).
+- The tests "merge replaces arrays and secrets, preserving winning provenance",
+  "environment preserves underscores and shorter paths win", and "environment
+  conversions follow upstream mapping" become spec scenarios.
+
+Not kept: `TomlValue` as the model, `Document::text/strings/boolean` lookups with
+fallbacks (binding replaces them), and `Invalid(String)`.
+
+### Decisions made in this change (not in the brief)
+
+1. `SourceSelection[T]` with a type parameter (D4).
+2. Default priority from the kind and role; an in-memory source takes the priority
+   before it (D4).
+3. `File(Explicit)` and `File(Legacy)` show the report name `project` (D4).
+4. In-memory pairs: list order, no type inference (D5).
+5. Reserved environment names compare without case (D6).
+6. Empty-key environment variable is an error; an empty environment reports
+   `loaded`; a `Discover` environment with no process variables reports
+   `not-found` (D6).
+7. KeyPath quoting and exact case (D3).
+8. Sexp as list; annotation rule for merged structs (D2).
+9. Format selection by extension; `.yml` accepted; Ion text only (D7).
+10. YAML default profile: one document and no merge keys (D7).
+11. YAML integers above `Int64` stay exact (D7).
+12. JSON integral numbers up to 2^53 become Int (D7).
+13. Null struct fields removed from the result (D8).
+14. `SecretSyntax::none()`; payload check at load; only an env resolver in core;
+    references shown as references (D10).
+15. Configurable redaction fragments; Ion as a show format (D11).
+16. Source providers as the discovery entry point; `Platform` in core and in the
+    load context; `ConfigWarning::Note` for provider warnings (D4a).
+17. Candidate existence from exact names in directory listings (D13).
+18. Synchronous `node:fs` calls in the TypeScript adapter; source in
+    `pkgs/lander/adapters/node/`; checked-in generated bundle (D13).
+
+## Risks / Trade-offs
+
+- [The one-field secret rule treats a real table such as `[deploy] env = "prod"`
+  as a secret reference] → `SecretSyntax::none()` turns it off; the payload check
+  gives an early, clear error.
+- [`json5` numbers are `Double`; integers above 2^53 lose precision with no
+  error] → document it; tell users to use TOML or Ion, or a string, for such
+  values. Revisit if `moonbitlang/x` adds source text to numbers.
+- [`json5` cannot report duplicate keys] → document it as a known difference from
+  TOML, YAML, and Ion.
+- [TOML 0.5.0 and Ion errors have no structured position] → keep the library
+  message, which holds the location as text. Add a position when the libraries
+  give one.
+- [A custom YAML event builder can drift from the library scalar rules] → test the
+  builder against `Yaml::load_from_string` on the library examples.
+- [The Ion tree is larger than a plain JSON tree] → configuration files are small.
+  Merge shares unchanged subtrees.
+- [`moonbitlang/async` has no js `fs`] → the TypeScript adapter over `node:fs`
+  reads files on js (O2). It is a second I/O stack to keep in step with the native
+  adapter → one request-loop contract and one acceptance suite run on both.
+- [The link from MoonBit js externs to a Bun bundle is not verified] → the first js
+  adapter task is a spike. If it fails, stop and return to the owner.
+- [Windows path forms (drive, UNC, `\`) can leak into reports] → the adapter
+  converts at the boundary (O3), and the windows-latest CI leg tests it.
+- [Substring redaction hides some safe keys, for example `tokenizer_mode`] →
+  this matches Morphir and errs on the safe side.
+
+## Migration Plan
+
+This change adds packages and changes no current API. morphir-moonbit moves later:
+
+1. Replace `@config.Document` with `@config.Config`, keeping the TOML model only in
+   the TOML format package.
+2. Replace `Document::text/strings/boolean` calls with binding
+   (`add-configuration-binding`).
+3. Replace `Invalid(String)` matches with `ConfigError` cases.
+
+Rollback: remove the new packages. No current consumer depends on them.
+
+## Open Questions
+
+- Should the Ion format read Ion binary later? This needs no spec change for text.

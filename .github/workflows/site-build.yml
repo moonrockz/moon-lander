@@ -32,6 +32,8 @@ jobs:
         run: mise run build:site -- --main
       - name: Check site
         run: mise run check:site
+      - name: Test site
+        run: mise run test:site
       - name: Upload Pages artifact
         if: inputs.pages
         uses: actions/upload-pages-artifact@v5

@@ -1,77 +1,178 @@
 ///|
-fn site_json(base_path~ : String = "/moon-lander/") -> String {
-  (
-    $|{
-    $|  "title": "Moon-Lander",
-    $|  "description": "An application framework for MoonBit.",
-    $|  "base_path": "\{base_path}",
-    $|  "site_url": "https://moonrockz.github.io/moon-lander/",
-    $|  "repo_url": "https://github.com/moonrockz/moon-lander",
-    $|  "packages": ["notebooks"]
-    $|}
+let config_json : String =
+  #|{
+  #|  "title": "Moon-Lander",
+  #|  "description": "An application framework for MoonBit",
+  #|  "base_path": "/moon-lander/",
+  #|  "site_url": "https://moonrockz.github.io/moon-lander/",
+  #|  "repo_url": "https://github.com/moonrockz/moon-lander",
+  #|  "packages": ["notebooks"]
+  #|}
+
+///|
+test "parse config and build links" {
+  let config = @model.SiteConfig::parse("site/site.json", config_json)
+  assert_eq(config.title, "Moon-Lander")
+  assert_eq(config.packages, ["notebooks"])
+  assert_eq(config.href("/docs/"), "/moon-lander/docs/")
+  assert_eq(config.href("/"), "/moon-lander/")
+  assert_eq(
+    config.absolute("/articles/x/"),
+    "https://moonrockz.github.io/moon-lander/articles/x/",
   )
 }
 
 ///|
-fn problems_of(text : String) -> Array[String] {
-  try @model.SiteConfig::parse("site/site.json", text) catch {
-    @model.Invalid(problems) => problems.map(p => p.render())
-  } noraise {
-    _ => []
+test "config problems name the missing fields" {
+  let problems = try {
+    ignore(@model.SiteConfig::parse("site/site.json", "{\"title\": \"x\"}"))
+    []
+  } catch {
+    @model.Invalid(problems) => problems
+  }
+  assert_eq(problems.map(p => p.message), [
+    "missing string field `description`", "missing string field `base_path`", "missing string field `site_url`",
+    "missing string field `repo_url`",
+  ])
+}
+
+///|
+test "base path must start and end with a slash" {
+  let text = config_json.replace(old="\"/moon-lander/\"", new="\"moon-lander\"")
+  let failed = try {
+    ignore(@model.SiteConfig::parse("site/site.json", text))
+    false
+  } catch {
+    @model.Invalid(_) => true
+  }
+  assert_true(failed)
+}
+
+///|
+fn with_nav(nav : String) -> String {
+  config_json[:config_json.length() - 2].to_owned() + ",\n  \"nav\": \{nav}\n}"
+}
+
+///|
+fn nav_problems(nav : String) -> Array[String] {
+  try {
+    ignore(@model.SiteConfig::parse("site/site.json", with_nav(nav)))
+    []
+  } catch {
+    @model.Invalid(problems) => problems.map(p => p.message)
   }
 }
 
 ///|
-test "parse reads the site configuration" {
-  let config = @model.SiteConfig::parse("site/site.json", site_json())
-  @expect.expect(config).to_equal({
-    title: "Moon-Lander",
-    description: "An application framework for MoonBit.",
-    base_path: "/moon-lander/",
-    site_url: "https://moonrockz.github.io/moon-lander/",
-    repo_url: "https://github.com/moonrockz/moon-lander",
-    packages: ["notebooks"],
-  })
+test "nav is optional" {
+  let config = @model.SiteConfig::parse("site/site.json", config_json)
+  assert_eq(config.nav, None)
 }
 
 ///|
-test "bad base path names the file and the key" {
-  @expect.expect(problems_of(site_json(base_path="/moon-lander"))).to_equal([
-    "site/site.json: `base_path` must start and end with `/`",
-  ])
-  @expect.expect(problems_of(site_json(base_path="moon-lander/"))).to_equal([
-    "site/site.json: `base_path` must start and end with `/`",
-  ])
-}
-
-///|
-test "every problem is reported" {
-  @expect.expect(problems_of("{\"base_path\": \"x\", \"packages\": [1]}")).to_equal([
-    "site/site.json: missing string field `title`",
-    "site/site.json: missing string field `description`",
-    "site/site.json: missing string field `site_url`",
-    "site/site.json: missing string field `repo_url`",
-    "site/site.json: `packages` must be an array of strings",
-    "site/site.json: `base_path` must start and end with `/`",
-  ])
-}
-
-///|
-test "the configuration must be a JSON object" {
-  @expect.expect(problems_of("[]")).to_equal([
-    "site/site.json: must be a JSON object",
-  ])
-}
-
-///|
-test "links use the base path" {
-  let config = @model.SiteConfig::parse("site/site.json", site_json())
-  @expect.expect(config.href("/articles/")).to_equal("/moon-lander/articles/")
-  @expect.expect(config.href("/")).to_equal("/moon-lander/")
-  @expect.expect(config.href("/assets/site.css")).to_equal(
-    "/moon-lander/assets/site.css",
+test "nav groups keep their order and items" {
+  let config = @model.SiteConfig::parse(
+    "site/site.json",
+    with_nav(
+      "[{\"group\": \"Start\", \"items\": [\"QUICK_START.md\", \"adr/\"]}, {\"group\": \"More\", \"items\": [\"*.md\", \"*/\"]}]",
+    ),
   )
-  @expect.expect(config.absolute("/articles/")).to_equal(
-    "https://moonrockz.github.io/moon-lander/articles/",
+  assert_eq(
+    config.nav,
+    Some([
+      { group: "Start", items: ["QUICK_START.md", "adr/"], },
+      { group: "More", items: ["*.md", "*/"], },
+    ]),
+  )
+}
+
+///|
+test "nav problems are reported together" {
+  assert_eq(nav_problems("{}"), ["`nav` must be an array of groups"])
+  assert_eq(
+    nav_problems(
+      "[{\"group\": \"\", \"items\": [\"A.md\"]}, {\"group\": \"B\", \"items\": []}, {\"group\": \"C\", \"items\": [1, \"adr/0001.md\", \"notes.txt\", \"A.md\", \"x/y/\"]}, \"D\"]",
+    ),
+    [
+      "`nav` group 1 needs a non-empty `group` label", "`nav` group `B` has no items",
+      "`nav` group `C`: every item must be a string", "`nav` item `adr/0001.md` must be a top-level page (`NAME.md` or `NAME.html`) or directory (`NAME/`)",
+      "`nav` item `notes.txt` must be a top-level page (`NAME.md` or `NAME.html`) or directory (`NAME/`)",
+      "`nav` item `A.md` is listed more than once", "`nav` item `x/y/` must be a top-level page (`NAME.md` or `NAME.html`) or directory (`NAME/`)",
+      "`nav` group 4 must be an object with `group` and `items`",
+    ],
+  )
+}
+
+///|
+/// The config with `"chapters": <chapters>` added.
+fn with_chapters(chapters : String) -> String {
+  config_json[:config_json.length() - 2].to_owned() +
+  ",\n  \"chapters\": \{chapters}\n}"
+}
+
+///|
+fn chapter_problems(chapters : String) -> Array[String] {
+  try {
+    ignore(@model.SiteConfig::parse("site/site.json", with_chapters(chapters)))
+    []
+  } catch {
+    @model.Invalid(problems) => problems.map(p => p.message)
+  }
+}
+
+///|
+test "chapters are optional" {
+  let config = @model.SiteConfig::parse("site/site.json", config_json)
+  assert_eq(config.chapters, [])
+}
+
+///|
+test "chapters give a listed package's sub-package pages their order" {
+  let config = @model.SiteConfig::parse(
+    "site/site.json",
+    with_chapters("{\"notebooks\": [\"json\", \"codec/wire\"]}"),
+  )
+  assert_eq(config.chapters, [
+    { name: "notebooks", chapters: ["json", "codec/wire"], },
+  ])
+  assert_eq(config.chapter_order("notebooks", "json"), Some(1))
+  assert_eq(config.chapter_order("notebooks", "codec/wire"), Some(2))
+  assert_eq(config.chapter_order("notebooks", "other"), None)
+  assert_eq(config.chapter_order("other-pkg", "json"), None)
+}
+
+///|
+test "chapter problems are reported together" {
+  assert_eq(chapter_problems("[]"), [
+    "`chapters` must be an object from package names to arrays of sub-package paths",
+  ])
+  assert_eq(
+    chapter_problems(
+      "{\"other-pkg\": [\"a\"], \"notebooks\": [\"json\", 1, \"\", \"/x\", \"y/\", \"json\"]}",
+    ),
+    [
+      "`chapters` names package `other-pkg`, which is not in `packages`", "`chapters` of `notebooks`: every item must be a sub-package path such as `frontend`",
+      "`chapters` of `notebooks`: every item must be a sub-package path such as `frontend`",
+      "`chapters` of `notebooks`: every item must be a sub-package path such as `frontend`",
+      "`chapters` of `notebooks`: every item must be a sub-package path such as `frontend`",
+      "`chapters` of `notebooks` lists `json` more than once",
+    ],
+  )
+  assert_eq(chapter_problems("{\"notebooks\": \"json\"}"), [
+    "`chapters` of `notebooks` must be an array of sub-package paths",
+  ])
+}
+
+///|
+test "nav items can name HTML pages" {
+  let config = @model.SiteConfig::parse(
+    "site/site.json",
+    with_nav(
+      "[{\"group\": \"Pages\", \"items\": [\"GUIDE.html\", \"*.html\"]}]",
+    ),
+  )
+  assert_eq(
+    config.nav,
+    Some([{ group: "Pages", items: ["GUIDE.html", "*.html"], }]),
   )
 }

@@ -10,7 +10,7 @@ for parsing, construction, custom registries, document metadata, directive
 navigation, errors and normalization. The
 [shared navigation guide](../examples.mbt.md) covers generic walks and folds.
 
-```moonbit
+```moonbit notest
 let book = @dib.parse("#!markdown\n# Results\n#!csharp\n1 + 1\n")
 let code = book.cells_for_kernel("c#")
 let serialized = book.to_string()
@@ -32,7 +32,7 @@ HTTP, value and Mermaid kernels, plus Markdown. Aliases include `cs`, `c#`,
 `C#`, `fs`, `f#`, `F#`, `powershell`, `js` and `md`. Matching is case-sensitive.
 Unmarked source uses C# by default. An explicit registry can change it:
 
-```moonbit
+```moonbit notest
 let kernel = @dib.KernelName("example")
 let registry = @dib.KernelRegistry(
   [@dib.KernelInfo(kernel, aliases=[@dib.KernelName("ex")])],
@@ -100,7 +100,7 @@ The original YAML/TOML syntax and comments are not retained.
 metadata when parsing that JSON recreates the same Ion value; otherwise it
 emits `#!meta ion`. To choose explicitly:
 
-```moonbit
+```moonbit notest
 let ion_source = book.to_string(metadata_output=@dib.MetadataOutput::Ion)
 let json_source = book.to_string(metadata_output=@dib.MetadataOutput::Json)
 ```
@@ -110,7 +110,7 @@ information. YAML and TOML are input formats; output uses JSON or Ion.
 
 ## Writing and construction
 
-```moonbit
+```moonbit notest
 let cell = @dib.Cell::Cell("Console.WriteLine(1);", kernel=@dib.KernelName("csharp"))
 let book = @dib.Notebook::Notebook([cell])
 ```

@@ -1,0 +1,18 @@
+import {
+  "moonrockz/moon-lander-site/content",
+  "moonrockz/moon-lander-site/model",
+  "moonrockz/moon-lander-site/views",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/string",
+}
+
+import {
+  "moonrockz/moon-lander-site/site",
+  "moonrockz/moon-lander-site/content",
+  "moonrockz/moon-lander-site/model",
+  "moonbitlang/async",
+  "moonbitlang/core/json",
+  "moonrockz/expect",
+} for "test"
+
+supported_targets = "native"

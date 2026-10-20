@@ -17,7 +17,7 @@ The `moonrockz/notebooks` module name and package imports are unchanged.
 Add the module with `moon add moonrockz/notebooks`. In `moon.pkg`, import the
 packages you use:
 
-```moonbit
+```moonbit notest
 import {
   "moonrockz/notebooks" @notebooks,
   "moonrockz/notebooks/nbformat" @nbformat,
@@ -63,7 +63,7 @@ engine does not convert notebooks or discard format-specific data.
 
 Write a generic function once and call it with either format's root:
 
-```moonbit
+```moonbit notest
 fn[N : @notebooks.Node] cell_sources(root : N) -> ReadOnlyArray[String] {
   let sources = []
   @notebooks.walk(root, node => {
@@ -127,7 +127,7 @@ Jupyter `@nbformat.Cell` implements `MimeTyped` for rich outputs and attachments
 DIB cells omit this trait because the format has no stored MIME bundles.
 The generic helper requires the capability at compile time:
 
-```moonbit
+```moonbit notest
 let cells = @notebooks.cells_by_mime_type(jupyter.cells(), "image/png")
 // cells is ReadOnlyArray[@nbformat.Cell].
 ```

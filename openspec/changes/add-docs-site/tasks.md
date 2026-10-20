@@ -24,22 +24,22 @@ Bead: lander-4us.7.1
 
 Bead: lander-4us.7.2
 
-- [ ] 2.1 Complete `scripts/site.mbtx build [--main]` with the steps of design D6 except `moon doc` (Bun install, islands build, Bun bundle, gzip budget, generate, highlight; task 10.1 adds `moon doc`); verify the "Step fails" scenario and that `--main` reaches `generate`.
-- [ ] 2.2 Add `apps/site/package.json` (private, `0.1.0`, `shiki` and `playwright` of design D3), `bun.lock`, and `apps/site/scripts/highlight.ts` ported from the model with `mbt` mapped to `moonbit`; verify the "Known language" and "Unknown language" scenarios with a test of `highlightHtml`.
-- [ ] 2.3 Add `scripts/serve-site.mbtx` with `moonbitlang/async/http`, the path rules of design D6, `--port`, `--no-watch`, and `mtime` polling that runs the build again; add `dev:site`; verify the "Directory request", "Path outside the base" and "Path escape" scenarios with tests of the pure path function.
-- [ ] 2.4 Add `site.mbtx check` and `site.mbtx test` with the tasks `check:site` and `test:site`; add the tests of the pure parts of both scripts to `mise run test:scripts`; verify that `mise run test:scripts` passes.
-- [ ] 2.5 Document the four tasks in the `README.md` task table; verify that each documented command runs as written.
+- [x] 2.1 Complete `scripts/site.mbtx build [--main]` with the steps of design D6 except `moon doc` (Bun install, islands build, Bun bundle, gzip budget, generate, highlight; task 10.1 adds `moon doc`); verify the "Step fails" scenario and that `--main` reaches `generate`.
+- [x] 2.2 Add `apps/site/package.json` (private, `0.1.0`, `shiki` and `playwright` of design D3), `bun.lock`, and `apps/site/scripts/highlight.ts` ported from the model with `mbt` mapped to `moonbit`; verify the "Known language" and "Unknown language" scenarios with a test of `highlightHtml`.
+- [x] 2.3 Add `scripts/serve-site.mbtx` with `moonbitlang/async/http`, the path rules of design D6, `--port`, `--no-watch`, and `mtime` polling that runs the build again; add `dev:site`; verify the "Directory request", "Path outside the base" and "Path escape" scenarios with tests of the pure path function.
+- [x] 2.4 Add `site.mbtx check` and `site.mbtx test` with the tasks `check:site` and `test:site`; add the tests of the pure parts of both scripts to `mise run test:scripts`; verify that `mise run test:scripts` passes.
+- [x] 2.5 Document the four tasks in the `README.md` task table; verify that each documented command runs as written.
 
 ## 3. Content pipeline
 
 Bead: lander-4us.7.3
 
-- [ ] 3.1 Add the `content` and `site` packages: source list from `git ls-files --cached --others --exclude-standard`, front matter, Markdown with heading anchors, and `doc_route`; verify the "Locally excluded plans" and "Plan not excluded" scenarios with a fixture repository.
-- [ ] 3.2 Add the docs page view, the sidebar from `nav` with the model glob rules, and the "On this page" list; verify the "New page not in nav" scenario.
-- [ ] 3.3 Add drafts and the `--main` flag; verify the "Draft in a local build" and "Draft in a main build" scenarios.
-- [ ] 3.4 Add package pages from `README.md` and `README.mbt.md` below each listed package; verify the "Package page" and "Two README kinds in one directory" scenarios with `notebooks`.
-- [ ] 3.5 Add link and anchor resolution, GitHub links for other repository files, and image copies; verify the "Relative Markdown link", "Missing anchor" and "SVG figure" scenarios.
-- [ ] 3.6 Add articles below `site/articles/`, the articles index, the Atom feed at `/articles/atom.xml`, and the search index; verify the "Article route", "Date does not match" and "Date is not real" scenarios and a well-formed feed.
+- [x] 3.1 Add the `content` and `site` packages: source list from `git ls-files --cached --others --exclude-standard`, front matter, Markdown with heading anchors, and `doc_route`; verify the "Locally excluded plans" and "Plan not excluded" scenarios with a fixture repository.
+- [x] 3.2 Add the docs page view, the sidebar from `nav` with the model glob rules, and the "On this page" list; verify the "New page not in nav" scenario.
+- [x] 3.3 Add drafts and the `--main` flag; verify the "Draft in a local build" and "Draft in a main build" scenarios.
+- [x] 3.4 Add package pages from `README.md` and `README.mbt.md` below each listed package; verify the "Package page" and "Two README kinds in one directory" scenarios with `notebooks`.
+- [x] 3.5 Add link and anchor resolution, GitHub links for other repository files, and image copies; verify the "Relative Markdown link", "Missing anchor" and "SVG figure" scenarios.
+- [x] 3.6 Add articles below `site/articles/`, the articles index, the Atom feed at `/articles/atom.xml`, and the search index; verify the "Article route", "Date does not match" and "Date is not real" scenarios and a well-formed feed.
 
 ## 4. Theming and islands
 
@@ -56,20 +56,20 @@ Bead: lander-4us.7.4
 
 Bead: lander-4us.7.5
 
-- [ ] 5.1 Render GitHub Markdown tables; verify a table fixture in a `content` test.
-- [ ] 5.2 Add the build-time Mermaid pass with `beautiful_mermaid` and no client fallback (design D9); verify the "Diagram renders" and "Diagram does not render" scenarios.
-- [ ] 5.3 Add the callout pass for the five GitHub alert kinds; verify the "Warning callout" scenario and that a plain block quote stays a block quote.
-- [ ] 5.4 Add the `layers` pass; verify the "Layer stack" and "Bad layer line" scenarios.
-- [ ] 5.5 Add `status: proposed` with the banner and the sidebar badge; verify the "Proposed page" and "Unknown status" scenarios.
-- [ ] 5.6 Add the MoonBit fence check of design D10; verify the "Untested example in docs" and "Example of a proposed API" scenarios, and the "Tested example" scenario with the `notebooks` README.
+- [x] 5.1 Render GitHub Markdown tables; verify a table fixture in a `content` test.
+- [x] 5.2 Add the build-time Mermaid pass with `beautiful_mermaid` and no client fallback (design D9); verify the "Diagram renders" and "Diagram does not render" scenarios.
+- [x] 5.3 Add the callout pass for the five GitHub alert kinds; verify the "Warning callout" scenario and that a plain block quote stays a block quote.
+- [x] 5.4 Add the `layers` pass; verify the "Layer stack" and "Bad layer line" scenarios.
+- [x] 5.5 Add `status: proposed` with the banner and the sidebar badge; verify the "Proposed page" and "Unknown status" scenarios.
+- [x] 5.6 Add the MoonBit fence check of design D10; verify the "Untested example in docs" and "Example of a proposed API" scenarios, and the "Tested example" scenario with the `notebooks` README.
 
 ## 6. Design overview page
 
 Bead: lander-4us.7.6
 
-- [ ] 6.1 Port the spec explainer page to `docs/design/overview.md` with `status: proposed` and the section order of design D19, using a table, a Mermaid run-order diagram, a `layers` block, callouts and `moonbit notest` code; verify the "Overview marked as proposed" scenario in a `generate` test of the built page.
-- [ ] 6.2 Draw any figure that `beautiful_mermaid` cannot render as an SVG file next to the page; verify that `mise run build:site -- --main` passes with no warning.
-- [ ] 6.3 Add a short landing page in `site/pages/index.html` that links the Design overview and says that user docs come with each hosting change (bead `lander-4us.6`); verify that `mise run check:site` passes.
+- [x] 6.1 Port the spec explainer page to `docs/design/overview.md` with `status: proposed` and the section order of design D19, using a table, a Mermaid run-order diagram, a `layers` block, callouts and `moonbit notest` code; verify the "Overview marked as proposed" scenario in a `generate` test of the built page.
+- [x] 6.2 Draw any figure that `beautiful_mermaid` cannot render as an SVG file next to the page; verify that `mise run build:site -- --main` passes with no warning.
+- [x] 6.3 Add a short landing page in `site/pages/index.html` that links the Design overview and says that user docs come with each hosting change (bead `lander-4us.6`); verify that `mise run check:site` passes.
 
 ## 7. Checks, CI and Pages
 

@@ -61,3 +61,67 @@ test "the TOML format selects the toml extension" {
     @config.fields([("a", @config.int(1))]),
   )
 }
+
+///|
+test "TOML date and time values" {
+  for (text, expected) in [
+    ("2026-09-28T12:30:00Z", "2026-09-28T12:30:00Z"),
+    ("2026-09-28T12:30:00", "2026-09-28T12:30:00-00:00"),
+    ("2026-09-28", "2026-09-28"),
+    ("2026-09-28t12:30:00z", "2026-09-28T12:30:00Z"),
+    ("2026-09-28 12:30:00", "2026-09-28T12:30:00-00:00"),
+    ("2026-09-28T12:30:00.1234567890+05:30", "2026-09-28T12:30:00.1234567890+05:30"),
+    ("2026-09-28T12:30:00.00100-07:00", "2026-09-28T12:30:00.00100-07:00"),
+    ("2026-09-28T12:30:00.00100", "2026-09-28T12:30:00.00100-00:00"),
+  ] {
+    let value = @toml.parse("value = " + text, origin="app.toml")
+    guard value.to_ion().kind() is Struct(fields) else { fail("expected a table") }
+    guard fields[0].value().kind() is Timestamp(timestamp) else {
+      fail("date lost its timestamp type")
+    }
+    @expect.expect(timestamp.to_ion_string()).to_equal(expected)
+  }
+}
+
+///|
+test "TOML local times keep their annotation and fractional spelling" {
+  for spelling in ["12:30:00", "12:30:00.00100"] {
+    let value = @toml.parse("value = " + spelling, origin="app.toml")
+    guard value.to_ion().kind() is Struct(fields) else { fail("expected a table") }
+    let time = fields[0].value()
+    guard time.kind() is String(actual) else { fail("local time lost its string type") }
+    @expect.expect(actual).to_equal(spelling)
+    @expect.expect(time.annotations().map(token => token.text())).to_equal(
+      [Some("toml_local_time")],
+    )
+  }
+}
+
+///|
+test "TOML date and time mapping recurses through tables and arrays" {
+  let value = @toml.parse(
+    "[nested]\nvalues = [2026-09-28, 12:30:00]",
+    origin="app.toml",
+  )
+  guard value.to_ion().kind() is Struct(root) else { fail("expected a table") }
+  guard root[0].value().kind() is Struct(nested) else { fail("expected nested table") }
+  guard nested[0].value().kind() is List(items) else { fail("expected a list") }
+  guard items[0].kind() is Timestamp(day) else { fail("date lost its type") }
+  @expect.expect(day.to_ion_string()).to_equal("2026-09-28")
+  @expect.expect(items[1].kind() is String("12:30:00")).to_be_true()
+  @expect.expect(items[1].annotations().map(token => token.text())).to_equal(
+    [Some("toml_local_time")],
+  )
+}
+
+///|
+test "Large TOML integer stays exact across the Int64 range" {
+  for spelling in [
+    "9223372036854775807", "-9223372036854775808", "9007199254740993",
+  ] {
+    let value = @toml.parse("large = " + spelling, origin="app.toml")
+    guard value.to_ion().kind() is Struct(fields) else { fail("expected a table") }
+    guard fields[0].value().kind() is Int(integer) else { fail("integer lost its type") }
+    @expect.expect(integer.to_string()).to_equal(spelling)
+  }
+}

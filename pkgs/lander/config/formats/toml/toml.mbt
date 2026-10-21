@@ -7,7 +7,10 @@ pub fn format() -> @config.Format {
 ///|
 /// Parse TOML text into a value tree. A string gives a string, an integer an
 /// integer, a float a float, a Boolean a Boolean, an array a list, and a table
-/// a struct with the keys in source order. `origin` names the source in errors.
+/// a struct with the keys in source order. Date-times and dates give timestamps,
+/// with an unknown offset for local date-times and day precision for dates.
+/// Local times give strings annotated with `toml_local_time`.
+/// `origin` names the source in errors.
 pub fn parse(
   text : String,
   origin~ : String,
@@ -35,8 +38,20 @@ fn to_ion(
         .to_array()
         .map(entry => @ion.field(entry.0, to_ion(entry.1, origin))),
       )
-    TomlDateTime(_) =>
-      raise parse_error(origin, "TOML date and time values are not supported yet")
+    TomlDateTime(_) => {
+      let (kind, spelling) = value.datetime_info().unwrap()
+      if kind == "LocalTime" {
+        @ion.Ion::string(spelling).with_annotation(@ion.symbol("toml_local_time"))
+      } else {
+        let text = spelling.replace_all(old=" ", new="T")
+          .replace_all(old="t", new="T").replace_all(old="z", new="Z")
+        let text = if kind == "LocalDateTime" { text + "-00:00" } else { text }
+        let timestamp = @ion.Timestamp::parse(text[:]) catch {
+          error => raise parse_error(origin, error.message())
+        }
+        @ion.Ion::timestamp(timestamp)
+      }
+    }
   }
 }
 

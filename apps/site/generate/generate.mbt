@@ -32,11 +32,37 @@ async fn list_files(root : String, prefix~ : String = "") -> Array[String] {
 }
 
 ///|
+/// The variables that make git use one repository, from
+/// `git rev-parse --local-env-vars`. Git sets some of them for hooks.
+let local_git_vars : Array[String] = [
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",
+  "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE",
+  "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX",
+  "GIT_SHALLOW_FILE", "GIT_COMMON_DIR",
+]
+
+///|
+/// The environment of this process without `local_git_vars`, so that a child
+/// git finds the repository from its working directory. Use it with
+/// `inherit_env=false`.
+fn git_env() -> Map[String, String] {
+  let env : Map[String, String] = Map([])
+  for name, value in @env.get_env_vars() {
+    if !local_git_vars.contains(name.to_upper()) {
+      env[name] = value
+    }
+  }
+  env
+}
+
+///|
 /// Repository files below `root`: tracked and untracked, without ignored files.
 async fn repository_files(root : String) -> Array[String] raise @model.Invalid {
   let (code, stdout, stderr) = @process.collect_output(
     "git",
     ["ls-files", "--cached", "--others", "--exclude-standard"],
+    extra_env=git_env(),
+    inherit_env=false,
     cwd=root,
   ) catch {
     error =>

@@ -66,7 +66,13 @@ async fn plan_repository() -> String {
   )
   @fs.write_file("\{root}/site/pages/index.html", "<h1>x</h1>")
   @fs.write_file("\{root}/docs/superpowers/plan.md", "# Plan\n")
-  let (code, _, _) = @process.collect_output("git", ["init", "-q"], cwd=root)
+  let (code, _, _) = @process.collect_output(
+    "git",
+    ["init", "-q"],
+    extra_env=git_env(),
+    inherit_env=false,
+    cwd=root,
+  )
   assert_eq(code, 0)
   root
 }
@@ -89,6 +95,36 @@ async test "Locally excluded plans" {
 async test "Plan not excluded" {
   let root = plan_repository()
   defer @fs.rmdir(root, recursive=true)
+  let problems = try generate(root, "\{root}/_out", "assets", true) catch {
+    @model.Invalid(problems) => problems.map(p => p.render())
+    error => [error.to_string()]
+  } noraise {
+    _ => []
+  }
+  assert_eq(problems, [
+    "docs/superpowers/plan.md: forbidden path: agent specs, plans and ledgers live in beads",
+  ])
+}
+
+///|
+/// Git sets `GIT_DIR` for hooks. The generator must still read the repository
+/// of the content root, not the repository that `GIT_DIR` names.
+async test "Inherited GIT_DIR does not choose the repository" {
+  let outer = @fs.tmpdir(prefix="lander-site-outer")
+  defer @fs.rmdir(outer, recursive=true)
+  let (code, _, _) = @process.collect_output(
+    "git",
+    ["init", "-q"],
+    extra_env=git_env(),
+    inherit_env=false,
+    cwd=outer,
+  )
+  assert_eq(code, 0)
+  @env.set_env_var("GIT_DIR", "\{outer}/.git")
+  defer @env.unset_env_var("GIT_DIR")
+  let root = plan_repository()
+  defer @fs.rmdir(root, recursive=true)
+  assert_true(@fs.exists("\{root}/.git"))
   let problems = try generate(root, "\{root}/_out", "assets", true) catch {
     @model.Invalid(problems) => problems.map(p => p.render())
     error => [error.to_string()]

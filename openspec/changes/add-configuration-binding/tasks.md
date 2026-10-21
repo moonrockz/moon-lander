@@ -12,15 +12,15 @@ with the `Decode` and `Validation` cases and `BindFailure` (with `DecodePath`,
 
 Bead: lander-4us.4.1
 
-- [ ] 1.1 Check that the core declares `ConfigError::Decode(failure~ : BindFailure)`, `ConfigError::Validation(failures~ : Array[BindFailure])`, `BindFailure`, `Located`, `DecodePath`, `DecodeStep` and `Blame` (`Set(Array[Origin])`, `Table`, `Default`, `Unset`) as in design D4; verify `moon info` shows them in `pkg.generated.mbti`, and stop and return to the owner if they differ
-- [ ] 1.2 Add `bind` and `Config::bind` for `T : FromJson`: parse the key with `KeyPath::parse`, select the section, convert it to `Json`, decode with `@json.from_json`; verify a white-box test binds `ir` from an in-memory source into a derived record, and empty key text raises `InvalidKeyPath`
-- [ ] 1.3 Add `bind_root` for `T : FromJson`; verify a test binds a record with the fields `ir` and `pipeline` and a root error names `ir.strict_mode`
-- [ ] 1.4 Translate the `JsonPath` text (RFC 6901 pointer, `~0`, `~1`, list indexes) into a `DecodePath` (key path up to the first list index, then the index and field suffix), and use the core `DecodePath` text form (`targets[1].level`, quoted names, `(root)`) to show it; verify unit tests for keys with `/`, `~`, `.`, and a list index
-- [ ] 1.5 Resolve blame from provenance at the key part of the `DecodePath` (`Set` with every list origin, then `Table` origins, then `Unset`); verify tests for a leaf, an element of a replaced list, an element of an appended list with two origins, a table with two sources, and an unset key
-- [ ] 1.6 Decode an absent section as `null`; verify an `Option` target gives `None` and a record target gives `Decode` with blame `Unset`
-- [ ] 1.7 Raise `Decode` with the values that the core `ConfigError::message()` renders as `<path>: <detail> (<blame text>)` with the core origin text (file role name and path, or variable name); verify snapshot tests over the core text for a `user-override` file origin, an environment origin, a list with two origins, `Unset`, and a Windows origin `C:/repo/morphir.toml` with no backslash
-- [ ] 1.8 Add an acceptance suite in `tests/` for the spec requirements "Bind a section to a typed value", "Bind the full configuration", "Absent section", "Decode errors name the decode path and its sources" and "Origin text in errors"; verify `mise run test` passes on all four targets
-- [ ] 1.9 Document `bind` and `bind_root` with a runnable example in the `config` package README; verify the README example runs in `mise run test`
+- [x] 1.1 Check that the core declares `ConfigError::Decode(failure~ : BindFailure)`, `ConfigError::Validation(failures~ : Array[BindFailure])`, `BindFailure`, `Located`, `DecodePath`, `DecodeStep` and `Blame` (`Set(Array[Origin])`, `Table`, `Default`, `Unset`) as in design D4; verify `moon info` shows them in `pkg.generated.mbti`, and stop and return to the owner if they differ
+- [x] 1.2 Add `bind` and `Config::bind` for `T : FromJson`: parse the key with `KeyPath::parse`, select the section, convert it to `Json`, decode with `@json.from_json`; verify a white-box test binds `ir` from an in-memory source into a derived record, and empty key text raises `InvalidKeyPath`
+- [x] 1.3 Add `bind_root` for `T : FromJson`; verify a test binds a record with the fields `ir` and `pipeline` and a root error names `ir.strict_mode`
+- [x] 1.4 Translate the `JsonPath` text (RFC 6901 pointer, `~0`, `~1`, list indexes) into a `DecodePath` (key path up to the first list index, then the index and field suffix), and use the core `DecodePath` text form (`targets[1].level`, quoted names, `(root)`) to show it; verify unit tests for keys with `/`, `~`, `.`, and a list index
+- [x] 1.5 Resolve blame from provenance at the key part of the `DecodePath` (`Set` with every list origin, then `Table` origins, then `Unset`); verify tests for a leaf, an element of a replaced list, an element of an appended list with two origins, a table with two sources, and an unset key
+- [x] 1.6 Decode an absent section as `null`; verify an `Option` target gives `None` and a record target gives `Decode` with blame `Unset`
+- [x] 1.7 Raise `Decode` with the values that the core `ConfigError::message()` renders as `<path>: <detail> (<blame text>)` with the core origin text (file role name and path, or variable name); verify snapshot tests over the core text for a `user-override` file origin, an environment origin, a list with two origins, `Unset`, and a Windows origin `C:/repo/morphir.toml` with no backslash
+- [x] 1.8 Add an acceptance suite in `tests/` for the spec requirements "Bind a section to a typed value", "Bind the full configuration", "Absent section", "Decode errors name the decode path and its sources" and "Origin text in errors"; verify `mise run test` passes on all four targets. "Value from an environment variable" and "Appended list names every source" run as white-box tests in `config` until the core gives environment sources (core 6) and append policies (core 11); 8.1 adds them to the suite
+- [x] 1.9 Document `bind` and `bind_root` with a runnable example in the `config` package README; verify the README example runs in `mise run test`
 
 ## 2. Bind over a default value
 
@@ -80,6 +80,6 @@ Bead: lander-4us.4.7
 
 Bead: lander-4us.4.8
 
-- [ ] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure")
+- [ ] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure"); also add "Value from an environment variable" and "Appended list names every source" to the acceptance suite
 - [ ] 8.2 Run `mise run format` and `mise run check`; verify both pass, and verify the windows-latest CI leg passes the binding tests for `native` and `js`
 - [ ] 8.3 Run `mise exec -- openspec validate add-configuration-binding --strict`; verify it passes

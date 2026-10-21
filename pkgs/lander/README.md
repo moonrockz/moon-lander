@@ -17,7 +17,7 @@ same inputs give the same configuration on every target.
 
 ```layers
 Hosting | @lander: arguments, lifecycle, exit codes (planned)
-Binding | typed values with source-aware errors (planned)
+Binding | @config.bind: typed values with source-aware errors
 Conventions | @conventions: where configuration files are found
 Configuration core | @config: sources, file tree, pure load, merge
 Formats | TOML today; YAML, JSON5 and Ion later
@@ -33,9 +33,9 @@ a load asks for. A `wasm` host gives the files itself.
 | Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources and the builder, file tree and the pure load, merge with null rules, provenance, typed errors |
 | Formats | `config/formats/toml` | TOML strings, numbers, Booleans, arrays, and tables |
 | Configuration core, rest | `config` | Environment variables, merge policies, secrets, redaction, and helpers come next |
-| Host adapters | `config/host` | Planned |
+| Host adapters | [`config/host`](config/host/README.mbt.md) | `native` reads files, variables, and the working directory; `js` comes next |
 | Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery of `<app>.<ext>`; the other layouts and locations come next |
-| Binding | | Planned |
+| Binding | [`config`](config/README.mbt.md) | `bind` and `bind_root` with source-aware decode errors; defaults and validation come next |
 | Hosting | `@lander` | Planned |
 
 The [Configuration](config/README.mbt.md) chapter shows the API that exists, with

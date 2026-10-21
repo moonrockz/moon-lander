@@ -1,0 +1,136 @@
+///|
+/// A temporary directory in the `/` form, removed after the test.
+async fn temp_dir() -> String {
+  to_slash(@fs.tmpdir(prefix="lander-host"), running_platform())
+}
+
+///|
+async fn write(path : String, text : String) -> Unit {
+  let native = from_slash(path, running_platform())
+  match path.rev_find("/") {
+    Some(index) =>
+      @fs.mkdir(
+        from_slash(path[:index].to_owned(), running_platform()),
+        recursive=true,
+        allow_exist=true,
+      )
+    None => ()
+  }
+  @fs.write_file(native, text, create_mode=CreateOrTruncate)
+}
+
+///|
+/// A provider that records the context it gets and adds no source.
+fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
+  {
+    name: "recorder",
+    expand: context => {
+      seen.val = Some(context)
+      Done({ sources: [], warnings: [] })
+    },
+  }
+}
+
+///|
+async test "Host adapter fills the inputs" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  write("\{dir}/app.toml", "project.name = \"disk\"")
+  let seen = Ref(None)
+  let config = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("\{dir}/app.toml")
+    |> @config.provider(recorder(seen))
+    |> load
+  @expect.expect(@config.get_text(config, "project.name")).to_equal("disk")
+  guard seen.val is Some(context) else { fail("the provider did not run") }
+  @expect.expect(context.env_vars).to_equal(@env.get_env_vars())
+  @expect.expect(context.working_dir).to_equal(
+    @env.current_dir().map(dir => to_slash(dir, running_platform())),
+  )
+  @expect.expect(context.platform).to_equal(Some(running_platform()))
+}
+
+///|
+async test "Adapter uses the given values" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  write("\{dir}/conf/app.toml", "a = 1")
+  let seen = Ref(None)
+  let config = @config.builder()
+    |> @config.env_vars({ "APP_A": "1" })
+    |> @config.working_dir(dir)
+    |> @config.platform(Linux)
+    |> @config.format(@toml.format())
+    |> @config.file("conf/app.toml")
+    |> @config.provider(recorder(seen))
+    |> load
+  @expect.expect(@config.get_text(config, "a")).to_equal("1")
+  @expect.expect(config.reports()[0].path).to_equal(Some("\{dir}/conf/app.toml"))
+  guard seen.val is Some(context) else { fail("the provider did not run") }
+  @expect.expect(context.env_vars).to_equal({ "APP_A": "1" })
+  @expect.expect(context.platform).to_equal(Some(Linux))
+}
+
+///|
+async test "Windows path in a report" {
+  // `moon test` runs in the module directory, which holds `moon.mod`.
+  let mod_format : @config.Format = {
+    name: "module",
+    extensions: ["mod"],
+    parse: (_, _) => @config.fields([]),
+  }
+  let config = @config.builder()
+    |> @config.format(mod_format)
+    |> @config.file("moon.mod")
+    |> load
+  guard config.reports()[0].path is Some(path) else {
+    fail("the report has no path")
+  }
+  @expect.expect(path.contains("\\")).to_equal(false)
+  @expect.expect(path).to_equal(
+    to_slash(@env.current_dir().unwrap_or("."), running_platform()) +
+    "/moon.mod",
+  )
+}
+
+///|
+async test "a missing explicit file raises file-not-found" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("\{dir}/missing/app.toml")
+  try load(builder) catch {
+    @config.FileNotFound(path~) =>
+      @expect.expect(path).to_equal("\{dir}/missing/app.toml")
+    error => fail("expected file-not-found, got \{error}")
+  } noraise {
+    _ => fail("expected file-not-found")
+  }
+}
+
+///|
+async test "discovery finds the project file on the disk" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  write("\{dir}/acme.toml", "project.name = \"walked\"")
+  write("\{dir}/src/nested/main.mbt", "")
+  let config = @config.builder()
+    |> @config.working_dir("\{dir}/src/nested")
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.app_dirs("acme"))
+    |> load
+  @expect.expect(@config.get_text(config, "project.name")).to_equal("walked")
+  @expect.expect(config.origins(@config.KeyPath::parse("project.name"))[0].location).to_equal(
+    Some("\{dir}/acme.toml"),
+  )
+}
+
+///|
+test "paths convert only on Windows" {
+  assert_eq(to_slash("C:\\w\\app.toml", Windows), "C:/w/app.toml")
+  assert_eq(from_slash("C:/w/app.toml", Windows), "C:\\w\\app.toml")
+  assert_eq(to_slash("/w/a\\b", Linux), "/w/a\\b")
+  assert_eq(from_slash("/w/app.toml", MacOs), "/w/app.toml")
+}

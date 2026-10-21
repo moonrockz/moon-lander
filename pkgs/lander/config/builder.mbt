@@ -55,6 +55,27 @@ pub fn ConfigBuilder::formats(self : ConfigBuilder) -> Array[Format] {
 }
 
 ///|
+/// The variable set that the builder holds, or `None` when nobody gave one. A
+/// host reads the process variables only when this is `None`.
+pub fn ConfigBuilder::given_env_vars(
+  self : ConfigBuilder,
+) -> Map[String, String]? {
+  self.env_vars.map(vars => vars.copy())
+}
+
+///|
+/// The working directory that the builder holds, or `None` when nobody gave one.
+pub fn ConfigBuilder::given_working_dir(self : ConfigBuilder) -> String? {
+  self.working_dir
+}
+
+///|
+/// The platform that the builder holds, or `None` when nobody gave one.
+pub fn ConfigBuilder::given_platform(self : ConfigBuilder) -> Platform? {
+  self.platform
+}
+
+///|
 /// Set the variable set of the run. Source providers read variables only from
 /// this set.
 pub fn env_vars(

@@ -488,10 +488,73 @@ fn try_int64(text : String) -> Int64? {
 }
 
 ///|
+/// Integer text under an explicit `!!int` tag. Allows optional sign and
+/// radix forms; plain scalars use `from_plain` instead.
 fn integer_ion(text : String) -> @ion.Ion {
+  match parse_tagged_radix_integer(text) {
+    Some(ion) =>
+      match ion.kind() {
+        Int(_) => return ion
+        _ => ()
+      }
+    None => ()
+  }
   match try_int64(text) {
     Some(integer) => @ion.Ion::big_int(@bigint.BigInt::from_int64(integer))
     None => @ion.Ion::big_int(@bigint.BigInt::from_string(text))
+  }
+}
+
+///|
+/// Optional sign plus `0x` / `0o` for explicitly tagged integers. Invalid
+/// digits after a radix prefix keep the text as a string.
+fn parse_tagged_radix_integer(value : String) -> @ion.Ion? {
+  let chars = value.to_array()
+  if chars.length() < 3 {
+    return None
+  }
+  let mut i = 0
+  let mut negative = false
+  if chars[0] is ('+' | '-') {
+    negative = chars[0] == '-'
+    i = 1
+  }
+  if i + 2 > chars.length() || chars[i] != '0' {
+    return None
+  }
+  let radix = match chars[i + 1] {
+    'x' | 'X' => 16
+    'o' | 'O' => 8
+    _ => return None
+  }
+  i += 2
+  if i >= chars.length() {
+    return None
+  }
+  let digits = StringBuilder()
+  while i < chars.length() {
+    let c = chars[i]
+    let ok = if radix == 16 {
+      (c >= '0' && c <= '9') ||
+      (c >= 'a' && c <= 'f') ||
+      (c >= 'A' && c <= 'F')
+    } else {
+      c >= '0' && c <= '7'
+    }
+    if !ok {
+      return Some(@ion.Ion::string(value))
+    }
+    digits.write_char(c)
+    i += 1
+  }
+  let ion = integer_ion_base(digits.to_string(), radix)
+  if negative {
+    match ion.kind() {
+      Int(number) => Some(@ion.Ion::big_int(number.neg()))
+      _ => Some(ion)
+    }
+  } else {
+    Some(ion)
   }
 }
 

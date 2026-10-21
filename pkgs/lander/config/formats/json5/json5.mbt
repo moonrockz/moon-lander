@@ -60,15 +60,16 @@ fn parse_error(
   origin : String,
   error : @json5_lib.ParseError,
 ) -> @config.ConfigError {
+  // json5 Position.column is 0-based; ConfigError columns are 1-based.
   let (line, column) = match error {
     @json5_lib.ParseError(@json5_lib.NoValidToken({ line, column, })) =>
-      (Some(line), Some(column))
+      (Some(line), Some(column + 1))
     @json5_lib.ParseError(@json5_lib.InvalidChar({ line, column, }, _)) =>
-      (Some(line), Some(column))
+      (Some(line), Some(column + 1))
     @json5_lib.ParseError(@json5_lib.InvalidNumber({ line, column, }, _)) =>
-      (Some(line), Some(column))
+      (Some(line), Some(column + 1))
     @json5_lib.ParseError(@json5_lib.InvalidIdentEscape({ line, column, })) =>
-      (Some(line), Some(column))
+      (Some(line), Some(column + 1))
     @json5_lib.ParseError(@json5_lib.InvalidEof) => (None, None)
   }
   Parse(

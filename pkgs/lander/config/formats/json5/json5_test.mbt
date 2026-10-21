@@ -47,10 +47,10 @@ test "JSON syntax error has a position" {
   try @json5.parse(text, origin="app.json") catch {
     Parse(format~, origin~, line~, column~, ..) as error => {
       @expect.expect((format, origin, line, column)).to_equal(
-        ("JSON5", "app.json", Some(2), Some(4)),
+        ("JSON5", "app.json", Some(2), Some(5)),
       )
       @expect.expect(error.message()).to_start_with(
-        "Failed to parse JSON5 configuration app.json at line 2, column 4",
+        "Failed to parse JSON5 configuration app.json at line 2, column 5",
       )
     }
     _ => fail("expected a parse error")

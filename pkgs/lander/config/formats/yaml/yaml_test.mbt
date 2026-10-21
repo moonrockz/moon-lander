@@ -278,3 +278,14 @@ test "signed radix forms stay strings" {
     ]),
   )
 }
+
+///|
+test "explicit !!int keeps radix forms" {
+  let value = @yaml.parse(
+    "a: !!int 0x2A\nb: !!int -0o52\n",
+    origin="app.yaml",
+  )
+  @expect.expect(value).to_equal(
+    @config.fields([("a", @config.int(42)), ("b", @config.int(-42))]),
+  )
+}

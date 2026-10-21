@@ -13,7 +13,7 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|    function normalizeBase(base) {
   #|      try {
   #|        const url = new URL(base);
-  #|        return /^(https?):\/\//.test(base) && !base.includes("?") && !base.includes("#") && !url.username && !url.password && url.pathname.endsWith("/") ? url.href : "";
+  #|        return /^(https?):\/\//i.test(base) && !base.includes("?") && !base.includes("#") && !url.username && !url.password && url.pathname.endsWith("/") ? url.href : "";
   #|      } catch {
   #|        return "";
   #|      }

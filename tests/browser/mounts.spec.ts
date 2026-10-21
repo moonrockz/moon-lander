@@ -59,12 +59,21 @@ test("directory URL bases retain their path and encode each literal filename seg
     expect(JSON.stringify(result)).not.toContain("secret");
   }
   expect(await pathsSince(page, start)).toEqual([]);
-  const normal = await run(page, { mounts: [mount(page, ["acme.toml"], "/workspace", "/configs/")], sources: ["acme.toml"], keys: ["server.host"] });
-  expect(normal.values["server.host"]).toBe("directory-base");
+  for (const base of ["HTTPS://example.org/configs/", "hTtPs://example.org/configs/"]) {
+    const result = await run(page, { mode: "construct", mounts: [{ ...mount(page), base }] });
+    expect(result.error).toBeUndefined();
+  }
+  expect(await pathsSince(page, start)).toEqual([]);
+  for (const scheme of ["http", "HTTP", "hTtP"]) {
+    const hosted = mount(page, ["acme.toml"], "/workspace", "/configs/");
+    hosted.base = hosted.base.replace(/^http:/, scheme + ":");
+    const normal = await run(page, { mounts: [hosted], sources: ["acme.toml"], keys: ["server.host"] });
+    expect(normal.values["server.host"]).toBe("directory-base");
+  }
   const filename = "space % #é?.toml";
   const encoded = await run(page, { mounts: [mount(page, [filename], "/workspace", "/configs/")], sources: [filename], keys: ["server.host"] });
   expect(encoded.values["server.host"]).toBe("encoded");
-  expect(await pathsSince(page, start)).toEqual(["/configs/acme.toml", "/configs/" + encodeURIComponent(filename)]);
+  expect(await pathsSince(page, start)).toEqual(["/configs/acme.toml", "/configs/acme.toml", "/configs/acme.toml", "/configs/" + encodeURIComponent(filename)]);
   const beforeLiteral = (await stats(page)).paths.length;
   const literal = await run(page, { mounts: [mount(page, ["%2e%2e/acme.toml"], "/workspace", "/configs/")], sources: ["%2e%2e/acme.toml"] });
   expect(literal.error).toBe("FileNotFound");

@@ -32,7 +32,7 @@ a load asks for. A `wasm` host gives the files itself.
 | Layer | Package | Status |
 | --- | --- | --- |
 | Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources (defaults, files, environment, overrides) and the builder, file tree and the pure load, merge with null rules, provenance, merge policies, lazy secrets, redaction, display helpers and typed errors |
-| Formats | [`formats`](formats/README.md), `config/formats/*` | TOML, YAML with default/strict profiles, JSON/JSON5 and Ion; default and TOML-only linked sets |
+| Formats | [`formats`](formats/README.mbt.md), `config/formats/*` | TOML, YAML with default/strict profiles, JSON/JSON5 and Ion; default and TOML-only linked sets |
 | Host adapters | [`config/host`](config/host/README.mbt.md) | `native` and `js` read files and fill missing variables and the working directory |
 | Browser adapter | [`config/browser`](config/browser/README.mbt.md) | js browser URL mounts with explicit manifests, run inputs, limits, cancellation, and typed boundary errors |
 | Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery in three layouts, system and global user directories on every platform, local and user overrides, explicit project file, ambiguity, legacy fallback, stop boundary, isolated mode; workspace and environment parts come next |
@@ -56,3 +56,14 @@ import {
 ```
 
 The root package exports `version()`, which gives the module version.
+
+## Choose which parsers the executable links
+
+Import `formats` to use the default set, or select `formats/toml` with one
+`overrides` entry in the executable's `moon.pkg`. The caller keeps the same
+`@formats.formats()` call. MoonBit virtual packages let the executable replace
+the default implementation at build time, so unused parsers can be omitted.
+
+The [format selection guide](formats/README.mbt.md) explains the language
+feature, shows the registration loop and a custom TOML/YAML implementation,
+and describes how the output-size and parser-marker checks verify trimming.

@@ -321,9 +321,13 @@ test "the extension selects the format" {
 }
 ```
 
-The [`formats`](../formats/README.md) virtual package supplies all four format
-packages by default. A main-package override selects TOML only or an
-application-defined set without changing the application source.
+The [`formats`](../formats/README.mbt.md) virtual package supplies all four format
+packages by default. An executable-package override selects TOML only or an
+application-defined set without changing the caller's import or registration
+loop. This selection happens at build time and can remove unused parsers from
+the executable. The guide explains MoonBit virtual packages, their `pkg.mbti`
+contract, and the difference between selecting linked code and registering
+formats in a builder.
 
 ## Merge rules
 

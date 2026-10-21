@@ -35,7 +35,7 @@ pub fn parse(
     profile,
     docs: [],
     stack: [],
-    key_stack: [],
+    pending_keys: [],
     anchors: Map([]),
     documents: 0,
     error: None,
@@ -71,7 +71,9 @@ priv struct Builder {
   profile : Profile
   docs : Array[@ion.Ion]
   stack : Array[Frame]
-  key_stack : Array[String]
+  /// `None` means the next mapping entry is a key; `Some(name)` means the next
+  /// entry is the value for that key (including an empty-string key).
+  pending_keys : Array[String?]
   anchors : Map[Int, @ion.Ion]
   mut documents : Int
   mut error : @config.ConfigError?
@@ -166,7 +168,7 @@ fn Builder::on_event_impl(
       self.check_tag(tag, mark)
       self.reject_complex_key(mark)
       self.stack.push(Mapping([], id))
-      self.key_stack.push("")
+      self.pending_keys.push(None)
     }
     SequenceEnd => {
       guard self.stack.pop() is Some(Sequence(items, id)) else {
@@ -180,7 +182,7 @@ fn Builder::on_event_impl(
       self.insert(@ion.Ion::list(items), id, mark)
     }
     MappingEnd => {
-      guard self.key_stack.pop() is Some(_) else {
+      guard self.pending_keys.pop() is Some(None) else {
         raise parse_error(
           self.origin,
           "unexpected mapping end",
@@ -212,7 +214,8 @@ fn Builder::reject_complex_key(
   self : Builder,
   mark : @yaml_lib.Marker,
 ) -> Unit raise @config.ConfigError {
-  if self.stack.last() is Some(Mapping(_)) && self.key_stack.last() is Some("") {
+  if self.stack.last() is Some(Mapping(_)) &&
+    self.pending_keys.last() is Some(None) {
     raise parse_error(
       self.origin,
       "mapping keys must be strings",
@@ -250,8 +253,8 @@ fn Builder::check_tag(
 
 ///|
 fn Builder::null_feature(self : Builder) -> String {
-  match self.key_stack.last() {
-    Some(key) if key != "" => key
+  match self.pending_keys.last() {
+    Some(Some(key)) => key
     _ => "null"
   }
 }
@@ -267,6 +270,9 @@ fn Builder::insert(
     self.anchors[id] = node
   }
   if self.stack.is_empty() {
+    if self.profile is Strict && !(node.kind() is Struct(_)) {
+      raise unsupported(self.origin, "non-mapping root", mark)
+    }
     self.stack.push(Root(node))
     return
   }
@@ -280,33 +286,36 @@ fn Builder::insert(
       )
     Sequence(items, _) => items.push(node)
     Mapping(fields, _) => {
-      let cur_key = self.key_stack[self.key_stack.length() - 1]
-      if cur_key == "" {
-        guard node.kind() is String(key) else {
-          raise parse_error(
-            self.origin,
-            "mapping keys must be strings",
-            Some(mark.line),
-            Some(mark.col),
-          )
-        }
-        if key == "<<" {
-          raise unsupported(self.origin, "merge key", mark)
-        }
-        for field in fields {
-          if field.0 == key {
+      let index = self.pending_keys.length() - 1
+      match self.pending_keys[index] {
+        None => {
+          guard node.kind() is String(key) else {
             raise parse_error(
               self.origin,
-              "duplicate key \{key}",
+              "mapping keys must be strings",
               Some(mark.line),
               Some(mark.col),
             )
           }
+          if key == "<<" {
+            raise unsupported(self.origin, "merge key", mark)
+          }
+          for field in fields {
+            if field.0 == key {
+              raise parse_error(
+                self.origin,
+                "duplicate key \{key}",
+                Some(mark.line),
+                Some(mark.col),
+              )
+            }
+          }
+          self.pending_keys[index] = Some(key)
         }
-        self.key_stack[self.key_stack.length() - 1] = key
-      } else {
-        fields.push((cur_key, node))
-        self.key_stack[self.key_stack.length() - 1] = ""
+        Some(key) => {
+          fields.push((key, node))
+          self.pending_keys[index] = None
+        }
       }
     }
   }
@@ -384,9 +393,11 @@ fn resolve_scalar(
 
 ///|
 fn from_plain(value : String) -> @ion.Ion {
+  match parse_radix_integer(value) {
+    Some(ion) => return ion
+    None => ()
+  }
   match value {
-    ['0', 'x', .. number] => return integer_ion_base(number.to_owned(), 16)
-    ['0', 'o', .. number] => return integer_ion_base(number.to_owned(), 8)
     ['+', .. number] =>
       match try_int64(number.to_owned()) {
         Some(integer) =>
@@ -409,6 +420,60 @@ fn from_plain(value : String) -> @ion.Ion {
           None => @ion.Ion::string(value)
         }
       }
+  }
+}
+
+///|
+/// Parse an optional sign plus `0x` / `0o` and valid digits. Invalid digits after
+/// a radix prefix keep the text as a string. Returns `None` when the text is not
+/// a radix form at all.
+fn parse_radix_integer(value : String) -> @ion.Ion? {
+  let chars = value.to_array()
+  if chars.length() < 3 {
+    return None
+  }
+  let mut i = 0
+  let mut negative = false
+  if chars[0] is ('+' | '-') {
+    negative = chars[0] == '-'
+    i = 1
+  }
+  if i + 2 > chars.length() || chars[i] != '0' {
+    return None
+  }
+  let radix = match chars[i + 1] {
+    'x' | 'X' => 16
+    'o' | 'O' => 8
+    _ => return None
+  }
+  i += 2
+  if i >= chars.length() {
+    return None
+  }
+  let digits = StringBuilder()
+  while i < chars.length() {
+    let c = chars[i]
+    let ok = if radix == 16 {
+      (c >= '0' && c <= '9') ||
+      (c >= 'a' && c <= 'f') ||
+      (c >= 'A' && c <= 'F')
+    } else {
+      c >= '0' && c <= '7'
+    }
+    if !ok {
+      return Some(@ion.Ion::string(value))
+    }
+    digits.write_char(c)
+    i += 1
+  }
+  let ion = integer_ion_base(digits.to_string(), radix)
+  if negative {
+    match ion.kind() {
+      Int(number) => Some(@ion.Ion::big_int(number.neg()))
+      _ => Some(ion)
+    }
+  } else {
+    Some(ion)
   }
 }
 

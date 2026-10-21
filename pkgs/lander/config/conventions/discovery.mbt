@@ -101,14 +101,18 @@ fn Conventions::project_sources(
 ///|
 /// The explicit primary at `path` with the role `Explicit`, and its overrides
 /// when the path has a standard layout. A relative path joins the working
-/// directory.
+/// directory. On Windows, `\` becomes `/`.
 fn Conventions::explicit_sources(
   self : Conventions,
-  path : String,
+  given : String,
   options : DiscoveryOptions,
   context : @config.LoadContext,
   extensions : Array[String],
 ) -> Array[@config.ConfigSource] {
+  let path = match context.platform {
+    Some(Windows) => given.replace_all(old="\\", new="/")
+    _ => given
+  }
   let resolved = if is_absolute(path) {
     normalize(path)
   } else {

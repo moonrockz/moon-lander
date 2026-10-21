@@ -222,7 +222,7 @@ test "the user override wins over the project file" {
 
 `DiscoveryOptions(config=Explicit(path))`, for example from a `--config` flag,
 names the project file. Discovery does not walk up. A relative path joins the
-working directory. The source has the role `Explicit`, and a missing file is an
+working directory, and on Windows `\` becomes `/`. The source has the role `Explicit`, and a missing file is an
 error, `FileNotFound`. When the path has a standard layout, such as
 `configs/acme.toml`, its local and user overrides apply. Other files, such as
 `configs/project.yaml`, have no overrides. `Skip` skips the project file.

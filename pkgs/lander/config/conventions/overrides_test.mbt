@@ -282,6 +282,26 @@ test "an explicit file in a standard layout has its overrides" {
 }
 
 ///|
+test "an explicit Windows path uses the / form" {
+  let config = discover_in(
+    "C:/work",
+    [],
+    options=@conventions.DiscoveryOptions::new(
+      config=Explicit("configs\\acme.toml"),
+    ),
+    platform=Windows,
+    env_vars={},
+  ) catch {
+    FileNotFound(path~) => {
+      @expect.expect(path).to_equal("C:/work/configs/acme.toml")
+      return
+    }
+    error => fail("expected file-not-found, got \{error.message()}")
+  }
+  fail("expected file-not-found, got \{project(config).status.to_repr()}")
+}
+
+///|
 test "a missing explicit file is an error" {
   try
     discover_in(

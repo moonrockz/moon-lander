@@ -376,7 +376,8 @@ standard layout: with no primary, a legacy primary, or a non-standard explicit
 file, there is no override source. `.<app>/<app>.<ext>` and `<app>.<ext>` use the
 same override names in the directory of the primary. `Explicit(path)` is a
 `ConfigSource::file` with the role `Explicit`, normalized against the working
-directory, and `Skip` gives a skipped project source.
+directory, with `\` changed to `/` on Windows, and `Skip` gives a skipped project
+source.
 
 Discovery with
 no working directory, or a relative one, gives a skipped project source and a

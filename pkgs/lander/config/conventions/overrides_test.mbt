@@ -302,6 +302,29 @@ test "an explicit Windows path uses the / form" {
 }
 
 ///|
+test "a relative dot-config explicit file has its overrides" {
+  let config = @config.builder()
+    |> @config.format(@toml.format())
+    |> @conventions.add(
+      @conventions.app_dirs("acme"),
+      options=@conventions.DiscoveryOptions::new(
+        config=Explicit(".config/acme/config.toml"),
+      ),
+    )
+    |> @config.load(
+      @config.FileTree::new(complete=true)
+      .with_listing(".config/acme", [
+        { name: "config.toml", kind: File },
+        { name: "config.user.toml", kind: File },
+      ])
+      .with_file(".config/acme/config.toml", "ui.theme = \"shared\"")
+      .with_file(".config/acme/config.user.toml", "ui.theme = \"personal\""),
+    )
+    |> done
+  @expect.expect(@config.get_text(config, "ui.theme")).to_equal("personal")
+}
+
+///|
 test "a missing explicit file is an error" {
   try
     discover_in(

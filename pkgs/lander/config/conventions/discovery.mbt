@@ -181,7 +181,8 @@ fn Conventions::adjacent(
       return Some((dir, self.name))
     }
     if file == "config.\{extension}" &&
-      dir.has_suffix("/.config/\{self.name}") {
+      (dir == ".config/\{self.name}" ||
+      dir.has_suffix("/.config/\{self.name}")) {
       return Some((dir, "config"))
     }
   }

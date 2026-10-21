@@ -58,6 +58,9 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
 | `mise run test:site` | Test the docs site packages and the code highlight step |
+| `mise run build:node-adapter` | Regenerate the checked-in TypeScript host adapter bundle |
+| `mise run check:node-adapter` | Reject a stale host adapter bundle |
+| `mise run test:node-adapter` | Test the js host adapter on Node and Bun |
 | `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.1.2` |
 | `mise run clean` | Remove build artifacts |
 

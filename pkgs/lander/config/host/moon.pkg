@@ -1,9 +1,9 @@
 import {
   "moonrockz/moon-lander/config",
+  "moonbitlang/core/env",
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/os_error",
-  "moonbitlang/core/env",
 }
 
 import {
@@ -14,10 +14,17 @@ import {
 
 import {
   "moonrockz/expect",
-  "moonrockz/moon-lander/config/conventions",
-  "moonrockz/moon-lander/config/formats/toml",
-  "moonbitlang/async/fs",
 } for "test"
 
-// The js adapter comes in a later task; wasm and wasm-gc hosts give a file tree.
-supported_targets = "native"
+// Wasm hosts inject a FileTree into the pure core.
+supported_targets = "native+js"
+
+// The pinned build system cannot condition imports by target. Native fs and
+// os_error imports are unused on js; retain other warning checks.
+warnings = "-29"
+
+options(targets: {
+  "fixture.native_wbtest.mbt": ["native"],
+  "fixture.js_wbtest.mbt": ["js"],
+  "node_fixture.generated.js_wbtest.mbt": ["js"],
+})

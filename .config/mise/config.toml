@@ -119,9 +119,21 @@ run = "moonx scripts/versions.mbtx check"
 description = "Run native tests with zig as the C compiler"
 run = "moonx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/test.mbtx native"
 
+[tasks."test:node-adapter"]
+description = "Test the js host adapter on Node and Bun (args: node|bun)"
+run = "moonx scripts/test-node-adapter.mbtx"
+
 [tasks."test:scripts"]
 description = "Test the task scripts"
 run = "moonx scripts/test-scripts.mbtx"
+
+[tasks."build:node-adapter"]
+description = "Bundle the TypeScript js host adapter with Bun"
+run = "moonx scripts/build-node-adapter.mbtx"
+
+[tasks."check:node-adapter"]
+description = "Check that the generated js host adapter is current"
+run = "moonx scripts/build-node-adapter.mbtx --check"
 
 [tasks.check]
 description = "Run lint, validate, tests, task script tests and builds"

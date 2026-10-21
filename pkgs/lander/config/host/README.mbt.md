@@ -1,38 +1,44 @@
 # Host adapter
 
 The `config/host` package (`@host`) loads configuration from the disk on the
-`native` target. It is the host side of the pure `@config.load`: it fills the
-inputs that the builder does not hold, then answers each file request until the
-load is done. The `js` adapter comes in a later change.
-
-Import `moonrockz/moon-lander/config/host` as `@host` in a `native` package. The
-`mbt check` block on this page runs as a test with `mise run test`.
+`native` and `js` targets. It fills the inputs that the builder does not hold,
+then answers the file requests from the pure `@config.load` until loading is done.
+The async `@host.load` API is the same on both targets.
 
 | Input | Where it comes from |
 | --- | --- |
 | Variable set | `@config.env_vars` when given, else the process environment |
 | Working directory | `@config.working_dir` when given, else the process working directory |
 | Platform | `@config.platform` when given, else the running system |
-| Files | The disk, through `moonbitlang/async` |
+| Files on native | `moonbitlang/async` |
+| Files on js | Synchronous `node:fs` calls through the TypeScript adapter |
 
-A file or a directory that does not exist becomes an absence record, so the
-loop never asks for one path twice. On Windows the adapter changes `\` to `/`
-when it reads a path, and back for each file call, so reports and errors show
-`C:/repo/app.toml` on every platform.
+The js adapter runs on the pinned Node and Bun versions. Its generated MoonBit
+FFI file is checked in, so `moon build` and `moon test` do not need Bun. After an
+edit to `pkgs/lander/adapters/node/`, run `mise run build:node-adapter`. Both
+`mise run check:node-adapter` and `mise run check` reject a stale generated file.
+
+A missing file or directory becomes an absence record. Other I/O errors are
+raised, so an inaccessible file does not silently disappear from discovery.
+Listings include hidden entries and follow symbolic links to classify entries.
+On Windows paths use `/` in the file tree, reports, origins, and errors. The
+adapter converts to native separators only for file calls.
+
+This example reads the module manifest from the process working directory with
+a format that accepts its text. It runs as a doc test on native and js.
 
 ```mbt check
 ///|
-async test "load the project file from the disk" {
-  let dir = @fs.tmpdir(prefix="lander-readme")
-  defer @fs.rmdir(dir, recursive=true)
-  let root = dir.replace_all(old="\\", new="/")
-  @fs.write_file("\{dir}/acme.toml", "project.name = \"acme\"")
-  @fs.mkdir("\{dir}/src", allow_exist=true)
+async test "read a file through the host adapter" {
+  let format : @config.Format = {
+    name: "module",
+    extensions: ["mod"],
+    parse: (text, _) => @config.fields([("text", @config.string(text))]),
+  }
   let config = @config.builder()
-    |> @config.working_dir("\{root}/src")
-    |> @config.format(@toml.format())
-    |> @conventions.add(@conventions.app_dirs("acme"))
+    |> @config.format(format)
+    |> @config.file("moon.mod")
     |> @host.load
-  @expect.expect(@config.get_text(config, "project.name")).to_equal("acme")
+  @expect.expect(@config.get_text(config, "text").contains("moonrockz/moon-lander")).to_equal(true)
 }
 ```

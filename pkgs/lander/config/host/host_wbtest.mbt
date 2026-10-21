@@ -1,25 +1,4 @@
 ///|
-/// A temporary directory in the `/` form, removed after the test.
-async fn temp_dir() -> String {
-  to_slash(@fs.tmpdir(prefix="lander-host"), running_platform())
-}
-
-///|
-async fn write(path : String, text : String) -> Unit {
-  let native = from_slash(path, running_platform())
-  match path.rev_find("/") {
-    Some(index) =>
-      @fs.mkdir(
-        from_slash(path[:index].to_owned(), running_platform()),
-        recursive=true,
-        allow_exist=true,
-      )
-    None => ()
-  }
-  @fs.write_file(native, text, create_mode=CreateOrTruncate)
-}
-
-///|
 /// A provider that records the context it gets and adds no source.
 fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
   {
@@ -33,16 +12,20 @@ fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
 
 ///|
 async test "Host adapter fills the inputs" {
+  @env.set_env_var("LANDER_HOST_INPUT_A", "1")
+  defer @env.unset_env_var("LANDER_HOST_INPUT_A")
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   write("\{dir}/app.toml", "project.name = \"disk\"")
   let seen = Ref(None)
   let config = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("\{dir}/app.toml")
+    |> @config.env(prefix="LANDER_HOST_INPUT")
     |> @config.provider(recorder(seen))
     |> load
   @expect.expect(@config.get_text(config, "project.name")).to_equal("disk")
+  @expect.expect(@config.get_text(config, "a")).to_equal("1")
   guard seen.val is Some(context) else { fail("the provider did not run") }
   @expect.expect(context.env_vars).to_equal(@env.get_env_vars())
   @expect.expect(context.working_dir).to_equal(
@@ -53,8 +36,10 @@ async test "Host adapter fills the inputs" {
 
 ///|
 async test "Adapter uses the given values" {
+  @env.set_env_var("APP_B", "2")
+  defer @env.unset_env_var("APP_B")
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   write("\{dir}/conf/app.toml", "a = 1")
   let seen = Ref(None)
   let config = @config.builder()
@@ -63,9 +48,11 @@ async test "Adapter uses the given values" {
     |> @config.platform(Linux)
     |> @config.format(@toml.format())
     |> @config.file("conf/app.toml")
+    |> @config.env(prefix="APP")
     |> @config.provider(recorder(seen))
     |> load
   @expect.expect(@config.get_text(config, "a")).to_equal("1")
+  @expect.expect(config.get(@config.KeyPath::parse("b"))).to_equal(None)
   @expect.expect(config.reports()[0].path).to_equal(Some("\{dir}/conf/app.toml"))
   guard seen.val is Some(context) else { fail("the provider did not run") }
   @expect.expect(context.env_vars).to_equal({ "APP_A": "1" })
@@ -97,7 +84,7 @@ async test "Windows path in a report" {
 ///|
 async test "a missing explicit file raises file-not-found" {
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("\{dir}/missing/app.toml")
@@ -113,7 +100,7 @@ async test "a missing explicit file raises file-not-found" {
 ///|
 async test "discovery finds the project file on the disk" {
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   write("\{dir}/acme.toml", "project.name = \"walked\"")
   write("\{dir}/src/nested/main.mbt", "")
   let config = @config.builder()
@@ -142,10 +129,10 @@ async test "a file that cannot be read is an error, not a missing file" {
     return
   }
   let dir = temp_dir()
-  defer @fs.rmdir(dir, recursive=true)
-  @fs.mkdir("\{dir}/locked", permission=0)
-  // A recursive remove cannot list the locked directory, so remove it first.
-  defer @fs.rmdir("\{dir}/locked")
+  defer remove_dir(dir)
+  mkdir("\{dir}/locked", permission=0)
+  // Restore access before recursive fixture cleanup.
+  defer chmod("\{dir}/locked", 0o755)
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("\{dir}/locked/app.toml")
@@ -164,11 +151,11 @@ async test "discovery does not skip a file it cannot inspect" {
     return
   }
   let dir = temp_dir()
-  defer @fs.rmdir(dir, recursive=true)
+  defer remove_dir(dir)
   write("\{dir}/acme.toml", "project.name = \"hidden\"")
   // Read but no search permission: the listing works, a stat of an entry fails.
-  @fs.chmod(dir, 0o444)
-  defer @fs.chmod(dir, 0o755)
+  chmod(dir, 0o444)
+  defer chmod(dir, 0o755)
   let builder = @config.builder()
     |> @config.working_dir(dir)
     |> @config.format(@toml.format())
@@ -208,7 +195,7 @@ async test "Adapter uses the given variable set for a discovered environment sou
 ///|
 async test "a boundary at the temporary root keeps a parent file out" {
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   write("\{dir}/acme.toml", "a = 1")
   write("\{dir}/case/.config/acme/config.toml", "b = 2")
   write("\{dir}/case/src/main.mbt", "")
@@ -234,7 +221,7 @@ async test "a boundary at the temporary root keeps a parent file out" {
 ///|
 async test "discovery reads the global file and the overrides on the disk" {
   let dir = temp_dir()
-  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  defer remove_dir(from_slash(dir, running_platform()))
   write("\{dir}/home/.acme/acme.toml", "a = \"global\"\nb = \"global\"")
   write("\{dir}/case/acme.toml", "a = \"project\"")
   write("\{dir}/case/acme.user.toml", "c = \"user\"")

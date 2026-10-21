@@ -393,6 +393,15 @@ Ported from morphir-moonbit `environment` and the Morphir merge-rules spec:
 The JSON value in step 3 uses `@json.parse` from `moonbitlang/core`. Its numbers
 keep their source text (`repr`), so the conversion to Ion keeps integers exact.
 
+**Call (this change)**, from task group 6: `ConfigSource::env(prefix~, reserved?,
+selection?)` and the pipe `@config.env(builder, prefix~, ...)` give the source;
+`selection` defaults to `Discover`. The load keeps one tree for each variable, so
+each leaf origin holds its variable name, and an exclusion warning names the
+variable that held the key. Keys with equal depth sort by key text, then by
+variable name, so two variables that differ only in case give the same result on
+every run. `ConfigSource::overrides(pairs)`, `overrides_value(value)`, and the pipe
+`@config.overrides(builder, pairs)` give the overrides source.
+
 **Call (this change)**: a variable named only `PREFIX_` (empty key) is an error, as
 in morphir-moonbit. An environment source with no matching variables reports
 `loaded`, because the source was read.

@@ -30,6 +30,7 @@ priv enum SourceInput {
   Value(ConfigValue)
   Path(String)
   Candidates(Array[String], String)
+  Env(SourceSelection[Map[String, String]], String, Array[String])
   NoInput
 }
 

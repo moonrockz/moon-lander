@@ -12,9 +12,8 @@ this page runs as a test with `mise run test`.
 
 > [!NOTE]
 > The configuration core is in progress. This page shows the API that exists
-> today. Environment variables, the YAML, JSON and Ion formats, the js host
-> adapter, the rest of discovery, and binding over defaults come in later
-> changes. The
+> today. The YAML, JSON and Ion formats, merge policies, secrets, the js host
+> adapter, the rest of discovery, and validation come in later changes. The
 > [design overview](../../../docs/design/overview.md) shows the full plan.
 
 ## One load, start to finish
@@ -69,6 +68,8 @@ a new builder, so you can keep a base builder and extend it.
 | `in_memory(value)`, `in_memory_pairs(pairs)` | `InMemory` | A value tree, or key-path and value pairs |
 | `ConfigSource::file(path, role~)`, `@config.file(builder, path)` | `File(role)` | One explicit file |
 | `ConfigSource::candidates(paths, display~)` | `File(role)` | A list of candidate files at one location |
+| `ConfigSource::env(prefix~)`, `@config.env(builder, prefix~)` | `Environment` | Variables that start with `PREFIX_` |
+| `ConfigSource::overrides(pairs)`, `@config.overrides(builder, pairs)` | `Overrides` | Key-path pairs, for example from the command line |
 | `ConfigSource::skipped(kind)` | any | Nothing; the report shows `Skipped` |
 
 ```mbt check
@@ -483,6 +484,90 @@ test "a decode error names the file that set the value" {
   }
 }
 ```
+
+## Bind over a default value
+
+`bind_or` merges the configured section over a typed default, with the same rules
+as the configuration merge: tables merge, a configured list or scalar replaces
+the default, and an absent section keeps the default. The type needs `ToJson` as
+well as `FromJson`. A failure in a value that the default gave says
+`from the bind default`.
+
+```mbt check
+///|
+struct ServerDefaults {
+  host : String
+  port : Int
+  tags : Array[String]
+} derive(FromJson, ToJson, Eq, Debug)
+
+///|
+test "configured keys win over the default" {
+  let config = @config.build([
+    @config.in_memory_pairs([
+      ("server.port", @config.int(9000)),
+      ("server.tags", @config.list([@config.string("eu")])),
+    ]),
+  ])
+  let server = config
+    |> @config.bind_or("server", ({
+      host: "localhost",
+      port: 8080,
+      tags: ["default"],
+    } : ServerDefaults))
+  @expect.expect(server).to_equal({ host: "localhost", port: 9000, tags: ["eu"] })
+  @expect.expect(config.bind_or("mode", "safe")).to_equal("safe")
+}
+```
+
+Binding decodes through `FromJson`, so its rules apply:
+
+| Case | Result |
+| --- | --- |
+| `Int` from `1.5` | `1`: the fraction is lost without an error |
+| `Int64` from a number | An error: `Int64` decodes only from text such as `"42"` |
+| An `Option` field that is absent | `None` |
+| An unknown field | Ignored |
+
+The configuration never holds a null field, so a `null` in a source does not
+reach an `Option` field: the field is absent and decodes as `None`.
+
+## Environment variables and overrides
+
+An environment source reads the variables that start with its prefix. `__`
+separates names, and the names are written in lower case, so
+`ACME_SERVER__PORT=9000` sets `server.port`. Values get a type: `true` and
+`false`, integers, and JSON lists or tables; other text stays a string. The
+origin of each value names its variable. An overrides source, for example from
+the command line, has the highest default priority, 700.
+
+```mbt check
+///|
+test "an environment variable overrides a file" {
+  let builder = @config.builder()
+    |> @config.env_vars({ "ACME_SERVER__PORT": "9000", "HOME": "/home/u" })
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/acme.toml")
+    |> @config.env(prefix="ACME")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/acme.toml",
+    "server.port = 8080\nserver.host = \"example.org\"",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  @expect.expect(@config.get_text(config, "server.port")).to_equal("9000")
+  let origin = config.origins(@config.KeyPath::parse("server.port"))[0]
+  @expect.expect(origin.location).to_equal(Some("ACME_SERVER__PORT"))
+}
+```
+
+| Rule | Example |
+| --- | --- |
+| The prefix matches in any case | `acme_ui__color=false` sets `ui.color` |
+| `_` after the prefix is skipped; a single `_` stays in a name | `ACME__IR_FORMAT=3` sets `ir_format` |
+| An empty name is an error | `ACME_A____B` raises `InvalidEnvKey` |
+| Reserved names stay out | `reserved=["ACME_HOME"]` |
+| A shorter path merges last | `ACME_IR=x` replaces `ACME_IR__MODE=fast` |
+| `Discover` with no variable set | The report shows `NotFound` |
 
 ## Hosts
 

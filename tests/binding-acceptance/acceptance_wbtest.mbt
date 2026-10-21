@@ -2,7 +2,23 @@
 priv struct IrOptions {
   layout : String
   strict_mode : Bool
+} derive(FromJson, ToJson)
+
+///|
+priv struct PipelineOptions {
+  components : Array[String]
+} derive(FromJson, ToJson)
+
+///|
+/// A default whose JSON form does not decode: `level` is text.
+priv struct Mode {
+  level : Int
 } derive(FromJson)
+
+///|
+impl ToJson for Mode with to_json(_) {
+  { "level": "high" }
+}
 
 ///|
 priv struct Pipeline {
@@ -25,13 +41,14 @@ priv struct Target {
 /// last binding: a result text or an error.
 priv struct BindingWorld {
   files : Array[(String, @config.FileRole, String)]
+  vars : Map[String, String]
   mut result : String?
   mut error : @config.ConfigError?
 }
 
 ///|
 fn BindingWorld::BindingWorld() -> BindingWorld {
-  { files: [], result: None, error: None }
+  { files: [], vars: {}, result: None, error: None }
 }
 
 ///|
@@ -51,6 +68,10 @@ fn BindingWorld::config(self : BindingWorld) -> @config.Config raise {
   for file in self.files {
     builder = builder |> @config.file(file.0, role=file.1)
     tree = tree.with_file(file.0, file.2)
+  }
+  if !self.vars.is_empty() {
+    builder = builder
+      |> @config.env(prefix="MORPHIR", selection=Explicit(self.vars))
   }
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
@@ -112,6 +133,38 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
   setup.when0("the application binds the full configuration", () => self.run(config => {
     let app : AppConfig = config |> @config.bind_root()
     "\{app.ir.layout} \{app.pipeline.target}"
+  }))
+  setup.given2("the environment variable {string} is {string}", (
+    name : String,
+    value : String,
+  ) => self.vars[name] = value)
+  setup.when1("the application binds {string} over the IR default", (
+    key : String,
+  ) => self.run(config => {
+    let ir = config
+      |> @config.bind_or(key, ({ layout: "single-file", strict_mode: false } : IrOptions))
+    "\{ir.layout} \{ir.strict_mode}"
+  }))
+  setup.when2("the application binds {string} over the text default {string}", (
+    key : String,
+    default : String,
+  ) => self.run(config => config |> @config.bind_or(key, default)))
+  setup.when1("the application binds {string} over the component default", (
+    key : String,
+  ) => self.run(config => {
+    let pipeline = config
+      |> @config.bind_or(key, ({ components: ["parse", "typecheck"] } : PipelineOptions))
+    pipeline.components.join(",")
+  }))
+  setup.when1("the application binds {string} to an integer", (key : String) => self.run(config => {
+    let value : Int = config |> @config.bind(key)
+    value.to_string()
+  }))
+  setup.when1("the application binds {string} over a default that does not decode", (
+    key : String,
+  ) => self.run(config => {
+    let mode = config |> @config.bind_or(key, ({ level: 1 } : Mode))
+    mode.level.to_string()
   }))
   setup.then1("the result is {string}", (expected : String) => {
     @expect.expect(self.result).to_equal(Some(expected))
@@ -223,6 +276,61 @@ let feature : String =
   #|    When the application binds "ir" to the IR record
   #|    Then the error text is "ir.strict_mode: Bool::from_json: expected boolean (set in project C:/repo/morphir.toml)"
   #|    And the error text has no backslash
+  #|
+  #|  Scenario: Value from an environment variable
+  #|    Given the environment variable "MORPHIR_IR__STRICT_MODE" is "maybe"
+  #|    And the environment variable "MORPHIR_IR__LAYOUT" is "tree"
+  #|    When the application binds "ir" to the IR record
+  #|    Then the error text is "ir.strict_mode: Bool::from_json: expected boolean (set in environment MORPHIR_IR__STRICT_MODE)"
+  #|
+  #|  Scenario: Unset keys keep default values
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.strict_mode = true
+  #|      """
+  #|    When the application binds "ir" over the IR default
+  #|    Then the result is "single-file true"
+  #|
+  #|  Scenario: Scalar default
+  #|    When the application binds "mode" over the text default "safe"
+  #|    Then the result is "safe"
+  #|
+  #|  Scenario: Scalar default with a configured value
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      mode = "fast"
+  #|      """
+  #|    When the application binds "mode" over the text default "safe"
+  #|    Then the result is "fast"
+  #|
+  #|  Scenario: Configured list replaces default list
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      pipeline.components = ["parse"]
+  #|      """
+  #|    When the application binds "pipeline" over the component default
+  #|    Then the result is "parse"
+  #|
+  #|  Scenario: No section uses the full default
+  #|    When the application binds "ir" over the IR default
+  #|    Then the result is "single-file false"
+  #|
+  #|  Scenario: Required field with no value
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.strict_mode = true
+  #|      """
+  #|    When the application binds "ir" to the IR record
+  #|    Then binding fails with a decode error at "ir"
+  #|    And the error text is "ir: Missing field layout (table set in project /repo/morphir.toml)"
+  #|
+  #|  Scenario: Unset scalar key
+  #|    When the application binds "server.port" to an integer
+  #|    Then the error text is "server.port: Int::from_json: expected number (not set by any source)"
+  #|
+  #|  Scenario: Bad default value
+  #|    When the application binds "mode" over a default that does not decode
+  #|    Then the error text is "mode.level: Int::from_json: expected number (from the bind default)"
 
 ///|
 /// Run each scenario of `text` with a fresh world and fail on the first scenario

@@ -59,12 +59,7 @@ pub fn Config::value(self : Config) -> ConfigValue {
 ///|
 /// The value at `key`, or `None` when no value is there.
 pub fn Config::get(self : Config, key : KeyPath) -> ConfigValue? {
-  let mut value = self.root
-  for name in key.names {
-    guard value.field(name) is Some(next) else { return None }
-    value = next
-  }
-  Some(value)
+  self.root.at(key.names)
 }
 
 ///|

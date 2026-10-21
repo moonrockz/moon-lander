@@ -2,7 +2,7 @@
 struct IrOptions {
   layout : String
   strict_mode : Bool
-} derive(FromJson, Debug, Eq)
+} derive(FromJson, ToJson, Debug, Eq)
 
 ///|
 struct Pipeline {
@@ -298,5 +298,136 @@ test "Required field with no value" {
   @expect.expect(failure.at[0].path.to_string()).to_equal("ir")
   @expect.expect(message).to_equal(
     "ir: Missing field layout (table set in project /repo/morphir.toml)",
+  )
+}
+
+///|
+struct PipelineOptions {
+  components : Array[String]
+  timeout : Int?
+} derive(FromJson, ToJson, Debug, Eq)
+
+///|
+test "Unset keys keep default values" {
+  let config = @config.build([
+    @config.in_memory_pairs([("ir.strict_mode", @config.bool(true))]),
+  ])
+  let default : IrOptions = { layout: "single-file", strict_mode: false }
+  let ir = config |> @config.bind_or("ir", default)
+  @expect.expect(ir).to_equal({ layout: "single-file", strict_mode: true })
+  @expect.expect(default).to_equal({ layout: "single-file", strict_mode: false })
+}
+
+///|
+test "Scalar default" {
+  let empty = @config.build([])
+  @expect.expect(empty |> @config.bind_or("mode", "safe")).to_equal("safe")
+  let set = @config.build([
+    @config.in_memory_pairs([("mode", @config.string("fast"))]),
+  ])
+  @expect.expect(set.bind_or("mode", "safe")).to_equal("fast")
+}
+
+///|
+test "Configured list replaces default list" {
+  let config = @config.build([
+    @config.in_memory_pairs([
+      ("pipeline.components", @config.list([@config.string("parse")])),
+    ]),
+  ])
+  let pipeline = config
+    |> @config.bind_or("pipeline", {
+      components: ["parse", "typecheck"],
+      timeout: Some(30),
+    })
+  @expect.expect(pipeline).to_equal({ components: ["parse"], timeout: Some(30) })
+}
+
+///|
+test "List default" {
+  let config = @config.build([])
+  @expect.expect(config |> @config.bind_or("targets", ["js"])).to_equal(["js"])
+}
+
+///|
+test "No section uses the full default" {
+  let config = @config.build([])
+  let default : IrOptions = { layout: "tree", strict_mode: true }
+  @expect.expect(config |> @config.bind_or("ir", default)).to_equal(default)
+}
+
+///|
+test "a null overlay keeps the default" {
+  let config = @config.build([
+    @config.ConfigSource::defaults({ "ir": { "layout": null } }),
+  ])
+  let default : IrOptions = { layout: "tree", strict_mode: true }
+  @expect.expect(config |> @config.bind_or("ir", default)).to_equal(default)
+}
+
+///|
+test "a None field of the default takes the configured value" {
+  let config = @config.build([
+    @config.in_memory_pairs([("pipeline.timeout", @config.int(5))]),
+  ])
+  let pipeline = config
+    |> @config.bind_or("pipeline", { components: [], timeout: None })
+  @expect.expect(pipeline.timeout).to_equal(Some(5))
+}
+
+///|
+struct Mode {
+  level : Int
+} derive(FromJson, Debug)
+
+///|
+/// A default whose JSON form does not decode as `Mode`.
+struct BadMode {
+  level : String
+} derive(ToJson)
+
+///|
+impl ToJson for Mode with to_json(_) {
+  ToJson::to_json(BadMode::{ level: "high" })
+}
+
+///|
+test "Bad default value" {
+  let config = @config.build([])
+  let (failure, message) = decode_failure(() => {
+    config |> @config.bind_or("mode", ({ level: 1 } : Mode)) |> ignore
+  })
+  @expect.expect(failure.at[0].blame).to_equal(Default)
+  @expect.expect(message).to_equal(
+    "mode.level: Int::from_json: expected number (from the bind default)",
+  )
+}
+
+///|
+test "a configured value over a default keeps the source blame" {
+  let config = load_files([
+    ("/repo/morphir.toml", Workspace, "ir.strict_mode = \"yes\""),
+  ])
+  let (failure, message) = decode_failure(() => {
+    config
+    |> @config.bind_or("ir", { layout: "tree", strict_mode: false })
+    |> ignore
+  })
+  @expect.expect(failure.at[0].path.to_string()).to_equal("ir.strict_mode")
+  @expect.expect(message).to_end_with("(set in project /repo/morphir.toml)")
+}
+
+///|
+test "table blame keeps an environment source before a later source" {
+  let config = @config.builder()
+    |> @config.env(prefix="APP", selection=Explicit({ "APP_IR__MODE": "x" }))
+    |> @config.overrides([("ir.strict_mode", @config.bool(true))])
+    |> @config.load(@config.FileTree::new(complete=true))
+    |> done
+  let (_, message) = decode_failure(() => {
+    let _ : IrOptions = config |> @config.bind("ir")
+  })
+  @expect.expect(message).to_equal(
+    "ir: Missing field layout (table set in environment APP_IR__MODE, overrides)",
   )
 }

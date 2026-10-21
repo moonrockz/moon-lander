@@ -3,6 +3,7 @@ import {
   "moonrockz/ion/json" @ion_json,
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
+  "moonbitlang/core/int64",
 }
 
 import {

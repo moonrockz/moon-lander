@@ -208,7 +208,7 @@ test "get_text raises key-not-found for a missing key" {
   let config = @config.build([])
   try @config.get_text(config, "project.missing") catch {
     error => {
-      guard error is KeyNotFound(_) else { fail("wrong error") }
+      guard error is KeyNotFound(..) else { fail("wrong error") }
       @expect.expect(error.message()).to_equal(
         "Configuration key not found: project.missing",
       )

@@ -32,7 +32,7 @@ pub fn Config::get(self : Config, key : KeyPath) -> ConfigValue? {
 /// other value gives compact JSON. A missing key raises `KeyNotFound`.
 pub fn get_text(config : Config, key : String) -> String raise ConfigError {
   let path = KeyPath::parse(key)
-  guard config.get(path) is Some(value) else { raise KeyNotFound(path) }
+  guard config.get(path) is Some(value) else { raise KeyNotFound(key=path) }
   match value.ion.kind() {
     String(text) => text
     _ => {

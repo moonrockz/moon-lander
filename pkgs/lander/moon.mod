@@ -5,6 +5,7 @@ version = "0.1.0"
 import {
   "moonbitlang/async@0.22.5",
   "moonbit-community/toml@0.5.0",
+  "moonbit-community/yaml@0.0.8",
   "moonrockz/ion@0.6.0",
   "moonrockz/expect@0.6.1",
 }

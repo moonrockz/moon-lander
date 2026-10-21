@@ -150,7 +150,7 @@ pub(all) enum SourceSelection[T] {
   Discover
   Explicit(T)
   Skip
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 pub(all) enum FileRole {
   Explicit
@@ -261,6 +261,26 @@ the listing of its directory in the `FileTree` holds its exact name as a file
 (D13). The conventions change applies the same rule during discovery, with its own
 skip rules for ancestors.
 
+**Call (this change)**, from the source model task group (5):
+
+- Source values come from constructors on `ConfigSource`: `defaults(json)`,
+  `defaults_value(value)`, `file(path, role~)`, `candidates(paths, display~)`,
+  and `skipped(kind)`, plus the existing `in_memory` and `in_memory_pairs`. Each
+  takes `name?` and `priority?`. A provider returns these values. The builder
+  pipes `@config.defaults(builder, json)` and `@config.file(builder, path)` add
+  one source each; `@config.add` adds any other source.
+- `@config.load` checks the priorities, not `add`, because a provider expands only
+  during the load. The check runs over the expanded list before any file request,
+  so the builder functions do not raise for the order.
+- `build(sources)` loads value sources over a complete empty `FileTree`.
+  `Config::reports()` gives the reports in merge order, and `Config::warnings()`
+  gives the provider warnings, then the report warnings in merge order.
+- The location of `Ambiguous` is the longest directory that holds every
+  candidate. The load raises `Ambiguous` as soon as two candidates exist, also
+  when the tree does not yet know the other candidates.
+- The source model types derive `Debug`, not `Show`, because `derive(Show)` is
+  deprecated.
+
 **Call (R9)**: key filters. `ConfigSource::exclude(self, paths, warn~ : Bool)`
 gives a source a list of key paths to remove. Core applies the filters after the
 parse and before the merge, inside the build. When `warn` is true, each removed key
@@ -274,7 +294,7 @@ inherited-layer removal without a warning (morphir-moonbit `Document::shared()`)
 pub(all) enum ConfigWarning {
   KeyRemoved(KeyPath, Origin)
   Note(source~ : String, message~ : String)   // provider warnings (D4a)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 ```
 
 ### D4a. Source providers and the load context
@@ -289,7 +309,7 @@ pub(all) enum Platform {
   Linux
   MacOs
   Windows
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 pub(all) struct LoadContext {
   tree : FileTree
@@ -702,9 +722,9 @@ async hosts prepare snapshots).
 sources and conventions discovery both read it.
 
 ```moonbit
-pub(all) enum EntryKind { File; Directory; Other } derive(Eq, Show)
+pub(all) enum EntryKind { File; Directory; Other } derive(Eq, Debug)
 
-pub(all) struct DirEntry { name : String; kind : EntryKind } derive(Eq, Show)
+pub(all) struct DirEntry { name : String; kind : EntryKind } derive(Eq, Debug)
 
 // Opaque and immutable: directory listings, file text, and a `complete` flag.
 pub struct FileTree { .. }
@@ -717,7 +737,7 @@ pub(all) enum FileRequest {
 pub(all) enum LoadStep[T] {
   Need(Array[FileRequest])
   Done(T)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 ```
 
 - `FileTree` holds listings with the real names and file text, keyed by path.
@@ -727,6 +747,11 @@ pub(all) enum LoadStep[T] {
   or directory. A path under a missing directory is also absent. An absence record
   answers a request, so the next round does not ask for that path again, and the
   tree can stay incomplete for paths that later rounds find.
+- **Call (this change)**: `FileTree::new(complete?)` makes an empty tree.
+  `FileTree::file(path)`, `FileTree::listing(dir)`, and `FileTree::is_file(path)`
+  give `Lookup[T]` (`Found(T)`, `Missing`, or `Unknown`), so a provider reads the
+  tree with the same three states as the load. `is_file` applies the exact-name
+  rule over the listing of the parent directory.
 - A path is in one of three states: held (listing or file text), missing (an
   absence record, or any path when `complete` is true), or unknown. The load asks
   only for unknown paths.

@@ -1,13 +1,38 @@
 ///|
-/// A merged configuration. Its root is always a struct.
+/// A merged configuration with the reports of its sources. Its root is always
+/// a struct.
 pub struct Config {
   priv root : ConfigValue
+  priv reports : Array[SourceReport]
+  priv notes : Array[ConfigWarning]
 }
 
 ///|
-/// Merge the sources in list order: a later source wins.
-pub fn build(sources : Array[ConfigSource]) -> Config {
-  { root: sources.fold(init=fields([]), (root, source) => merge(root, source.value)) }
+/// Load the sources in list order over a complete empty file tree: a later
+/// source wins. A file source raises `FileNotFound`, so this suits value
+/// sources.
+pub fn build(sources : Array[ConfigSource]) -> Config raise ConfigError {
+  match load(sources.fold(init=builder(), add), FileTree::new(complete=true)) {
+    Done(config) => config
+    Need(_) => abort("a complete file tree never asks for files")
+  }
+}
+
+///|
+/// The source reports in merge order.
+pub fn Config::reports(self : Config) -> Array[SourceReport] {
+  self.reports.map(report => {
+    ..report,
+    candidates: report.candidates.copy(),
+    warnings: report.warnings.copy(),
+  })
+}
+
+///|
+/// The warnings of the load: the warnings of the source providers, then the
+/// warnings of each source report in merge order.
+pub fn Config::warnings(self : Config) -> Array[ConfigWarning] {
+  [..self.notes, ..self.reports.map(report => report.warnings).flatten()]
 }
 
 ///|

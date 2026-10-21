@@ -70,6 +70,58 @@ async fn main {
     "\{dir}/consumer/moon.mod",
     "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"moonrockz/moon-lander@\{version}\" }\n",
   )
+  let (code, toolchain, err) = @process.collect_output("mise", [
+    "where", "http:moonbit",
+  ])
+  guard code == 0 else { fail(err.text()) }
+  let consumer_env = {
+    "MOON_HOME": isolated,
+    "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
+    "MOON_DEP_CACHE": "\{dir}/dependencies",
+    "MOON_BUILD_CACHE": "\{dir}/build-cache",
+  }
+  if @env.args().contains("--published") {
+    // This mode is a release gate. It uses the public registry, with neither
+    // the candidate's synthetic index entry nor the loopback archive server.
+    @fs.rmdir("\{isolated}/registry/index", recursive=true)
+    @fs.write_file(
+      "\{isolated}/config.json",
+      (
+        {
+          "registry": "https://mooncakes.io",
+          "index": "https://mooncakes.io/git/index",
+        } : Json).stringify(),
+    )
+    @async.with_timeout(240_000, () => {
+      let (code, out, err) = @process.collect_output(
+        "moon",
+        ["update"],
+        cwd="\{dir}/consumer",
+        extra_env=consumer_env,
+      )
+      guard code == 0 else { fail(out.text() + err.text()) }
+      let (code, out, err) = @process.collect_output(
+        "moonx",
+        [script, "--verify-failures"],
+        cwd="\{dir}/consumer",
+        extra_env=consumer_env,
+      )
+      guard code == 0 else { fail(out.text() + err.text()) }
+      println(out.text())
+    })
+    let installed = "\{dir}/consumer/.mooncakes/moonrockz/moon-lander"
+    guard @fs.read_file("\{installed}/formats/pkg.mbti").text() ==
+      @fs.read_file("pkgs/lander/formats/pkg.mbti").text() else {
+      fail("Published virtual interface differs from the candidate")
+    }
+    let published = @fs.read_file(
+      "\{isolated}/registry/cache/moonrockz/moon-lander/\{version}.zip",
+    ).binary()
+    println(
+      "Public registry consumer verified \{version} on all four targets; archive SHA-256 \{@crypto.bytes_to_hex_string(@crypto.sha256(published))}",
+    )
+    return
+  }
   // The candidate archive is the only new registry entry. Its dependencies
   // retain the real pinned entries and checksums from moon update.
   let dependencies : Map[String, Json] = Map([])
@@ -106,10 +158,6 @@ async fn main {
         "index": Json::string("\{dir}/unused-index"),
       } : Json).stringify(),
   )
-  let (code, toolchain, err) = @process.collect_output("mise", [
-    "where", "http:moonbit",
-  ])
-  guard code == 0 else { fail(err.text()) }
   let requests : Array[String] = []
   @async.with_timeout(240_000, () => {
     @async.with_task_group() <| group => {
@@ -150,12 +198,7 @@ async fn main {
         "moonx",
         [script, "--verify-failures"],
         cwd="\{dir}/consumer",
-        extra_env={
-          "MOON_HOME": isolated,
-          "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
-          "MOON_DEP_CACHE": "\{dir}/dependencies",
-          "MOON_BUILD_CACHE": "\{dir}/build-cache",
-        },
+        extra_env=consumer_env,
       )
       guard code == 0 else { fail(out.text() + err.text()) }
       println(out.text())

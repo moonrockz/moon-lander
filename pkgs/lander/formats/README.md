@@ -7,7 +7,7 @@ YAML handles `.yaml` and `.yml`.
 
 To link only TOML, add one override to the application's main `moon.pkg`:
 
-```moonbit
+```moonbit notest
 options(
   "is-main": true,
   overrides: [ "moonrockz/moon-lander/formats/toml" ],
@@ -20,7 +20,7 @@ can continue to do so.
 
 For another format set, create an implementation package:
 
-```moonbit
+```moonbit notest
 import {
   "moonrockz/moon-lander/config",
   "moonrockz/moon-lander/config/formats/toml",
@@ -32,7 +32,7 @@ options("implement": "moonrockz/moon-lander/formats")
 
 Its `formats.mbt` supplies the interface:
 
-```moonbit
+```moonbit notest
 pub fn formats() -> Array[@config.Format] {
   [@toml.format(), @yaml.format()]
 }
@@ -56,3 +56,10 @@ into an isolated cache. The test requires an actual candidate download and the
 installed hand-written virtual interface. Third-party archives come from the
 pinned registry cache populated by the preceding workspace checks. No module is
 published. Publishing to mooncakes.io still requires the owner's approval.
+
+After an authorized candidate upload, `mise run check:formats-published` repeats
+the consumer checks using the public registry and an isolated cache. It reports
+the downloaded archive checksum and checks the published virtual interface
+against the candidate. A missing version fails the command. Record the candidate
+source SHA, checksum and results in release gate `lander-4us.9`; the gate must
+close before the Moon-Lander GitHub release or candidate promotion.

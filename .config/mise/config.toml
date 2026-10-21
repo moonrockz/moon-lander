@@ -178,6 +178,10 @@ run = "moonx scripts/check-formats.mbtx --verify-failures"
 description = "Verify the packaged candidate through an isolated loopback registry consumer"
 run = "moonx scripts/check-formats-registry.mbtx"
 
+[tasks."check:formats-published"]
+description = "Release gate: verify the public registry candidate outside the workspace"
+run = "moonx scripts/check-formats-registry.mbtx --published"
+
 [tasks.check]
 description = "Run lint, validate, tests, task script tests and builds"
 run = "moonx scripts/check.mbtx"

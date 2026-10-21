@@ -145,7 +145,7 @@ Bead: lander-4us.2.16
 
 Bead: lander-4us.2.17
 
-- [ ] 17.1 Run the full acceptance suite with the same inputs on wasm, wasm-gc, js, and native and compare values, provenance, and reports; verify the "Same result on all targets" scenario on Linux, macOS, and Windows CI and that `mise run check` passes.
+- [x] 17.1 Run the full acceptance suite with the same inputs on wasm, wasm-gc, js, and native and compare values, provenance, and reports; verify the "Same result on all targets" scenario on Linux, macOS, and Windows CI and that `mise run check` passes.
 
 ## 18. Format trimming with a virtual package
 
@@ -170,3 +170,11 @@ Bead: lander-4us.2.18
 - Linux CI runs all three checks in the existing task-script job. The macOS job
   and the Windows native job run core observation and workspace trimming checks
   for all four targets. The existing aggregate requires these jobs to pass.
+- Public-registry qualification is tracked separately in release gate
+  `lander-4us.9`, as approved by the owner. `mise run check:formats-published`
+  must pass for the authorized candidate before its GitHub release or promotion.
+  This gate does not defer the completed pre-publish loopback registry check.
+- PR #29 run `39665536068` passed the Linux, macOS and Windows core checks,
+  including complete observations and parser trimming on all four targets.
+  The separate docs-site failure was corrected and `mise run build:site` and
+  `mise run check:site` pass locally; the final head must pass all CI gates.

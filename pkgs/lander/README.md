@@ -6,8 +6,9 @@ layered configuration from files, environment variables, and the command line,
 typed binding, and a host that runs commands and services with clear exit codes.
 
 The provisional module name is `moonrockz/moon-lander`, imported as `@lander`.
-The module has not been published. Every package runs on `wasm`, `wasm-gc`, `js`,
-and `native`.
+The module has not been published. The pure core and formats run on `wasm`,
+`wasm-gc`, `js`, and `native`. File host adapters support `native` and `js`; the
+browser adapter supports `js`.
 
 ## The layer stack
 

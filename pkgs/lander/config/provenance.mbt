@@ -1,8 +1,11 @@
 ///|
 /// The leaves of the struct `value` with their key paths, in tree order. A
-/// leaf is a value below a struct field that is not a struct; a list counts as
-/// one leaf. Null fields are not leaves.
-fn leaves(value : ConfigValue) -> Array[(KeyPath, ConfigValue)] {
+/// leaf is a value below a struct field that is not a struct; a list and a
+/// secret reference each count as one leaf. Null fields are not leaves.
+fn leaves(
+  value : ConfigValue,
+  secret_syntax~ : SecretSyntax = Standard,
+) -> Array[(KeyPath, ConfigValue)] {
   let out = []
   fn walk(ion : @ion.Ion, names : Array[String]) {
     guard ion.kind() is Struct(fields) else { return }
@@ -12,10 +15,13 @@ fn leaves(value : ConfigValue) -> Array[(KeyPath, ConfigValue)] {
         continue
       }
       let path = [..names, name]
-      if value.kind() is Struct(_) {
+      let child = { ion: value }
+      if is_secret_reference(child, secret_syntax) {
+        out.push(({ names: path }, child))
+      } else if value.kind() is Struct(_) {
         walk(value, path)
       } else {
-        out.push(({ names: path }, { ion: value }))
+        out.push(({ names: path }, child))
       }
     }
   }
@@ -25,22 +31,51 @@ fn leaves(value : ConfigValue) -> Array[(KeyPath, ConfigValue)] {
 
 ///|
 /// Record `origin` for each leaf of `tree`. A new leaf removes the records at,
-/// below, and above its path, then adds its own.
+/// below, and above its path, then adds its own. An `Append` or `MergeByKey`
+/// list keeps the origins that the path already has and adds `origin` after
+/// them.
 fn record_origins(
   provenance : Map[KeyPath, Array[Origin]],
   tree : ConfigValue,
   origin : Origin,
+  source_policy~ : MergePolicy = Replace,
+  key_policies~ : Array[(KeyPath, MergePolicy)] = [],
+  secret_syntax~ : SecretSyntax = Standard,
+  previous~ : ConfigValue = fields([]),
 ) -> Unit {
-  for leaf in leaves(tree) {
-    let (path, _) = leaf
+  for leaf in leaves(tree, secret_syntax~) {
+    let (path, value) = leaf
+    let policy = resolve_policy(path.names, source_policy, key_policies)
+    // Append origins only when this overlay list merges with a base list.
+    // A list that replaces a scalar (or a missing path) has one origin.
+    let previous_was_list = match previous.at(path.names) {
+      Some(prior) => prior.ion.kind() is List(_)
+      None => false
+    }
+    let list_merge = match (value.ion.kind(), policy, previous_was_list) {
+      (List(_), Append | MergeByKey(_), true) => true
+      _ => false
+    }
     let stale = provenance
       .keys()
-      .filter(key => is_prefix(key, path) || is_prefix(path, key))
+      .filter(key => {
+        if list_merge && key == path {
+          false
+        } else {
+          is_prefix(key, path) || is_prefix(path, key)
+        }
+      })
       .collect()
     for key in stale {
       provenance.remove(key)
     }
-    provenance[path] = [origin]
+    if list_merge {
+      let existing = provenance.get(path).map(origins => origins.copy()).unwrap_or([])
+      existing.push(origin)
+      provenance[path] = existing
+    } else {
+      provenance[path] = [origin]
+    }
   }
 }
 

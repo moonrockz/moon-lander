@@ -84,6 +84,7 @@ pub fn load(
   let env_given = builder.env_vars is Some(_)
   let results = sources.map(source => resolve(source, context, needs, env_given))
   guard expanded && needs.is_empty() else { return Need(needs) }
+  let secret_syntax = builder.secret_syntax
   let mut root = fields([])
   let provenance : Map[KeyPath, Array[Origin]] = Map([])
   let reports : Array[SourceReport] = []
@@ -116,8 +117,26 @@ pub fn load(
     // Each piece has its own location, for example the variable of an
     // environment source.
     for piece in pieces {
-      root = merge(root, piece.0)
-      record_origins(provenance, piece.0, { ..origin, location: piece.1 })
+      let piece_origin = piece.1.unwrap_or(source.name)
+      check_secret_payloads(piece.0, piece_origin, secret_syntax)
+      let previous = root
+      root = merge(
+        root,
+        piece.0,
+        policy=source.policy,
+        key_policies=source.key_policies,
+        source=source.name,
+        secret_syntax=secret_syntax,
+      )
+      record_origins(
+        provenance,
+        piece.0,
+        { ..origin, location: piece.1 },
+        source_policy=source.policy,
+        key_policies=source.key_policies,
+        secret_syntax=secret_syntax,
+        previous=previous,
+      )
     }
     reports.push({
       kind: source.kind,
@@ -132,12 +151,12 @@ pub fn load(
   // The configuration holds no null field, and a record only for each leaf.
   root = without_nulls(root)
   let leaf_origins : Map[KeyPath, Array[Origin]] = Map([])
-  for leaf in leaves(root) {
+  for leaf in leaves(root, secret_syntax=secret_syntax) {
     if provenance.get(leaf.0) is Some(origins) {
       leaf_origins[leaf.0] = origins
     }
   }
-  Done({ root, reports, notes, provenance: leaf_origins })
+  Done({ root, reports, notes, provenance: leaf_origins, secret_syntax, })
 }
 
 ///|

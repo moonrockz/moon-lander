@@ -95,27 +95,27 @@ Bead: lander-4us.2.10
 
 Bead: lander-4us.2.11
 
-- [ ] 11.1 Add `MergePolicy` with `Append` and per-source and per-key-path scope; verify "Append lists" and "Key path policy beats source policy".
-- [ ] 11.2 Add `MergeByKey` and `ConfigError::MergeKey`; verify "Merge by key" and "Merge-by-key item without the key".
-- [ ] 11.3 Record all contributing origins for merged lists and keep every origin list non-empty; verify "Appended list has all contributors" and a property test that no provenance entry is empty.
+- [x] 11.1 Add `MergePolicy` with `Append` and per-source and per-key-path scope; verify "Append lists" and "Key path policy beats source policy".
+- [x] 11.2 Add `MergeByKey` and `ConfigError::MergeKey`; verify "Merge by key" and "Merge-by-key item without the key".
+- [x] 11.3 Record all contributing origins for merged lists and keep every origin list non-empty; verify "Appended list has all contributors" and a property test that no provenance entry is empty.
 
 ## 12. Secret references and lazy resolution
 
 Bead: lander-4us.2.12
 
-- [ ] 12.1 Add `SecretRef` recognition, `SecretSyntax`, the payload check, and leaf merge; verify "Two secret references do not merge" and "Invalid reference payload".
-- [ ] 12.2 Add `Secret`, `SecretResolver`, `SecretError` classes, `Config::secret`, and `env_resolver`; verify the lazy secret resolution scenarios, including a resolver spy for "Load does not resolve".
-- [ ] 12.3 Pass the leaf origin to the resolver; verify "Resolver gets the origin".
+- [x] 12.1 Add `SecretRef` recognition, `SecretSyntax`, the payload check, and leaf merge; verify "Two secret references do not merge" and "Invalid reference payload".
+- [x] 12.2 Add `Secret`, `SecretResolver`, `SecretError` classes, `Config::secret`, and `env_resolver`; verify the lazy secret resolution scenarios, including a resolver spy for "Load does not resolve".
+- [x] 12.3 Pass the leaf origin to the resolver; verify "Resolver gets the origin".
 
 ## 13. Redaction and command helpers
 
 Bead: lander-4us.2.13
 
-- [ ] 13.1 Add `redact` with the Morphir fragment list; verify the four display redaction scenarios.
-- [ ] 13.2 Add `get_text` and `get_json` over redacted values with the key-not-found message; verify the four get helper scenarios.
-- [ ] 13.3 Add `show` for TOML, JSON, and Ion with the render mapping and `ConfigError::Render`; verify the three show helper scenarios.
-- [ ] 13.4 Add `path_text`, `path_json`, and `explain`; verify the path helper and explain helper scenarios.
-- [ ] 13.5 Add moonspec acceptance scenarios in `tests/` for get, show, and path, ported from Morphir `config.feature`; verify that they pass on all four targets.
+- [x] 13.1 Add `redact` with the Morphir fragment list; verify the four display redaction scenarios.
+- [x] 13.2 Add `get_text` and `get_json` over redacted values with the key-not-found message; verify the four get helper scenarios.
+- [x] 13.3 Add `show` for TOML, JSON, and Ion with the render mapping and `ConfigError::Render`; verify the three show helper scenarios.
+- [x] 13.4 Add `path_text`, `path_json`, and `explain`; verify the path helper and explain helper scenarios.
+- [x] 13.5 Add moonspec acceptance scenarios in `tests/` for get, show, and path, ported from Morphir `config.feature`; verify that they pass on all four targets.
 
 ## 14. Typed errors
 

@@ -16,11 +16,14 @@ pub extend SourceSelection with @debug.Debug::{to_repr}
 
 ///|
 /// An immutable configuration source: a kind, a display name, an optional
-/// display priority, the input, and the key paths to exclude.
+/// display priority, the list merge policy, key-path policies, the input, and
+/// the key paths to exclude.
 pub struct ConfigSource {
   priv kind : SourceKind
   priv name : String
   priv priority : Int?
+  priv policy : MergePolicy
+  priv key_policies : Array[(KeyPath, MergePolicy)]
   priv input : SourceInput
   priv excluded : Array[(KeyPath, Bool)]
 }
@@ -112,6 +115,8 @@ pub fn ConfigSource::file(
     kind: File(role),
     name: name.unwrap_or(path),
     priority,
+    policy: Replace,
+    key_policies: [],
     input: Path(path),
     excluded: [],
   }
@@ -134,6 +139,8 @@ pub fn ConfigSource::parsed_file(
     kind: File(role),
     name: name.unwrap_or(path),
     priority,
+    policy: Replace,
+    key_policies: [],
     input: Parsed(path, value),
     excluded: [],
   }
@@ -156,6 +163,8 @@ pub fn ConfigSource::candidates(
     kind: File(role),
     name: name.unwrap_or(display),
     priority,
+    policy: Replace,
+    key_policies: [],
     input: Candidates(paths.copy(), display),
     excluded: [],
   }
@@ -173,6 +182,8 @@ pub fn ConfigSource::skipped(
     kind,
     name: name.unwrap_or(kind.report_name()),
     priority,
+    policy: Replace,
+    key_policies: [],
     input: NoInput,
     excluded: [],
   }
@@ -191,13 +202,44 @@ pub fn ConfigSource::exclude(
 }
 
 ///|
+/// A new source with the list merge policy `policy` for every list that has no
+/// key-path policy.
+pub fn ConfigSource::with_policy(
+  self : ConfigSource,
+  policy : MergePolicy,
+) -> ConfigSource {
+  { ..self, policy, }
+}
+
+///|
+/// A new source with the list merge policy `policy` at `key`. A key-path
+/// policy beats the source policy.
+pub fn ConfigSource::with_key_policy(
+  self : ConfigSource,
+  key : KeyPath,
+  policy : MergePolicy,
+) -> ConfigSource {
+  let policies = self.key_policies.filter(entry => entry.0 != key)
+  policies.push((key, policy))
+  { ..self, key_policies: policies }
+}
+
+///|
 fn value_source(
   kind : SourceKind,
   name : String,
   priority : Int?,
   value : ConfigValue,
 ) -> ConfigSource {
-  { kind, name, priority, input: Value(value), excluded: [] }
+  {
+    kind,
+    name,
+    priority,
+    policy: Replace,
+    key_policies: [],
+    input: Value(value),
+    excluded: [],
+  }
 }
 
 ///|

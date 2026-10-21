@@ -38,21 +38,21 @@ Bead: lander-4us.2.4
 
 - [ ] 4.1 Add null-overlay handling and null-field removal from the result; verify the "Null does not unset" and "Null with no base value" scenarios.
 - [ ] 4.2 Make merge copy only changed paths and keep inputs unchanged; verify "Inputs do not change" and "New keys follow base keys", plus an associativity property test over generated trees.
-- [ ] 4.3 Add the provenance map and stale-record removal ported from morphir-moonbit `merge`, over the `Origin` type that group 14 declares; verify the "Winning origins" and "Stale records go" scenarios.
-- [ ] 4.4 Add `SourceReport` with kind, name, priority, path, candidates, status, and warnings, the Morphir kind names, and `local-override`; verify the "Report order and status" and "File role names" scenarios.
+- [ ] 4.3 Add the provenance map and stale-record removal ported from morphir-moonbit `merge`, over the `Origin` type that group 14 declares; verify the "Winning origins" and "Stale records go" scenarios, the origin part of "Defaults from JSON", and that excluded values have no provenance record.
+- [ ] 4.4 Add the Morphir kind names and `local-override` to the `SourceReport` that group 5 adds (kind, name, priority, path, candidates, status, and warnings); verify the "Report order and status" and "File role names" scenarios.
 
 ## 5. Source model: selection, file source, ambiguity, exclusion
 
 Bead: lander-4us.2.5
 
-- [ ] 5.1 Add `SourceSelection[T]`, `ConfigBuilder`, `add`, and the defaults source, over the `SourceKind` and `FileRole` (with `LocalOverride`) types that group 14 declares; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
-- [ ] 5.2 Add display priorities with the defaults by kind and role (local override 390), the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities", "Override file priorities", and "Decreasing priority" scenarios.
-- [ ] 5.3 Add `FileTree` (with `with_listing`, `with_file`, and `with_missing`), `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files", "Complete tree never asks", "Absence record answers a request", and "Missing directory answers its children" scenarios.
-- [ ] 5.4 Add `Platform`, `LoadContext` (with `env_vars` and `working_dir`), `@config.env_vars`, `@config.working_dir`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
-- [ ] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), and the explicit file source over a `FileTree` that joins a relative path to the working directory; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the working directory".
-- [ ] 5.6 Add the candidate-list file source and the exact-name existence check over listings, and raise the `ConfigError::Ambiguous(display~, location~, candidates~)` case that group 14 declares when more than one candidate exists; verify the candidate ambiguity scenarios and "Name match is exact".
-- [ ] 5.7 Add `ConfigSource::exclude(paths, warn~)`, `ConfigWarning::KeyRemoved`, and `SourceReport.warnings`; verify the three source subtree exclusion scenarios.
-- [ ] 5.8 Document the source model in `pkgs/lander/README.md` with an example that runs as a doc test; verify with `mise run test`.
+- [x] 5.1 Add `SourceSelection[T]`, `ConfigBuilder`, `add`, `SourceReport`, and the defaults source, over the `SourceKind` and `FileRole` (with `LocalOverride`) types that group 14 declares; verify "Skip a source" with a skipped environment source, "Same kind at two positions", and the value and report of "Defaults from JSON" (4.3 verifies its origin).
+- [x] 5.2 Add display priorities with the defaults by kind and role (local override 390), the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities", "Override file priorities", and "Decreasing priority" scenarios.
+- [x] 5.3 Add `FileTree` (with `with_listing`, `with_file`, and `with_missing`), `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files", "Complete tree never asks", "Absence record answers a request", and "Missing directory answers its children" scenarios.
+- [x] 5.4 Add `Platform`, `LoadContext` (with `env_vars` and `working_dir`), `@config.env_vars`, `@config.working_dir`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
+- [x] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), and the explicit file source over a `FileTree` that joins a relative path to the working directory; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the working directory".
+- [x] 5.6 Add the candidate-list file source and the exact-name existence check over listings, and raise the `ConfigError::Ambiguous(display~, location~, candidates~)` case that group 14 declares when more than one candidate exists; verify the candidate ambiguity scenarios and "Name match is exact".
+- [x] 5.7 Add `ConfigSource::exclude(paths, warn~)`, `ConfigWarning::KeyRemoved`, and `SourceReport.warnings`; verify the three source subtree exclusion scenarios.
+- [x] 5.8 Document the source model in the `config` package guide `pkgs/lander/config/README.mbt.md`, linked from `pkgs/lander/README.md`, with examples that run as doc tests; verify with `mise run test`.
 
 ## 6. Environment and overrides sources
 
@@ -60,7 +60,7 @@ Bead: lander-4us.2.6
 
 - [ ] 6.1 Port the environment key mapping (prefix in any case, leading `_`, `__`, lowercase, empty segment error) and reserved names; verify all environment name and reserved name scenarios.
 - [ ] 6.2 Port value typing and the shorter-path-wins order from morphir-moonbit; verify the "Typed values", "JSON list value", "Invalid JSON stays text", "Integer out of range", and both shorter-path scenarios, the last with two input orders.
-- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, and read `Discover` variables from the builder variable set (`@config.env_vars`); verify "Environment origin names the variable", "Explicit environment variables", and "Discover environment with no host".
+- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, read `Discover` variables from the builder variable set (`@config.env_vars`), and give a skipped source for `Skip`; verify "Environment origin names the variable", "Explicit environment variables", "Discover environment with no host", and "Skip a source" with the environment selection.
 - [ ] 6.4 Add the overrides source; verify the "Overrides beat the environment" scenario.
 
 ## 7. TOML date and time mapping

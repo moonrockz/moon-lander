@@ -4,7 +4,7 @@
   "base_path": "/moon-lander/",
   "site_url": "https://moonrockz.github.io/moon-lander/",
   "repo_url": "https://github.com/moonrockz/moon-lander",
-  "packages": ["notebooks"],
+  "packages": ["lander", "notebooks"],
   "api": ["pkgs/lander", "pkgs/notebooks"],
   "nav": [
     { "group": "Design", "items": ["design/"] },

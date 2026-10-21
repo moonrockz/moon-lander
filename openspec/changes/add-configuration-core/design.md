@@ -532,9 +532,9 @@ position. Other overlay items append. A missing key field or a repeated key valu
 in one list raises `ConfigError::MergeKey`. **Call**: no .NET index-based list
 merge and no explicit unset.
 
-**Call (this change)**: the build removes null struct fields from the result. So
-`Config` never holds a null field, and a single source with `a = null` gives no
-`a`. Nulls inside lists stay.
+**Call (this change)**: the build removes null struct fields from the result, also
+in structs inside lists. So `Config` never holds a null field, and a single source
+with `a = null` gives no `a`. A null list item stays.
 
 ### D9. Provenance
 

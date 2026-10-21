@@ -216,3 +216,18 @@ test "discovery options default to not given" {
     project: None,
   })
 }
+
+///|
+test "discovery needs an absolute working directory" {
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing("repo/sub", [{ name: "acme.toml", kind: File }])
+    .with_file("repo/sub/acme.toml", "a = 1")
+  let config = acme("repo/sub") |> @config.load(tree) |> done
+  @expect.expect(config.reports()[0].status).to_equal(Skipped)
+  @expect.expect(config.warnings()).to_equal([
+    Note(
+      source="acme",
+      message="discovery needs an absolute working directory, not repo/sub",
+    ),
+  ])
+}

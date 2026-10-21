@@ -353,7 +353,9 @@ Call (this change, tracer bullet): walk-up asks for one listing per round, neare
 first, and stops at the root it finds, so it never lists parents above the project
 root. `add(builder, conventions)` takes no options until a part reads them; the
 group that first reads a `DiscoveryOptions` field adds `options?`. Discovery with
-no working directory gives a skipped project source and a `Note` warning. With no
+no working directory, or a relative one, gives a skipped project source and a
+`Note` warning: the core would join a relative candidate to the working directory
+again, and a relative directory has no parents to walk to. With no
 primary, the candidate list at the start directory reports `NotFound`.
 
 ### D13. No host package in this change (Call (R1); Owner (O2))

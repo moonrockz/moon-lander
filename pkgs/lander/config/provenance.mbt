@@ -52,17 +52,27 @@ fn is_prefix(prefix : KeyPath, path : KeyPath) -> Bool {
 }
 
 ///|
-/// `value` without struct fields whose value is null, at any depth below
-/// structs. Nulls inside lists stay.
+/// `value` without struct fields whose value is null, at any depth, also in
+/// structs inside lists. A null list item stays.
 fn without_nulls(value : ConfigValue) -> ConfigValue {
-  guard value.ion.kind() is Struct(fields) else { return value }
-  let kept = []
-  for field in fields {
-    let child = field.value()
-    if child.is_null() {
-      continue
+  let ion = match value.ion.kind() {
+    Struct(fields) => {
+      let kept = []
+      for field in fields {
+        let child = field.value()
+        if !child.is_null() {
+          kept.push(
+            @ion.Field::from_token(field.name(), without_nulls({ ion: child }).ion),
+          )
+        }
+      }
+      @ion.Ion::from_fields(kept)
     }
-    kept.push(@ion.Field::from_token(field.name(), without_nulls({ ion: child }).ion))
+    List(items) =>
+      @ion.Ion::list(items.map(item => without_nulls({ ion: item }).ion))
+    Sexp(items) =>
+      @ion.Ion::sexp(items.map(item => without_nulls({ ion: item }).ion))
+    _ => return value
   }
-  { ion: @ion.Ion::from_fields(kept).with_annotations(value.ion.annotations()) }
+  { ion: ion.with_annotations(value.ion.annotations()) }
 }

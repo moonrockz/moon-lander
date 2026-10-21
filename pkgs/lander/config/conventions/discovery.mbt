@@ -24,6 +24,24 @@ fn discover(
       ],
     })
   }
+  // The core joins a relative candidate to the working directory again, and a
+  // relative directory has no parents to walk to.
+  guard is_absolute(working_dir) else {
+    return Done({
+      sources: [
+        @config.ConfigSource::skipped(
+          File(Workspace),
+          name=conventions.display,
+        ),
+      ],
+      warnings: [
+        Note(
+          source=conventions.display,
+          message="discovery needs an absolute working directory, not \{working_dir}",
+        ),
+      ],
+    })
+  }
   let extensions = searched_extensions(context.formats)
   let start = trim_dir(working_dir)
   let mut dir = start
@@ -102,6 +120,13 @@ fn is_root(dir : String) -> Bool {
   dir == "/" ||
   (dir.length() == 3 && dir[1:3] == ":/") ||
   (dir.has_prefix("//") && dir[2:].split("/").count() <= 2)
+}
+
+///|
+/// Whether `path` is absolute: it starts with `/` (also `//server/share`) or
+/// with a drive such as `C:/`.
+fn is_absolute(path : String) -> Bool {
+  path.has_prefix("/") || (path.length() >= 3 && path[1:3] == ":/")
 }
 
 ///|

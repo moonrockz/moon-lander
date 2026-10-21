@@ -304,3 +304,13 @@ test "report names of every kind" {
     "overrides",
   ])
 }
+
+///|
+test "a struct inside a list holds no null field" {
+  let config = @config.build([
+    named({ "items": [{ "optional": null, "a": 1 }, null, [{ "b": null }]] }, "one"),
+  ])
+  @expect.expect(config.value()).to_equal(
+    json_tree({ "items": [{ "a": 1 }, null, [{}]] }),
+  )
+}

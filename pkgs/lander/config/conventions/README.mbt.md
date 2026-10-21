@@ -28,7 +28,7 @@ becomes the project source, with the role `Workspace` and the priority 300.
 
 | Step | What discovery does |
 | --- | --- |
-| Start | The working directory that `@config.working_dir` sets |
+| Start | The working directory that `@config.working_dir` sets; it must be absolute |
 | Search | `<app>.<ext>` for each extension of the registered formats, by exact name |
 | Walk | Each parent directory, up to the file-system root |
 | Stop | At the first directory with a primary; two primaries there are `Ambiguous` |

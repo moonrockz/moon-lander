@@ -236,8 +236,13 @@ test "Strict profile rejects a non-mapping root" {
   let error = expect_error(() =>
     @yaml.parse("- 1\n- 2\n", origin="/w/app.yaml", profile=Strict)
   )
-  guard error is InvalidRoot(origin~, found~) else { fail("expected InvalidRoot") }
-  @expect.expect((origin, found)).to_equal(("/w/app.yaml", "list"))
+  guard error is UnsupportedYaml(origin~, feature~, line~, column~) else {
+    fail("expected UnsupportedYaml with a source mark")
+  }
+  @expect.expect(origin).to_equal("/w/app.yaml")
+  @expect.expect(feature).to_equal("non-mapping root")
+  @expect.expect(line > 0).to_equal(true)
+  @expect.expect(column >= 0).to_equal(true)
 }
 
 ///|
@@ -245,4 +250,28 @@ test "Default profile rejects a non-mapping root" {
   let error = expect_error(() => @yaml.parse("- 1\n", origin="app.yaml"))
   guard error is InvalidRoot(found~, ..) else { fail("expected InvalidRoot") }
   @expect.expect(found).to_equal("list")
+}
+
+///|
+test "empty string mapping keys are kept" {
+  let value = @yaml.parse("\"\": kept\n", origin="app.yaml")
+  @expect.expect(value).to_equal(
+    @config.fields([("", @config.string("kept"))]),
+  )
+}
+
+///|
+test "invalid radix digits stay strings" {
+  let value = @yaml.parse("id: 0xnode\n", origin="app.yaml")
+  @expect.expect(value).to_equal(
+    @config.fields([("id", @config.string("0xnode"))]),
+  )
+}
+
+///|
+test "signed radix integers are recognized" {
+  let value = @yaml.parse("a: -0x2A\nb: +0o52\n", origin="app.yaml")
+  @expect.expect(value).to_equal(
+    @config.fields([("a", @config.int(-42)), ("b", @config.int(42))]),
+  )
 }

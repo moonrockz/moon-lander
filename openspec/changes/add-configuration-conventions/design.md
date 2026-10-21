@@ -359,8 +359,24 @@ listings of the directory, `.<app>/`, and `.config/<app>/`. A legacy file is rea
 with its own format and given to the core as `ConfigSource::parsed_file` with the
 role `Legacy`. A relative boundary joins the working directory, and both are
 normalized (`.` and `..`) before the walk. `add` now takes `options?`; discovery
-reads `isolated`, and a given `environment`, `config` or `project` adds a `Note`
-until its group reads it.
+reads `isolated` and `config`, and a given `environment` or `project` adds a
+`Note` until its group reads it.
+
+Call (this change, groups 4 and 5): `app_dirs` holds the standard parts as a list
+of `Part` values (`SystemDir`, `UserConfigDir`, `AppHome`, `Layouts`,
+`LocalOverrides`, `UserOverrides`), which `without(part)` removes and the part
+functions add. Walk-up is not a part. The provider gives its sources in the order
+system, global, project primary, local override, user override, and the core
+resolves the candidate lists of the system and global sources, so they add no
+discovery round. With no `Platform` in the load context, the system and global
+sources report `Skipped` and discovery adds a `Note`; the host adapter always
+gives a platform. A relative directory variable other than `XDG_CONFIG_HOME`
+joins the working directory. Override sources exist only next to a primary in a
+standard layout: with no primary, a legacy primary, or a non-standard explicit
+file, there is no override source. `.<app>/<app>.<ext>` and `<app>.<ext>` use the
+same override names in the directory of the primary. `Explicit(path)` is a
+`ConfigSource::file` with the role `Explicit`, normalized against the working
+directory, and `Skip` gives a skipped project source.
 
 Discovery with
 no working directory, or a relative one, gives a skipped project source and a

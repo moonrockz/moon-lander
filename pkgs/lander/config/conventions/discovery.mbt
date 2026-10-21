@@ -1,63 +1,88 @@
 ///|
-/// Find the project primary. Walk up from the working directory to the
-/// boundary, or to the file-system root, and stop at the first directory that
-/// holds a primary candidate or the legacy file. The candidate list at that
-/// directory becomes one file source, so the core load reads it, or raises
-/// `Ambiguous` when more than one candidate exists. A legacy file counts only
-/// when no primary exists there. With no root, the candidate list at the start
-/// directory reports `NotFound`.
+/// Give the sources of the convention set in merge order: the system and
+/// global user sources, then the project primary and its overrides.
 fn discover(
   conventions : Conventions,
   options : DiscoveryOptions,
   context : @config.LoadContext,
 ) -> @config.LoadStep[@config.Expansion] raise @config.ConfigError {
   let notes = unread_options(conventions, options)
+  let extensions = searched_extensions(context.formats)
+  let machine = conventions.machine_sources(options, context, extensions, notes)
+  match conventions.project_sources(options, context, extensions, notes) {
+    Need(requests) => Need(requests)
+    Done(project) => Done({ sources: [..machine, ..project], warnings: notes })
+  }
+}
+
+///|
+/// The project primary and its overrides. `Explicit(path)` gives the primary
+/// with no walk-up, and `Skip` skips it. Otherwise walk up from the working
+/// directory to the boundary, or to the file-system root, and stop at the
+/// first directory that holds a primary candidate or the legacy file. The
+/// candidate list at that directory becomes one file source, so the core load
+/// reads it, or raises `Ambiguous` when more than one candidate exists. A
+/// legacy file counts only when no primary exists there. With no root, the
+/// candidate list at the start directory reports `NotFound`.
+fn Conventions::project_sources(
+  self : Conventions,
+  options : DiscoveryOptions,
+  context : @config.LoadContext,
+  extensions : Array[String],
+  notes : Array[@config.ConfigWarning],
+) -> @config.LoadStep[Array[@config.ConfigSource]] raise @config.ConfigError {
+  match options.config {
+    Explicit(path) =>
+      return Done(self.explicit_sources(path, options, context, extensions))
+    Skip => return Done([self.skipped_project()])
+    Discover => ()
+  }
   guard context.working_dir is Some(working_dir) else {
-    return skipped(
-      conventions,
-      [..notes, note(conventions, "discovery has no working directory to start from")],
-    )
+    notes.push(note(self, "discovery has no working directory to start from"))
+    return Done([self.skipped_project()])
   }
   // The core joins a relative candidate to the working directory again, and a
   // relative directory has no parents to walk to.
   guard is_absolute(working_dir) else {
-    return skipped(conventions, [
-      ..notes,
+    notes.push(
       note(
-        conventions,
+        self,
         "discovery needs an absolute working directory, not \{working_dir}",
       ),
-    ])
+    )
+    return Done([self.skipped_project()])
   }
   let start = normalize(working_dir)
-  let stop = conventions.boundary.map(dir => {
+  let stop = self.boundary.map(dir => {
     normalize(if is_absolute(dir) { dir } else { join(start, dir) })
   })
   if stop is Some(stop) && !is_within(start, stop) {
     raise OutsideBoundary(start~, boundary=stop)
   }
-  let extensions = searched_extensions(context.formats)
   let mut dir = start
   while true {
-    let candidates = conventions.candidates(dir, extensions)
+    let candidates = self.candidates(dir, extensions)
     let needs : Array[@config.FileRequest] = []
-    let mut found = false
+    let mut found : String? = None
     for candidate in candidates {
       match context.tree.is_file(candidate) {
-        Found(true) => found = true
+        Found(true) => if found is None { found = Some(candidate) }
         Found(false) | Missing => ()
         Unknown => add_need(needs, ListDir(parent_of(candidate)))
       }
     }
     // The core load checks the other candidates and raises `Ambiguous`.
-    if found {
-      return Done({ sources: [conventions.primary(candidates)], warnings: notes })
+    if found is Some(primary) {
+      return Done([
+        self.primary(candidates),
+        ..self.overrides(primary, options, extensions),
+      ])
     }
-    if conventions.legacy is Some(legacy) {
+    if self.legacy is Some(legacy) {
       let path = join(dir, legacy.name)
       match context.tree.is_file(path) {
         Found(true) if needs.is_empty() =>
-          return legacy_source(conventions, legacy, path, context, notes)
+          return legacy_source(self, legacy, path, context)
         Unknown => add_need(needs, ListDir(dir))
         _ => ()
       }
@@ -65,43 +90,120 @@ fn discover(
     if !needs.is_empty() {
       return Need(needs)
     }
-    guard conventions.walk_up &&
-      stop != Some(dir) &&
-      parent_dir(dir) is Some(parent) else {
+    guard self.walk_up && stop != Some(dir) && parent_dir(dir) is Some(parent) else {
       break
     }
     dir = parent
   }
-  Done({
-    sources: [conventions.primary(conventions.candidates(start, extensions))],
-    warnings: notes,
-  })
+  Done([self.primary(self.candidates(start, extensions))])
+}
+
+///|
+/// The explicit primary at `path` with the role `Explicit`, and its overrides
+/// when the path has a standard layout. A relative path joins the working
+/// directory.
+fn Conventions::explicit_sources(
+  self : Conventions,
+  path : String,
+  options : DiscoveryOptions,
+  context : @config.LoadContext,
+  extensions : Array[String],
+) -> Array[@config.ConfigSource] {
+  let resolved = if is_absolute(path) {
+    normalize(path)
+  } else {
+    match context.working_dir {
+      Some(dir) if is_absolute(dir) => normalize(join(dir, path))
+      _ => path
+    }
+  }
+  [
+    @config.ConfigSource::file(resolved, role=Explicit, name=self.display),
+    ..self.overrides(resolved, options, extensions),
+  ]
+}
+
+///|
+/// The local and user override sources next to the primary at `path`, or none
+/// when the path has no standard layout. In isolated mode they report
+/// `Skipped`.
+fn Conventions::overrides(
+  self : Conventions,
+  path : String,
+  options : DiscoveryOptions,
+  extensions : Array[String],
+) -> Array[@config.ConfigSource] {
+  guard self.adjacent(path, extensions) is Some((dir, stem)) else { return [] }
+  let sources = []
+  let kinds : Array[(Part, @config.FileRole, String)] = [
+    (LocalOverrides, LocalOverride, "local"),
+    (UserOverrides, UserOverride, "user"),
+  ]
+  for kind in kinds {
+    let (part, role, word) = kind
+    guard self.has(part) else { continue }
+    sources.push(
+      if options.isolated {
+        @config.ConfigSource::skipped(File(role), name=self.display)
+      } else {
+        @config.ConfigSource::candidates(
+          extensions.map(extension => join(dir, "\{stem}.\{word}.\{extension}")),
+          display=self.display,
+          role~,
+          name=self.display,
+        )
+      },
+    )
+  }
+  sources
+}
+
+///|
+/// The directory and the file stem of the primary at `path` when the path has
+/// a standard layout: `<app>` for `<app>.<ext>` (also `.<app>/<app>.<ext>`),
+/// and `config` for `.config/<app>/config.<ext>`.
+fn Conventions::adjacent(
+  self : Conventions,
+  path : String,
+  extensions : Array[String],
+) -> (String, String)? {
+  let dir = parent_of(path)
+  let file = match path.rev_find("/") {
+    Some(index) => path[index + 1:].to_owned()
+    None => path
+  }
+  for extension in extensions {
+    if file == "\{self.name}.\{extension}" {
+      return Some((dir, self.name))
+    }
+    if file == "config.\{extension}" &&
+      dir.has_suffix("/.config/\{self.name}") {
+      return Some((dir, "config"))
+    }
+  }
+  None
 }
 
 ///|
 /// The legacy file at `path` as a `Legacy` file source, once the tree holds
-/// its text.
+/// its text. A legacy file has no overrides.
 fn legacy_source(
   conventions : Conventions,
   legacy : Legacy,
   path : String,
   context : @config.LoadContext,
-  notes : Array[@config.ConfigWarning],
-) -> @config.LoadStep[@config.Expansion] raise @config.ConfigError {
+) -> @config.LoadStep[Array[@config.ConfigSource]] raise @config.ConfigError {
   match context.tree.file(path) {
     Found(text) => {
       let value = (legacy.decode)((legacy.format.parse)(text, path))
-      Done({
-        sources: [
-          @config.ConfigSource::parsed_file(
-            path,
-            value,
-            role=Legacy,
-            name=conventions.display,
-          ),
-        ],
-        warnings: notes,
-      })
+      Done([
+        @config.ConfigSource::parsed_file(
+          path,
+          value,
+          role=Legacy,
+          name=conventions.display,
+        ),
+      ])
     }
     Missing => raise FileNotFound(path~)
     Unknown => Need([ReadFile(path)])
@@ -109,17 +211,9 @@ fn legacy_source(
 }
 
 ///|
-/// A skipped project source with `warnings`.
-fn skipped(
-  conventions : Conventions,
-  warnings : Array[@config.ConfigWarning],
-) -> @config.LoadStep[@config.Expansion] {
-  Done({
-    sources: [
-      @config.ConfigSource::skipped(File(Workspace), name=conventions.display),
-    ],
-    warnings,
-  })
+/// A skipped project source.
+fn Conventions::skipped_project(self : Conventions) -> @config.ConfigSource {
+  @config.ConfigSource::skipped(File(Workspace), name=self.display)
 }
 
 ///|
@@ -137,9 +231,6 @@ fn unread_options(
   if options.environment is Some(_) {
     notes.push(note(conventions, "discovery does not read the environment option yet"))
   }
-  if !(options.config is Discover) {
-    notes.push(note(conventions, "discovery does not read the config option yet"))
-  }
   if options.project is Some(_) {
     notes.push(note(conventions, "discovery does not read the project option yet"))
   }
@@ -153,8 +244,10 @@ fn Conventions::candidates(
   dir : String,
   extensions : Array[String],
 ) -> Array[String] {
+  guard self.has(Layouts) else { return [] }
+  let layouts : Array[Layout] = [Root, Hidden, DotConfig]
   let paths = []
-  for layout in self.layouts {
+  for layout in layouts {
     for extension in extensions {
       let relative = match layout {
         Root => "\{self.name}.\{extension}"

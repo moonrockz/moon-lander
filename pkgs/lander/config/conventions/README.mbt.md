@@ -9,10 +9,24 @@ Import `moonrockz/moon-lander/config/conventions` as `@conventions`. Each
 `mbt check` block on this page runs as a test with `mise run test`.
 
 > [!NOTE]
-> Discovery finds the project file in three layouts by walking up from the
-> working directory, with a stop boundary, a legacy fallback, and isolated mode.
-> The system and user directories, overrides, workspaces, and environments come
-> in later parts.
+> Discovery finds the system file, the global user file, and the project file in
+> three layouts by walking up from the working directory, with local and user
+> overrides next to the project file, an explicit project file, a stop boundary,
+> a legacy fallback, and isolated mode. Workspaces and environments come in
+> later parts.
+
+`app_dirs("acme")` gives these sources, in merge order:
+
+| Priority | Source | Role | Files for `acme` with TOML on Linux |
+| --- | --- | --- | --- |
+| 100 | System | `System` | `/etc/acme/acme.toml` |
+| 200 | Global user | `Global` | `~/.config/acme/acme.toml` or `~/.acme/acme.toml` |
+| 300 | Project | `Workspace` | `acme.toml`, `.acme/acme.toml`, or `.config/acme/config.toml`, found by walk-up |
+| 390 | Local override | `LocalOverride` | `acme.local.toml` next to the project file |
+| 400 | User override | `UserOverride` | `acme.user.toml` next to the project file |
+
+The environment-variable source (600) of the core comes after them, so a
+variable wins over every file.
 
 ## Walk up to the project root
 
@@ -68,7 +82,13 @@ test "find the project file from a nested directory" {
     fail("a complete tree never asks for files")
   }
   @expect.expect(@config.get_text(config, "project.name")).to_equal("acme")
-  @expect.expect(config.reports()[0].path).to_equal(Some("/w/acme.toml"))
+  let project = config
+    .reports()
+    .iter()
+    .find_first(report => report.kind == File(Workspace))
+  @expect.expect(project.map(report => report.path)).to_equal(
+    Some(Some("/w/acme.toml")),
+  )
 }
 ```
 
@@ -98,17 +118,150 @@ test "a test root keeps files above it out" {
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
-  @expect.expect(config.reports()[0].status).to_equal(NotFound)
+  let project = config
+    .reports()
+    .iter()
+    .find_first(report => report.kind == File(Workspace))
+  @expect.expect(project.map(report => report.status)).to_equal(Some(NotFound))
 }
 ```
 
 Isolated mode comes from `DiscoveryOptions(isolated=true)`, for example from an
 `--isolated` flag that a host parses. It skips the files of the user and the
 machine: the system directory, the global user directory, and the local and
-user overrides. The project file and the environment variables stay. Those
-parts come later; each one reports `Skipped` in isolated mode. Discovery does
-not read the `environment`, `config`, and `project` options yet, and a given
-value adds a `Note` warning.
+user overrides. Each of them reports `Skipped`. The project file and the
+environment variables stay. Discovery does not read the `environment` and
+`project` options yet, and a given value adds a `Note` warning.
+
+## System and global user directories
+
+The system source and the global user source come from the platform and the
+variable set of the run, which `@config.platform` and `@config.env_vars` give.
+Discovery never reads the process environment. The host adapter
+`@config/host.load` fills both from the running system when the builder holds
+none. With no platform, the two sources report `Skipped` and discovery adds a
+`Note` warning.
+
+| Directory | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| System | `/etc/<app>` | `/etc/<app>` | `%PROGRAMDATA%/<app>`, else `C:/ProgramData/<app>` |
+| User configuration | `$XDG_CONFIG_HOME/<app>`, else `$HOME/.config/<app>` | `$XDG_CONFIG_HOME/<app>`, else `$HOME/Library/Application Support/<app>` | `%APPDATA%/<app>` |
+| Application home | `$<PREFIX>_HOME`, else `$HOME/.<app>` | `$<PREFIX>_HOME`, else `$HOME/.<app>` | `$<PREFIX>_HOME`, else `%USERPROFILE%/.<app>` |
+
+- The file name in each directory is `<app>.<ext>`.
+- An empty variable counts as unset. `XDG_CONFIG_HOME` counts only when it is
+  absolute, and it has no effect on Windows.
+- The user configuration directory and the application home are one global
+  source. Two global files are `Ambiguous`.
+- On Windows, `\` becomes `/` in each variable. An absolute Windows path starts
+  with a drive and a separator (`C:/`) or with `//server/share`; `C:foo` is not
+  absolute. A relative value joins the working directory.
+
+```mbt check
+///|
+test "the global candidates come from the variable set of the run" {
+  let builder = @config.builder()
+    |> @config.working_dir("/w")
+    |> @config.platform(Linux)
+    |> @config.env_vars({ "HOME": "/home/alice", "ACME_HOME": "/opt/acme" })
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.app_dirs("acme"))
+  guard @config.load(builder, @config.FileTree::new(complete=true))
+    is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  let global = config
+    .reports()
+    .iter()
+    .find_first(report => report.kind == File(Global))
+  @expect.expect(global.map(report => report.candidates)).to_equal(
+    Some(["/home/alice/.config/acme/acme.toml", "/opt/acme/acme.toml"]),
+  )
+}
+```
+
+## Overrides next to the project file
+
+A local override is for one checkout, and git ignores it. A user override is the
+preference of one person, so it wins over the local override. Both sit in the
+directory of the project file:
+
+| Project file | Local override | User override |
+| --- | --- | --- |
+| `acme.toml` | `acme.local.toml` | `acme.user.toml` |
+| `.acme/acme.toml` | `.acme/acme.local.toml` | `.acme/acme.user.toml` |
+| `.config/acme/config.toml` | `.config/acme/config.local.toml` | `.config/acme/config.user.toml` |
+
+The extensions come from the registered formats, so `acme.user.yaml` can
+override `acme.toml`. Two overrides of one kind, such as `acme.user.toml` and
+`acme.user.yaml`, are `Ambiguous`. A legacy file has no overrides, and with no
+project file there is no override source.
+
+```mbt check
+///|
+test "the user override wins over the project file" {
+  let builder = @config.builder()
+    |> @config.working_dir("/w")
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.app_dirs("acme"))
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing("/w", [
+      { name: "acme.toml", kind: File },
+      { name: "acme.user.toml", kind: File },
+    ])
+    .with_file("/w/acme.toml", "ui.theme = \"shared\"")
+    .with_file("/w/acme.user.toml", "ui.theme = \"personal\"")
+  guard @config.load(builder, tree) is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  @expect.expect(@config.get_text(config, "ui.theme")).to_equal("personal")
+}
+```
+
+## An explicit project file
+
+`DiscoveryOptions(config=Explicit(path))`, for example from a `--config` flag,
+names the project file. Discovery does not walk up. A relative path joins the
+working directory. The source has the role `Explicit`, and a missing file is an
+error, `FileNotFound`. When the path has a standard layout, such as
+`configs/acme.toml`, its local and user overrides apply. Other files, such as
+`configs/project.yaml`, have no overrides. `Skip` skips the project file.
+
+## Choose the parts
+
+`app_dirs` uses every standard part. `without(part)` removes one, and `base`
+with single parts gives full control:
+
+```mbt check
+///|
+test "remove the system part, or build from single parts" {
+  // No system file, for a tool that never installs machine-wide.
+  let tool = @conventions.app_dirs("acme") |> @conventions.without(SystemDir)
+  // Only the project file in three layouts and a user override.
+  let minimal = @conventions.base("acme")
+    |> @conventions.layouts
+    |> @conventions.user_overrides
+  let kinds = (conventions : @conventions.Conventions) => {
+    let builder = @config.builder()
+      |> @config.working_dir("/w")
+      |> @config.platform(Linux)
+      |> @config.env_vars({ "HOME": "/home/alice" })
+      |> @config.format(@toml.format())
+      |> @conventions.add(conventions)
+    let tree = @config.FileTree::new(complete=true)
+      .with_listing("/w", [{ name: "acme.toml", kind: File }])
+      .with_file("/w/acme.toml", "a = 1")
+    guard @config.load(builder, tree) is Done(config) else {
+      fail("a complete tree never asks for files")
+    }
+    config.reports().map(report => report.kind.report_name())
+  }
+  @expect.expect(kinds(tool)).to_equal([
+    "global", "project", "local-override", "user-override",
+  ])
+  @expect.expect(kinds(minimal)).to_equal(["project", "user-override"])
+}
+```
 
 ## Legacy fallback
 
@@ -146,8 +299,12 @@ test "discovery asks for the listing of the working directory first" {
 
 | Part | Value |
 | --- | --- |
-| `base(name, prefix?, display?)` | An empty convention set: no layouts and no walk-up |
-| `app_dirs(name, prefix?, display?)` | `base` with the three layouts and walk-up |
+| `base(name, prefix?, display?)` | An empty convention set: no parts and no walk-up |
+| `app_dirs(name, prefix?, display?)` | `base` with every standard part and walk-up |
+| `system_dir`, `user_config_dir`, `app_home` | The system, user configuration, and application home directories |
+| `layouts` | The three primary layouts |
+| `local_overrides`, `user_overrides` | `*.local.*` and `*.user.*` files next to the project file |
+| `without(part)` | Removes one `Part`: `SystemDir`, `UserConfigDir`, `AppHome`, `Layouts`, `LocalOverrides`, or `UserOverrides` |
 | `boundary(dir)` | The walk-up stop; a relative `dir` joins the working directory |
 | `legacy(name, format~, decode~)` | A legacy fallback file with its own format |
 | `add(builder, conventions, options?)` | The provider that runs discovery during `@config.load` |

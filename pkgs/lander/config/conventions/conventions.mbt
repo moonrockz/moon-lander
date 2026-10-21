@@ -31,17 +31,40 @@ pub fn DiscoveryOptions::new(
 
 ///|
 /// An immutable convention set: the application name, the variable prefix,
-/// the display name, the file layouts to search, the walk-up rule, the stop
+/// the display name, the standard parts to use, the walk-up rule, the stop
 /// boundary, and the legacy fallback file.
 pub struct Conventions {
   priv name : String
   priv prefix : String
   priv display : String
-  priv layouts : Array[Layout]
+  priv parts : Array[Part]
   priv walk_up : Bool
   priv boundary : String?
   priv legacy : Legacy?
 }
+
+///|
+/// A standard part of a convention set, which `without` can remove.
+pub(all) enum Part {
+  /// The system directory: `/etc/<app>`, or `%PROGRAMDATA%/<app>` on Windows.
+  SystemDir
+  /// `<app>/<app>.<ext>` in the global user configuration directory.
+  UserConfigDir
+  /// `<app>.<ext>` in the application home, `$<PREFIX>_HOME` or `~/.<app>`.
+  AppHome
+  /// The three primary layouts at each discovery location.
+  Layouts
+  /// `*.local.*` files next to each primary.
+  LocalOverrides
+  /// `*.user.*` files next to each primary.
+  UserOverrides
+} derive(Eq, Debug)
+
+///|
+pub extend Part with Eq::{equal, not_equal}
+
+///|
+pub extend Part with @debug.Debug::{to_repr}
 
 ///|
 /// Where a primary file sits in a directory.
@@ -64,8 +87,8 @@ priv struct Legacy {
 }
 
 ///|
-/// An empty convention set: no layouts and no walk-up. `prefix` defaults to
-/// the name in upper case with `-` changed to `_`, and `display` to the name.
+/// An empty convention set: no parts and no walk-up. `prefix` defaults to the
+/// name in upper case with `-` changed to `_`, and `display` to the name.
 pub fn base(
   name : String,
   prefix? : String,
@@ -75,7 +98,7 @@ pub fn base(
     name,
     prefix: prefix.unwrap_or(name.to_upper().replace_all(old="-", new="_")),
     display: display.unwrap_or(name),
-    layouts: [],
+    parts: [],
     walk_up: false,
     boundary: None,
     legacy: None,
@@ -83,9 +106,10 @@ pub fn base(
 }
 
 ///|
-/// The standard convention set: `base` with the three primary layouts and
-/// walk-up from the working directory. Later parts add the system, user, and
-/// override locations.
+/// The standard convention set: `base` with every standard part (the system
+/// directory, the global user directory, the application home, the three
+/// primary layouts, local overrides, and user overrides) and walk-up from the
+/// working directory.
 pub fn app_dirs(
   name : String,
   prefix? : String,
@@ -93,9 +117,82 @@ pub fn app_dirs(
 ) -> Conventions {
   {
     ..base(name, prefix?, display?),
-    layouts: [Root, Hidden, DotConfig],
+    parts: [
+      SystemDir, UserConfigDir, AppHome, Layouts, LocalOverrides, UserOverrides,
+    ],
     walk_up: true,
   }
+}
+
+///|
+/// Add the system directory: `/etc/<app>` on Linux and macOS, and
+/// `%PROGRAMDATA%/<app>` on Windows, or `C:/ProgramData/<app>` when
+/// `PROGRAMDATA` is not set. The candidates are `<app>.<ext>`.
+pub fn system_dir(conventions : Conventions) -> Conventions {
+  conventions.with_part(SystemDir)
+}
+
+///|
+/// Add the global user configuration directory: `$XDG_CONFIG_HOME` when it is
+/// absolute, else `$HOME/.config` on Linux and
+/// `$HOME/Library/Application Support` on macOS, and `%APPDATA%` on Windows.
+/// The candidates are `<app>/<app>.<ext>`.
+pub fn user_config_dir(conventions : Conventions) -> Conventions {
+  conventions.with_part(UserConfigDir)
+}
+
+///|
+/// Add the application home: `$<PREFIX>_HOME`, else `.<app>` in the user home
+/// (`$HOME`, or `%USERPROFILE%` on Windows). The candidates are `<app>.<ext>`.
+/// The application home and the user configuration directory are one global
+/// source, so two global files are `Ambiguous`.
+pub fn app_home(conventions : Conventions) -> Conventions {
+  conventions.with_part(AppHome)
+}
+
+///|
+/// Add the three primary layouts: `<app>.<ext>`, `.<app>/<app>.<ext>`, and
+/// `.config/<app>/config.<ext>`.
+pub fn layouts(conventions : Conventions) -> Conventions {
+  conventions.with_part(Layouts)
+}
+
+///|
+/// Add local overrides: `<app>.local.<ext>` next to a primary in the
+/// `<app>.<ext>` or `.<app>/<app>.<ext>` layout, and `config.local.<ext>` next
+/// to `.config/<app>/config.<ext>`, with the role `LocalOverride` and the
+/// priority 390.
+pub fn local_overrides(conventions : Conventions) -> Conventions {
+  conventions.with_part(LocalOverrides)
+}
+
+///|
+/// Add user overrides: `<app>.user.<ext>` next to a primary in the
+/// `<app>.<ext>` or `.<app>/<app>.<ext>` layout, and `config.user.<ext>` next
+/// to `.config/<app>/config.<ext>`, with the role `UserOverride` and the
+/// priority 400.
+pub fn user_overrides(conventions : Conventions) -> Conventions {
+  conventions.with_part(UserOverrides)
+}
+
+///|
+/// Remove one standard part, for example `without(SystemDir)`.
+pub fn without(conventions : Conventions, part : Part) -> Conventions {
+  { ..conventions, parts: conventions.parts.filter(p => p != part) }
+}
+
+///|
+fn Conventions::with_part(self : Conventions, part : Part) -> Conventions {
+  if self.parts.contains(part) {
+    self
+  } else {
+    { ..self, parts: [..self.parts, part] }
+  }
+}
+
+///|
+fn Conventions::has(self : Conventions, part : Part) -> Bool {
+  self.parts.contains(part)
 }
 
 ///|
@@ -140,12 +237,15 @@ pub fn Conventions::display(self : Conventions) -> String {
 
 ///|
 /// Add the convention set to a core builder as a source provider. During
-/// `@config.load`, discovery gives the project primary at its position in
-/// merge order, with the role `Workspace` (or `Legacy`) and the priority 300.
+/// `@config.load`, discovery gives its sources at its position in merge order:
+/// the system source (priority 100), the global user source (200), the project
+/// primary with the role `Workspace`, `Legacy`, or `Explicit` (300), the local
+/// override (390), and the user override (400).
 ///
-/// Discovery reads `isolated` from `options`: in isolated mode the system,
-/// global user, and override parts report `Skipped`. It does not read the
-/// `environment`, `config`, and `project` options yet; a given value adds a
+/// Discovery reads `isolated` and `config` from `options`. In isolated mode the
+/// system, global user, and override sources report `Skipped`. `Explicit(path)`
+/// is the project primary with no walk-up, and `Skip` skips it. Discovery does
+/// not read the `environment` and `project` options yet; a given value adds a
 /// `Note` warning so that it is never ignored without a sign.
 pub fn add(
   builder : @config.ConfigBuilder,

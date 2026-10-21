@@ -42,7 +42,11 @@ async fn bundle(
     source.write_string("  #|\{line}\n")
   }
   for line in bundle.trim_end().split("\n") {
-    source.write_string("  #|  \{line}\n")
+    if line.trim_end().is_empty() {
+      source.write_string("  #|\n")
+    } else {
+      source.write_string("  #|  \{line.trim_end()}\n")
+    }
   }
   source.write_string("  #|  return module.exports;\n  #|}\n")
   let source = source.to_string()

@@ -46,7 +46,7 @@ extern "js" fn node_fixture() -> NodeFixture =
   #|        set: __exportSetter.bind(all, name)
   #|      });
   #|  };
-  #|  
+  #|
   #|  // pkgs/lander/adapters/node/fixture.ts
   #|  var exports_fixture = {};
   #|  __export(exports_fixture, {

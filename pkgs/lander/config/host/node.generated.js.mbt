@@ -46,7 +46,7 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|        set: __exportSetter.bind(all, name)
   #|      });
   #|  };
-  #|  
+  #|
   #|  // pkgs/lander/adapters/node/index.ts
   #|  var exports_node = {};
   #|  __export(exports_node, {

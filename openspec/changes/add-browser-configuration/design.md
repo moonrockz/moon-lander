@@ -81,7 +81,7 @@ The intended public operations are:
 | `from_directory` | Caller-supplied directory handle, root; gives a read-only mount |
 | `load` | Builder, mounts, limits, optional abort signal; gives `Config` asynchronously |
 | `workspace` | Conventions and mount; gives conventions confined to that root |
-| `open_store` | Application namespace and root; opens an OPFS store and its read mount |
+| `open_store(namespace, root~)` | Application namespace and required virtual root; opens an OPFS store and its read mount |
 | `write_text`, `remove` | Explicit store, relative path, and text where applicable |
 
 Use external wrapper types for `File`, directory handles, and abort signals. Do
@@ -134,8 +134,13 @@ directories. A path absent from the manifest is missing without a fetch. Do not
 infer listings by probing arbitrary URLs or depend on web-server directory indexes.
 
 The base must be an HTTP or HTTPS directory URL with no credentials, query, or
-fragment. The caller explicitly authorizes that base, including a cross-origin
-base. Construct each file URL by encoding each validated virtual path segment.
+fragment. Its parsed pathname must end in `/`. Reject a base without that trailing
+slash before any fetch; do not guess a directory by appending a slash. Thus
+`https://host/configs` is invalid, while `https://host/configs/` maps `acme.toml`
+to `https://host/configs/acme.toml`.
+
+The caller explicitly authorizes that base, including a cross-origin base.
+Construct each file URL by encoding each validated virtual path segment.
 No entry can supply its own URL. Set `credentials: "omit"` and `redirect: "error"`.
 This bounds the requested namespace without relying on server path normalization.
 Applications that need a custom authenticated fetch can obtain a browser `File`
@@ -182,11 +187,17 @@ source path. Do not add backend URLs or handles to the core data model.
 
 ### D8. OPFS writes require an explicit scoped store
 
-`open_store(namespace)` uses an application namespace below a fixed library-owned
-OPFS directory. The namespace is one validated path segment; it cannot name the
-origin root or a parent directory. Opening a store is an explicit caller action,
-not a side effect of loading configuration. The store supplies a read mount that
-uses the directory backend from group 4.
+`open_store(namespace, root~)` requires an application namespace and a canonical
+absolute virtual root. Validate both before any storage access. The namespace is
+one validated path segment below a fixed library-owned OPFS directory; it cannot
+name the origin root or a parent directory. The supplied root locates the read
+mount and uses the directory backend from group 4. It does not change the backing
+namespace: reopening the same namespace at `/restored` instead of `/state` reads
+the same stored files and reports their new virtual paths.
+
+Opening a store is an explicit caller action, not a side effect of loading
+configuration. No virtual root is inferred from the namespace or hard-coded by
+the adapter.
 
 `write_text` creates parent directories only inside that store, writes text, and
 awaits close before reporting success. `remove` removes only a named file inside
@@ -213,10 +224,20 @@ Use default limits of 4096 observed entries, 8 MiB of total loaded UTF-8 text, a
 8192 distinct requests per load. The caller can provide other positive limits.
 Count each unique virtual entry once, including inferred parents but excluding
 mount roots. Count manifest and selected-file entries before I/O; count directory
-entries while listing. Cached entries do not consume the limit again. Check known file sizes before reading and actual UTF-8 size afterward.
+entries while listing. Cached entries do not consume the limit again. Check known
+file sizes before reading and actual UTF-8 size afterward.
 For HTTP, enforce the byte limit while streaming the response, including when
-Content-Length is absent or incorrect; release or cancel the reader on failure.
-Do not fetch the next file after a limit or abort failure. Pass the abort signal to fetch. Race non-abortable File operations against abort
+Content-Length is absent or incorrect. Release every acquired reader lock after
+normal completion or any streaming failure, including read and decoding errors.
+If a failed response may still be live, actively cancel it with `reader.cancel()`
+or abort its fetch before releasing the lock. An already errored stream needs
+lock release; `releaseLock()` alone does not cancel a live response. Preserve the
+original load error if cleanup also fails. The oversized-response and decoding
+failure fixtures must observe upstream cancellation or connection closure, not
+only that the load rejected; an injected read error must leave no locked reader.
+
+Do not fetch the next file after a limit or abort failure. Pass the abort signal
+to fetch. Race non-abortable File operations against abort
 for load completion, ignore any late result, and release signal listeners. The
 browser may finish that underlying read, but the adapter must not accept its
 result or start another request after abort.
@@ -310,5 +331,8 @@ rollback must not clear OPFS namespaces or delete selected user files.
 - [File System Access and picker permissions](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)
 - [Origin private file system](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system)
 - [Fetch and response handling](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+- [Relative URL resolution](https://developer.mozilla.org/en-US/docs/Web/API/URL_API/Resolving_relative_references)
+- [Reader cancellation](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/cancel)
+- [Reader lock release](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/releaseLock)
 - [Playwright file inputs](https://playwright.dev/docs/input)
 - [Playwright browser builds](https://playwright.dev/docs/browsers)

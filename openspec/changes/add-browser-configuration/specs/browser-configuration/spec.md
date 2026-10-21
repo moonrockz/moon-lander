@@ -114,8 +114,19 @@ A repeated request that cannot make progress MUST raise a protocol error.
 A URL mount SHALL use a version-1 manifest of relative file paths and optional
 empty directories. It SHALL derive listings from that manifest and fetch only
 listed files from its authorized base. It MUST encode path segments, omit
-credentials, and reject redirects. Invalid bases or manifests MUST fail before
-fetch. No manifest entry may set an independent URL.
+credentials, and reject redirects. The parsed base pathname MUST end in `/`.
+Invalid bases or manifests MUST fail before fetch; the adapter MUST NOT append a
+slash to repair an invalid base. No manifest entry may set an independent URL.
+
+#### Scenario: A base omits its directory slash
+
+- **WHEN** the base is `https://host/configs` and the manifest lists `acme.toml`
+- **THEN** construction fails before fetch instead of resolving to `https://host/acme.toml`
+
+#### Scenario: A directory base preserves its path
+
+- **WHEN** the base is `https://host/configs/` and the manifest lists `acme.toml`
+- **THEN** the file request uses `https://host/configs/acme.toml`
 
 #### Scenario: A manifest version is unsupported
 
@@ -258,6 +269,27 @@ errors; they MUST NOT cause an implicit storage fallback.
 - **WHEN** the caller loads configuration through URL, selected-file, or directory mounts
 - **THEN** no OPFS namespace or file is created and no backend is written
 
+### Requirement: Browser store mounts use explicit virtual roots
+
+`open_store(namespace, root~)` SHALL require and validate both the namespace and a
+canonical absolute virtual root before storage access. The returned read mount
+SHALL use that root; the root MUST NOT change the backing namespace.
+
+#### Scenario: A store uses the supplied virtual root
+
+- **WHEN** the caller opens a namespace at `/state`, writes `acme.toml`, and mounts that store
+- **THEN** the stored file is available as `/state/acme.toml` and that path appears in its origin
+
+#### Scenario: A namespace is reopened at a different root
+
+- **WHEN** the same namespace is reopened with virtual root `/restored`
+- **THEN** its saved files are available under `/restored` without creating a different backing namespace
+
+#### Scenario: A store root is invalid
+
+- **WHEN** a caller gives a relative or otherwise invalid virtual root
+- **THEN** opening the store fails before any OPFS access or directory creation
+
 ### Requirement: Browser failures retain type and source information
 
 Boundary failures SHALL use a typed `BrowserError` with operation and virtual path
@@ -279,8 +311,10 @@ credentials, or sensitive backend URLs.
 
 A load SHALL enforce caller-supplied positive limits or defaults of 4096 observed
 entries, 8 MiB of total loaded UTF-8 text, and 8192 distinct requests. It SHALL honor
-an optional abort signal. A limit or abort failure MUST stop further requests,
-release response readers, and return no partial configuration.
+an optional abort signal. A limit, abort, or streaming failure MUST stop further
+requests and return no partial configuration. Acquired reader locks MUST be released; any
+possibly live response MUST be cancelled or its fetch aborted first. Lock release
+alone is not cancellation. Cleanup MUST preserve the original error.
 
 #### Scenario: A mount exceeds its entry limit
 
@@ -290,7 +324,22 @@ release response readers, and return no partial configuration.
 #### Scenario: A response omits its size
 
 - **WHEN** an HTTP response without Content-Length streams more than the remaining byte limit
-- **THEN** reading stops at the limit, the reader is released or cancelled, and no next file is fetched
+- **THEN** reading stops at the limit, the stream is cancelled or its fetch is aborted, the fixture observes upstream cancellation or connection closure, and no next file is fetched
+
+#### Scenario: Decoding fails while a response is live
+
+- **WHEN** decoding fails after a reader is acquired and the response is still live
+- **THEN** the response is cancelled or its fetch aborted, the fixture observes upstream stopping, the lock is released, and no next file is fetched
+
+#### Scenario: Reading an errored stream fails
+
+- **WHEN** a body read rejects because the response stream has errored
+- **THEN** its reader lock is released and the original read failure is returned
+
+#### Scenario: Cleanup also fails
+
+- **WHEN** cancellation or lock release fails while handling a streaming failure
+- **THEN** the original load error is preserved and remaining reader cleanup is attempted
 
 #### Scenario: Loading is aborted
 

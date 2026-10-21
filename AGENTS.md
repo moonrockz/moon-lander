@@ -31,6 +31,11 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   TypeScript adapter over `node:fs` in `pkgs/lander/adapters/node/`, built with Bun
   through `scripts/build-node-adapter.mbtx`. Its test fixtures use a separate
   TypeScript entry point and generated test file.
+- Browser Web API calls may use TypeScript in `pkgs/lander/adapters/browser/`,
+  bundled with the pinned Bun browser target through moonx. The unpublished
+  feasibility fixture and Playwright tests live under `tests/`; HTTP serving,
+  installation, build and process lifecycle stay in MoonBit task scripts. No
+  published package may contain selection UI or a Node browser shim.
 - Put libraries under `pkgs/` and executables under `apps/`. Register modules in
   `moon.work`. Add acceptance suites under an unpublished `tests/` module when
   there is behavior to test.

@@ -13,12 +13,12 @@ commands, and results in its bead before closing and syncing it.
 
 Bead: lander-4us.8.1
 
-- [ ] 1.1 Add an unpublished browser fixture that fetches one TOML file, runs the current pure loader with an explicit override, binds a typed section, and reports its value and origin. Keep all configuration execution inside the browser page.
-- [ ] 1.2 Bundle a small TypeScript Web API adapter with the pinned Bun through a moonx script. Prove a browser-compatible generated inline FFI factory and the async promise bridge in Chromium, Firefox, and WebKit without Node shims. Record exact compilable FFI/API shapes in the design.
-- [ ] 1.3 Add the narrow AGENTS.md Web API exception for browser adapters and fixtures. Keep selection UI in the unpublished fixture and automation in MoonBit task scripts.
-- [ ] 1.4 Pin Playwright exactly in mise and the private harness dependency, commit the lockfile, and check version agreement. Add browsers:install and test:browser moonx tasks, bounded server/process cleanup, a documented local setup, and test:browser in mise run check.
+- [x] 1.1 Add an unpublished browser fixture that fetches one TOML file, runs the current pure loader with an explicit override, binds a typed section, and reports its value and origin. Keep all configuration execution inside the browser page.
+- [x] 1.2 Bundle a small TypeScript Web API adapter with the pinned Bun through a moonx script. Prove a browser-compatible generated inline FFI factory and the async promise bridge in Chromium, Firefox, and WebKit without Node shims. Record exact compilable FFI/API shapes in the design.
+- [x] 1.3 Add the narrow AGENTS.md Web API exception for browser adapters and fixtures. Keep selection UI in the unpublished fixture and automation in MoonBit task scripts.
+- [x] 1.4 Pin Playwright exactly in mise and the private harness dependency, commit the lockfile, and check version agreement. Add browsers:install and test:browser moonx tasks, bounded server/process cleanup, a documented local setup, and test:browser in mise run check.
 - [ ] 1.5 Add a focused Linux browser CI category on the existing events and require it in ci-ok without removing existing needs. Build the fixture once for the three engines. Prove a deliberate failing assertion or missing engine makes the task nonzero; record setup, build, suite, and total timings.
-- [ ] 1.6 Verify real-browser loading and binding, absence of Node shims in the fixture, and the explicit feasibility failure gate. The public browser-package import scenario is completed in group 2. If any required engine or the FFI bridge cannot work, record the evidence and stop dependent work for an owner decision. Do not substitute Node execution or reduce the engine matrix.
+- [x] 1.6 Verify real-browser loading and binding, absence of Node shims in the fixture, and the explicit feasibility failure gate. The public browser-package import scenario is completed in group 2. If any required engine or the FFI bridge cannot work, record the evidence and stop dependent work for an owner decision. Do not substitute Node execution or reduce the engine matrix.
 
 ## 2. Hosted configuration with production mounts
 

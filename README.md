@@ -29,6 +29,7 @@ Then install the hooks and check the workspace:
 
 ```shell
 mise run hooks:install
+mise run browsers:install
 mise run check
 ```
 
@@ -61,6 +62,11 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run build:node-adapter` | Regenerate the checked-in TypeScript host adapter bundle |
 | `mise run check:node-adapter` | Reject a stale host adapter bundle |
 | `mise run test:node-adapter` | Test the js host adapter on Node and Bun |
+| `mise run browsers:install` | Install the locked Playwright harness and Chromium, Firefox, WebKit; add `-- --with-deps` on Linux |
+| `mise run test:browser` | Build the unpublished fixture once and test all three browser engines |
+| `mise run test:browser-failures` | Also prove deliberate assertion and unavailable-engine failures propagate |
+| `mise run build:browser-fixture` | Generate the spike FFI and build the browser fixture |
+| `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |
 | `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.1.2` |
 | `mise run clean` | Remove build artifacts |
 

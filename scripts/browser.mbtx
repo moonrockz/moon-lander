@@ -1,0 +1,184 @@
+///|
+/// Install the pinned harness/engines, or serve and test the compiled fixture.
+/// Process and HTTP lifetimes are bounded by structured concurrency.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+let cli : String = "tests/browser/node_modules/@playwright/test/cli.js"
+
+///|
+async fn run(command : String, args : Array[String]) -> Unit {
+  let code = @process.run(
+    command,
+    args,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  guard code == 0 else { fail("\{command} failed with exit \{code}") }
+}
+
+///|
+async fn check_versions() -> Unit {
+  let manifest = @json.parse(@fs.read_file("tests/browser/package.json").text())
+  guard manifest
+    is { "devDependencies": { "@playwright/test": String(version), .. }, .. } else {
+    fail("Missing exact Playwright dependency")
+  }
+  let mise = @fs.read_file(".config/mise/config.toml").text()
+  guard mise.contains("\"npm:@playwright/test\" = \"\{version}\"") else {
+    fail("Playwright versions in mise and the harness differ")
+  }
+  let installed = @json.parse(
+    @fs.read_file("tests/browser/node_modules/@playwright/test/package.json").text(),
+  )
+  guard installed is { "version": String(actual), .. } && actual == version else {
+    fail("Installed Playwright does not match the pin")
+  }
+}
+
+///|
+async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit {
+  let (status, content_type, text) = match request.path {
+    "/" => (200, "text/html", @fs.read_file("tests/browser/index.html").text())
+    "/fixture.js" =>
+      (
+        200,
+        "text/javascript",
+        @fs.read_file("_build/browser/fixture.js").text(),
+      )
+    "/acme.toml" =>
+      (200, "text/plain", "[server]\nhost = 'browser.example'\nport = 8080\n")
+    "/bad.toml" => (200, "text/plain", "[broken\n")
+    "/wrong-type.toml" =>
+      (200, "text/plain", "[server]\nhost = 42\nport = 8080\n")
+    _ => (404, "text/plain", "Not found")
+  }
+  let headers = Map::from_array([
+    (@http.CaseInsensitiveString("Content-Type"), content_type),
+  ])
+  conn
+  ..send_response(
+    status,
+    if status == 200 {
+      "OK"
+    } else {
+      "Not Found"
+    },
+    extra_headers=headers,
+  )
+  .write(text)
+}
+
+///|
+async fn suite(extra_env : Map[String, String]) -> (Int32, String) {
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let url = "http://\{server.addr}"
+  println("Browser fixture: \{url}")
+  let env = extra_env.copy()
+  env["LANDER_BROWSER_URL"] = url
+  let result = @async.with_timeout(180_000, () => {
+    @async.with_task_group() <| group => {
+      // Browsers normally close keep-alive connections. Those read failures
+      // terminate only that connection. Failed responses still fail the tests.
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, conn) => {
+          answer(request, conn)
+        })
+      })
+      let (code, out, err) = @process.collect_output(
+        "node",
+        [cli, "test", "--config", "tests/browser/playwright.config.ts"],
+        extra_env=env,
+      )
+      (code, out.text() + err.text())
+    }
+  })
+  server.close()
+  let closed = try @socket.Tcp::connect(server.addr) catch {
+    _ => true
+  } noraise {
+    connection => {
+      connection.close()
+      false
+    }
+  }
+  guard closed else { fail("Browser fixture listener leaked after the suite") }
+  result
+}
+
+///|
+async fn verify_failures() -> Unit {
+  let (assertion, assertion_log) = suite({
+    "LANDER_BROWSER_FAIL_ASSERTION": "1",
+  })
+  guard assertion == 1 &&
+    assertion_log.contains("deliberate failure") &&
+    assertion_log.contains("3 failed") else {
+    fail("Expected assertion failures in all three engines: " + assertion_log)
+  }
+  let dir = @fs.tmpdir(prefix="lander-no-browser")
+  defer @fs.rmdir(dir, recursive=true)
+  let (missing, missing_log) = suite({ "PLAYWRIGHT_BROWSERS_PATH": dir })
+  guard missing == 1 &&
+    missing_log.contains("Executable doesn't exist") &&
+    missing_log.contains("6 failed") else {
+    fail(
+      "Expected missing-engine failures in all three projects: " + missing_log,
+    )
+  }
+  println(
+    "Verified nonzero assertion and missing-engine exits in all three projects; listeners closed.",
+  )
+}
+
+///|
+async fn main {
+  let started = @async.now()
+  let args = @env.args()[1:]
+  match args {
+    ["install", .. rest] => {
+      @async.with_timeout(300_000, () => {
+        run("bun", ["install", "--frozen-lockfile", "--cwd", "tests/browser"])
+      })
+      check_versions()
+      let flags = rest.to_owned()
+      @async.with_timeout(600_000, () => {
+        run("node", [cli, "install", ..flags, "chromium", "firefox", "webkit"])
+      })
+      println("Browser installation: \{@async.now() - started} ms")
+    }
+    ["test", .. flags] => {
+      guard flags.is_empty() || flags is ["--verify-failures"] else {
+        fail("Expected test [--verify-failures]")
+      }
+      check_versions()
+      @async.with_timeout(180_000, () => {
+        run("moonx", ["scripts/build-browser-fixture.mbtx"])
+      })
+      let suite_start = @async.now()
+      let (code, output) = suite(Map([]))
+      println(output)
+      guard code == 0 else { fail("Browser suite failed with exit \{code}") }
+      println(
+        "Browser suite: \{@async.now() - suite_start} ms; total: \{@async.now() - started} ms",
+      )
+      if !flags.is_empty() {
+        verify_failures()
+      }
+    }
+    _ =>
+      fail(
+        "Usage: browser.mbtx install [--with-deps] | test [--verify-failures]",
+      )
+  }
+}

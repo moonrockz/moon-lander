@@ -11,9 +11,9 @@ listings, and absence records. The Node adapter uses synchronous `node:fs` calls
 its generated factory also uses `process.getBuiltinModule`. That package cannot
 be the browser entry point.
 
-The pinned async library has a js promise bridge in `async/js_async`. Its browser
-execution with the generated adapter is not yet proved. Group 1 must prove that
-boundary before a public browser API is implemented.
+The pinned async library has a js promise bridge in `async/js_async`. Group 1's
+unpublished fixture proves its browser execution with a generated adapter. See
+the feasibility evidence below. The public browser API remains group 2 work.
 
 All decisions below are **Call (this change)**. They implement the browser path
 requested by the owner. A failed feasibility gate returns to the owner; it must
@@ -301,6 +301,75 @@ After group 6 merges, its PR maintainer opens a separate archive-only documentat
 PR and validates the accepted specification. Keep the epic open until that
 maintenance PR merges. Archiving is not a condition that must be completed inside
 the final implementation PR.
+
+## Group 1 feasibility evidence
+
+The unpublished `tests/browser-fixture` imports `config`, `config/formats/toml`,
+and `async/js_async`. `tests/browser` holds the private Playwright harness. The
+HTTP server, build, installation, and process lifecycle use moonx scripts.
+No public browser package is introduced by the spike.
+
+The compilable bridge uses external object wrappers and a cancellable promise:
+
+```moonbit
+#external
+priv type Adapter
+#external
+priv type Reply
+extern "js" fn Adapter::fetch_text(
+  self : Adapter,
+  url : String,
+  signal : @js_async.AbortSignal,
+) -> @js_async.Promise[Reply] =
+  #|(adapter, url, signal) => adapter.fetchText(url, signal)
+```
+
+MoonBit awaits that call with
+`@js_async.run_promise(signal => adapter.fetch_text(url, signal))`. The TypeScript
+boundary catches Web API errors and returns tagged reply data. MoonBit inspects
+reply properties through `extern "js"` accessors, fills the requested virtual
+file in `FileTree`, reruns the pure loader, and binds the resulting section.
+
+The generated factory supplies a lexical `receiveBrowserAdapter` callback. Bun
+bundles a small entry which imports the adapter and calls that callback. The
+factory returns the received object. This tested `--target=browser --format=iife`
+shape uses no `require`, `module`, `process`, or browser global registration.
+The pinned Bun CLI did not supply an export object with `--global-name`; do not
+depend on that unrecognized option. The final MoonBit application is also bundled
+with the browser target and checked for forbidden runtime dependencies.
+
+The test application exports its entry through
+`@js_async.Promise::from_async(() => probe(url))`. That export converts raised
+errors to generic `Error` text. The fixture explicitly uses `ConfigError::message`
+at this JavaScript presentation boundary to retain source paths. The production
+MoonBit browser loader must preserve typed `ConfigError` values inside MoonBit;
+the fixture's text export is not a replacement error API.
+
+Local proof on macOS arm64 with Playwright `1.64.1` passed six tests across
+Chromium `156.0.8078.4`, Firefox `157.0`, and WebKit `27.2`. The browser page fetches
+hosted TOML, applies port override `9000`, binds a typed server record, and reports
+`/workspace/acme.toml` as the host value's origin. All three runtime globals are
+absent. HTTP 404, malformed TOML, and invalid typed data reject through the bridge.
+The successful suite took 2.9 seconds, build 0.2 seconds, total 3.1 seconds in one
+representative warm run. Installing the missing Firefox and WebKit builds took
+17.8 seconds with Chromium already cached; this is not a cold-install measure.
+
+Negative verification reuses that one application artifact. It requires the
+specific assertion-failure marker with three failing projects, then six engine
+launch failures with an empty browser installation directory. An arbitrary
+nonzero result cannot pass verification. Each run checks that its loopback
+listener no longer accepts connections after structured cleanup. Reader-closed
+errors from browser keep-alive disconnects close only their connection. The server
+task is `no_wait=true`, so normal task-group exit cancels and joins it.
+
+The browser job is a separate Linux category because Node tests cannot execute
+the browser Web APIs or prove the page's runtime environment. It runs on the
+existing PR, main-push, merge-group, and manual events, depends on lint, and is a
+required `ci-ok` dependency. It installs the locked harness and all three engines,
+then runs the success and negative checks with one build. All prior gates remain.
+The PR maintainer owns failures, which block merge. Cold Linux job timings and
+the current-head CI run are recorded in the bead when verified. No release or
+publishing behavior changes.
 
 ## Risks / Trade-offs
 

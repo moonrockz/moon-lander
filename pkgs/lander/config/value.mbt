@@ -131,6 +131,17 @@ fn ConfigValue::field(self : ConfigValue, name : String) -> ConfigValue? {
 }
 
 ///|
+/// The value at the struct field names `names`, from this value down.
+fn ConfigValue::at(self : ConfigValue, names : Array[String]) -> ConfigValue? {
+  let mut value = self
+  for name in names {
+    guard value.field(name) is Some(next) else { return None }
+    value = next
+  }
+  Some(value)
+}
+
+///|
 /// Raise `InvalidRoot` when the value is not a struct.
 fn ConfigValue::check_root(
   self : ConfigValue,

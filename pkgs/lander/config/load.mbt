@@ -81,7 +81,8 @@ pub fn load(
     }
   }
   let priorities = if expanded { source_priorities(sources) } else { [] }
-  let results = sources.map(source => resolve(source, context, needs))
+  let env_given = builder.env_vars is Some(_)
+  let results = sources.map(source => resolve(source, context, needs, env_given))
   guard expanded && needs.is_empty() else { return Need(needs) }
   let mut root = fields([])
   let provenance : Map[KeyPath, Array[Origin]] = Map([])
@@ -96,19 +97,27 @@ pub fn load(
       location: result.path,
     }
     let warnings : Array[ConfigWarning] = []
-    let mut value = result.value
+    let pieces = result.pieces.copy()
     for excluded in source.excluded {
       let (key, warn) = excluded
-      if value.bind(tree => remove_key(tree, key.names)) is Some(rest) {
-        value = Some(rest)
-        if warn {
-          warnings.push(KeyRemoved(key, origin))
+      let mut removed : Origin? = None
+      for piece_index, piece in pieces {
+        if remove_key(piece.0, key.names) is Some(rest) {
+          pieces[piece_index] = (rest, piece.1)
+          if removed is None {
+            removed = Some({ ..origin, location: piece.1 })
+          }
         }
       }
+      if warn && removed is Some(removed_origin) {
+        warnings.push(KeyRemoved(key, removed_origin))
+      }
     }
-    if value is Some(tree) {
-      root = merge(root, tree)
-      record_origins(provenance, tree, origin)
+    // Each piece has its own location, for example the variable of an
+    // environment source.
+    for piece in pieces {
+      root = merge(root, piece.0)
+      record_origins(provenance, piece.0, { ..origin, location: piece.1 })
     }
     reports.push({
       kind: source.kind,
@@ -134,7 +143,8 @@ pub fn load(
 ///|
 /// What a load resolved for one source.
 priv struct Resolved {
-  value : ConfigValue?
+  /// The trees of the source in merge order, each with its location.
+  pieces : Array[(ConfigValue, String?)]
   path : String?
   candidates : Array[String]
   status : SourceStatus
@@ -147,19 +157,39 @@ fn resolve(
   source : ConfigSource,
   context : LoadContext,
   needs : Array[FileRequest],
+  env_given : Bool,
 ) -> Resolved? raise ConfigError {
   match source.input {
     Value(value) =>
-      Some({ value: Some(value), path: None, candidates: [], status: Loaded })
-    NoInput =>
-      Some({ value: None, path: None, candidates: [], status: Skipped })
+      Some({ pieces: [(value, None)], path: None, candidates: [], status: Loaded })
+    NoInput => Some({ pieces: [], path: None, candidates: [], status: Skipped })
+    Env(selection, prefix, reserved) =>
+      match selection {
+        Skip => Some({ pieces: [], path: None, candidates: [], status: Skipped })
+        Explicit(vars) =>
+          Some({
+            pieces: env_pieces(vars, prefix, reserved),
+            path: None,
+            candidates: [],
+            status: Loaded,
+          })
+        Discover if env_given =>
+          Some({
+            pieces: env_pieces(context.env_vars, prefix, reserved),
+            path: None,
+            candidates: [],
+            status: Loaded,
+          })
+        Discover =>
+          Some({ pieces: [], path: None, candidates: [], status: NotFound })
+      }
     Path(given) => {
       let path = join_path(context.working_dir, given)
       let format = select_format(context.formats, path)
       match context.tree.file(path) {
         Found(text) =>
           Some({
-            value: Some(parse_with(format, path, text)),
+            pieces: [(parse_with(format, path, text), Some(path))],
             path: Some(path),
             candidates: [],
             status: Loaded,
@@ -200,18 +230,13 @@ fn resolve(
       }
       guard !unknown else { return None }
       guard existing is [path] else {
-        return Some({
-          value: None,
-          path: None,
-          candidates,
-          status: NotFound,
-        })
+        return Some({ pieces: [], path: None, candidates, status: NotFound })
       }
       let format = select_format(context.formats, path)
       match context.tree.file(path) {
         Found(text) =>
           Some({
-            value: Some(parse_with(format, path, text)),
+            pieces: [(parse_with(format, path, text), Some(path))],
             path: Some(path),
             candidates,
             status: Loaded,

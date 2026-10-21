@@ -48,13 +48,66 @@ fn[T : FromJson] decode(
   config : Config,
   key : KeyPath?,
   json : Json,
+  blame? : (DecodePath) -> Blame,
 ) -> T raise ConfigError {
+  let blame = blame.unwrap_or(path => config.blame(path))
   @json.from_json(json) catch {
     JsonDecodeError((pointer, detail)) => {
       let path = decode_path(key, pointer.to_string(), json)
-      raise Decode(failure={ at: [{ path, blame: config.blame(path) }], detail })
+      raise Decode(failure={ at: [{ path, blame: blame(path) }], detail })
     }
   }
+}
+
+///|
+/// Decode the section at `key` merged over `default`. The default is written
+/// with `ToJson`, the configured section merges over it with the core merge
+/// rules, and the result decodes into a `T`: tables merge, a configured list
+/// or scalar replaces the default, and an absent section keeps the default.
+/// A `None` field of the default is not written, so a configured value fills
+/// it. A failure in a value that the default gave has the blame `Default`.
+/// The default does not change.
+pub fn[T : FromJson + ToJson] bind_or(
+  config : Config,
+  key : String,
+  default : T,
+) -> T raise ConfigError {
+  let path = KeyPath::parse(key)
+  // Synthetic roots keep the rule that a tree root is a struct, so a scalar or
+  // list default works too.
+  let default_root = fields([("value", { ion: @ion.Ion::Ion(ToJson::to_json(default)) })])
+  let merged = match config.get(path) {
+    Some(section) => merge(default_root, fields([("value", section)]))
+    None => default_root
+  }
+  let value = merged.field("value").unwrap_or({ ion: @ion.Ion::Ion(Json::null()) })
+  let json = section_json(config, Some(path), value)
+  decode(config, Some(path), json, blame=decode_path => {
+    match config.blame(decode_path) {
+      Unset | Table([]) => {
+        let below = match decode_path.key {
+          Some(failing) => failing.names[path.names.length():].to_owned()
+          None => []
+        }
+        if default_root.at(["value", ..below]) is Some(_) {
+          Default
+        } else {
+          Unset
+        }
+      }
+      blame => blame
+    }
+  })
+}
+
+///|
+/// Decode the section at `key` merged over `default`, as `bind_or` does.
+pub fn[T : FromJson + ToJson] Config::bind_or(
+  self : Config,
+  key : String,
+  default : T,
+) -> T raise ConfigError {
+  bind_or(self, key, default)
 }
 
 ///|

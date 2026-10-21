@@ -58,10 +58,10 @@ Bead: lander-4us.2.5
 
 Bead: lander-4us.2.6
 
-- [ ] 6.1 Port the environment key mapping (prefix in any case, leading `_`, `__`, lowercase, empty segment error) and reserved names; verify all environment name and reserved name scenarios.
-- [ ] 6.2 Port value typing and the shorter-path-wins order from morphir-moonbit; verify the "Typed values", "JSON list value", "Invalid JSON stays text", "Integer out of range", and both shorter-path scenarios, the last with two input orders.
-- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, read `Discover` variables from the builder variable set (`@config.env_vars`), and give a skipped source for `Skip`; verify "Environment origin names the variable", "Explicit environment variables", "Discover environment with no host", "Skip a source" with the environment selection, and the environment-source parts of "Host adapter fills the inputs" and "Adapter uses the given values".
-- [ ] 6.4 Add the overrides source; verify the "Overrides beat the environment" scenario.
+- [x] 6.1 Port the environment key mapping (prefix in any case, leading `_`, `__`, lowercase, empty segment error) and reserved names; verify all environment name and reserved name scenarios.
+- [x] 6.2 Port value typing and the shorter-path-wins order from morphir-moonbit; verify the "Typed values", "JSON list value", "Invalid JSON stays text", "Integer out of range", and both shorter-path scenarios, the last with two input orders.
+- [x] 6.3 Record the variable name in each environment origin, support `Explicit` variables, read `Discover` variables from the builder variable set (`@config.env_vars`), and give a skipped source for `Skip`; verify "Environment origin names the variable", "Explicit environment variables", "Discover environment with no host", "Skip a source" with the environment selection, and the environment-source parts of "Host adapter fills the inputs" and "Adapter uses the given values".
+- [x] 6.4 Add the overrides source; verify the "Overrides beat the environment" scenario.
 
 ## 7. TOML date and time mapping
 

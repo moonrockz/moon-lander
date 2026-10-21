@@ -180,3 +180,27 @@ async test "discovery does not skip a file it cannot inspect" {
       fail("discovery skipped an entry it could not inspect: \{config.reports()[0].status.to_repr()}")
   }
 }
+
+///|
+async test "Host adapter fills the inputs with a discovered environment source" {
+  @env.set_env_var("LANDER_HOST_FILL_A", "1")
+  defer @env.unset_env_var("LANDER_HOST_FILL_A")
+  let config = @config.builder()
+    |> @config.env(prefix="LANDER_HOST_FILL")
+    |> load
+  @expect.expect(@config.get_text(config, "a")).to_equal("1")
+  @expect.expect(config.reports()[0].status).to_equal(Loaded)
+}
+
+///|
+async test "Adapter uses the given variable set for a discovered environment source" {
+  @env.set_env_var("LANDER_HOST_GIVEN_B", "2")
+  defer @env.unset_env_var("LANDER_HOST_GIVEN_B")
+  let config = @config.builder()
+    |> @config.env_vars({ "LANDER_HOST_GIVEN_A": "1" })
+    |> @config.env(prefix="LANDER_HOST_GIVEN")
+    |> load
+  @expect.expect(config.value()).to_equal(
+    @config.fields([("a", @config.int(1))]),
+  )
+}

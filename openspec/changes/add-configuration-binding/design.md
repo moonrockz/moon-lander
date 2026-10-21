@@ -179,6 +179,11 @@ let ir : IrOptions = ctx.config
   |> @config.bind_or("ir", { layout: "single-file", strict_mode: false })
 ```
 
+**Call (this change)**, from task group 2: `bind_or` and `Config::bind_or` take no
+`unknown?` argument until the unknown-key group (7) adds it, so no option is
+accepted and ignored. A failing path gets `Default` when no source sets it and the
+default holds a value there; otherwise it keeps the blame of `bind`.
+
 Alternatives: (a) `ToJson` on all `bind` calls (rejected: the owner sketch derives
 only `FromJson`); (b) a wrapper `Seed[T]` made by `@config.seed(value)` so that
 `bind` can keep a `default?` argument (rejected: more words at each call).

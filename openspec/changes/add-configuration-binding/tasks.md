@@ -19,17 +19,17 @@ Bead: lander-4us.4.1
 - [x] 1.5 Resolve blame from provenance at the key part of the `DecodePath` (`Set` with every list origin, then `Table` origins, then `Unset`); verify tests for a leaf, an element of a replaced list, an element of an appended list with two origins, a table with two sources, and an unset key
 - [x] 1.6 Decode an absent section as `null`; verify an `Option` target gives `None` and a record target gives `Decode` with blame `Unset`
 - [x] 1.7 Raise `Decode` with the values that the core `ConfigError::message()` renders as `<path>: <detail> (<blame text>)` with the core origin text (file role name and path, or variable name); verify snapshot tests over the core text for a `user-override` file origin, an environment origin, a list with two origins, `Unset`, and a Windows origin `C:/repo/morphir.toml` with no backslash
-- [x] 1.8 Add an acceptance suite in `tests/` for the spec requirements "Bind a section to a typed value", "Bind the full configuration", "Absent section", "Decode errors name the decode path and its sources" and "Origin text in errors"; verify `mise run test` passes on all four targets. "Value from an environment variable" and "Appended list names every source" run as white-box tests in `config` until the core gives environment sources (core 6) and append policies (core 11); 8.1 adds them to the suite
+- [x] 1.8 Add an acceptance suite in `tests/` for the spec requirements "Bind a section to a typed value", "Bind the full configuration", "Absent section", "Decode errors name the decode path and its sources" and "Origin text in errors"; verify `mise run test` passes on all four targets. "Appended list names every source" runs as a white-box test in `config` until the core gives append policies (core 11); 8.1 adds it to the suite. "Value from an environment variable" joined the suite with group 2
 - [x] 1.9 Document `bind` and `bind_root` with a runnable example in the `config` package README; verify the README example runs in `mise run test`
 
 ## 2. Bind over a default value
 
 Bead: lander-4us.4.2
 
-- [ ] 2.1 Add `bind_or` for `T : FromJson + ToJson`: write the default with `ToJson`, wrap the default and the section as the field of two synthetic root structs, merge them with the core merge, take the field out, decode; verify tests for unset keys, a replaced list, a scalar default, a list default, a `null` overlay and an absent section
-- [ ] 2.2 Mark leaves that the default supplies with blame `Default`; verify a bad default gives `Decode` text that says `from the bind default`
-- [ ] 2.3 Add acceptance scenarios for "Bind over a default value" and "Decode errors for tables, unset and default values"; verify they pass on all four targets
-- [ ] 2.4 Document `bind_or`, and the observed `FromJson` limits (`Int` truncation, `Int64` text only, `null` in an `Option` field), in the package README; verify the README examples run
+- [x] 2.1 Add `bind_or` for `T : FromJson + ToJson`: write the default with `ToJson`, wrap the default and the section as the field of two synthetic root structs, merge them with the core merge, take the field out, decode; verify tests for unset keys, a replaced list, a scalar default, a list default, a `null` overlay and an absent section
+- [x] 2.2 Mark leaves that the default supplies with blame `Default`; verify a bad default gives `Decode` text that says `from the bind default`
+- [x] 2.3 Add acceptance scenarios for "Bind over a default value" and "Decode errors for tables, unset and default values"; verify they pass on all four targets
+- [x] 2.4 Document `bind_or`, and the observed `FromJson` limits (`Int` truncation, `Int64` text only, `null` in an `Option` field), in the package README; verify the README examples run
 
 ## 3. Secret guard and safe error text
 
@@ -80,6 +80,6 @@ Bead: lander-4us.4.7
 
 Bead: lander-4us.4.8
 
-- [ ] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure"); also add "Value from an environment variable" and "Appended list names every source" to the acceptance suite
+- [ ] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure"); also add "Appended list names every source" to the acceptance suite
 - [ ] 8.2 Run `mise run format` and `mise run check`; verify both pass, and verify the windows-latest CI leg passes the binding tests for `native` and `js`
 - [ ] 8.3 Run `mise exec -- openspec validate add-configuration-binding --strict`; verify it passes

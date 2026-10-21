@@ -227,12 +227,14 @@ mount roots. Count manifest and selected-file entries before I/O; count director
 entries while listing. Cached entries do not consume the limit again. Check known
 file sizes before reading and actual UTF-8 size afterward.
 For HTTP, enforce the byte limit while streaming the response, including when
-Content-Length is absent or incorrect. On a limit or abort failure, actively
-cancel the response with `reader.cancel()` or abort the underlying fetch before
-releasing the reader lock. `releaseLock()` alone does not cancel a response.
-Release a lock after normal completion or cancellation, and preserve the original
-load error if cleanup also fails. The oversized-response fixture must observe
-upstream cancellation or connection closure, not only that the load rejected.
+Content-Length is absent or incorrect. Release every acquired reader lock after
+normal completion or any streaming failure, including read and decoding errors.
+If a failed response may still be live, actively cancel it with `reader.cancel()`
+or abort its fetch before releasing the lock. An already errored stream needs
+lock release; `releaseLock()` alone does not cancel a live response. Preserve the
+original load error if cleanup also fails. The oversized-response and decoding
+failure fixtures must observe upstream cancellation or connection closure, not
+only that the load rejected; an injected read error must leave no locked reader.
 
 Do not fetch the next file after a limit or abort failure. Pass the abort signal
 to fetch. Race non-abortable File operations against abort

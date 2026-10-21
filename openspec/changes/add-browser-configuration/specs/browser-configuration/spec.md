@@ -311,10 +311,10 @@ credentials, or sensitive backend URLs.
 
 A load SHALL enforce caller-supplied positive limits or defaults of 4096 observed
 entries, 8 MiB of total loaded UTF-8 text, and 8192 distinct requests. It SHALL honor
-an optional abort signal. A limit or abort failure MUST stop further requests,
-actively cancel the response stream or abort its fetch before releasing the reader
-lock, and return no partial configuration. Releasing the lock alone MUST NOT count
-as cancellation. Cleanup failure MUST NOT replace the original load error.
+an optional abort signal. A limit, abort, or streaming failure MUST stop further
+requests and return no partial configuration. Acquired reader locks MUST be released; any
+possibly live response MUST be cancelled or its fetch aborted first. Lock release
+alone is not cancellation. Cleanup MUST preserve the original error.
 
 #### Scenario: A mount exceeds its entry limit
 
@@ -325,6 +325,21 @@ as cancellation. Cleanup failure MUST NOT replace the original load error.
 
 - **WHEN** an HTTP response without Content-Length streams more than the remaining byte limit
 - **THEN** reading stops at the limit, the stream is cancelled or its fetch is aborted, the fixture observes upstream cancellation or connection closure, and no next file is fetched
+
+#### Scenario: Decoding fails while a response is live
+
+- **WHEN** decoding fails after a reader is acquired and the response is still live
+- **THEN** the response is cancelled or its fetch aborted, the fixture observes upstream stopping, the lock is released, and no next file is fetched
+
+#### Scenario: Reading an errored stream fails
+
+- **WHEN** a body read rejects because the response stream has errored
+- **THEN** its reader lock is released and the original read failure is returned
+
+#### Scenario: Cleanup also fails
+
+- **WHEN** cancellation or lock release fails while handling a streaming failure
+- **THEN** the original load error is preserved and remaining reader cleanup is attempted
 
 #### Scenario: Loading is aborted
 

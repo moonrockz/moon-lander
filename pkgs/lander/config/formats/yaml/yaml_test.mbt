@@ -269,9 +269,12 @@ test "invalid radix digits stay strings" {
 }
 
 ///|
-test "signed radix integers are recognized" {
+test "signed radix forms stay strings" {
   let value = @yaml.parse("a: -0x2A\nb: +0o52\n", origin="app.yaml")
   @expect.expect(value).to_equal(
-    @config.fields([("a", @config.int(-42)), ("b", @config.int(42))]),
+    @config.fields([
+      ("a", @config.string("-0x2A")),
+      ("b", @config.string("+0o52")),
+    ]),
   )
 }

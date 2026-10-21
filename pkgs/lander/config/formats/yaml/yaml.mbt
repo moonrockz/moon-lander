@@ -424,29 +424,20 @@ fn from_plain(value : String) -> @ion.Ion {
 }
 
 ///|
-/// Parse an optional sign plus `0x` / `0o` and valid digits. Invalid digits after
-/// a radix prefix keep the text as a string. Returns `None` when the text is not
-/// a radix form at all.
+/// Parse unsigned `0x` / `0o` and valid digits (YAML 1.2 core schema). Invalid
+/// digits after a radix prefix keep the text as a string. Returns `None` when
+/// the text is not a radix form at all. A leading sign is not a radix form.
 fn parse_radix_integer(value : String) -> @ion.Ion? {
   let chars = value.to_array()
-  if chars.length() < 3 {
+  if chars.length() < 3 || chars[0] != '0' {
     return None
   }
-  let mut i = 0
-  let mut negative = false
-  if chars[0] is ('+' | '-') {
-    negative = chars[0] == '-'
-    i = 1
-  }
-  if i + 2 > chars.length() || chars[i] != '0' {
-    return None
-  }
-  let radix = match chars[i + 1] {
+  let radix = match chars[1] {
     'x' | 'X' => 16
     'o' | 'O' => 8
     _ => return None
   }
-  i += 2
+  let mut i = 2
   if i >= chars.length() {
     return None
   }
@@ -466,19 +457,31 @@ fn parse_radix_integer(value : String) -> @ion.Ion? {
     digits.write_char(c)
     i += 1
   }
-  let ion = integer_ion_base(digits.to_string(), radix)
-  if negative {
-    match ion.kind() {
-      Int(number) => Some(@ion.Ion::big_int(number.neg()))
-      _ => Some(ion)
-    }
-  } else {
-    Some(ion)
-  }
+  Some(integer_ion_base(digits.to_string(), radix))
 }
 
 ///|
+/// Decimal `Int64` only: optional sign and digits. Rejects radix forms that
+/// `@string.parse_int64` would accept, so signed `0x` / `0o` stay strings.
 fn try_int64(text : String) -> Int64? {
+  let chars = text.to_array()
+  if chars.is_empty() {
+    return None
+  }
+  let mut i = 0
+  if chars[0] is ('+' | '-') {
+    i = 1
+  }
+  if i >= chars.length() {
+    return None
+  }
+  while i < chars.length() {
+    let c = chars[i]
+    if c < '0' || c > '9' {
+      return None
+    }
+    i += 1
+  }
   Some(@string.parse_int64(text)) catch {
     _ => None
   }

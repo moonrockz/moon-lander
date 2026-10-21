@@ -134,3 +134,49 @@ test "paths convert only on Windows" {
   assert_eq(to_slash("/w/a\\b", Linux), "/w/a\\b")
   assert_eq(from_slash("/w/app.toml", MacOs), "/w/app.toml")
 }
+
+///|
+async test "a file that cannot be read is an error, not a missing file" {
+  // Windows ignores the POSIX mode of a new directory.
+  if running_platform() is Windows {
+    return
+  }
+  let dir = temp_dir()
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.mkdir("\{dir}/locked", permission=0)
+  // A recursive remove cannot list the locked directory, so remove it first.
+  defer @fs.rmdir("\{dir}/locked")
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("\{dir}/locked/app.toml")
+  try load(builder) catch {
+    @config.FileNotFound(..) => fail("a permission error became file-not-found")
+    _ => ()
+  } noraise {
+    _ => fail("expected the permission error")
+  }
+}
+
+///|
+async test "discovery does not skip a file it cannot inspect" {
+  // Windows ignores POSIX modes.
+  if running_platform() is Windows {
+    return
+  }
+  let dir = temp_dir()
+  defer @fs.rmdir(dir, recursive=true)
+  write("\{dir}/acme.toml", "project.name = \"hidden\"")
+  // Read but no search permission: the listing works, a stat of an entry fails.
+  @fs.chmod(dir, 0o444)
+  defer @fs.chmod(dir, 0o755)
+  let builder = @config.builder()
+    |> @config.working_dir(dir)
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.app_dirs("acme"))
+  try load(builder) catch {
+    _ => ()
+  } noraise {
+    config =>
+      fail("discovery skipped an entry it could not inspect: \{config.reports()[0].status.to_repr()}")
+  }
+}

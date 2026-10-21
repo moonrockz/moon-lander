@@ -10,7 +10,8 @@
 /// - Paths use `/` in the tree, reports, and errors. On Windows the adapter
 ///   converts `\` to `/` when it reads a path and back for each file call.
 /// - A file or a directory that does not exist becomes an absence record, so
-///   no round asks for the same path twice.
+///   no round asks for the same path twice. Other file-system errors, such as a
+///   missing permission, pass out of `load`.
 pub async fn load(builder : @config.ConfigBuilder) -> @config.Config raise {
   let platform = builder.given_platform().unwrap_or(running_platform())
   let mut builder = builder |> @config.platform(platform)
@@ -43,22 +44,22 @@ async fn answer(
   match request {
     ReadFile(path) => {
       let native = from_slash(path, platform)
-      guard @fs.exists(native) && kind_of(native) is Regular else {
+      guard kind_of(native) is Some(Regular) else {
         return tree.with_missing(path)
       }
       tree.with_file(path, @fs.read_file(native).text())
     }
     ListDir(dir) => {
       let native = from_slash(dir, platform)
-      guard @fs.exists(native) && kind_of(native) is Directory else {
+      guard kind_of(native) is Some(Directory) else {
         return tree.with_missing(dir)
       }
       let entries : Array[@config.DirEntry] = []
       for name in @fs.readdir(native, include_hidden=true, sort=true) {
         let kind : @config.EntryKind = match
           kind_of(from_slash(join(dir, name), platform)) {
-          Regular => File
-          Directory => Directory
+          Some(Regular) => File
+          Some(Directory) => Directory
           _ => Other
         }
         entries.push({ name, kind })
@@ -69,11 +70,15 @@ async fn answer(
 }
 
 ///|
-/// The kind of the file at `native`, through symbolic links. A link that
-/// points nowhere gives `Unknown`.
-async fn kind_of(native : String) -> @fs.FileKind {
-  @fs.kind(native, follow_symlink=true) catch {
-    _ => Unknown
+/// The kind of the file at `native`, through symbolic links, or `None` when
+/// nothing is there: the path, or a directory on it, does not exist, or a link
+/// points nowhere. Other errors, such as a missing permission, pass out, so an
+/// inaccessible file is never reported as absent.
+async fn kind_of(native : String) -> @fs.FileKind? raise {
+  Some(@fs.kind(native, follow_symlink=true)) catch {
+    @os_error.OSError(_) as error if error.is_ENOENT() || error.is_ENOTDIR() =>
+      None
+    error => raise error
   }
 }
 

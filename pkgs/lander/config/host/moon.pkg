@@ -2,6 +2,7 @@ import {
   "moonrockz/moon-lander/config",
   "moonbitlang/async",
   "moonbitlang/async/fs",
+  "moonbitlang/async/os_error",
   "moonbitlang/core/env",
 }
 

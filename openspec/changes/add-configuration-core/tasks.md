@@ -136,9 +136,9 @@ Bead: lander-4us.2.15
 
 Bead: lander-4us.2.16
 
-- [ ] 16.1 Spike: bundle a small TypeScript module over `node:fs` with Bun through a moonx task script, call it from MoonBit `extern "js"` functions, and run it on Node and Bun on Linux, macOS, and Windows; verify that a js test reads one file. If the spike fails, stop and return to the owner.
+- [x] 16.1 Spike: bundle a small TypeScript module over `node:fs` with Bun through a moonx task script, call it from MoonBit `extern "js"` functions, and run it on Node and Bun on Linux, macOS, and Windows; verify that a js test reads one file. If the spike fails, stop and return to the owner.
 - [x] 16.2 Add `scripts/build-node-adapter.mbtx` and a mise task that bundle `pkgs/lander/adapters/node/` with Bun into the checked-in generated js file of `config/host`, and add a check to `mise run check` that the generated file is current; verify that the check fails after an edit to the TypeScript source.
-- [ ] 16.3 Add the js request loop of `config/host` with synchronous `node:fs` reads and only `node:*` APIs that Node and Bun both support; verify "Host adapter fills the inputs" and "Adapter uses the given values" on the js target on Linux and Windows CI.
+- [x] 16.3 Add the js request loop of `config/host` with synchronous `node:fs` reads and only `node:*` APIs that Node and Bun both support; verify "Host adapter fills the inputs" and "Adapter uses the given values" on the js target on Linux and Windows CI.
 - [x] 16.4 Add a narrow AGENTS.md exception: js file access uses the TypeScript adapter over `node:fs`, built with Bun through a moonx task script; verify that `mise run check` passes.
 
 ## 17. Integration check

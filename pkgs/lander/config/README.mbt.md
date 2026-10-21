@@ -575,8 +575,7 @@ The core never reads the disk or the process. A host gives it those inputs.
 
 | Target | How to load |
 | --- | --- |
-| `native` | `@host.load(builder)` from [`config/host`](host/README.mbt.md) reads the files, and the process variables and working directory when the builder holds none |
-| `js` | A host adapter comes in a later change; until then, run the request loop above |
+| `native`, `js` | `@host.load(builder)` from [`config/host`](host/README.mbt.md) reads the files, and the process variables and working directory when the builder holds none. The js adapter runs on Node and Bun |
 | `wasm`, `wasm-gc` | The host gives a complete `FileTree`, a variable set, and a working directory, then calls `@config.load` once |
 
 ```mbt check

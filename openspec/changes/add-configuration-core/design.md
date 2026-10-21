@@ -837,8 +837,8 @@ fills only what nobody gave. The platform comes from `@async.platform`, so no C
 stub is needed. A listing includes hidden entries, and an entry kind follows
 symbolic links. A path that does not exist, or that is not a file (for a read) or
 a directory (for a listing), becomes an absence record. Other file-system errors
-pass out of `load`. `config/host` supports only `native` until the js adapter
-(task group 16) lands.
+pass out of `load`. `config/host` supports `native` and `js`; each target supplies its file request
+handler.
 
 **Call (this change)**: the adapter uses the synchronous `node:fs` calls
 (`readdirSync`, `readFileSync`, `statSync`). The MoonBit side then needs no promise
@@ -848,8 +848,8 @@ small, so blocking reads are acceptable.
 **Call (this change)**: the TypeScript source is in `pkgs/lander/adapters/node/`.
 The moonx task script bundles it and writes the bundle as a generated MoonBit js
 file in `config/host`, which is checked in. So `moon build` and `moon test` do not
-need Bun, and CI checks that the generated file is current. Feasibility of this
-link step is not verified yet; the first js adapter task is a spike that proves it.
+need Bun, and CI checks that the generated file is current. The first js adapter task verifies this link step on Node and Bun on Linux,
+macOS, and Windows.
 
 **Owner (O2)**: AGENTS.md says to use `moonbitlang/async` for file-system work. A
 task adds a narrow exception for the TypeScript adapter on js (R12).

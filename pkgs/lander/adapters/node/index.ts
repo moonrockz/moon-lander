@@ -3,13 +3,11 @@ import { join } from "node:path";
 
 // Keep the result data-only at the FFI boundary. MoonBit turns an error result
 // into a raised error, rather than letting a JS exception escape its handlers.
-type Reply = {
-  kind: "missing" | "file" | "directory" | "error";
-  text?: string;
-  names?: string[];
-  kinds?: string[];
-  error?: string;
-};
+type Reply =
+  | { kind: "missing" }
+  | { kind: "file"; text: string }
+  | { kind: "directory"; names: string[]; kinds: string[] }
+  | { kind: "error"; error: string };
 
 function absent(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code;

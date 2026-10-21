@@ -311,7 +311,7 @@ test "an option that discovery does not read yet adds a note" {
       message
     }),
   ).to_equal([
-    "discovery does not read the environment option yet", "discovery does not read the project option yet",
+    "environments are off, so discovery ignores the environment option", "discovery does not read the project option yet",
     no_platform,
   ])
 }

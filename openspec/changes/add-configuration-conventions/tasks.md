@@ -77,10 +77,10 @@ Bead: lander-4us.3.7
 
 Bead: lander-4us.3.8
 
-- [ ] 8.1 Add `environments(default?)` and resolve the name from `DiscoveryOptions`, then `<PREFIX>_ENVIRONMENT`, then the default, and verify the "Environment name resolution" and "Discovery options from the host" scenarios.
-- [ ] 8.2 Add name validation with `ConfigError::InvalidEnvironmentName`, with `user` and `local` reserved in any letter case, and verify the three "Environment name validation" scenarios.
-- [ ] 8.3 Add environment-file candidates for project-tier primaries with role `EnvironmentFile` at priority 375, and verify the three "Environment files" scenarios and the "No environment file for global configuration" scenario.
-- [ ] 8.4 Document environments, the opt-in and the reserved names that an application without hosting must give, in the package README, and verify that the README example runs.
+- [x] 8.1 Add `environments(default?)` and resolve the name from `DiscoveryOptions`, then `<PREFIX>_ENVIRONMENT`, then the default, and verify the "Environment name resolution" and "Discovery options from the host" scenarios.
+- [x] 8.2 Add name validation with `ConfigError::InvalidEnvironmentName`, with `user` and `local` reserved in any letter case, and verify the three "Environment name validation" scenarios.
+- [x] 8.3 Add environment-file candidates for project-tier primaries with role `EnvironmentFile` at priority 375, and verify the three "Environment files" scenarios and the "No environment file for global configuration" scenario.
+- [x] 8.4 Document environments, the opt-in and the reserved names that an application without hosting must give, in the package README, and verify that the README example runs.
 
 ## 9. Load protocol and host adapters
 

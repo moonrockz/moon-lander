@@ -7,33 +7,44 @@ fn discover(
   context : @config.LoadContext,
 ) -> @config.LoadStep[@config.Expansion] raise @config.ConfigError {
   let notes = unread_options(conventions, options)
+  let environment = environment_name(conventions, options~, context.env_vars)
   let extensions = searched_extensions(context.formats)
   let machine = conventions.machine_sources(options, context, extensions, notes)
-  match conventions.project_sources(options, context, extensions, notes) {
+  let inputs = { options, environment, extensions }
+  match conventions.project_sources(inputs, context, notes) {
     Need(requests) => Need(requests)
     Done(project) => Done({ sources: [..machine, ..project], warnings: notes })
   }
 }
 
 ///|
-/// The project primary and its overrides. `Explicit(path)` gives the primary
-/// with no walk-up, and `Skip` skips it. Otherwise walk up from the working
-/// directory to the boundary, or to the file-system root, and stop at the
-/// first directory that holds a primary candidate or the legacy file. The
-/// candidate list at that directory becomes one file source, so the core load
-/// reads it, or raises `Ambiguous` when more than one candidate exists. A
-/// legacy file counts only when no primary exists there. With no root, the
-/// candidate list at the start directory reports `NotFound`.
+/// The inputs of the project-tier sources: the discovery options, the
+/// environment name of the run, and the searched extensions.
+priv struct ProjectInputs {
+  options : DiscoveryOptions
+  environment : String?
+  extensions : Array[String]
+}
+
+///|
+/// The project primary, its environment file, and its overrides.
+/// `Explicit(path)` gives the primary with no walk-up, and `Skip` skips it.
+/// Otherwise walk up from the working directory to the boundary, or to the
+/// file-system root, and stop at the first directory that holds a primary
+/// candidate or the legacy file. The candidate list at that directory becomes
+/// one file source, so the core load reads it, or raises `Ambiguous` when more
+/// than one candidate exists. A legacy file counts only when no primary exists
+/// there. With no root, the candidate list at the start directory reports
+/// `NotFound`.
 fn Conventions::project_sources(
   self : Conventions,
-  options : DiscoveryOptions,
+  project : ProjectInputs,
   context : @config.LoadContext,
-  extensions : Array[String],
   notes : Array[@config.ConfigWarning],
 ) -> @config.LoadStep[Array[@config.ConfigSource]] raise @config.ConfigError {
-  match options.config {
-    Explicit(path) =>
-      return Done(self.explicit_sources(path, options, context, extensions))
+  let extensions = project.extensions
+  match project.options.config {
+    Explicit(path) => return Done(self.explicit_sources(path, project, context))
     Skip => return Done([self.skipped_project()])
     Discover => ()
   }
@@ -75,7 +86,7 @@ fn Conventions::project_sources(
     if found is Some(primary) {
       return Done([
         self.primary(candidates),
-        ..self.overrides(primary, options, extensions),
+        ..self.overrides(primary, project),
       ])
     }
     if self.legacy is Some(legacy) {
@@ -99,15 +110,14 @@ fn Conventions::project_sources(
 }
 
 ///|
-/// The explicit primary at `path` with the role `Explicit`, and its overrides
-/// when the path has a standard layout. A relative path joins the working
-/// directory. On Windows, `\` becomes `/`.
+/// The explicit primary at `path` with the role `Explicit`, and its
+/// environment file and overrides when the path has a standard layout. A
+/// relative path joins the working directory. On Windows, `\` becomes `/`.
 fn Conventions::explicit_sources(
   self : Conventions,
   given : String,
-  options : DiscoveryOptions,
+  project : ProjectInputs,
   context : @config.LoadContext,
-  extensions : Array[String],
 ) -> Array[@config.ConfigSource] {
   let path = match context.platform {
     Some(Windows) => given.replace_all(old="\\", new="/")
@@ -123,22 +133,25 @@ fn Conventions::explicit_sources(
   }
   [
     @config.ConfigSource::file(resolved, role=Explicit, name=self.display),
-    ..self.overrides(resolved, options, extensions),
+    ..self.overrides(resolved, project),
   ]
 }
 
 ///|
-/// The local and user override sources next to the primary at `path`, or none
-/// when the path has no standard layout. In isolated mode they report
-/// `Skipped`.
+/// The environment file, local override and user override sources next to the
+/// primary at `path`, or none when the path has no standard layout. In
+/// isolated mode the overrides report `Skipped`; the environment file stays.
 fn Conventions::overrides(
   self : Conventions,
   path : String,
-  options : DiscoveryOptions,
-  extensions : Array[String],
+  project : ProjectInputs,
 ) -> Array[@config.ConfigSource] {
+  let { options, environment, extensions } = project
   guard self.adjacent(path, extensions) is Some((dir, stem)) else { return [] }
   let sources = []
+  if environment is Some(name) {
+    sources.push(self.environment_file(dir, stem, name, extensions))
+  }
   let kinds : Array[(Part, @config.FileRole, String)] = [
     (LocalOverrides, LocalOverride, "local"),
     (UserOverrides, UserOverride, "user"),
@@ -227,14 +240,19 @@ fn note(conventions : Conventions, message : String) -> @config.ConfigWarning {
 }
 
 ///|
-/// A note for each given option that discovery does not read yet.
+/// A note for each given option that discovery does not read: the environment
+/// with environments off, and the project, which it does not read yet.
 fn unread_options(
   conventions : Conventions,
   options : DiscoveryOptions,
 ) -> Array[@config.ConfigWarning] {
   let notes = []
-  if options.environment is Some(_) {
-    notes.push(note(conventions, "discovery does not read the environment option yet"))
+  if options.environment is Some(_) && conventions.environments is None {
+    notes.push(
+      note(
+        conventions, "environments are off, so discovery ignores the environment option",
+      ),
+    )
   }
   if options.project is Some(_) {
     notes.push(note(conventions, "discovery does not read the project option yet"))

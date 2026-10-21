@@ -32,7 +32,7 @@ pub fn DiscoveryOptions::new(
 ///|
 /// An immutable convention set: the application name, the variable prefix,
 /// the display name, the standard parts to use, the walk-up rule, the stop
-/// boundary, and the legacy fallback file.
+/// boundary, the legacy fallback file, and the environment opt-in.
 pub struct Conventions {
   priv name : String
   priv prefix : String
@@ -41,6 +41,7 @@ pub struct Conventions {
   priv walk_up : Bool
   priv boundary : String?
   priv legacy : Legacy?
+  priv environments : Environments?
 }
 
 ///|
@@ -87,8 +88,15 @@ priv struct Legacy {
 }
 
 ///|
-/// An empty convention set: no parts and no walk-up. `prefix` defaults to the
-/// name in upper case with `-` changed to `_`, and `display` to the name.
+/// The environment opt-in and its default name.
+priv struct Environments {
+  default : String?
+}
+
+///|
+/// An empty convention set: no parts, no walk-up and no environments.
+/// `prefix` defaults to the name in upper case with `-` changed to `_`, and
+/// `display` to the name.
 pub fn base(
   name : String,
   prefix? : String,
@@ -102,6 +110,7 @@ pub fn base(
     walk_up: false,
     boundary: None,
     legacy: None,
+    environments: None,
   }
 }
 
@@ -239,14 +248,16 @@ pub fn Conventions::display(self : Conventions) -> String {
 /// Add the convention set to a core builder as a source provider. During
 /// `@config.load`, discovery gives its sources at its position in merge order:
 /// the system source (priority 100), the global user source (200), the project
-/// primary with the role `Workspace`, `Legacy`, or `Explicit` (300), the local
-/// override (390), and the user override (400).
+/// primary with the role `Workspace`, `Legacy`, or `Explicit` (300), the
+/// environment file (375), the local override (390), and the user override
+/// (400).
 ///
-/// Discovery reads `isolated` and `config` from `options`. In isolated mode the
-/// system, global user, and override sources report `Skipped`. `Explicit(path)`
-/// is the project primary with no walk-up, and `Skip` skips it. Discovery does
-/// not read the `environment` and `project` options yet; a given value adds a
-/// `Note` warning so that it is never ignored without a sign.
+/// Discovery reads `isolated`, `config` and `environment` from `options`. In
+/// isolated mode the system, global user, and override sources report
+/// `Skipped`. `Explicit(path)` is the project primary with no walk-up, and
+/// `Skip` skips it. With environments off, a given `environment` adds a `Note`
+/// warning. Discovery does not read the `project` option yet; a given value
+/// adds a `Note` warning so that it is never ignored without a sign.
 pub fn add(
   builder : @config.ConfigBuilder,
   conventions : Conventions,

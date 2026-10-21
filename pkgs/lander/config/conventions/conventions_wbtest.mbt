@@ -31,3 +31,16 @@ test "paths normalize dot segments" {
   assert_eq(normalize("C:/"), "C:/")
   assert_eq(normalize("//server/share/w/.."), "//server/share")
 }
+
+///|
+test "Windows absolute paths have a drive and a separator, or a UNC prefix" {
+  assert_eq(is_absolute_on("C:/Users", Windows), true)
+  assert_eq(is_absolute_on("d:/", Windows), true)
+  assert_eq(is_absolute_on("//server/share", Windows), true)
+  assert_eq(is_absolute_on("C:foo", Windows), false)
+  assert_eq(is_absolute_on("1:/x", Windows), false)
+  assert_eq(is_absolute_on("/Users", Windows), false)
+  assert_eq(is_absolute_on("Users", Windows), false)
+  assert_eq(is_absolute_on("/home", Linux), true)
+  assert_eq(is_absolute_on("C:/x", MacOs), false)
+}

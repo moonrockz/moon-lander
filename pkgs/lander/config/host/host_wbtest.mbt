@@ -177,7 +177,7 @@ async test "discovery does not skip a file it cannot inspect" {
     _ => ()
   } noraise {
     config =>
-      fail("discovery skipped an entry it could not inspect: \{config.reports()[0].status.to_repr()}")
+      fail("discovery skipped an entry it could not inspect: \{config.reports().length()} reports")
   }
 }
 
@@ -222,7 +222,47 @@ async test "a boundary at the temporary root keeps a parent file out" {
   @expect.expect(config.value()).to_equal(
     @config.fields([("b", @config.int(2))]),
   )
-  @expect.expect(config.reports()[0].path).to_equal(
-    Some("\{dir}/case/.config/acme/config.toml"),
+  let project = config
+    .reports()
+    .iter()
+    .find_first(report => report.kind == File(Workspace))
+  @expect.expect(project.map(report => report.path)).to_equal(
+    Some(Some("\{dir}/case/.config/acme/config.toml")),
   )
+}
+
+///|
+async test "discovery reads the global file and the overrides on the disk" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  write("\{dir}/home/.acme/acme.toml", "a = \"global\"\nb = \"global\"")
+  write("\{dir}/case/acme.toml", "a = \"project\"")
+  write("\{dir}/case/acme.user.toml", "c = \"user\"")
+  // The variable set of the run, never the process environment, gives the
+  // user home, so the real home of the test runner stays out.
+  let config = @config.builder()
+    |> @config.working_dir("\{dir}/case")
+    |> @config.env_vars({ "HOME": "\{dir}/home", "USERPROFILE": "\{dir}/home" })
+    |> @config.format(@toml.format())
+    |> @conventions.add(
+      @conventions.app_dirs("acme")
+      |> @conventions.without(SystemDir)
+      |> @conventions.boundary("\{dir}/case"),
+    )
+    |> load
+  @expect.expect(config.value()).to_equal(
+    @config.fields([
+      ("a", @config.string("project")),
+      ("b", @config.string("global")),
+      ("c", @config.string("user")),
+    ]),
+  )
+  @expect.expect(
+    config.reports().map(report => (report.kind.report_name(), report.status)),
+  ).to_equal([
+    ("global", Loaded),
+    ("project", Loaded),
+    ("local-override", NotFound),
+    ("user-override", Loaded),
+  ])
 }

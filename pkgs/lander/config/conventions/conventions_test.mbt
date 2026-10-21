@@ -33,6 +33,22 @@ fn done(step : @config.LoadStep[@config.Config]) -> @config.Config {
 }
 
 ///|
+/// The report of the project primary.
+fn project(config : @config.Config) -> @config.SourceReport {
+  guard config
+    .reports()
+    .search_by(report => report.kind is File(Workspace | Legacy | Explicit))
+    is Some(index) else {
+    abort("expected a project report")
+  }
+  config.reports()[index]
+}
+
+///|
+/// The note that discovery adds when the run gives no platform.
+let no_platform : String = "discovery has no platform, so it skips the system and global user directories"
+
+///|
 test "discovery reads one listing of a complete tree" {
   let tree = @config.FileTree::new(complete=true)
     .with_listing("/w", files(["acme.toml"]))
@@ -49,7 +65,7 @@ test "Configuration found from a nested directory" {
     .with_listing("/w/src/nested", [])
     .with_file("/w/acme.toml", "project.name = \"root\"")
   let config = acme("/w/src/nested") |> @config.load(tree) |> done
-  let report = config.reports()[0]
+  let report = project(config)
   @expect.expect((report.kind, report.priority, report.path, report.status)).to_equal((
     File(Workspace),
     300,
@@ -141,7 +157,7 @@ test "the first request lists the layout directories of the start directory" {
 ///|
 test "no primary reports not-found at the start directory" {
   let config = load_from(acme("/w/src"), { "/w/src/main.mbt": "" })
-  let report = config.reports()[0]
+  let report = project(config)
   @expect.expect((report.status, report.candidates)).to_equal((
     NotFound,
     ["/w/src/acme.toml", "/w/src/.acme/acme.toml", "/w/src/.config/acme/config.toml"],
@@ -171,7 +187,7 @@ test "two primaries in the nearest directory are ambiguous" {
 test "searched extensions come from the registered formats" {
   let builder = acme("/w")
   let config = load_from(builder, { "/w/acme.yaml": "a: 1" })
-  @expect.expect(config.reports()[0].status).to_equal(NotFound)
+  @expect.expect(project(config).status).to_equal(NotFound)
 }
 
 ///|
@@ -180,8 +196,9 @@ test "discovery without a working directory is skipped with a note" {
     |> @conventions.add(@conventions.app_dirs("acme", display="Acme"))
     |> @config.load(@config.FileTree::new())
     |> done
-  @expect.expect(config.reports()[0].status).to_equal(Skipped)
+  @expect.expect(project(config).status).to_equal(Skipped)
   @expect.expect(config.warnings()).to_equal([
+    Note(source="Acme", message=no_platform),
     Note(
       source="Acme",
       message="discovery has no working directory to start from",
@@ -197,7 +214,7 @@ test "a base convention set searches no file" {
     |> @conventions.add(@conventions.base("acme"))
     |> @config.load(@config.FileTree::new())
     |> done
-  @expect.expect(config.reports()[0].candidates).to_equal([])
+  @expect.expect(project(config).candidates).to_equal([])
 }
 
 ///|
@@ -228,8 +245,9 @@ test "discovery needs an absolute working directory" {
     .with_listing("repo/sub", [{ name: "acme.toml", kind: File }])
     .with_file("repo/sub/acme.toml", "a = 1")
   let config = acme("repo/sub") |> @config.load(tree) |> done
-  @expect.expect(config.reports()[0].status).to_equal(Skipped)
+  @expect.expect(project(config).status).to_equal(Skipped)
   @expect.expect(config.warnings()).to_equal([
+    Note(source="acme", message=no_platform),
     Note(
       source="acme",
       message="discovery needs an absolute working directory, not repo/sub",

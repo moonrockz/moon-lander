@@ -45,11 +45,19 @@ fn discover_in(
   conventions? : @conventions.Conventions = @conventions.app_dirs("acme"),
   formats? : Array[@config.Format] = [@toml.format()],
   options? : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
+  platform? : @config.Platform,
+  env_vars? : Map[String, String],
 ) -> @config.Config raise @config.ConfigError {
-  let builder = formats.fold(
+  let mut builder = formats.fold(
     init=@config.builder() |> @config.working_dir(start),
     (builder, format) => builder |> @config.format(format),
   )
+  if platform is Some(platform) {
+    builder = builder |> @config.platform(platform)
+  }
+  if env_vars is Some(vars) {
+    builder = builder |> @config.env_vars(vars)
+  }
   builder
   |> @conventions.add(conventions, options~)
   |> @config.load(disk(files))
@@ -68,7 +76,7 @@ fn ambiguity(run : () -> Unit raise @config.ConfigError) -> (String, Array[Strin
 
 ///|
 fn primary_path(config : @config.Config) -> String? {
-  config.reports()[0].path
+  project(config).path
 }
 
 ///|
@@ -99,8 +107,8 @@ test "Unregistered extension ignored" {
     @toml.format(),
     yaml_only(),
   ])
-  @expect.expect(config.reports()[0].status).to_equal(NotFound)
-  @expect.expect(config.reports()[0].candidates.length()).to_equal(6)
+  @expect.expect(project(config).status).to_equal(NotFound)
+  @expect.expect(project(config).candidates.length()).to_equal(6)
 }
 
 ///|
@@ -174,7 +182,7 @@ fn with_legacy() -> @conventions.Conventions {
 ///|
 test "Legacy file used when no primary exists" {
   let config = discover_in("/w/src", [("/w/acme.json", "{}")], conventions=with_legacy())
-  let report = config.reports()[0]
+  let report = project(config)
   @expect.expect((report.kind, report.path, report.status)).to_equal((
     File(Legacy),
     Some("/w/acme.json"),
@@ -200,7 +208,7 @@ test "Primary wins over legacy file" {
 ///|
 test "the legacy format adds no searched extension" {
   let config = discover_in("/w", [("/w/main.mbt", "")], conventions=with_legacy())
-  @expect.expect(config.reports()[0].candidates).to_equal([
+  @expect.expect(project(config).candidates).to_equal([
     "/w/acme.toml", "/w/.acme/acme.toml", "/w/.config/acme/config.toml",
   ])
 }
@@ -212,7 +220,7 @@ test "Ancestor configuration above the boundary is ignored" {
     [("/tmp/acme.toml", "a = 1"), ("/tmp/case/src/main.mbt", "")],
     conventions=@conventions.app_dirs("acme") |> @conventions.boundary("/tmp/case"),
   )
-  @expect.expect(config.reports()[0].status).to_equal(NotFound)
+  @expect.expect(project(config).status).to_equal(NotFound)
 }
 
 ///|
@@ -250,7 +258,7 @@ test "a relative boundary joins the working directory" {
     [("/w/acme.toml", "a = 1"), ("/w/a/acme.toml", "a = 2"), ("/w/a/b/x", "")],
     conventions=@conventions.app_dirs("acme") |> @conventions.boundary("."),
   )
-  @expect.expect(config.reports()[0].status).to_equal(NotFound)
+  @expect.expect(project(config).status).to_equal(NotFound)
 }
 
 ///|
@@ -292,7 +300,6 @@ test "an option that discovery does not read yet adds a note" {
     [("/w/acme.toml", "a = 1")],
     options=@conventions.DiscoveryOptions::new(
       environment="Staging",
-      config=Explicit("/w/other.toml"),
       project="api",
     ),
   )
@@ -304,7 +311,7 @@ test "an option that discovery does not read yet adds a note" {
       message
     }),
   ).to_equal([
-    "discovery does not read the environment option yet", "discovery does not read the config option yet",
-    "discovery does not read the project option yet",
+    "discovery does not read the environment option yet", "discovery does not read the project option yet",
+    no_platform,
   ])
 }

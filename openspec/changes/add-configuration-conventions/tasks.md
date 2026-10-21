@@ -39,21 +39,21 @@ Bead: lander-4us.3.3
 
 Bead: lander-4us.3.4
 
-- [ ] 4.1 Add `system_dir` for Linux, macOS and Windows (`PROGRAMDATA` with the `C:/ProgramData` fallback), and verify the two "System directory" scenarios.
-- [ ] 4.2 Add `user_config_dir` with the absolute-only XDG rule, the macOS directory and `APPDATA` on Windows, and verify the four "Global user configuration directory" scenarios.
-- [ ] 4.3 Add `app_home` with `$<PREFIX>_HOME`, `USERPROFILE` on Windows and the empty-means-unset rule, and verify the four "Application home directory" scenarios.
-- [ ] 4.4 Treat all global candidates as one source and report every candidate, and verify the "Two global files" and "Not-found global source lists candidates" scenarios; in isolated mode the system and global sources report `Skipped`.
-- [ ] 4.5 Add the `/`-form path value with drive and UNC absolute checks and `\` to `/` conversion of path-valued variables on Windows, and verify the "Path handling on Windows" scenarios with tests that give `Platform::Windows` on every target.
-- [ ] 4.6 Add `app_dirs(name, prefix?, display?)` as `base` plus the standard parts, and `without(part)`, and verify a test that removes the system part.
-- [ ] 4.7 Read every directory variable only from the `env_vars` set of the core load context, never from the process, and verify the "Directories come only from the given set" scenario on all four targets with a set that gives `HOME` and `XDG_CONFIG_HOME` explicitly.
+- [x] 4.1 Add `system_dir` for Linux, macOS and Windows (`PROGRAMDATA` with the `C:/ProgramData` fallback), and verify the two "System directory" scenarios.
+- [x] 4.2 Add `user_config_dir` with the absolute-only XDG rule, the macOS directory and `APPDATA` on Windows, and verify the four "Global user configuration directory" scenarios.
+- [x] 4.3 Add `app_home` with `$<PREFIX>_HOME`, `USERPROFILE` on Windows and the empty-means-unset rule, and verify the four "Application home directory" scenarios.
+- [x] 4.4 Treat all global candidates as one source and report every candidate, and verify the "Two global files" and "Not-found global source lists candidates" scenarios; in isolated mode the system and global sources report `Skipped`.
+- [x] 4.5 Add the `/`-form path value with drive and UNC absolute checks and `\` to `/` conversion of path-valued variables on Windows, and verify the "Path handling on Windows" scenarios with tests that give `Platform::Windows` on every target.
+- [x] 4.6 Add `app_dirs(name, prefix?, display?)` as `base` plus the standard parts, and `without(part)`, and verify a test that removes the system part.
+- [x] 4.7 Read every directory variable only from the `env_vars` set of the core load context, never from the process, and verify the "Directories come only from the given set" scenario on all four targets with a set that gives `HOME` and `XDG_CONFIG_HOME` explicitly.
 
 ## 5. User overrides and explicit primary files
 
 Bead: lander-4us.3.5
 
-- [ ] 5.1 Add `user_overrides` for the three layouts with ambiguity checks, and verify the three "Adjacent user overrides" scenarios; in isolated mode user and local overrides report `Skipped`, and "Isolated mode skips user and machine files" passes in full.
-- [ ] 5.2 Read `Explicit(path)` from the `config` value of `DiscoveryOptions` with layout detection by path, and verify the two "Explicit primary file" scenarios.
-- [ ] 5.3 Add `local_overrides` (`<app>.local.<ext>` and `config.local.<ext>` next to each primary, role `LocalOverride`, priority 390, ambiguity checks), include it in `app_dirs` and not in `base`, and verify the three "Adjacent local overrides" scenarios and the two "Local overrides in the standard set" scenarios.
+- [x] 5.1 Add `user_overrides` for the three layouts with ambiguity checks, and verify the three "Adjacent user overrides" scenarios; in isolated mode user and local overrides report `Skipped`, and "Isolated mode skips user and machine files" passes in full.
+- [x] 5.2 Read `Explicit(path)` from the `config` value of `DiscoveryOptions` with layout detection by path, and verify the two "Explicit primary file" scenarios.
+- [x] 5.3 Add `local_overrides` (`<app>.local.<ext>` and `config.local.<ext>` next to each primary, role `LocalOverride`, priority 390, ambiguity checks), include it in `app_dirs` and not in `base`, and verify the three "Adjacent local overrides" scenarios and the two "Local overrides in the standard set" scenarios.
 
 ## 6. Workspaces and member selection
 

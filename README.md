@@ -6,6 +6,17 @@ Build an application once and land it on a host. A host can be the web, WebAssem
 
 [Moonbase](https://github.com/moonrockz/Moonbase) holds the web UI and the Proton desktop shell.
 
+## Choose the configuration parsers you ship
+
+Applications get TOML, YAML, JSON/JSON5 and Ion through the `formats` virtual
+package. One override in the executable's `moon.pkg` selects TOML only, with no
+application source change. A consumer can also provide its own format set.
+Unused parsers can then be omitted from the linked output.
+
+The [format selection guide](pkgs/lander/formats/README.mbt.md) shows the builder
+code, the TOML-only override, a custom combination, and the MoonBit
+virtual-package feature that enables this build-time selection.
+
 ## Development setup
 
 The build setup follows Moonbase and smithy. Install [mise](https://mise.jdx.dev/), then run:

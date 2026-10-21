@@ -110,15 +110,20 @@ it. A default that only `bind_or` gives is not in the configuration, so
 `config show` does not list it.
 
 The formats come from a MoonBit virtual package, `moonrockz/moon-lander/formats`.
-Its default implementation registers all the formats. An application can link only
+Its default implementation returns all the formats. An application can link only
 TOML with one override in its own `moon.pkg`. The code does not change.
 
 ```moonbit notest
+pkgtype(kind: "executable")
+
 options(
-  "is-main": true,
   overrides: ["moonrockz/moon-lander/formats/toml"],
 )
 ```
+
+The implemented [format selection guide](../../pkgs/lander/formats/README.mbt.md)
+shows how callers register the selected formats, how to supply a custom set,
+and how MoonBit's virtual interface and build-time override make trimming work.
 
 ## The layer stack
 

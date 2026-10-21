@@ -236,7 +236,8 @@ segment that is a list index in the tree becomes `Index`. Other segments become
 Text form: `key` uses the core `KeyPath` text. `Index(n)` gives `[n]`. `Field(name)`
 after an index gives `.name`, with the same quote rule as `KeyPath`. A path with no
 `key` and no `suffix` gives `(root)`. Examples: `ir.strict_mode`, `targets[1].level`,
-`servers."eu.west".port`.
+`servers."eu.west".port`. The core implements this text form; binding fills the
+`DecodePath` and does not render it.
 
 Blame: binding looks up the provenance record at `key`. A list has one record for
 the whole list, so an error inside a list gets the blame of the list.
@@ -249,7 +250,8 @@ the tree, a leaf that the default supplied gets `Default`.
 
 ### D5. Origin text in errors (Call (R4), Call (O3); format in this change)
 
-Rendering follows `metadata_provider.mbt`: `<path>: <detail> (<blame text>)`.
+Rendering follows `metadata_provider.mbt`: `<path>: <detail> (<blame text>)`. The
+core `ConfigError::message()` implements this format; binding fills the values.
 
 ```text
 ir.strict_mode: Bool::from_json: expected boolean (set in user-override /repo/morphir.user.toml)

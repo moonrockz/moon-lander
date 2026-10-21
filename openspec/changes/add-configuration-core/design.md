@@ -162,7 +162,7 @@ pub(all) enum FileRole {
   LocalOverride
   UserOverride
   Legacy
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 pub(all) enum SourceKind {
   Defaults
@@ -170,7 +170,7 @@ pub(all) enum SourceKind {
   File(FileRole)
   Environment
   Overrides
-} derive(Eq, Show)
+} derive(Eq, Debug)
 ```
 
 **Call (R4)**: `SourceKind` and `FileRole` are the shared kinds of all four
@@ -520,7 +520,7 @@ pub(all) struct Origin {
   source : String        // display name
   priority : Int
   location : String?     // file path or variable name
-} derive(Eq, Show)
+} derive(Eq, Debug)
 ```
 
 `Config` holds `Map[KeyPath, Array[Origin]]`. The map uses the same update rules as
@@ -631,8 +631,8 @@ error types. Each case uses labelled fields:
 | `InvalidEnvironmentName` | name, reason | conventions |
 | `UnknownProject` | selector, workspace | conventions |
 | `AmbiguousProject` | selector, matches | conventions |
-| `Decode` | `BindFailure` | binding |
-| `Validation` | `Array[BindFailure]` | binding |
+| `Decode` | `failure~ : BindFailure` | binding |
+| `Validation` | `failures~ : Array[BindFailure]` | binding |
 
 The `Ambiguous` message is `Ambiguous <display> configuration; found: <paths>`, so
 the Morphir preset keeps `Ambiguous Morphir configuration`.
@@ -677,7 +677,18 @@ types and renders `DecodePath` as text. If the binding change refines a field, i
 records the change in its own design, and the core task that declares the types
 follows it.
 
-`ConfigError::message()` gives text for people, with paths in the `/` form (D13).
+`ConfigError::message()` gives text for people. It shows paths as the error holds
+them and does not convert them; the host adapter gives them in the `/` form (D13).
+For `Decode` and `Validation` it gives the binding D5 text: one line
+`<path>: <detail> (<blame text>)` for each `Located`, and `Validation` joins its
+failures with a newline. The origin text is the role name and the path for a
+file, `environment <VAR>` for the environment source, and else the kind name.
+The blame text is `set in <origins>`, `table set in <origins>`, `not set by any
+source`, or `from the bind default`. An empty `Table` gives `empty table, no
+source sets keys in it`. **Call (this change)**: `Origin`, `SourceKind`,
+`FileRole`, and the `Ambiguous` case are declared with the errors (task 14.1),
+before the provenance and source model groups add their behavior. These types
+derive `Debug`, not `Show`, because `derive(Show)` is deprecated.
 Hosting owns `UsageError` for CLI misuse, for example an empty `--environment`
 value (R3). Every `ConfigError` is a usage error; `add-host-lifecycle` maps it to
 exit code 2 (**Call**).

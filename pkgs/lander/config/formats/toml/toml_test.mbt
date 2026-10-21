@@ -37,7 +37,7 @@ test "TOML keeps the field order" {
 }
 
 ///|
-test "invalid TOML raises a parse error with its origin" {
+test "Parse error with origin" {
   try @toml.parse("a = ", origin="/w/app.toml") catch {
     Parse(format~, origin~, line~, column~, ..) as error => {
       @expect.expect((format, origin, line, column)).to_equal(

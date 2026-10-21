@@ -38,19 +38,19 @@ Bead: lander-4us.2.4
 
 - [ ] 4.1 Add null-overlay handling and null-field removal from the result; verify the "Null does not unset" and "Null with no base value" scenarios.
 - [ ] 4.2 Make merge copy only changed paths and keep inputs unchanged; verify "Inputs do not change" and "New keys follow base keys", plus an associativity property test over generated trees.
-- [ ] 4.3 Add `Origin`, the provenance map, and stale-record removal ported from morphir-moonbit `merge`; verify the "Winning origins" and "Stale records go" scenarios.
+- [ ] 4.3 Add the provenance map and stale-record removal ported from morphir-moonbit `merge`, over the `Origin` type that group 14 declares; verify the "Winning origins" and "Stale records go" scenarios.
 - [ ] 4.4 Add `SourceReport` with kind, name, priority, path, candidates, status, and warnings, the Morphir kind names, and `local-override`; verify the "Report order and status" and "File role names" scenarios.
 
 ## 5. Source model: selection, file source, ambiguity, exclusion
 
 Bead: lander-4us.2.5
 
-- [ ] 5.1 Add `SourceSelection[T]`, `SourceKind`, `FileRole` (with `LocalOverride`), `ConfigBuilder`, `add`, and the defaults source; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
+- [ ] 5.1 Add `SourceSelection[T]`, `ConfigBuilder`, `add`, and the defaults source, over the `SourceKind` and `FileRole` (with `LocalOverride`) types that group 14 declares; verify the "Skip a source", "Same kind at two positions", and "Defaults from JSON" scenarios.
 - [ ] 5.2 Add display priorities with the defaults by kind and role (local override 390), the in-memory rule, and `ConfigError::SourceOrder`; verify the "Default priorities", "Override file priorities", and "Decreasing priority" scenarios.
 - [ ] 5.3 Add `FileTree` (with `with_listing`, `with_file`, and `with_missing`), `FileRequest`, `LoadStep[T]`, and the pure `@config.load(builder, tree)`; verify the "Incomplete tree asks for files", "Complete tree never asks", "Absence record answers a request", and "Missing directory answers its children" scenarios.
 - [ ] 5.4 Add `Platform`, `LoadContext` (with `env_vars` and `working_dir`), `@config.env_vars`, `@config.working_dir`, `Expansion`, `SourceProvider`, `@config.provider`, `@config.platform`, and `ConfigWarning::Note`, and expand providers in place during `@config.load`; verify the three source provider scenarios.
 - [ ] 5.5 Add `Format`, the builder format registry (`format`, `formats`, `parse_file`), and the explicit file source over a `FileTree` that joins a relative path to the working directory; verify the format registry scenarios, "Extension selects the format", "Missing explicit file", "Unregistered extension", and "Relative path joins the working directory".
-- [ ] 5.6 Add the candidate-list file source, the exact-name existence check over listings, and `ConfigError::Ambiguous(display~, location~, candidates~)` with its message; verify the candidate ambiguity scenarios and "Name match is exact".
+- [ ] 5.6 Add the candidate-list file source and the exact-name existence check over listings, and raise the `ConfigError::Ambiguous(display~, location~, candidates~)` case that group 14 declares when more than one candidate exists; verify the candidate ambiguity scenarios and "Name match is exact".
 - [ ] 5.7 Add `ConfigSource::exclude(paths, warn~)`, `ConfigWarning::KeyRemoved`, and `SourceReport.warnings`; verify the three source subtree exclusion scenarios.
 - [ ] 5.8 Document the source model in `pkgs/lander/README.md` with an example that runs as a doc test; verify with `mise run test`.
 
@@ -121,8 +121,8 @@ Bead: lander-4us.2.13
 
 Bead: lander-4us.2.14
 
-- [ ] 14.1 Declare the conventions and binding cases of `ConfigError` (`OutsideBoundary`, `InvalidEnvironmentName`, `UnknownProject`, `AmbiguousProject`, `Decode`, `Validation`) and the types `BindFailure`, `Located`, `Blame`, `DecodePath`, and `DecodeStep` with the shapes of the binding design; verify "Binding failure is a configuration error" and that `moon info` shows the types in `pkg.generated.mbti`.
-- [ ] 14.2 Review every `ConfigError` case for origin, position, `/` paths, and `message()` text; verify "Parse error with origin" and "Match an error by case", plus one message test for each case.
+- [x] 14.1 Declare all 20 `ConfigError` cases of design D12 with labelled fields, including the conventions and binding cases (`OutsideBoundary`, `InvalidEnvironmentName`, `UnknownProject`, `AmbiguousProject`, `Decode`, `Validation`) and `Ambiguous` (pulled forward from 5.6). Declare `Origin`, `SourceKind`, and `FileRole` as plain data (pulled forward from 4.3 and 5.1; groups 4 and 5 add the behavior), and the types `BindFailure`, `Located`, `Blame`, `DecodePath`, and `DecodeStep` with the shapes of the binding design, with the `DecodePath` text form (`targets[1].level`, quoted names, `(root)`); verify "Binding failure is a configuration error" and that `moon info` shows the types in `pkg.generated.mbti`.
+- [x] 14.2 Review every `ConfigError` case for origin and position, and give `message()` text for each of the 20 cases. `Decode` and `Validation` use the binding D5 text: one line `<path>: <detail> (<blame text>)` for each located path, with the core origin text (file role name and path, `environment <VAR>`, else the kind name) and the blame text for `Set`, `Table` (an empty table gives `empty table, no source sets keys in it`), `Unset`, and `Default`. `message()` does not convert paths; the host adapter gives the `/` form (15.2). Verify "Parse error with origin" and "Match an error by case", plus one message test for each case.
 
 ## 15. Native host adapter
 

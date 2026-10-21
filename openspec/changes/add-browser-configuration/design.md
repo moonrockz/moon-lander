@@ -371,6 +371,17 @@ The PR maintainer owns failures, which block merge. Cold Linux job timings and
 the current-head CI run are recorded in the bead when verified. No release or
 publishing behavior changes.
 
+The first Linux execution passed in CI run `39619728998`, browser job
+`119290058615`, on implementation commit `481c24e`. All 17 checks passed. The
+browser job used 21 seconds for pinned tool setup, 45.0 seconds for the locked
+harness, engines and OS dependencies, 6.9 seconds for the application build, and
+7.4 seconds for the successful browser suite. Both negative checks then passed
+with listener cleanup; the test step took 27 seconds including compilation and
+all runs. Total job time was 98 seconds, excluding queue delay. Linux reported
+the same three engine versions as the local proof. Playwright's pinned builds
+are Chromium/headless shell `1248`, Firefox `1555`, and WebKit `2370`. This is one
+cold Linux sample with no browser cache configured, not a timing guarantee.
+
 ## Risks / Trade-offs
 
 - Promise or generated-FFI integration can fail in a real browser. Group 1 proves

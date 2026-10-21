@@ -12,8 +12,7 @@ this page runs as a test with `mise run test`.
 
 > [!NOTE]
 > The configuration core is in progress. This page shows the API that exists
-> today. The YAML, JSON and Ion formats, merge policies, secrets, the js host
-> adapter, the rest of discovery, and validation come in later changes. The
+> today. Merge policies, secrets, and validation come in later changes. The
 > [design overview](../../../docs/design/overview.md) shows the full plan.
 
 ## One load, start to finish
@@ -299,7 +298,9 @@ lowercase. `parse_file` gives other packages the same selection.
 | Package | Format | Extensions | Status |
 | --- | --- | --- | --- |
 | `config/formats/toml` | TOML | `toml` | Available; dates come later |
-| YAML, JSON and JSON5, Ion | | `yaml`, `yml`, `json`, `json5`, `ion` | Later changes |
+| YAML | `config/formats/yaml` | `yaml`, `yml` | Default and strict profiles |
+| JSON and JSON5 | `config/formats/json5` | `json`, `json5` | Comments allowed; see package README for precision limits |
+| Ion | `config/formats/ion` | `ion` | Text only; one top-level struct |
 
 ```mbt check
 ///|

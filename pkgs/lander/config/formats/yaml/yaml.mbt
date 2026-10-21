@@ -424,10 +424,91 @@ fn from_plain(value : String) -> @ion.Ion {
 }
 
 ///|
-/// Parse an optional sign plus `0x` / `0o` and valid digits. Invalid digits after
-/// a radix prefix keep the text as a string. Returns `None` when the text is not
-/// a radix form at all.
+/// Parse unsigned `0x` / `0o` and valid digits (YAML 1.2 core schema). Invalid
+/// digits after a radix prefix keep the text as a string. Returns `None` when
+/// the text is not a radix form at all. A leading sign is not a radix form.
 fn parse_radix_integer(value : String) -> @ion.Ion? {
+  let chars = value.to_array()
+  if chars.length() < 3 || chars[0] != '0' {
+    return None
+  }
+  let radix = match chars[1] {
+    'x' | 'X' => 16
+    'o' | 'O' => 8
+    _ => return None
+  }
+  let mut i = 2
+  if i >= chars.length() {
+    return None
+  }
+  let digits = StringBuilder()
+  while i < chars.length() {
+    let c = chars[i]
+    let ok = if radix == 16 {
+      (c >= '0' && c <= '9') ||
+      (c >= 'a' && c <= 'f') ||
+      (c >= 'A' && c <= 'F')
+    } else {
+      c >= '0' && c <= '7'
+    }
+    if !ok {
+      return Some(@ion.Ion::string(value))
+    }
+    digits.write_char(c)
+    i += 1
+  }
+  Some(integer_ion_base(digits.to_string(), radix))
+}
+
+///|
+/// Decimal `Int64` only: optional sign and digits. Rejects radix forms that
+/// `@string.parse_int64` would accept, so signed `0x` / `0o` stay strings.
+fn try_int64(text : String) -> Int64? {
+  let chars = text.to_array()
+  if chars.is_empty() {
+    return None
+  }
+  let mut i = 0
+  if chars[0] is ('+' | '-') {
+    i = 1
+  }
+  if i >= chars.length() {
+    return None
+  }
+  while i < chars.length() {
+    let c = chars[i]
+    if c < '0' || c > '9' {
+      return None
+    }
+    i += 1
+  }
+  Some(@string.parse_int64(text)) catch {
+    _ => None
+  }
+}
+
+///|
+/// Integer text under an explicit `!!int` tag. Allows optional sign and
+/// radix forms; plain scalars use `from_plain` instead.
+fn integer_ion(text : String) -> @ion.Ion {
+  match parse_tagged_radix_integer(text) {
+    Some(ion) =>
+      match ion.kind() {
+        Int(_) => return ion
+        _ => ()
+      }
+    None => ()
+  }
+  match try_int64(text) {
+    Some(integer) => @ion.Ion::big_int(@bigint.BigInt::from_int64(integer))
+    None => @ion.Ion::big_int(@bigint.BigInt::from_string(text))
+  }
+}
+
+///|
+/// Optional sign plus `0x` / `0o` for explicitly tagged integers. Invalid
+/// digits after a radix prefix keep the text as a string.
+fn parse_tagged_radix_integer(value : String) -> @ion.Ion? {
   let chars = value.to_array()
   if chars.length() < 3 {
     return None
@@ -474,21 +555,6 @@ fn parse_radix_integer(value : String) -> @ion.Ion? {
     }
   } else {
     Some(ion)
-  }
-}
-
-///|
-fn try_int64(text : String) -> Int64? {
-  Some(@string.parse_int64(text)) catch {
-    _ => None
-  }
-}
-
-///|
-fn integer_ion(text : String) -> @ion.Ion {
-  match try_int64(text) {
-    Some(integer) => @ion.Ion::big_int(@bigint.BigInt::from_int64(integer))
-    None => @ion.Ion::big_int(@bigint.BigInt::from_string(text))
   }
 }
 

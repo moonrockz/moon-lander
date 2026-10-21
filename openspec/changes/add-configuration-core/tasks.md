@@ -81,15 +81,15 @@ Bead: lander-4us.2.8
 
 Bead: lander-4us.2.9
 
-- [ ] 9.1 Add `moonbitlang/x` and the `config/formats/json5` package for `.json` and `.json5`, with the number rule and positioned errors; verify "JSON with comments", "JSON number types", and "JSON syntax error has a position".
-- [ ] 9.2 Document the JSON precision and duplicate-key limits in the package README; verify the README examples run as doc tests.
+- [x] 9.1 Add `moonbitlang/x` and the `config/formats/json5` package for `.json` and `.json5`, with the number rule and positioned errors; verify "JSON with comments", "JSON number types", and "JSON syntax error has a position".
+- [x] 9.2 Document the JSON precision and duplicate-key limits in the package README; verify the README examples run as doc tests.
 
 ## 10. Ion format
 
 Bead: lander-4us.2.10
 
-- [ ] 10.1 Add the `config/formats/ion` package for Ion text with one top-level struct and a repeated-field check; verify "Ion keeps exact values", "Ion repeated field", and "Ion with two top-level values".
-- [ ] 10.2 Add a cross-format test that parses one configuration in TOML, YAML, JSON, and Ion; verify the "All formats give the same tree" scenario.
+- [x] 10.1 Add the `config/formats/ion` package for Ion text with one top-level struct and a repeated-field check; verify "Ion keeps exact values", "Ion repeated field", and "Ion with two top-level values".
+- [x] 10.2 Add a cross-format test that parses one configuration in TOML, YAML, JSON, and Ion; verify the "All formats give the same tree" scenario.
 
 ## 11. Merge policies
 

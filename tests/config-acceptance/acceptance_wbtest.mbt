@@ -9,7 +9,7 @@ struct ConfigWorld {
 
 ///|
 fn ConfigWorld::ConfigWorld() -> ConfigWorld {
-  { snapshot: "", pairs: [], config: None, text: "", json: None }
+  { snapshot: "", pairs: [], config: None, text: "", json: None, }
 }
 
 ///|
@@ -23,7 +23,7 @@ impl @moonspec.World for ConfigWorld with fn configure(self, setup) {
   ) => self.pairs.push((key, @config.string(value))))
   setup.given2("the in-memory pair {string} with the integer {int}", (
     key : String,
-    value : Int,
+    value : Int32,
   ) => self.pairs.push((key, @config.int(value.to_int64()))))
   setup.when0("the in-memory source is merged over the TOML snapshot", () => {
     self.config = Some(
@@ -59,34 +59,48 @@ impl @moonspec.World for ConfigWorld with fn configure(self, setup) {
     )
   })
   setup.when1("the caller gets {string}", (key : String) => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.text = @config.get_text(config, key)
   })
   setup.when1("the caller gets {string} as JSON", (key : String) => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.json = Some(@config.get_json(config, key))
   })
   setup.when0("the caller shows the configuration as JSON", () => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.text = @config.show(config, Json)
   })
   setup.when0("the caller shows the configuration as TOML", () => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.text = @config.show(config, Toml)
   })
   setup.when0("the caller renders the path text", () => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.text = @config.path_text(config.reports())
   })
   setup.when0("the caller renders the path JSON", () => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     self.json = Some(@config.path_json(config.reports()))
   })
   setup.then2("the text at {string} is {string}", (
     key : String,
     expected : String,
   ) => {
-    guard self.config is Some(config) else { fail("build the configuration first") }
+    guard self.config is Some(config) else {
+      fail("build the configuration first")
+    }
     @expect.expect(@config.get_text(config, key)).to_equal(expected)
   })
   setup.then1("the text output is {string}", (expected : String) => {
@@ -105,15 +119,18 @@ impl @moonspec.World for ConfigWorld with fn configure(self, setup) {
       Some(Json::string("ir.format_version")),
     )
   })
-  setup.then0("the path text lists the project source before the defaults source", () => {
-    @expect.expect(
-      self.text.has_prefix(
-        "Configuration sources (in priority order):\n\n[✓] project (project)",
-      ),
-    ).to_equal(true)
-    @expect.expect(self.text.contains("Path: /w/app.toml")).to_equal(true)
-    @expect.expect(self.text.contains("Status: loaded")).to_equal(true)
-  })
+  setup.then0(
+    "the path text lists the project source before the defaults source",
+    () => {
+      @expect.expect(
+        self.text.has_prefix(
+          "Configuration sources (in priority order):\n\n[✓] project (project)",
+        ),
+      ).to_equal(true)
+      @expect.expect(self.text.contains("Path: /w/app.toml")).to_equal(true)
+      @expect.expect(self.text.contains("Status: loaded")).to_equal(true)
+    },
+  )
   setup.then0("the path JSON lists sources in ascending priority", () => {
     guard self.json is Some(Array(items)) else { fail("missing JSON array") }
     @expect.expect(items.length()).to_equal(2)

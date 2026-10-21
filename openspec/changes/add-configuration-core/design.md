@@ -932,13 +932,20 @@ parsers:
 - A separate consumer module in a `moon.work` workspace overrode the virtual package
   of the library module on all four targets.
 
-Not verified:
+Implementation verification (2026-10-21):
 
-- An override from a consumer that gets `moonrockz/moon-lander` from mooncakes.io and
-  not from a workspace. A pre-publish task checks it (see Risks).
-- A hand-written `pkg.mbti` that names a type of another package
-  (`@config.Format`). The probe used `Array[String]`. The first task of the story
-  checks it.
+- The hand-written `pkg.mbti` returns `Array[@config.Format]` and builds on all
+  four targets.
+- `mise run check:formats` checks the default, TOML-only and application-defined
+  TOML/YAML implementations. It verifies smaller release outputs, checks real
+  parser diagnostics in UTF-8 and UTF-16LE, and rejects a reachable YAML import.
+- `mise run check:formats-registry` packages the candidate with `moon package`,
+  then serves that checksummed archive from a loopback registry. A separate
+  consumer outside `moon.work` resolves and downloads the module through Moon's
+  registry protocol, with isolated module caches. It passes the same trimming
+  and runtime checks on all four targets. This verifies registry consumption
+  before the first mooncakes.io publish without uploading a package. Publication
+  still requires the owner's approval.
 
 ### Decisions made in this change (not in the brief)
 

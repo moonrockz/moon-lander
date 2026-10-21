@@ -97,6 +97,11 @@ bd close <id>                # after its tasks are done and verified
    `openspec/changes/archive/` and merges its requirement changes into
    `openspec/specs/`.
 
+Before publishing `moonrockz/moon-lander`, run `mise run check:formats-registry`
+on the exact candidate. It checks registry resolution and virtual-package
+trimming outside `moon.work` through a loopback registry, without publishing.
+Ask the owner before publishing to mooncakes.io or cutting a GitHub release.
+
 ## Commits and pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/), for example

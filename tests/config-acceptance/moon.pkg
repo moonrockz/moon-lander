@@ -1,5 +1,6 @@
 import {
   "moonrockz/moon-lander/config",
+  "moonrockz/moon-lander-tests/config-fixture" @fixture,
   "moonrockz/moon-lander/config/formats/toml",
   "moonrockz/moonspec",
   "moonrockz/moonspec/core" @moonspec_core,

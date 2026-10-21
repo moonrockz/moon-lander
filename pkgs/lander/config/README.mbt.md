@@ -297,10 +297,10 @@ lowercase. `parse_file` gives other packages the same selection.
 
 | Package | Format | Extensions | Status |
 | --- | --- | --- | --- |
-| `config/formats/toml` | TOML | `toml` | Available; dates come later |
-| YAML | `config/formats/yaml` | `yaml`, `yml` | Default and strict profiles |
-| JSON and JSON5 | `config/formats/json5` | `json`, `json5` | Comments allowed; see package README for precision limits |
-| Ion | `config/formats/ion` | `ion` | Text only; one top-level struct |
+| `config/formats/toml` | TOML | `toml` | Exact integers, dates and times |
+| `config/formats/yaml` | YAML | `yaml`, `yml` | Default and strict profiles |
+| `config/formats/json5` | JSON and JSON5 | `json`, `json5` | Comments allowed; see package README for precision limits |
+| `config/formats/ion` | Ion | `ion` | Text only; one top-level struct |
 
 ```mbt check
 ///|
@@ -320,6 +320,10 @@ test "the extension selects the format" {
   }
 }
 ```
+
+The [`formats`](../formats/README.md) virtual package supplies all four format
+packages by default. A main-package override selects TOML only or an
+application-defined set without changing the application source.
 
 ## Merge rules
 

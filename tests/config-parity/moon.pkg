@@ -1,0 +1,6 @@
+import {
+  "moonrockz/moon-lander-tests/config-fixture" @fixture,
+  "moonbitlang/core/debug",
+}
+
+pkgtype(kind: "executable")

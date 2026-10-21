@@ -166,6 +166,18 @@ run = "moonx scripts/build-node-adapter.mbtx"
 description = "Check that the generated js host adapter is current"
 run = "moonx scripts/build-node-adapter.mbtx --check"
 
+[tasks."check:config"]
+description = "Compare configuration values, provenance and reports on all four targets"
+run = "moonx scripts/check-config.mbtx"
+
+[tasks."check:formats"]
+description = "Verify linked formats, parser trimming and leak rejection on all four targets"
+run = "moonx scripts/check-formats.mbtx --verify-failures"
+
+[tasks."check:formats-registry"]
+description = "Verify the packaged candidate through an isolated loopback registry consumer"
+run = "moonx scripts/check-formats-registry.mbtx"
+
 [tasks.check]
 description = "Run lint, validate, tests, task script tests and builds"
 run = "moonx scripts/check.mbtx"

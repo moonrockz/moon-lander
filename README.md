@@ -55,6 +55,9 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run lint` | Check YAML, MoonBit formatting, and compiler warnings |
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
+| `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
+| `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
+| `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
@@ -78,7 +81,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its `version()` export provides a build and test smoke check. Its
-  `config` packages hold the configuration core, which is in progress.
+  `config` packages hold the configuration core and `formats` selects the linked
+  parsers through a virtual package.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors

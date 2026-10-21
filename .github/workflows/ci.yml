@@ -105,6 +105,12 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compare configuration values, provenance and reports
+        run: mise run check:config
+      - name: Verify format trimming and failure propagation
+        run: mise run check:formats
+      - name: Verify the packaged candidate through a registry consumer
+        run: mise run check:formats-registry
       - name: Test task scripts
         run: mise run test:scripts
 
@@ -154,9 +160,15 @@ jobs:
       - name: Test the js host adapter on Bun
         if: matrix.target == 'js'
         run: mise run test:node-adapter -- bun
+      - name: Compare configuration values, provenance and reports
+        if: matrix.target == 'native'
+        run: mise run check:config
+      - name: Verify format trimming and failure propagation
+        if: matrix.target == 'native'
+        run: mise run check:formats
 
-  # The js FFI bundle must work on Node and Bun on macOS as well as Linux/Windows.
-  # Keep this focused on the adapter; the existing jobs own workspace coverage.
+  # The core observation must also agree on every target on macOS.
+  # Reuse the existing macOS setup and retain its Node/Bun adapter coverage.
   node-adapter-macos:
     name: Node adapter (macOS)
     runs-on: macos-latest
@@ -171,6 +183,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test the js host adapter on Node and Bun
         run: mise run test:node-adapter
+      - name: Compare configuration values, provenance and reports
+        run: mise run check:config
+      - name: Verify format trimming and failure propagation
+        run: mise run check:formats
 
   # The docs site. It runs on each pull request with no path filter, because a path-filtered
   # required check stays pending on other pull requests. It builds the site and does not deploy it.

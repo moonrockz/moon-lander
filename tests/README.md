@@ -6,7 +6,10 @@ configuration core.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
-| `config-acceptance` | An in-memory source merged over a TOML snapshot, read with `get_text` | All four |
+| `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
+| `config-fixture`, `config-parity` | Shared explicit builder and file tree; complete value, provenance and report observations compared by `mise run check:config` | All four |
+| `formats-default`, `formats-toml`, `formats-custom` | Default and overridden format sets, parser execution and linked output trimming | All four |
+| `formats-leaky` | Deliberately reachable YAML parser that `mise run check:formats` must reject | All four |
 | `nbformat-acceptance` | Jupyter cells, outputs, attachments, extensions, cursor paths and validation errors | JavaScript, native |
 | `nbformat-laws` | JSON and text round trips, traversal agreement and cursor navigation | All four |
 | `notebooks-acceptance` | Shared Jupyter and DIB navigation, JSON/YAML/TOML/Ion metadata, kernel aliases, directives, specialized payloads and runtime capability inspection in mixed cell collections | JavaScript, native |

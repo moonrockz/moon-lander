@@ -1,0 +1,188 @@
+///|
+/// Build real default/overridden applications and inspect their linked outputs.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+}
+
+///|
+// These are real parser diagnostics, not strings added to make this check pass.
+let markers : Array[String] = [
+  "unexpected mapping end", "Invalid escape sequence in identifier at line ", "unterminated S-expression",
+]
+
+///|
+fn contains_bytes(data : Bytes, needle : Bytes) -> Bool {
+  for i = 0; i + needle.length() <= data.length(); i = i + 1 {
+    let mut same = true
+    for j = 0; j < needle.length(); j = j + 1 {
+      if data[i + j] != needle[j] {
+        same = false
+        break
+      }
+    }
+    if same {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn has_marker(data : Bytes, marker : String) -> Bool {
+  let ascii = @utf8.encode(marker)
+  let wide : Array[Byte] = []
+  for byte in ascii {
+    wide.push(byte)
+    wide.push(0)
+  }
+  contains_bytes(data, ascii) || contains_bytes(data, Bytes::from_array(wide))
+}
+
+///|
+fn check_trimmed(default : Bytes, trimmed : Bytes) -> Unit raise {
+  for marker in markers {
+    guard has_marker(default, marker) else {
+      fail("Default output lacks parser marker: \{marker}")
+    }
+    guard !has_marker(trimmed, marker) else {
+      fail("Trimmed output links parser marker: \{marker}")
+    }
+  }
+  guard trimmed.length() < default.length() else {
+    fail(
+      "Trimmed output is not smaller: \{trimmed.length()} >= \{default.length()}",
+    )
+  }
+}
+
+///|
+async fn build(target : String, name : String) -> Bytes {
+  let (code, out, err) = @process.collect_output("moon", [
+    "run",
+    "--build-only",
+    "--release",
+    "--deny-warn",
+    "--target",
+    target,
+    "tests/formats-\{name}",
+  ])
+  guard code == 0 else { fail(out.text() + err.text()) }
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Expected one application artifact: " + out.text())
+  }
+  @fs.read_file(path).binary()
+}
+
+///|
+async fn verify_output(
+  target : String,
+  name : String,
+  names : Array[String],
+) -> Unit {
+  let (code, out, err) = @process.collect_output("moon", [
+    "run",
+    "--release",
+    "--deny-warn",
+    "--target",
+    target,
+    "tests/formats-\{name}",
+  ])
+  guard code == 0 else { fail(out.text() + err.text()) }
+  let output = out.text().replace_all(old="\r\n", new="\n")
+  let lines = output
+    .split("\n")
+    .take(names.length())
+    .map(line => line.to_owned())
+    .collect()
+  guard lines == names else {
+    fail("Wrong linked formats on \{target}/\{name}: \{output}")
+  }
+  guard output.split("kind: Int(42)").count() == names.length() + 1 else {
+    fail("Every selected format must parse the fixture: \{output}")
+  }
+}
+
+///|
+async fn main {
+  // The override must be the only difference between these applications.
+  guard @fs.read_file("tests/formats-default/main.mbt").text() ==
+    @fs.read_file("tests/formats-toml/main.mbt").text() else {
+    fail("Default and TOML application sources differ")
+  }
+  for target in ["wasm", "wasm-gc", "js", "native"] {
+    let default = build(target, "default")
+    let trimmed = build(target, "toml")
+    check_trimmed(default, trimmed)
+    verify_output(target, "default", [
+      "TOML:toml", "YAML:yaml,yml", "JSON5:json,json5", "Ion:ion",
+    ])
+    verify_output(target, "toml", ["TOML:toml"])
+    verify_output(target, "custom", ["TOML:toml", "YAML:yaml,yml"])
+    println(
+      "\{target}: default \{default.length()} bytes; TOML \{trimmed.length()} bytes",
+    )
+    if @env.args().contains("--verify-failures") {
+      let leaky = build(target, "leaky")
+      let rejected = try {
+        check_trimmed(default, leaky)
+        false
+      } catch {
+        error => {
+          guard error.to_string().contains("Trimmed output links parser marker") else {
+            raise error
+          }
+          true
+        }
+      }
+      guard rejected else {
+        fail("Trimming check accepted the YAML import on \{target}")
+      }
+      println("\{target}: trimming check rejected a reachable YAML parser")
+    }
+  }
+}
+
+///|
+test "marker scan reads UTF-8 and UTF-16LE and rejects leaked parsers" {
+  assert_true(
+    has_marker(b"prefix InvalidIdentEscape suffix", "InvalidIdentEscape"),
+  )
+  assert_true(has_marker(b"I\x00o\x00n\x00", "Ion"))
+  assert_false(has_marker(b"TOML", "Ion"))
+  let default = @utf8.encode(markers.join(" "))
+  check_trimmed(default, b"TOML")
+  let rejected = try {
+    check_trimmed(default, default)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(rejected)
+  let rejected = try {
+    check_trimmed(b"TOML", b"TOML")
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(rejected)
+}
+
+///|
+test "size comparison rejects an output with no parser markers that is not smaller" {
+  let default = @utf8.encode(markers.join(" "))
+  let rejected = try {
+    check_trimmed(default, @utf8.encode("x".repeat(default.length())))
+    false
+  } catch {
+    error => {
+      assert_true(error.to_string().contains("Trimmed output is not smaller"))
+      true
+    }
+  }
+  assert_true(rejected)
+}

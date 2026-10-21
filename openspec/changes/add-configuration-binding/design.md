@@ -255,7 +255,8 @@ the tree, a leaf that the default supplied gets `Default`.
 
 **Call (this change)**: merge order for `Table` origins is the order of the source
 reports; an origin matches the report with the same kind, name, priority, and
-path. A path with no key (the root of `bind_root`) gets `Table` with the origins of
+path, or with no path, so the per-variable origins of an environment source match
+its report. A path with no key (the root of `bind_root`) gets `Table` with the origins of
 every leaf. A value with no JSON form fails as `Decode` at the section, with the
 conversion message as its detail.
 

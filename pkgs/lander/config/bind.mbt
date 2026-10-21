@@ -204,13 +204,15 @@ fn Config::table_origins(self : Config, names : Array[String]) -> Array[Origin] 
       }
     }
   }
+  // A report with no path can stand for origins with locations, for example
+  // the variables of an environment source.
   let rank = (origin : Origin) => {
     self.reports
     .search_by(report => {
       report.kind == origin.kind &&
       report.name == origin.source &&
       report.priority == origin.priority &&
-      report.path == origin.location
+      (report.path is None || report.path == origin.location)
     })
     .unwrap_or(self.reports.length())
   }

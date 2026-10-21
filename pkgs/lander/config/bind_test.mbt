@@ -416,3 +416,18 @@ test "a configured value over a default keeps the source blame" {
   @expect.expect(failure.at[0].path.to_string()).to_equal("ir.strict_mode")
   @expect.expect(message).to_end_with("(set in project /repo/morphir.toml)")
 }
+
+///|
+test "table blame keeps an environment source before a later source" {
+  let config = @config.builder()
+    |> @config.env(prefix="APP", selection=Explicit({ "APP_IR__MODE": "x" }))
+    |> @config.overrides([("ir.strict_mode", @config.bool(true))])
+    |> @config.load(@config.FileTree::new(complete=true))
+    |> done
+  let (_, message) = decode_failure(() => {
+    let _ : IrOptions = config |> @config.bind("ir")
+  })
+  @expect.expect(message).to_equal(
+    "ir: Missing field layout (table set in environment APP_IR__MODE, overrides)",
+  )
+}

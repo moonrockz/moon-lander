@@ -15,7 +15,8 @@ async fn main {
   for
     task in [
       "check:node-adapter", "check:browser-adapter", "check:browser-fixture", "lint",
-      "validate", "test", "test:scripts", "build", "test:browser",
+      "validate", "test", "check:config", "check:formats", "check:formats-registry",
+      "test:scripts", "build", "test:browser",
     ] {
     println("")
     println("=== \{task} ===")

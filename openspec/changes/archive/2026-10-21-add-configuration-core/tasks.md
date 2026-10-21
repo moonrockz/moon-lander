@@ -145,13 +145,36 @@ Bead: lander-4us.2.16
 
 Bead: lander-4us.2.17
 
-- [ ] 17.1 Run the full acceptance suite with the same inputs on wasm, wasm-gc, js, and native and compare values, provenance, and reports; verify the "Same result on all targets" scenario on Linux, macOS, and Windows CI and that `mise run check` passes.
+- [x] 17.1 Run the full acceptance suite with the same inputs on wasm, wasm-gc, js, and native and compare values, provenance, and reports; verify the "Same result on all targets" scenario on Linux, macOS, and Windows CI and that `mise run check` passes.
 
 ## 18. Format trimming with a virtual package
 
 Bead: lander-4us.2.18
 
-- [ ] 18.1 Create the virtual package `moonrockz/moon-lander/formats` with `options("virtual": { "has-default": true })`, the hand-written `pkg.mbti` of design D15 with `fn formats() -> Array[@config.Format]`, and a default implementation that gives the `toml`, `yaml`, `json5` and `ion` formats; verify the "Default linked formats" scenario on all four targets and that the hand-written interface with the `@config.Format` type builds
-- [ ] 18.2 Add the implementation package `moonrockz/moon-lander/formats/toml` with `options("implement": "moonrockz/moon-lander/formats")` and TOML only; verify the "Trim to TOML with one line" and "Own format mix" scenarios with test applications in `tests/` whose main `moon.pkg` has an `overrides` entry
-- [ ] 18.3 Add a moonx script in `scripts/*.mbtx` and a mise task in `mise run check` that builds a default application and a trimmed application on wasm, wasm-gc, js and native, and fails when a trimmed output is not smaller or holds a marker string of the YAML, JSON5 or Ion parser; verify the "Unused parsers are not linked" scenario in CI, and verify that the check fails when the trimmed application imports the YAML package
-- [ ] 18.4 Pre-publish check: before the first publish to mooncakes.io, build a consumer module that gets `moonrockz/moon-lander` from a registry and not from a `moon.work` workspace, override `formats` with `formats/toml`, and verify the trimmed result on all four targets. Ask the owner before any publish. If the override fails, record it in the bead and tell the owner
+- [x] 18.1 Create the virtual package `moonrockz/moon-lander/formats` with `options("virtual": { "has-default": true })`, the hand-written `pkg.mbti` of design D15 with `fn formats() -> Array[@config.Format]`, and a default implementation that gives the `toml`, `yaml`, `json5` and `ion` formats; verify the "Default linked formats" scenario on all four targets and that the hand-written interface with the `@config.Format` type builds
+- [x] 18.2 Add the implementation package `moonrockz/moon-lander/formats/toml` with `options("implement": "moonrockz/moon-lander/formats")` and TOML only; verify the "Trim to TOML with one line" and "Own format mix" scenarios with test applications in `tests/` whose main `moon.pkg` has an `overrides` entry
+- [x] 18.3 Add a moonx script in `scripts/*.mbtx` and a mise task in `mise run check` that builds a default application and a trimmed application on wasm, wasm-gc, js and native, and fails when a trimmed output is not smaller or holds a marker string of the YAML, JSON5 or Ion parser; verify the "Unused parsers are not linked" scenario in CI, and verify that the check fails when the trimmed application imports the YAML package
+- [x] 18.4 Pre-publish check: before the first publish to mooncakes.io, build a consumer module that gets `moonrockz/moon-lander` from a registry and not from a `moon.work` workspace, override `formats` with `formats/toml`, and verify the trimmed result on all four targets. Ask the owner before any publish. If the override fails, record it in the bead and tell the owner
+
+## Verification evidence
+
+- `mise run check:config` runs the core and format tests and the acceptance
+  suite on all four targets. It compares complete values, provenance and reports
+  with `tests/config-fixture/expected.txt`, the same expected result on each OS.
+- `mise run check:formats` runs the unchanged application with default, TOML-only
+  and consumer-defined TOML/YAML implementations. It checks release sizes and
+  real parser markers in UTF-8 and UTF-16LE, and rejects a reachable YAML import.
+- `mise run check:formats-registry` packages the candidate and downloads it through
+  a loopback registry into an isolated consumer outside `moon.work`. Registry
+  checksum validation and all four target checks pass before public publication.
+- Linux CI runs all three checks in the existing task-script job. The macOS job
+  and the Windows native job run core observation and workspace trimming checks
+  for all four targets. The existing aggregate requires these jobs to pass.
+- Public-registry qualification is tracked separately in release gate
+  `lander-4us.9`, as approved by the owner. `mise run check:formats-published`
+  must pass for the authorized candidate before its GitHub release or promotion.
+  This gate does not defer the completed pre-publish loopback registry check.
+- PR #29 run `39665536068` passed the Linux, macOS and Windows core checks,
+  including complete observations and parser trimming on all four targets.
+  The separate docs-site failure was corrected and `mise run build:site` and
+  `mise run check:site` pass locally; the final head must pass all CI gates.

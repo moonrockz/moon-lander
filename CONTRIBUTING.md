@@ -97,6 +97,22 @@ bd close <id>                # after its tasks are done and verified
    `openspec/changes/archive/` and merges its requirement changes into
    `openspec/specs/`.
 
+Before publishing `moonrockz/moon-lander`, run `mise run check:formats-registry`
+on the exact candidate. It checks registry resolution and virtual-package
+trimming outside `moon.work` through a loopback registry, without publishing.
+Ask the owner before publishing to mooncakes.io or cutting a GitHub release.
+After an authorized Moon-Lander candidate upload, run
+`mise run check:formats-published`. Release gate `lander-4us.9` MUST remain open
+until that public-registry consumer passes on all four targets for the exact
+candidate and its source SHA and published archive checksum are recorded in the
+bead. Do not cut the Moon-Lander GitHub release or promote the candidate while
+the gate is open, failed, or missing evidence. The pre-publish loopback check
+continues to run in ordinary CI. Future release automation must reuse
+[Smithy's release flow](https://github.com/moonrockz/smithy/blob/main/.github/workflows/release.yml)
+and its `MOONCAKES_USER_TOKEN` organization secret, with public-consumer
+verification after publish and before the GitHub release. Repository access to
+that organization secret must be verified during release setup.
+
 ## Commits and pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/), for example

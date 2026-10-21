@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander/formats",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  overrides: [ "moonrockz/moon-lander-tests/formats-mix" ],
+)

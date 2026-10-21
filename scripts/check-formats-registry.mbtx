@@ -1,0 +1,218 @@
+///|
+/// Package the candidate and verify a consumer through a loopback registry.
+/// No workspace overrides, public uploads, credentials, or shared-cache writes.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+async fn command(args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("moon", args)
+  guard code == 0 else { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for entry in @fs.readdir(source) {
+    let from = "\{source}/\{entry}"
+    let to = "\{destination}/\{entry}"
+    if @fs.kind(from) is Directory {
+      copy_tree(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let script = "\{root}/scripts/check-formats.mbtx"
+  let manifest = @fs.read_file("pkgs/lander/moon.mod").text()
+  let versions = manifest
+    .split("\n")
+    .filter(line => line.has_prefix("version = "))
+    .collect()
+  guard versions[:] is [version_line] else { fail("Module version is absent") }
+  let version = version_line
+    .replace_all(old="version = ", new="")
+    .replace_all(old="\"", new="")
+    .trim()
+    .to_owned()
+  ignore(command(["-C", "pkgs/lander", "package"]))
+  let archive = @fs.read_file(
+    "_build/publish/moonrockz-moon-lander-\{version}.zip",
+  ).binary()
+  let checksum = @crypto.bytes_to_hex_string(@crypto.sha256(archive))
+  let dir = @fs.tmpdir(prefix="lander-registry")
+  defer @fs.rmdir(dir, recursive=true)
+  let home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => {
+    let user = @env.get_env_var("HOME").unwrap_or_else(() => {
+      @env.get_env_var("USERPROFILE").unwrap()
+    })
+    user + "/.moon"
+  })
+  let isolated = "\{dir}/moon"
+  copy_tree("\{home}/registry/index/user", "\{isolated}/registry/index/user")
+  @fs.mkdir("\{dir}/consumer/tests", recursive=true)
+  for name in ["default", "toml", "custom", "mix", "leaky"] {
+    copy_tree("tests/formats-\{name}", "\{dir}/consumer/tests/formats-\{name}")
+  }
+  @fs.write_file(
+    "\{dir}/consumer/moon.mod",
+    "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"moonrockz/moon-lander@\{version}\" }\n",
+  )
+  let (code, toolchain, err) = @process.collect_output("mise", [
+    "where", "http:moonbit",
+  ])
+  guard code == 0 else { fail(err.text()) }
+  let consumer_env = {
+    "MOON_HOME": isolated,
+    "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
+    "MOON_DEP_CACHE": "\{dir}/dependencies",
+    "MOON_BUILD_CACHE": "\{dir}/build-cache",
+  }
+  if @env.args().contains("--published") {
+    // This mode is a release gate. It uses the public registry, with neither
+    // the candidate's synthetic index entry nor the loopback archive server.
+    @fs.rmdir("\{isolated}/registry/index", recursive=true)
+    @fs.write_file(
+      "\{isolated}/config.json",
+      (
+        {
+          "registry": "https://mooncakes.io",
+          "index": "https://mooncakes.io/git/index",
+        } : Json).stringify(),
+    )
+    @async.with_timeout(240_000, () => {
+      let (code, out, err) = @process.collect_output(
+        "moon",
+        ["update"],
+        cwd="\{dir}/consumer",
+        extra_env=consumer_env,
+      )
+      guard code == 0 else { fail(out.text() + err.text()) }
+      let (code, out, err) = @process.collect_output(
+        "moonx",
+        [script, "--verify-failures"],
+        cwd="\{dir}/consumer",
+        extra_env=consumer_env,
+      )
+      guard code == 0 else { fail(out.text() + err.text()) }
+      println(out.text())
+    })
+    let installed = "\{dir}/consumer/.mooncakes/moonrockz/moon-lander"
+    guard @fs.read_file("\{installed}/formats/pkg.mbti").text() ==
+      @fs.read_file("pkgs/lander/formats/pkg.mbti").text() else {
+      fail("Published virtual interface differs from the candidate")
+    }
+    let published = @fs.read_file(
+      "\{isolated}/registry/cache/moonrockz/moon-lander/\{version}.zip",
+    ).binary()
+    println(
+      "Public registry consumer verified \{version} on all four targets; archive SHA-256 \{@crypto.bytes_to_hex_string(@crypto.sha256(published))}",
+    )
+    return
+  }
+  // The candidate archive is the only new registry entry. Its dependencies
+  // retain the real pinned entries and checksums from moon update.
+  let dependencies : Map[String, Json] = Map([])
+  for line in manifest.split("\n") {
+    let line = line.trim()
+    if line.has_prefix("\"") && line.contains("@") {
+      let dependency = line
+        .replace_all(old="\"", new="")
+        .replace_all(old=",", new="")
+      let parts = dependency.split("@").map(part => part.to_owned()).collect()
+      guard parts.length() == 2 else { fail("Invalid pinned dependency") }
+      dependencies[parts[0]] = Json::string(parts[1])
+    }
+  }
+  @fs.write_file(
+    "\{isolated}/registry/index/user/moonrockz/moon-lander.index",
+    (
+      {
+        "name": "moonrockz/moon-lander",
+        "version": Json::string(version),
+        "deps": Json::object(dependencies),
+        "checksum": Json::string(checksum),
+      } : Json).stringify() +
+    "\n",
+  )
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let url = "http://\{server.addr}"
+  @fs.write_file(
+    "\{isolated}/config.json",
+    (
+      {
+        "registry": Json::string(url),
+        "index": Json::string("\{dir}/unused-index"),
+      } : Json).stringify(),
+  )
+  let requests : Array[String] = []
+  @async.with_timeout(240_000, () => {
+    @async.with_task_group() <| group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, conn) => {
+          let path = request.path.replace_all(old="%2F", new="/")
+          requests.push(path)
+          let bytes = if path == "/user/moonrockz/moon-lander/\{version}.zip" {
+            archive
+          } else {
+            guard path.has_prefix("/user/") &&
+              path.has_suffix(".zip") &&
+              !path.contains("..") else {
+              conn.send_response(404, "Not Found")
+              return
+            }
+            let cached = "\{home}/registry/cache/" + path[6:].to_owned()
+            guard @fs.exists(cached) else {
+              conn.send_response(404, "Not Found")
+              return
+            }
+            @fs.read_file(cached).binary()
+          }
+          conn.send_response(
+            200,
+            "OK",
+            extra_headers=Map::from_array([
+              (
+                @http.CaseInsensitiveString("Content-Length"),
+                bytes.length().to_string(),
+              ),
+            ]),
+          )
+          conn.write(bytes)
+        })
+      })
+      let (code, out, err) = @process.collect_output(
+        "moonx",
+        [script, "--verify-failures"],
+        cwd="\{dir}/consumer",
+        extra_env=consumer_env,
+      )
+      guard code == 0 else { fail(out.text() + err.text()) }
+      println(out.text())
+    }
+  })
+  guard requests.contains("/user/moonrockz/moon-lander/\{version}.zip") else {
+    fail("Consumer did not download the candidate from the loopback registry")
+  }
+  guard @fs.exists(
+    "\{dir}/consumer/.mooncakes/moonrockz/moon-lander/formats/pkg.mbti",
+  ) else {
+    fail("Registry consumer did not install the virtual interface")
+  }
+  println(
+    "Registry consumer verified all four targets from candidate archive \{checksum}",
+  )
+}

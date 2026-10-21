@@ -6,8 +6,9 @@ layered configuration from files, environment variables, and the command line,
 typed binding, and a host that runs commands and services with clear exit codes.
 
 The provisional module name is `moonrockz/moon-lander`, imported as `@lander`.
-The module has not been published. Every package runs on `wasm`, `wasm-gc`, `js`,
-and `native`.
+The module has not been published. The pure core and formats run on `wasm`,
+`wasm-gc`, `js`, and `native`. File host adapters support `native` and `js`; the
+browser adapter supports `js`.
 
 ## The layer stack
 
@@ -20,7 +21,7 @@ Hosting | @lander: arguments, lifecycle, exit codes (planned)
 Binding | @config.bind: typed values with source-aware errors
 Conventions | @conventions: where configuration files are found
 Configuration core | @config: sources, file tree, pure load, merge
-Formats | TOML today; YAML, JSON5 and Ion later
+Formats | TOML, YAML, JSON5 and Ion; linked set selected by a virtual package
 ```
 
 Host adapters sit beside the core. On `native` and `js` they read the files that
@@ -30,9 +31,8 @@ a load asks for. A `wasm` host gives the files itself.
 
 | Layer | Package | Status |
 | --- | --- | --- |
-| Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources (defaults, files, environment, overrides) and the builder, file tree and the pure load, merge with null rules, provenance, typed errors |
-| Formats | `config/formats/toml` | TOML strings, numbers, Booleans, arrays, and tables |
-| Configuration core, rest | `config` | Merge policies, secrets, redaction, more formats, and helpers come next |
+| Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources (defaults, files, environment, overrides) and the builder, file tree and the pure load, merge with null rules, provenance, merge policies, lazy secrets, redaction, display helpers and typed errors |
+| Formats | [`formats`](formats/README.md), `config/formats/*` | TOML, YAML with default/strict profiles, JSON/JSON5 and Ion; default and TOML-only linked sets |
 | Host adapters | [`config/host`](config/host/README.mbt.md) | `native` and `js` read files and fill missing variables and the working directory |
 | Browser adapter | [`config/browser`](config/browser/README.mbt.md) | js browser URL mounts with explicit manifests, run inputs, limits, cancellation, and typed boundary errors |
 | Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery in three layouts, system and global user directories on every platform, local and user overrides, explicit project file, ambiguity, legacy fallback, stop boundary, isolated mode; workspace and environment parts come next |

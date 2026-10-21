@@ -1,0 +1,348 @@
+{
+  annotations: [],
+  kind: Struct(
+    [
+      {
+        name: {
+          text: Some("server"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: {
+          annotations: [],
+          kind: Struct(
+            [
+              {
+                name: {
+                  text: Some("host"),
+                  sid: None,
+                  import_location: None,
+                  import_version: None,
+                },
+                value: { annotations: [], kind: String("command") },
+              },
+              {
+                name: {
+                  text: Some("port"),
+                  sid: None,
+                  import_location: None,
+                  import_version: None,
+                },
+                value: { annotations: [], kind: Int(9000) },
+              },
+            ],
+          ),
+        },
+      },
+      {
+        name: {
+          text: Some("plugins"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: {
+          annotations: [],
+          kind: List(
+            [
+              { annotations: [], kind: String("base") },
+              { annotations: [], kind: String("yaml") },
+            ],
+          ),
+        },
+      },
+      {
+        name: {
+          text: Some("registry"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: {
+          annotations: [],
+          kind: Struct(
+            [
+              {
+                name: {
+                  text: Some("token"),
+                  sid: None,
+                  import_location: None,
+                  import_version: None,
+                },
+                value: {
+                  annotations: [],
+                  kind: Struct(
+                    [
+                      {
+                        name: {
+                          text: Some("env"),
+                          sid: None,
+                          import_location: None,
+                          import_version: None,
+                        },
+                        value: { annotations: [], kind: String("TOKEN") },
+                      },
+                    ],
+                  ),
+                },
+              },
+            ],
+          ),
+        },
+      },
+      {
+        name: {
+          text: Some("json"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: { annotations: [], kind: Int(3) },
+      },
+      {
+        name: {
+          text: Some("json5"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: { annotations: [], kind: Int(5) },
+      },
+      {
+        name: {
+          text: Some("exact"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: { annotations: [], kind: Int(123456789012345678901234567890) },
+      },
+      {
+        name: {
+          text: Some("price"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: {
+          annotations: [],
+          kind: Decimal({ coefficient: 120, exponent: -2, negative_zero: false }),
+        },
+      },
+      {
+        name: {
+          text: Some("enabled"),
+          sid: None,
+          import_location: None,
+          import_version: None,
+        },
+        value: { annotations: [], kind: Bool(true) },
+      },
+    ],
+  ),
+}
+[
+  (
+    { names: ["server", "host"] },
+    [
+      {
+        kind: Overrides,
+        source: "overrides",
+        priority: 700,
+        location: None,
+      },
+    ],
+  ),
+  (
+    { names: ["server", "port"] },
+    [
+      {
+        kind: Environment,
+        source: "environment",
+        priority: 600,
+        location: Some("APP_SERVER__PORT"),
+      },
+    ],
+  ),
+  (
+    { names: ["plugins"] },
+    [
+      { kind: Defaults, source: "defaults", priority: 0, location: None },
+      {
+        kind: File(Explicit),
+        source: "yaml",
+        priority: 310,
+        location: Some("/workspace/app.yaml"),
+      },
+    ],
+  ),
+  (
+    { names: ["registry", "token"] },
+    [
+      {
+        kind: File(Explicit),
+        source: "project",
+        priority: 300,
+        location: Some("/workspace/app.toml"),
+      },
+    ],
+  ),
+  (
+    { names: ["json"] },
+    [
+      {
+        kind: File(Explicit),
+        source: "json",
+        priority: 320,
+        location: Some("/workspace/app.json"),
+      },
+    ],
+  ),
+  (
+    { names: ["json5"] },
+    [
+      {
+        kind: File(Explicit),
+        source: "json5",
+        priority: 330,
+        location: Some("/workspace/app.json5"),
+      },
+    ],
+  ),
+  (
+    { names: ["exact"] },
+    [
+      {
+        kind: File(Explicit),
+        source: "ion",
+        priority: 340,
+        location: Some("/workspace/app.ion"),
+      },
+    ],
+  ),
+  (
+    { names: ["price"] },
+    [
+      {
+        kind: File(Explicit),
+        source: "ion",
+        priority: 340,
+        location: Some("/workspace/app.ion"),
+      },
+    ],
+  ),
+  (
+    { names: ["enabled"] },
+    [
+      {
+        kind: Environment,
+        source: "environment",
+        priority: 600,
+        location: Some("APP_ENABLED"),
+      },
+    ],
+  ),
+]
+[
+  {
+    kind: Defaults,
+    name: "defaults",
+    priority: 0,
+    path: None,
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: File(Explicit),
+    name: "project",
+    priority: 300,
+    path: Some("/workspace/app.toml"),
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: File(Explicit),
+    name: "yaml",
+    priority: 310,
+    path: Some("/workspace/app.yaml"),
+    candidates: [],
+    status: Loaded,
+    warnings: [
+      KeyRemoved(
+        { names: ["discard"] },
+        {
+          kind: File(Explicit),
+          source: "yaml",
+          priority: 310,
+          location: Some("/workspace/app.yaml"),
+        },
+      ),
+    ],
+  },
+  {
+    kind: File(Explicit),
+    name: "json",
+    priority: 320,
+    path: Some("/workspace/app.json"),
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: File(Explicit),
+    name: "json5",
+    priority: 330,
+    path: Some("/workspace/app.json5"),
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: File(Explicit),
+    name: "ion",
+    priority: 340,
+    path: Some("/workspace/app.ion"),
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: File(Explicit),
+    name: "optional",
+    priority: 350,
+    path: None,
+    candidates: ["/workspace/missing.toml"],
+    status: NotFound,
+    warnings: [],
+  },
+  {
+    kind: File(LocalOverride),
+    name: "skipped",
+    priority: 390,
+    path: None,
+    candidates: [],
+    status: Skipped,
+    warnings: [],
+  },
+  {
+    kind: Environment,
+    name: "environment",
+    priority: 600,
+    path: None,
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+  {
+    kind: Overrides,
+    name: "overrides",
+    priority: 700,
+    path: None,
+    candidates: [],
+    status: Loaded,
+    warnings: [],
+  },
+]

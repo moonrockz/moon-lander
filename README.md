@@ -55,6 +55,10 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run lint` | Check YAML, MoonBit formatting, and compiler warnings |
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
+| `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
+| `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
+| `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
+| `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
@@ -78,7 +82,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its `version()` export provides a build and test smoke check. Its
-  `config` packages hold the configuration core, which is in progress.
+  `config` packages hold the configuration core and `formats` selects the linked
+  parsers through a virtual package.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
@@ -91,8 +96,9 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 - `.github/workflows/ci.yml` checks lint, validation, builds, tests, and task scripts.
   The `ci-ok` job is the aggregate check for branch protection.
 
-The application model, host adapters, and CLI are proposed in `openspec/changes/`
-and are not implemented yet. No UI packages
+The application model, command and service lifecycle, and CLI are proposed in
+`openspec/changes/` and are not implemented yet. The configuration file host
+adapters are implemented. No UI packages
 are included. CI has read-only permissions and no publishing or release workflow.
 
 ## Releases
@@ -117,6 +123,9 @@ mise exec -- moon -C pkgs/notebooks publish
 ```
 
 Publishing is manual and requires an explicit release request. No workflow
-publishes automatically.
+publishes automatically. Before the first Moon-Lander GitHub release or candidate
+promotion, release gate `lander-4us.9` must be closed with successful
+`mise run check:formats-published` evidence for that candidate. See
+[the contributing guide](CONTRIBUTING.md).
 
 License: Apache-2.0.

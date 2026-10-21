@@ -1,0 +1,34 @@
+///|
+/// Compare the complete pure-load observation across compiler targets.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+}
+
+///|
+async fn main {
+  let expected = @fs.read_file("tests/config-fixture/expected.txt")
+    .text()
+    .replace_all(old="\r\n", new="\n")
+  for target in ["wasm", "wasm-gc", "js", "native"] {
+    let (code, out, err) = @process.collect_output("moon", [
+      "test", "--deny-warn", "--target", target, "pkgs/lander/config", "pkgs/lander/config/formats/toml",
+      "pkgs/lander/config/formats/yaml", "pkgs/lander/config/formats/json5", "pkgs/lander/config/formats/ion",
+      "tests/config-acceptance",
+    ])
+    guard code == 0 else { fail(out.text() + err.text()) }
+    let (code, out, err) = @process.collect_output("moon", [
+      "run", "--release", "--deny-warn", "--target", target, "tests/config-parity",
+    ])
+    guard code == 0 else { fail(out.text() + err.text()) }
+    let observation = out.text().replace_all(old="\r\n", new="\n")
+    guard !observation.is_empty() else {
+      fail("Empty configuration observation")
+    }
+    guard observation == expected else {
+      fail("Values, provenance or reports differ on \{target}:\n\{observation}")
+    }
+    println("Core acceptance and complete observation agree: \{target}")
+  }
+}

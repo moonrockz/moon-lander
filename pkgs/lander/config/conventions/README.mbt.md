@@ -12,8 +12,8 @@ Import `moonrockz/moon-lander/config/conventions` as `@conventions`. Each
 > Discovery finds the system file, the global user file, and the project file in
 > three layouts by walking up from the working directory, with local and user
 > overrides next to the project file, an explicit project file, a stop boundary,
-> a legacy fallback, and isolated mode. Workspaces and environments come in
-> later parts.
+> a legacy fallback, isolated mode, and environment files. Workspaces come in a
+> later part.
 
 `app_dirs("acme")` gives these sources, in merge order:
 
@@ -22,6 +22,7 @@ Import `moonrockz/moon-lander/config/conventions` as `@conventions`. Each
 | 100 | System | `System` | `/etc/acme/acme.toml` |
 | 200 | Global user | `Global` | `~/.config/acme/acme.toml` or `~/.acme/acme.toml` |
 | 300 | Project | `Workspace` | `acme.toml`, `.acme/acme.toml`, or `.config/acme/config.toml`, found by walk-up |
+| 375 | Environment file | `EnvironmentFile` | `acme.Production.toml` next to the project file, when environments are on |
 | 390 | Local override | `LocalOverride` | `acme.local.toml` next to the project file |
 | 400 | User override | `UserOverride` | `acme.user.toml` next to the project file |
 
@@ -129,9 +130,9 @@ test "a test root keeps files above it out" {
 Isolated mode comes from `DiscoveryOptions(isolated=true)`, for example from an
 `--isolated` flag that a host parses. It skips the files of the user and the
 machine: the system directory, the global user directory, and the local and
-user overrides. Each of them reports `Skipped`. The project file and the
-environment variables stay. Discovery does not read the `environment` and
-`project` options yet, and a given value adds a `Note` warning.
+user overrides. Each of them reports `Skipped`. The project file, its
+environment file and the environment variables stay. Discovery does not read
+the `project` option yet, and a given value adds a `Note` warning.
 
 ## System and global user directories
 
@@ -227,6 +228,85 @@ error, `FileNotFound`. When the path has a standard layout, such as
 `configs/acme.toml`, its local and user overrides apply. Other files, such as
 `configs/project.yaml`, have no overrides. `Skip` skips the project file.
 
+## Environments
+
+An environment file holds the values of one environment, such as `Production`,
+next to the project file. Environments are off until the application turns them
+on with `environments(default?)`. The name of the run comes from the first of
+these sources that gives one:
+
+| Order | Source | Example |
+| --- | --- | --- |
+| 1 | The `environment` value of `DiscoveryOptions` | A host fills it from `--environment Staging` |
+| 2 | `<PREFIX>_ENVIRONMENT` in the variable set of the run | `ACME_ENVIRONMENT=Production`; an empty value counts as unset |
+| 3 | The default of `environments` | `environments(default="Development")` |
+
+With no name, no environment file loads. With environments off, a given
+`environment` option adds a `Note` warning. Discovery never reads the process
+arguments, so a host parses `--environment` and gives the value as the option.
+
+The environment file has the priority 375: it wins over the project file, and
+the local and user overrides win over it. It follows the layout of the project
+file:
+
+| Project file | Environment file for `Production` |
+| --- | --- |
+| `acme.toml` | `acme.Production.toml` |
+| `.acme/acme.toml` | `.acme/acme.Production.toml` |
+| `.config/acme/config.toml` | `.config/acme/config.Production.toml` |
+
+- The name matches exactly, so `acme.production.toml` is not the file for
+  `Production`.
+- An environment file alone does not mark a project root.
+- Two environment files for one project file, such as `acme.Production.toml` and
+  `acme.Production.yaml`, are `Ambiguous`.
+- The system file, the global user file, a legacy file and an explicit file
+  outside the standard layouts have no environment file.
+
+A name must not be empty, must not contain `/`, `\`, `.` or a control
+character, and must not be `user` or `local` in any letter case, so an override
+is never an environment file. A bad name raises `InvalidEnvironmentName`, which
+names the source of the name. `environment_name` gives the name of the run with
+the same rules, and `check_environment_name` checks a name from another source.
+
+An application without a host gives the environment-variable source the
+reserved names `<PREFIX>_ENVIRONMENT` and `<PREFIX>_HOME` itself. These
+variables select files, so they must not become configuration keys:
+
+```mbt check
+///|
+test "the environment file of the run wins over the project file" {
+  let conventions = @conventions.app_dirs("acme")
+    |> @conventions.environments(default="Development")
+  let vars = { "ACME_ENVIRONMENT": "Production", "ACME_UI__THEME": "dark" }
+  let builder = @config.builder()
+    |> @config.working_dir("/w")
+    |> @config.env_vars(vars)
+    |> @config.format(@toml.format())
+    |> @conventions.add(conventions)
+    |> @config.env(prefix="ACME", reserved=["ACME_ENVIRONMENT", "ACME_HOME"])
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing("/w", [
+      { name: "acme.toml", kind: File },
+      { name: "acme.Production.toml", kind: File },
+    ])
+    .with_file("/w/acme.toml", "log.level = \"info\"")
+    .with_file("/w/acme.Production.toml", "log.level = \"warn\"")
+  guard @config.load(builder, tree) is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  @expect.expect(@conventions.environment_name(conventions, vars)).to_equal(
+    Some("Production"),
+  )
+  @expect.expect(@config.get_text(config, "log.level")).to_equal("warn")
+  @expect.expect(@config.get_text(config, "ui.theme")).to_equal("dark")
+  // The reserved names give no configuration key.
+  @expect.expect(config.get(@config.KeyPath::parse("environment"))).to_equal(
+    None,
+  )
+}
+```
+
 ## Choose the parts
 
 `app_dirs` uses every standard part. `without(part)` removes one, and `base`
@@ -307,6 +387,9 @@ test "discovery asks for the listing of the working directory first" {
 | `without(part)` | Removes one `Part`: `SystemDir`, `UserConfigDir`, `AppHome`, `Layouts`, `LocalOverrides`, or `UserOverrides` |
 | `boundary(dir)` | The walk-up stop; a relative `dir` joins the working directory |
 | `legacy(name, format~, decode~)` | A legacy fallback file with its own format |
+| `environments(default?)` | Turns on environment files, with an optional default name |
+| `environment_name(conventions, options?, env_vars)` | The environment name of the run, or `None` |
+| `check_environment_name(name, source~)` | Checks a name with the environment name rules |
 | `add(builder, conventions, options?)` | The provider that runs discovery during `@config.load` |
 | `prefix` | The environment variable prefix; defaults to the name in upper case with `-` changed to `_` |
 | `display` | The name that the ambiguity message shows; defaults to the name |

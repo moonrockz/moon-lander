@@ -134,6 +134,14 @@ run = "moonx scripts/test-scripts.mbtx"
 description = "Generate the spike FFI and build the browser fixture"
 run = "moonx scripts/build-browser-fixture.mbtx"
 
+[tasks."build:browser-adapter"]
+description = "Generate the production browser Web API adapter"
+run = "moonx scripts/build-browser-adapter.mbtx"
+
+[tasks."check:browser-adapter"]
+description = "Check production browser adapter freshness without rewriting"
+run = "moonx scripts/build-browser-adapter.mbtx --check"
+
 [tasks."check:browser-fixture"]
 description = "Check that the generated browser spike adapter is current"
 run = "moonx scripts/build-browser-fixture.mbtx --check"

@@ -6,6 +6,7 @@ test("hosted TOML, override, binding, origin, and no Node shims", async ({ page,
   const files: string[] = [];
   page.on("request", request => { if (request.url().endsWith(".toml")) files.push(request.url()); });
   await page.goto("/");
+  expect(errors).toEqual([]);
   expect(await page.evaluate(() => typeof (globalThis as any).landerProbe)).toBe("function");
   expect(await page.evaluate(() => [typeof (globalThis as any).process, typeof (globalThis as any).require, typeof (globalThis as any).Bun])).toEqual(["undefined", "undefined", "undefined"]);
   const result = await page.evaluate(() => (globalThis as any).landerProbe("/acme.toml"));
@@ -19,7 +20,7 @@ test("hosted TOML, override, binding, origin, and no Node shims", async ({ page,
 test("boundary and core failures reject through the promise bridge", async ({ page }) => {
   await page.goto("/");
   expect(await page.evaluate(() => typeof (globalThis as any).landerProbe)).toBe("function");
-  for (const [path, expected] of [["/missing.toml", "HTTP 404"], ["/bad.toml", "/workspace/acme.toml"], ["/wrong-type.toml", "server.host"]]) {
+  for (const [path, expected] of [["/missing.toml", "HTTP 404"], ["/bad.toml", "/workspace/bad.toml"], ["/wrong-type.toml", "server.host"]]) {
     const error = await page.evaluate(async path => {
       try { await (globalThis as any).landerProbe(path); return "unexpected success"; }
       catch (error) { return String(error); }

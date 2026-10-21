@@ -1,5 +1,3 @@
-import { fetchText } from "../../pkgs/lander/adapters/browser/feasibility";
-
-// Supplied lexically by the generated MoonBit factory, never a browser global.
-declare function receiveBrowserAdapter(adapter: { fetchText: typeof fetchText }): void;
-receiveBrowserAdapter({ fetchText });
+import { register, origin, signal } from "./fixture";
+declare function receiveBrowserAdapter(adapter: { register: typeof register; origin: typeof origin; signal: typeof signal }): void;
+receiveBrowserAdapter({ register, origin, signal });

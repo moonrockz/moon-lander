@@ -6,20 +6,22 @@ extern "js" fn browser_adapter() -> Adapter =
   #|  let adapter;
   #|  const receiveBrowserAdapter = value => { adapter = value; };
   #|  (() => {
-  #|    // pkgs/lander/adapters/browser/feasibility.ts
-  #|    async function fetchText(url, signal) {
-  #|      try {
-  #|        const response = await fetch(url, { signal, credentials: "omit", redirect: "error" });
-  #|        if (!response.ok)
-  #|          return { kind: "http", text: "", status: response.status };
-  #|        return { kind: "file", text: await response.text(), status: response.status };
-  #|      } catch {
-  #|        return { kind: "io", text: "", status: 0 };
-  #|      }
+  #|    // tests/browser/fixture.ts
+  #|    function register(run, probe) {
+  #|      Object.assign(globalThis, {
+  #|        landerRun: async (request) => JSON.parse(await run(JSON.stringify(request))),
+  #|        landerProbe: probe
+  #|      });
+  #|    }
+  #|    function origin() {
+  #|      return location.origin;
+  #|    }
+  #|    function signal() {
+  #|      return globalThis.testSignal ?? new AbortController().signal;
   #|    }
   #|
   #|    // tests/browser/adapter-entry.ts
-  #|    receiveBrowserAdapter({ fetchText });
+  #|    receiveBrowserAdapter({ register, origin, signal });
   #|  })();
   #|  return adapter;
   #|}

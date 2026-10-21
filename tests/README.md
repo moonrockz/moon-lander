@@ -29,3 +29,7 @@ Run the notebook suites on one target:
 ```shell
 mise exec -- moon test tests/nbformat-acceptance tests/nbformat-laws tests/notebooks-acceptance tests/notebooks-laws --target js
 ```
+
+`mise run test:node-adapter` runs the shared host tests and the
+`config-host-esm` application on Node and Bun. The application verifies that the
+checked-in adapter also links and reads a file in ESM output.

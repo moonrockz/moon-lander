@@ -12,7 +12,10 @@ import {
 ///|
 async fn main {
   println("🔍 Running all checks...")
-  for task in ["lint", "validate", "test", "test:scripts", "build"] {
+  for
+    task in [
+      "check:node-adapter", "lint", "validate", "test", "test:scripts", "build",
+    ] {
     println("")
     println("=== \{task} ===")
     let code = @process.run(

@@ -31,6 +31,7 @@ priv enum SourceInput {
   Path(String)
   Candidates(Array[String], String)
   Env(SourceSelection[Map[String, String]], String, Array[String])
+  Parsed(String, ConfigValue)
   NoInput
 }
 
@@ -112,6 +113,28 @@ pub fn ConfigSource::file(
     name: name.unwrap_or(path),
     priority,
     input: Path(path),
+    excluded: [],
+  }
+}
+
+///|
+/// A file source whose text the caller already read and turned into a value
+/// tree, for example a legacy file with its own format. The report and the
+/// origins show `path`, which joins the working directory when it is relative.
+/// The root must be a struct.
+pub fn ConfigSource::parsed_file(
+  path : String,
+  value : ConfigValue,
+  role? : FileRole = Explicit,
+  name? : String,
+  priority? : Int,
+) -> ConfigSource raise ConfigError {
+  value.check_root(path)
+  {
+    kind: File(role),
+    name: name.unwrap_or(path),
+    priority,
+    input: Parsed(path, value),
     excluded: [],
   }
 }

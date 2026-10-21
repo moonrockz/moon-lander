@@ -128,9 +128,14 @@ test "the core load runs discovery and asks for each directory" {
 }
 
 ///|
-test "the first request is the listing of the start directory" {
+test "the first request lists the layout directories of the start directory" {
   let step = acme("/w/src") |> @config.load(@config.FileTree::new())
-  @expect.expect(step is Need([ListDir("/w/src")])).to_equal(true)
+  @expect.expect(
+    step
+    is Need(
+      [ListDir("/w/src"), ListDir("/w/src/.acme"), ListDir("/w/src/.config/acme")]
+    ),
+  ).to_equal(true)
 }
 
 ///|
@@ -139,7 +144,7 @@ test "no primary reports not-found at the start directory" {
   let report = config.reports()[0]
   @expect.expect((report.status, report.candidates)).to_equal((
     NotFound,
-    ["/w/src/acme.toml"],
+    ["/w/src/acme.toml", "/w/src/.acme/acme.toml", "/w/src/.config/acme/config.toml"],
   ))
 }
 

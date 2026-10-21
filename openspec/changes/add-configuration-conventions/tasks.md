@@ -22,18 +22,18 @@ Bead: lander-4us.3.1
 
 Bead: lander-4us.3.2
 
-- [ ] 2.1 Add the `.<app>/<app>.<ext>` and `.config/<app>/config.<ext>` layouts with exact-name matching through listings, and verify the three "Candidate layouts per location" scenarios.
-- [ ] 2.2 Derive the searched extensions from the registered formats and keep their order only for reports, and verify the two "Searched extensions come from registered formats" scenarios.
-- [ ] 2.3 Raise the core `ConfigError::Ambiguous(display~, location~, candidates~)` with the display name of the convention set, and verify the "Ambiguity at one location is an error" scenarios and the "Ambiguity in the nearest directory stops discovery" scenario.
-- [ ] 2.4 Add `legacy(name, format~, decode~)` as a root marker and fallback whose format does not join the searched extensions, and verify the two "Legacy fallback candidate" scenarios.
+- [x] 2.1 Add the `.<app>/<app>.<ext>` and `.config/<app>/config.<ext>` layouts with exact-name matching through listings, and verify the three "Candidate layouts per location" scenarios.
+- [x] 2.2 Derive the searched extensions from the registered formats and keep their order only for reports, and verify the two "Searched extensions come from registered formats" scenarios.
+- [x] 2.3 Raise the core `ConfigError::Ambiguous(display~, location~, candidates~)` with the display name of the convention set, and verify the "Ambiguity at one location is an error" scenarios and the "Ambiguity in the nearest directory stops discovery" scenario.
+- [x] 2.4 Add `legacy(name, format~, decode~)` as a root marker and fallback whose format does not join the searched extensions, and verify the two "Legacy fallback candidate" scenarios.
 
 ## 3. Stop boundary and isolated mode
 
 Bead: lander-4us.3.3
 
-- [ ] 3.1 Add `boundary(dir)` and make the walk-up inclusive of the boundary, and verify the three "Explicit stop boundary" scenarios, including `ConfigError::OutsideBoundary`.
-- [ ] 3.2 Read isolated mode from `DiscoveryOptions` and set system, global, local-override and user-override selections to `Skip` with skipped reports, and verify the two "Isolated mode" scenarios.
-- [ ] 3.3 Document the boundary and isolated mode in the package README with a test-root example, and verify the example runs.
+- [x] 3.1 Add `boundary(dir)` and make the walk-up inclusive of the boundary, and verify the three "Explicit stop boundary" scenarios, including `ConfigError::OutsideBoundary`.
+- [x] 3.2 Read isolated mode from `DiscoveryOptions` (through `add(builder, conventions, options?)`) so that the system, global, local-override and user-override parts can set their selections to `Skip` with skipped reports, and verify "Isolated mode keeps environment variables" and that isolated mode keeps the project primary. Groups 4 and 5 make each of those parts honor isolated mode and verify "Isolated mode skips user and machine files" fully. A given `environment`, `config` or `project` option that discovery does not read yet adds a `Note` warning.
+- [x] 3.3 Document the boundary and isolated mode in the package README with a test-root example, and verify the example runs.
 
 ## 4. System, global user and application-home directories on every platform
 
@@ -42,7 +42,7 @@ Bead: lander-4us.3.4
 - [ ] 4.1 Add `system_dir` for Linux, macOS and Windows (`PROGRAMDATA` with the `C:/ProgramData` fallback), and verify the two "System directory" scenarios.
 - [ ] 4.2 Add `user_config_dir` with the absolute-only XDG rule, the macOS directory and `APPDATA` on Windows, and verify the four "Global user configuration directory" scenarios.
 - [ ] 4.3 Add `app_home` with `$<PREFIX>_HOME`, `USERPROFILE` on Windows and the empty-means-unset rule, and verify the four "Application home directory" scenarios.
-- [ ] 4.4 Treat all global candidates as one source and report every candidate, and verify the "Two global files" and "Not-found global source lists candidates" scenarios.
+- [ ] 4.4 Treat all global candidates as one source and report every candidate, and verify the "Two global files" and "Not-found global source lists candidates" scenarios; in isolated mode the system and global sources report `Skipped`.
 - [ ] 4.5 Add the `/`-form path value with drive and UNC absolute checks and `\` to `/` conversion of path-valued variables on Windows, and verify the "Path handling on Windows" scenarios with tests that give `Platform::Windows` on every target.
 - [ ] 4.6 Add `app_dirs(name, prefix?, display?)` as `base` plus the standard parts, and `without(part)`, and verify a test that removes the system part.
 - [ ] 4.7 Read every directory variable only from the `env_vars` set of the core load context, never from the process, and verify the "Directories come only from the given set" scenario on all four targets with a set that gives `HOME` and `XDG_CONFIG_HOME` explicitly.
@@ -51,7 +51,7 @@ Bead: lander-4us.3.4
 
 Bead: lander-4us.3.5
 
-- [ ] 5.1 Add `user_overrides` for the three layouts with ambiguity checks, and verify the three "Adjacent user overrides" scenarios.
+- [ ] 5.1 Add `user_overrides` for the three layouts with ambiguity checks, and verify the three "Adjacent user overrides" scenarios; in isolated mode user and local overrides report `Skipped`, and "Isolated mode skips user and machine files" passes in full.
 - [ ] 5.2 Read `Explicit(path)` from the `config` value of `DiscoveryOptions` with layout detection by path, and verify the two "Explicit primary file" scenarios.
 - [ ] 5.3 Add `local_overrides` (`<app>.local.<ext>` and `config.local.<ext>` next to each primary, role `LocalOverride`, priority 390, ambiguity checks), include it in `app_dirs` and not in `base`, and verify the three "Adjacent local overrides" scenarios and the two "Local overrides in the standard set" scenarios.
 

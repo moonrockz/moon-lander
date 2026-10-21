@@ -204,3 +204,25 @@ async test "Adapter uses the given variable set for a discovered environment sou
     @config.fields([("a", @config.int(1))]),
   )
 }
+
+///|
+async test "a boundary at the temporary root keeps a parent file out" {
+  let dir = temp_dir()
+  defer @fs.rmdir(from_slash(dir, running_platform()), recursive=true)
+  write("\{dir}/acme.toml", "a = 1")
+  write("\{dir}/case/.config/acme/config.toml", "b = 2")
+  write("\{dir}/case/src/main.mbt", "")
+  let config = @config.builder()
+    |> @config.working_dir("\{dir}/case/src")
+    |> @config.format(@toml.format())
+    |> @conventions.add(
+      @conventions.app_dirs("acme") |> @conventions.boundary("\{dir}/case"),
+    )
+    |> load
+  @expect.expect(config.value()).to_equal(
+    @config.fields([("b", @config.int(2))]),
+  )
+  @expect.expect(config.reports()[0].path).to_equal(
+    Some("\{dir}/case/.config/acme/config.toml"),
+  )
+}

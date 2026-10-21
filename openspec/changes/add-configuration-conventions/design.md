@@ -352,7 +352,17 @@ file-system root.
 Call (this change, tracer bullet): walk-up asks for one listing per round, nearest
 first, and stops at the root it finds, so it never lists parents above the project
 root. `add(builder, conventions)` takes no options until a part reads them; the
-group that first reads a `DiscoveryOptions` field adds `options?`. Discovery with
+group that first reads a `DiscoveryOptions` field adds `options?`. Call (this change, groups 2 and 3): at each directory the candidate list holds
+the three layouts in the order `<app>.<ext>`, `.<app>/<app>.<ext>`,
+`.config/<app>/config.<ext>`, each in extension order, and one round asks for the
+listings of the directory, `.<app>/`, and `.config/<app>/`. A legacy file is read
+with its own format and given to the core as `ConfigSource::parsed_file` with the
+role `Legacy`. A relative boundary joins the working directory, and both are
+normalized (`.` and `..`) before the walk. `add` now takes `options?`; discovery
+reads `isolated`, and a given `environment`, `config` or `project` adds a `Note`
+until its group reads it.
+
+Discovery with
 no working directory, or a relative one, gives a skipped project source and a
 `Note` warning: the core would join a relative candidate to the working directory
 again, and a relative directory has no parents to walk to. With no

@@ -163,6 +163,10 @@ fn resolve(
     Value(value) =>
       Some({ pieces: [(value, None)], path: None, candidates: [], status: Loaded })
     NoInput => Some({ pieces: [], path: None, candidates: [], status: Skipped })
+    Parsed(given, value) => {
+      let path = join_path(context.working_dir, given)
+      Some({ pieces: [(value, Some(path))], path: Some(path), candidates: [], status: Loaded })
+    }
     Env(selection, prefix, reserved) =>
       match selection {
         Skip => Some({ pieces: [], path: None, candidates: [], status: Skipped })

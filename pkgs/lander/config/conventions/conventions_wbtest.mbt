@@ -21,3 +21,13 @@ test "a trailing slash goes, except at a root" {
   assert_eq(trim_dir("/"), "/")
   assert_eq(trim_dir("C:/"), "C:/")
 }
+
+///|
+test "paths normalize dot segments" {
+  assert_eq(normalize("/w/a/b/."), "/w/a/b")
+  assert_eq(normalize("/w/a/b/../c/"), "/w/a/c")
+  assert_eq(normalize("/w/../.."), "/")
+  assert_eq(normalize("C:/w/./x/.."), "C:/w")
+  assert_eq(normalize("C:/"), "C:/")
+  assert_eq(normalize("//server/share/w/.."), "//server/share")
+}

@@ -275,6 +275,9 @@ skip rules for ancestors.
 - `build(sources)` loads value sources over a complete empty `FileTree`.
   `Config::reports()` gives the reports in merge order, and `Config::warnings()`
   gives the provider warnings, then the report warnings in merge order.
+- `ConfigSource::parsed_file(path, value, role~)` gives a file source whose text
+  the caller already parsed, for example a legacy file with its own format. Its
+  report and origins show the path (added with conventions group 2).
 - The location of `Ambiguous` is the longest directory that holds every
   candidate. The load raises `Ambiguous` as soon as two candidates exist, also
   when the tree does not yet know the other candidates.

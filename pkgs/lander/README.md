@@ -34,7 +34,7 @@ a load asks for. A `wasm` host gives the files itself.
 | Formats | `config/formats/toml` | TOML strings, numbers, Booleans, arrays, and tables |
 | Configuration core, rest | `config` | Merge policies, secrets, redaction, more formats, and helpers come next |
 | Host adapters | [`config/host`](config/host/README.mbt.md) | `native` reads files, variables, and the working directory; `js` comes next |
-| Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery of `<app>.<ext>`; the other layouts and locations come next |
+| Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery in three layouts, ambiguity, legacy fallback, stop boundary, isolated mode; system, user, override, workspace, and environment parts come next |
 | Binding | [`config`](config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
 | Hosting | `@lander` | Planned |
 

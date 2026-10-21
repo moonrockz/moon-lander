@@ -584,3 +584,51 @@ test "Absent key gives no warning" {
   @expect.expect(config.warnings()).to_equal([])
   @expect.expect(@config.get_text(config, "ir.layout")).to_equal("tree")
 }
+
+///|
+test "a registered format does not change when the caller changes its extensions" {
+  let extensions = ["toml"]
+  let toml = @config.Format::{ ..@toml.format(), extensions, }
+  let builder = @config.builder() |> @config.format(toml)
+  extensions.push("ini")
+  builder.formats()[0].extensions.push("cfg")
+  @expect.expect(builder.formats()[0].extensions).to_equal(["toml"])
+}
+
+///|
+test "a report does not change when the caller changes its arrays" {
+  let config = @config.build([
+    @config.in_memory_pairs([("a", @config.int(1))]).exclude(
+      [key("a")],
+      warn=true,
+    ),
+  ])
+  config.reports()[0].warnings.clear()
+  config.reports()[0].candidates.push("/x")
+  @expect.expect(config.reports()[0].warnings.length()).to_equal(1)
+  @expect.expect(config.reports()[0].candidates).to_equal([])
+}
+
+///|
+test "a candidate named twice is one candidate" {
+  let config = @config.builder()
+    |> @config.working_dir("/w")
+    |> @config.format(@toml.format())
+    |> @config.add(
+      @config.ConfigSource::candidates(
+        ["app.toml", "/w/app.toml", "app.toml"],
+        display="App",
+      ),
+    )
+    |> @config.load(
+      complete()
+      .with_listing("/w", listing(["app.toml"]))
+      .with_file("/w/app.toml", "a = 1"),
+    )
+    |> done
+  let report = config.reports()[0]
+  @expect.expect((report.status, report.candidates)).to_equal((
+    Loaded,
+    ["/w/app.toml"],
+  ))
+}

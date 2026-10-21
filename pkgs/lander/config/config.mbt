@@ -21,7 +21,11 @@ pub fn build(sources : Array[ConfigSource]) -> Config raise ConfigError {
 ///|
 /// The source reports in merge order.
 pub fn Config::reports(self : Config) -> Array[SourceReport] {
-  self.reports.copy()
+  self.reports.map(report => {
+    ..report,
+    candidates: report.candidates.copy(),
+    warnings: report.warnings.copy(),
+  })
 }
 
 ///|

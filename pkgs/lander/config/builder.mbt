@@ -45,13 +45,13 @@ pub fn provider(builder : ConfigBuilder, p : SourceProvider) -> ConfigBuilder {
 ///|
 /// Register `format` after the formats that the builder holds.
 pub fn format(builder : ConfigBuilder, format : Format) -> ConfigBuilder {
-  { ..builder, formats: [..builder.formats, format] }
+  { ..builder, formats: [..builder.formats, format.copy()] }
 }
 
 ///|
 /// The registered formats in registration order.
 pub fn ConfigBuilder::formats(self : ConfigBuilder) -> Array[Format] {
-  self.formats.copy()
+  self.formats.map(Format::copy)
 }
 
 ///|

@@ -58,7 +58,7 @@ pub fn load(
     platform: builder.platform,
     env_vars: builder.env_vars.map(vars => vars.copy()).unwrap_or(Map([])),
     working_dir: builder.working_dir,
-    formats: builder.formats.copy(),
+    formats: builder.formats(),
   }
   let sources : Array[ConfigSource] = []
   let notes : Array[ConfigWarning] = []
@@ -162,7 +162,13 @@ fn resolve(
       }
     }
     Candidates(given, display) => {
-      let candidates = given.map(path => join_path(context.working_dir, path))
+      let candidates : Array[String] = []
+      for path in given {
+        let joined = join_path(context.working_dir, path)
+        if !candidates.contains(joined) {
+          candidates.push(joined)
+        }
+      }
       let existing = []
       let mut unknown = false
       for candidate in candidates {

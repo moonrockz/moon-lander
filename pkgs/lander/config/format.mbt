@@ -8,6 +8,12 @@ pub(all) struct Format {
 }
 
 ///|
+/// A copy that does not share the extension list with `self`.
+fn Format::copy(self : Format) -> Format {
+  { ..self, extensions: self.extensions.copy() }
+}
+
+///|
 /// Parse the text of the file `path` with the format that its extension
 /// selects from `formats`. The extension compares in lowercase. No match
 /// raises `UnsupportedFormat` with the registered extensions.

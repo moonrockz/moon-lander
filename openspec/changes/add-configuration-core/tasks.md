@@ -67,7 +67,7 @@ Bead: lander-4us.2.6
 
 Bead: lander-4us.2.7
 
-- [ ] 7.1 Map TOML date-time values as `pkgs/notebooks` does and keep `Int64` exact; verify the "TOML date and time values" and "Large TOML integer" scenarios.
+- [x] 7.1 Map TOML date-time values as `pkgs/notebooks` does and keep `Int64` exact; verify the "TOML date and time values" and "Large TOML integer" scenarios.
 
 ## 8. YAML format with default and strict profiles
 

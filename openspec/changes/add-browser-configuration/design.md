@@ -382,6 +382,67 @@ the same three engine versions as the local proof. Playwright's pinned builds
 are Chromium/headless shell `1248`, Firefox `1555`, and WebKit `2370`. This is one
 cold Linux sample with no browser cache configured, not a timing guarantee.
 
+## Group 2 production URL mounts
+
+The public js-only package is `config/browser`. `from_urls(base, manifest, root~)`
+accepts a JSON manifest with exactly `version: 1`, `files`, and optional
+`directories`. Paths are string arrays. Unknown fields and invalid shapes fail
+before fetch. The immutable opaque `Mount` exposes only `root()`. Constructor
+validation owns duplicate/collision checks and inferred directories; load-time
+limits count every unique entry before any backend call. Empty manifests are
+valid, while an empty mount set is not.
+
+`limits(entries?, bytes?, requests?)` creates immutable positive per-load bounds.
+`load(builder, mounts, limits?, signal?)` copies the mount array before awaiting,
+preserves explicit builder inputs, and uses the proven `async/js_async` bridge.
+`AbortController` and `AbortSignal` are aliases for that library's external
+wrappers. Each request batch is checked for canonical paths, containment and
+remaining request quota before reads begin. Answers are cached in a fresh
+`FileTree`; a request batch with no new answer raises `Protocol`. Listings use
+explicit lexical code-unit comparison rather than MoonBit's shortlex comparison.
+
+Policy, mount data and the request loop are MoonBit. The TypeScript boundary
+exports only URL normalization, required-capability detection and HTTP text reads.
+Its generated factory lives in the public package; generated fixture helpers
+remain in the unpublished tests module. A consumer compiles the checked-in FFI
+with MoonBit, without Bun. A task-script test forces a fresh consumer target with
+only the MoonBit compiler directory on `PATH`. The freshness regression changes
+TypeScript behavior, checks for a nonzero result without output mutation, and
+rejects a Node import with Bun's browser target.
+
+The HTTP adapter encodes each validated relative path segment, omits credentials,
+and rejects redirects. It counts streamed bytes and final UTF-8 text across files,
+independently of Content-Length. Fatal decoding rejects malformed UTF-8; BOM text
+is retained as it is in file inputs. Both caller and task signals control an
+internal fetch controller. Failures abort transport before cancellation and lock
+release; errored reads and failed cancellation still attempt remaining cleanup.
+Boundary replies contain only stable failure classes, never browser exception
+text, backend URLs or response bodies. MoonBit raises labelled `BrowserError`
+cases and leaves `ConfigError` values unchanged. Invalid path text is not echoed.
+
+The runnable guide is `config/browser/README.mbt.md`, with an unpublished headless
+consumer in `tests/browser-consumer`. Both that example and the acceptance fixture
+are compiled once and reused by all three engines. The existing browser CI
+category is now named Browser configuration and retains the same required
+`browser` dependency in `ci-ok`; production freshness is added to the lint job.
+No existing check is removed. Negative harness checks select the original smoke
+file, so extra acceptance tests do not change their expected failure counts.
+
+The production acceptance suite covers the group 2 namespace/run-input/manifest
+scenarios, ordering, binding, reports, exact virtual origins, empty directories,
+404/403/500, credential omission, redirects, real CORS and server disconnects,
+encoded filenames and literal percent-encoded segments, per-load snapshots,
+entry/request/UTF-8 budgets and faulty providers. Real streamed responses verify
+upstream stopping for byte limits, decoding errors and abort. Controlled streams
+verify false size headers, errored readers, cancellation/release failures and
+original-error preservation. A compressed HTTP response verifies that wire size
+cannot bypass the decoded-byte budget. Available parse positions and binding
+blame are checked before the fixture's JavaScript presentation conversion.
+
+Selected files, browser workspace conventions, directory handles, OPFS operations
+and cross-target consumer parity remain groups 3-6. Group 2 does not implement
+those APIs or claim their scenarios have passed.
+
 ## Risks / Trade-offs
 
 - Promise or generated-FFI integration can fail in a real browser. Group 1 proves

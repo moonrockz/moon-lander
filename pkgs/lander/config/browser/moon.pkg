@@ -1,0 +1,7 @@
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/async/js_async",
+  "moonrockz/moon-lander/config",
+}
+
+supported_targets = "js"

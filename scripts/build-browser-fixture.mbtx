@@ -49,26 +49,42 @@ async fn main {
     return
   }
   @fs.write_file(generated, source)
-  let (code, out, err) = @process.collect_output("moon", [
-    "run", "--build-only", "--deny-warn", "--target", "js", "tests/browser-fixture",
+  let (fresh, fresh_out, fresh_err) = @process.collect_output("moonx", [
+    "scripts/build-browser-adapter.mbtx", "--check",
   ])
-  guard code == 0 else { fail(out.text() + err.text()) }
-  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
-    fail("Expected one browser fixture artifact: " + out.text())
-  }
+  guard fresh == 0 else { fail(fresh_out.text() + fresh_err.text()) }
   if !@fs.exists("_build/browser") {
     @fs.mkdir("_build/browser", recursive=true)
   }
-  // Browser-target bundling also rejects accidental Node module imports.
-  command([
-    "build", path, "--target=browser", "--format=esm", "--outfile", "_build/browser/fixture.js",
-  ])
-  let linked = @fs.read_file("_build/browser/fixture.js").text()
-  for forbidden in ["node:", "require(", "process.", "Bun."] {
-    guard !linked.contains(forbidden) else {
-      fail(
-        "Browser fixture contains a forbidden runtime dependency: \{forbidden}",
-      )
+  for
+    app in [
+      ("tests/browser-fixture", "fixture.js"),
+      ("tests/browser-consumer", "example.js"),
+    ] {
+    let (code, out, err) = @process.collect_output("moon", [
+      "run",
+      "--build-only",
+      "--deny-warn",
+      "--target",
+      "js",
+      app.0,
+    ])
+    guard code == 0 else { fail(out.text() + err.text()) }
+    guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+      fail("Expected one browser application artifact: " + out.text())
+    }
+    let output = "_build/browser/" + app.1
+    command([
+      "build", path, "--target=browser", "--format=esm", "--outfile", output,
+    ])
+    let linked = @fs.read_file(output).text()
+    for forbidden in ["node:", "require(", "process.", "Bun."] {
+      guard !linked.contains(forbidden) else {
+        fail(
+          "Browser application contains a forbidden runtime dependency: " +
+          forbidden,
+        )
+      }
     }
   }
   println("Browser fixture build: \{@async.now() - started} ms")

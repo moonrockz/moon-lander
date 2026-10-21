@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "feasibility.spec.ts",
+  testMatch: "*.spec.ts",
   outputDir: "../../_build/browser/results",
   workers: 1,
   retries: 0,

@@ -46,9 +46,103 @@ async fn check_versions() -> Unit {
 }
 
 ///|
-async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit {
+struct FixtureState {
+  paths : Array[String]
+  stopped : Array[String]
+  finished : Array[String]
+  mut fresh : Int32
+}
+
+///|
+async fn answer(
+  state : FixtureState,
+  request : @http.Request,
+  conn : @http.ServerConnection,
+) -> Unit {
+  let path = request.path
+  if path == "/stats" {
+    conn
+    ..send_response(200, "OK")
+    .write(
+      (
+        {
+          "paths": Json(state.paths),
+          "stopped": Json(state.stopped),
+          "finished": Json(state.finished),
+        } : Json).stringify(),
+    )
+    return
+  }
+  if path != "/" && path != "/fixture.js" && path != "/favicon.ico" {
+    state.paths.push(path)
+  }
+  if path.has_prefix("/stream/") {
+    conn.send_response(200, "OK")
+    errdefer state.stopped.push(path)
+    if path == "/stream/decoding.toml" {
+      conn.write(Bytes::from_array([0xff]))
+    }
+    for i = 0; i < 200; i = i + 1 {
+      conn.write("#".repeat(8192) + "\n")
+      @async.sleep(10)
+    }
+    state.finished.push(path)
+    return
+  }
+  if path == "/redirect.toml" {
+    conn.send_response(
+      302,
+      "Found",
+      extra_headers=Map::from_array([
+        (@http.CaseInsensitiveString("Location"), "/acme.toml"),
+      ]),
+    )
+    return
+  }
+  if path == "/disconnect.toml" {
+    conn.close()
+    return
+  }
+  if path == "/compressed.toml" {
+    let body = Bytes::from_array([
+      0x1f, 0x8b, 0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0xff, 0xed, 0xc8, 0xb1, 0x9,
+      0x80, 0x30, 0x10, 0x0, 0xc0, 0xfe, 0xa7, 0x10, 0x2c, 0xd2, 0x5a, 0xda, 0x38,
+      0x89, 0x58, 0x69, 0xc0, 0x46, 0x12, 0x12, 0x71, 0x7e, 0x71, 0xc, 0xe1, 0xae,
+      0xbc, 0x71, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xfe, 0x2e, 0xd6, 0x9e,
+      0xdb, 0x93, 0xdb, 0x16, 0x67, 0xe9, 0xf7, 0xb0, 0xc, 0x69, 0x2f, 0x57, 0x6d,
+      0xb9, 0xf7, 0x7c, 0xa4, 0xa8, 0xa5, 0x7d, 0x37, 0x4f, 0xf3, 0x14, 0x2f, 0xf1,
+      0x12, 0xf6, 0xb3, 0x2a, 0x20, 0x0, 0x0,
+    ])
+    conn.send_response(
+      200,
+      "OK",
+      extra_headers=Map::from_array([
+        (@http.CaseInsensitiveString("Content-Type"), "text/plain"),
+        (@http.CaseInsensitiveString("Content-Encoding"), "gzip"),
+        (
+          @http.CaseInsensitiveString("Content-Length"),
+          body.length().to_string(),
+        ),
+      ]),
+    )
+    conn.write(body)
+    return
+  }
+  if path == "/fresh.toml" {
+    state.fresh += 1
+  }
   let (status, content_type, text) = match request.path {
     "/" => (200, "text/html", @fs.read_file("tests/browser/index.html").text())
+    "/example" =>
+      (
+        200, "text/html", "<!doctype html><meta charset='utf-8'><title>Hosted example</title><script type='module' src='/example.js'></script>",
+      )
+    "/example.js" =>
+      (
+        200,
+        "text/javascript",
+        @fs.read_file("_build/browser/example.js").text(),
+      )
     "/fixture.js" =>
       (
         200,
@@ -60,6 +154,30 @@ async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit 
     "/bad.toml" => (200, "text/plain", "[broken\n")
     "/wrong-type.toml" =>
       (200, "text/plain", "[server]\nhost = 42\nport = 8080\n")
+    "/configs/acme.toml" =>
+      (200, "text/plain", "[server]\nhost = 'directory-base'\nport = 8080\n")
+    "/defaults/acme.toml" =>
+      (200, "text/plain", "[server]\nhost = 'defaults'\nport = 7070\n")
+    "/workspace/acme.toml" =>
+      (200, "text/plain", "[server]\nhost = 'workspace'\nport = 8080\n")
+    "/configs/space%20%25%20%23%C3%A9%3F.toml" =>
+      (200, "text/plain", "[server]\nhost = 'encoded'\nport = 8080\n")
+    "/cookie.toml" =>
+      (
+        200,
+        "text/plain",
+        "[server]\nhost = '\{if request.headers.contains(@http.CaseInsensitiveString("Cookie")) { "cookie" } else { "no-cookie" }}'\nport = 8080\n",
+      )
+    "/fresh.toml" =>
+      (
+        200,
+        "text/plain",
+        "[server]\nhost = 'revision-\{state.fresh}'\nport = 8080\n",
+      )
+    "/unicode.toml" =>
+      (200, "text/plain", "[server]\nhost = 'é🌘'\nport = 8080\n")
+    "/forbidden.toml" => (403, "text/plain", "sensitive-response-body")
+    "/server-error.toml" => (500, "text/plain", "sensitive-response-body")
     _ => (404, "text/plain", "Not found")
   }
   let headers = Map::from_array([
@@ -79,48 +197,70 @@ async fn answer(request : @http.Request, conn : @http.ServerConnection) -> Unit 
 }
 
 ///|
-async fn suite(extra_env : Map[String, String]) -> (Int32, String) {
+async fn suite(
+  extra_env : Map[String, String],
+  smoke_only~ : Bool = false,
+) -> (Int32, String) {
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
+  let cross = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer cross.close()
+  let state : FixtureState = { paths: [], stopped: [], finished: [], fresh: 0, }
   let url = "http://\{server.addr}"
   println("Browser fixture: \{url}")
   let env = extra_env.copy()
   env["LANDER_BROWSER_URL"] = url
+  env["LANDER_BROWSER_CROSS_URL"] = "http://\{cross.addr}"
+  let args = [cli, "test", "--config", "tests/browser/playwright.config.ts"]
+  if smoke_only {
+    args.push("feasibility.spec.ts")
+  }
   let result = @async.with_timeout(180_000, () => {
     @async.with_task_group() <| group => {
       // Browsers normally close keep-alive connections. Those read failures
       // terminate only that connection. Failed responses still fail the tests.
       group.spawn_bg(no_wait=true, () => {
         server.run_forever(allow_failure=true, (request, _, conn) => {
-          answer(request, conn)
+          answer(state, request, conn)
+        })
+      })
+      group.spawn_bg(no_wait=true, () => {
+        cross.run_forever(allow_failure=true, (request, _, conn) => {
+          answer(state, request, conn)
         })
       })
       let (code, out, err) = @process.collect_output(
         "node",
-        [cli, "test", "--config", "tests/browser/playwright.config.ts"],
+        args,
         extra_env=env,
       )
       (code, out.text() + err.text())
     }
   })
   server.close()
-  let closed = try @socket.Tcp::connect(server.addr) catch {
-    _ => true
-  } noraise {
-    connection => {
-      connection.close()
-      false
+  cross.close()
+  for address in [server.addr, cross.addr] {
+    let closed = try @socket.Tcp::connect(address) catch {
+      _ => true
+    } noraise {
+      connection => {
+        connection.close()
+        false
+      }
+    }
+    guard closed else {
+      fail("Browser fixture listener leaked after the suite")
     }
   }
-  guard closed else { fail("Browser fixture listener leaked after the suite") }
   result
 }
 
 ///|
 async fn verify_failures() -> Unit {
-  let (assertion, assertion_log) = suite({
-    "LANDER_BROWSER_FAIL_ASSERTION": "1",
-  })
+  let (assertion, assertion_log) = suite(
+    { "LANDER_BROWSER_FAIL_ASSERTION": "1" },
+    smoke_only=true,
+  )
   guard assertion == 1 &&
     assertion_log.contains("deliberate failure") &&
     assertion_log.contains("3 failed") else {
@@ -128,7 +268,10 @@ async fn verify_failures() -> Unit {
   }
   let dir = @fs.tmpdir(prefix="lander-no-browser")
   defer @fs.rmdir(dir, recursive=true)
-  let (missing, missing_log) = suite({ "PLAYWRIGHT_BROWSERS_PATH": dir })
+  let (missing, missing_log) = suite(
+    { "PLAYWRIGHT_BROWSERS_PATH": dir },
+    smoke_only=true,
+  )
   guard missing == 1 &&
     missing_log.contains("Executable doesn't exist") &&
     missing_log.contains("6 failed") else {

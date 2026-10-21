@@ -67,6 +67,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run test:browser-failures` | Also prove deliberate assertion and unavailable-engine failures propagate |
 | `mise run build:browser-fixture` | Generate the spike FFI and build the browser fixture |
 | `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |
+| `mise run build:browser-adapter` | Generate the production browser Web API adapter |
+| `mise run check:browser-adapter` | Reject stale production browser FFI without rewriting it |
 | `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.1.2` |
 | `mise run clean` | Remove build artifacts |
 

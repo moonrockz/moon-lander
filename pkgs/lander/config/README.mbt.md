@@ -12,8 +12,9 @@ this page runs as a test with `mise run test`.
 
 > [!NOTE]
 > The configuration core is in progress. This page shows the API that exists
-> today. Environment variables, the YAML, JSON and Ion formats, the host
-> adapters, the rest of discovery, and binding come in later changes. The
+> today. Environment variables, the YAML, JSON and Ion formats, the js host
+> adapter, the rest of discovery, and binding over defaults come in later
+> changes. The
 > [design overview](../../../docs/design/overview.md) shows the full plan.
 
 ## One load, start to finish
@@ -417,6 +418,98 @@ test "a provider adds the file of its directory" {
   let config = load_from(builder, { "/srv/app.local.toml": "debug = true" })
   @expect.expect(@config.get_text(config, "debug")).to_equal("true")
   @expect.expect(config.reports()[0].priority).to_equal(390)
+}
+```
+
+## Bind typed values
+
+Read a section into a typed value with `bind`, or the full configuration with
+`bind_root`. Any type that implements `FromJson` works, usually through
+`derive(FromJson)`. A section that no source sets decodes as `null`, so an
+`Option` target gives `None`.
+
+```mbt check
+///|
+struct ServerOptions {
+  host : String
+  port : Int
+} derive(FromJson, Eq, Debug)
+
+///|
+test "bind a section to a record" {
+  let config = @config.build([
+    @config.ConfigSource::defaults({
+      "server": { "host": "localhost", "port": 8080 },
+    }),
+  ])
+  let server : ServerOptions = config |> @config.bind("server")
+  @expect.expect(server).to_equal({ host: "localhost", port: 8080 })
+  let metrics : ServerOptions? = config.bind("metrics")
+  @expect.expect(metrics).to_equal(None)
+}
+```
+
+A decode failure raises `Decode`. Its text names the decode path, the decoder
+detail, and the sources that set the bad value, as
+`<path>: <detail> (<blame text>)`. A path inside a list shows the index, for
+example `targets[1].level`. The text never shows the configured value.
+
+| Blame | Text | When |
+| --- | --- | --- |
+| `Set(origins)` | `set in project /repo/app.toml` | A source set the leaf or the list |
+| `Table(origins)` | `table set in ...` | The key is a table, for example a missing field |
+| `Unset` | `not set by any source` | No source sets the key |
+
+```mbt check
+///|
+test "a decode error names the file that set the value" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/app.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.toml",
+    "server.host = \"example.org\"\nserver.port = \"eighty\"",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  try {
+    let _ : ServerOptions = config |> @config.bind("server")
+  } catch {
+    error =>
+      @expect.expect(error.message()).to_equal(
+        "server.port: Int::from_json: expected number (set in project /srv/app.toml)",
+      )
+  } noraise {
+    _ => fail("expected a decode error")
+  }
+}
+```
+
+## Hosts
+
+The core never reads the disk or the process. A host gives it those inputs.
+
+| Target | How to load |
+| --- | --- |
+| `native` | `@host.load(builder)` from [`config/host`](host/README.mbt.md) reads the files, and the process variables and working directory when the builder holds none |
+| `js` | A host adapter comes in a later change; until then, run the request loop above |
+| `wasm`, `wasm-gc` | The host gives a complete `FileTree`, a variable set, and a working directory, then calls `@config.load` once |
+
+```mbt check
+///|
+test "a wasm host gives every input" {
+  let builder = @config.builder()
+    |> @config.env_vars({ "ACME_MODE": "fast" })
+    |> @config.working_dir("/app")
+    |> @config.format(@toml.format())
+    |> @config.file("acme.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/app/acme.toml",
+    "mode = \"safe\"",
+  )
+  guard @config.load(builder, tree) is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  @expect.expect(@config.get_text(config, "mode")).to_equal("safe")
 }
 ```
 

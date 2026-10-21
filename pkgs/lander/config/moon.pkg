@@ -2,6 +2,7 @@ import {
   "moonrockz/ion/ion" @ion,
   "moonrockz/ion/json" @ion_json,
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 import {

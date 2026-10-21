@@ -819,6 +819,15 @@ TypeScript adapter.
 **Call (O2)**: the TypeScript uses only `node:*` APIs that both Node and Bun
 support, so the bundle runs on Node (the js tests use the pinned Node) and on Bun.
 
+**Call (this change)**, native adapter (task group 15): `ConfigBuilder` gives
+`given_env_vars()`, `given_working_dir()`, and `given_platform()`, so the adapter
+fills only what nobody gave. The platform comes from `@async.platform`, so no C
+stub is needed. A listing includes hidden entries, and an entry kind follows
+symbolic links. A path that does not exist, or that is not a file (for a read) or
+a directory (for a listing), becomes an absence record. Other file-system errors
+pass out of `load`. `config/host` supports only `native` until the js adapter
+(task group 16) lands.
+
 **Call (this change)**: the adapter uses the synchronous `node:fs` calls
 (`readdirSync`, `readFileSync`, `statSync`). The MoonBit side then needs no promise
 bridge, and one loop round reads all requests at once. Configuration files are

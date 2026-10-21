@@ -1,0 +1,23 @@
+import {
+  "moonrockz/moon-lander/config",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/os_error",
+  "moonbitlang/core/env",
+}
+
+import {
+  "moonrockz/expect",
+  "moonrockz/moon-lander/config/conventions",
+  "moonrockz/moon-lander/config/formats/toml",
+} for "wbtest"
+
+import {
+  "moonrockz/expect",
+  "moonrockz/moon-lander/config/conventions",
+  "moonrockz/moon-lander/config/formats/toml",
+  "moonbitlang/async/fs",
+} for "test"
+
+// The js adapter comes in a later task; wasm and wasm-gc hosts give a file tree.
+supported_targets = "native"

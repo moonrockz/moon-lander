@@ -60,7 +60,7 @@ Bead: lander-4us.2.6
 
 - [ ] 6.1 Port the environment key mapping (prefix in any case, leading `_`, `__`, lowercase, empty segment error) and reserved names; verify all environment name and reserved name scenarios.
 - [ ] 6.2 Port value typing and the shorter-path-wins order from morphir-moonbit; verify the "Typed values", "JSON list value", "Invalid JSON stays text", "Integer out of range", and both shorter-path scenarios, the last with two input orders.
-- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, read `Discover` variables from the builder variable set (`@config.env_vars`), and give a skipped source for `Skip`; verify "Environment origin names the variable", "Explicit environment variables", "Discover environment with no host", and "Skip a source" with the environment selection.
+- [ ] 6.3 Record the variable name in each environment origin, support `Explicit` variables, read `Discover` variables from the builder variable set (`@config.env_vars`), and give a skipped source for `Skip`; verify "Environment origin names the variable", "Explicit environment variables", "Discover environment with no host", "Skip a source" with the environment selection, and the environment-source parts of "Host adapter fills the inputs" and "Adapter uses the given values".
 - [ ] 6.4 Add the overrides source; verify the "Overrides beat the environment" scenario.
 
 ## 7. TOML date and time mapping
@@ -128,9 +128,9 @@ Bead: lander-4us.2.14
 
 Bead: lander-4us.2.15
 
-- [ ] 15.1 Add the `config/host` package with the native `load(builder)` request loop over `moonbitlang/async` `fs`. It uses the variable set and the working directory of the builder, and reads a value from `moonbitlang/core/env` only when the builder holds none. Verify "Host adapter fills the inputs" and "Adapter uses the given values" with native tests over a temporary directory.
-- [ ] 15.2 Convert Windows paths to the `/` form at the adapter boundary and back for file-system calls; verify "Windows path in a report" in the windows-latest CI leg.
-- [ ] 15.3 Document the wasm and wasm-gc path (an injected `FileTree`, a variable set, and a working directory) in `pkgs/lander/README.md`; verify that the README example runs as a doc test.
+- [x] 15.1 Add the `config/host` package with the native `load(builder)` request loop over `moonbitlang/async` `fs`. It uses the variable set and the working directory of the builder, and reads a value from `moonbitlang/core/env` only when the builder holds none. Verify "Host adapter fills the inputs" and "Adapter uses the given values" with native tests over a temporary directory, with a provider that records the load context (6.3 verifies the environment-source part of both scenarios).
+- [x] 15.2 Convert Windows paths to the `/` form at the adapter boundary and back for file-system calls; verify "Windows path in a report" in the windows-latest CI leg.
+- [x] 15.3 Document the wasm and wasm-gc path (an injected `FileTree`, a variable set, and a working directory) in the `config` package guide `pkgs/lander/config/README.mbt.md`, with the native adapter in `config/host/README.mbt.md`; verify that the examples run as doc tests.
 
 ## 16. js host adapter in TypeScript
 

@@ -73,9 +73,9 @@ Bead: lander-4us.2.7
 
 Bead: lander-4us.2.8
 
-- [ ] 8.1 Add `moonbit-community/yaml@0.0.8` and the `config/formats/yaml` package with an event-based builder that keeps line and column; verify "Core schema scalars" and that the builder matches `Yaml::load_from_string` on the library examples.
-- [ ] 8.2 Add the default profile rules (one document, aliases expanded, no merge keys, no duplicate keys, string keys, empty document); verify the YAML format scenarios and "Default profile accepts an alias".
-- [ ] 8.3 Add the strict profile; verify "Strict profile rejects an alias", "Strict profile rejects null", and one test for each other strict rule.
+- [x] 8.1 Add `moonbit-community/yaml@0.0.8` and the `config/formats/yaml` package with an event-based builder that keeps line and column; verify "Core schema scalars" and that the builder matches `Yaml::load_from_string` on the library examples.
+- [x] 8.2 Add the default profile rules (one document, aliases expanded, no merge keys, no duplicate keys, string keys, empty document); verify the YAML format scenarios and "Default profile accepts an alias".
+- [x] 8.3 Add the strict profile; verify "Strict profile rejects an alias", "Strict profile rejects null", and one test for each other strict rule.
 
 ## 9. JSON and JSON5 formats
 

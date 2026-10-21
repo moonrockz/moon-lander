@@ -1,9 +1,12 @@
 import {
   "moonrockz/ion/ion" @ion,
   "moonrockz/ion/json" @ion_json,
+  "moonrockz/ion/text" @ion_text,
+  "moonbit-community/toml" @toml_lib,
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "moonbitlang/core/int64",
+  "moonbitlang/core/encoding/base64" @base64,
 }
 
 import {

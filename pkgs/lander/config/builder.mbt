@@ -9,6 +9,7 @@ pub struct ConfigBuilder {
   priv env_vars : Map[String, String]?
   priv working_dir : String?
   priv platform : Platform?
+  priv secret_syntax : SecretSyntax
 }
 
 ///|
@@ -26,7 +27,18 @@ pub fn builder() -> ConfigBuilder {
     env_vars: None,
     working_dir: None,
     platform: None,
+    secret_syntax: Standard,
   }
+}
+
+///|
+/// Set whether one-field `env` / `file` / `command` / `keyring` structs are
+/// secret references. The default is `SecretSyntax::standard()`.
+pub fn secret_syntax(
+  builder : ConfigBuilder,
+  syntax : SecretSyntax,
+) -> ConfigBuilder {
+  { ..builder, secret_syntax: syntax }
 }
 
 ///|

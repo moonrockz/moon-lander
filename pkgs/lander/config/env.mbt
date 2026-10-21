@@ -26,6 +26,8 @@ pub fn ConfigSource::env(
     kind: Environment,
     name,
     priority,
+    policy: Replace,
+    key_policies: [],
     input: Env(selection, prefix, reserved.copy()),
     excluded: [],
   }

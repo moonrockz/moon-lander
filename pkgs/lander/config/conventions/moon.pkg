@@ -1,0 +1,9 @@
+import {
+  "moonrockz/moon-lander/config",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/expect",
+  "moonrockz/moon-lander/config/formats/toml",
+} for "test"

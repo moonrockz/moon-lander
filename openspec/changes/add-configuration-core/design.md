@@ -510,6 +510,12 @@ design follows Morphir.
 The merge copies only the changed path. It shares unchanged subtrees. Inputs do not
 change.
 
+**Call (this change)**: the merge is associative only when no path is a struct in
+one tree and a leaf in another. With `{x = {y}}`, `{x = 2}` and `{x = {z}}`, the
+left grouping gives `{x = {z}}` and the right grouping gives `{x = {y, z}}`,
+because a struct replaces a scalar. Load order is fixed, so this does not change a
+result; the property test generates trees whose names keep one shape.
+
 **Call**: `MergePolicy` selects list behaviour per source or per key path:
 
 ```moonbit
@@ -552,6 +558,11 @@ origin for a replaced leaf or a replaced list. An `Append` or `MergeByKey` list 
 every contributing origin in merge order. Binding shows this array as its blame for
 a list (`Set(Array[Origin])`). A struct has no record of its own, as in the Morphir
 spec. An empty struct therefore has no origin.
+
+**Call (this change)**: `Config::origins(key)` gives the origins of the leaf at
+`key`, and an empty array for a struct or a missing key. `Config::provenance()`
+gives every leaf with its origins, in tree order. Both return copies.
+`SourceKind::report_name()` gives the report names of D4.
 
 `SourceReport` holds `kind`, `name`, `priority`, `path : String?`,
 `candidates : Array[String]`, `status : SourceStatus` (`Loaded`, `NotFound`,

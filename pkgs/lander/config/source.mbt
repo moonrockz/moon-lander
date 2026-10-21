@@ -147,7 +147,7 @@ pub fn ConfigSource::skipped(
 ) -> ConfigSource {
   {
     kind,
-    name: name.unwrap_or(kind_name(kind)),
+    name: name.unwrap_or(kind.report_name()),
     priority,
     input: NoInput,
     excluded: [],

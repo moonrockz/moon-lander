@@ -12,8 +12,8 @@ this page runs as a test with `mise run test`.
 
 > [!NOTE]
 > The configuration core is in progress. This page shows the API that exists
-> today. Environment variables, provenance, the YAML, JSON and Ion formats, the
-> host adapters, discovery, and binding come in later changes. The
+> today. Environment variables, the YAML, JSON and Ion formats, the host
+> adapters, the rest of discovery, and binding come in later changes. The
 > [design overview](../../../docs/design/overview.md) shows the full plan.
 
 ## One load, start to finish
@@ -322,9 +322,42 @@ test "the extension selects the format" {
 
 | Base | Overlay | Result |
 | --- | --- | --- |
+| any | null | The base value stays, at any depth |
 | struct | struct | Fields merge one by one; base fields first, new fields after |
 | any | any other value | The overlay wins |
 | list | list | The overlay list replaces the base list |
+
+A merged configuration never holds a null struct field: a null with no base value
+adds nothing. Nulls inside lists stay. The merge never changes its inputs.
+
+## Where each value came from
+
+Every leaf of the merged tree has a non-empty list of origins: the kind, the
+display name, the priority, and the file path of the source that set it. A list
+counts as one leaf. A struct has no origin of its own, and a value that replaces a
+struct removes the records below it. Reports name each kind as Morphir does, for
+example `project` for a workspace file and `user-override` for a user override.
+
+```mbt check
+///|
+test "the origin of each value" {
+  let config = @config.build([
+    @config.ConfigSource::defaults({ "ir": { "layout": "tree", "mode": "safe" } }),
+    @config.in_memory_pairs(
+      [("ir.mode", @config.string("fast"))],
+      name="command line",
+    ),
+  ])
+  let origins = config.provenance().map(record => {
+    (record.0.to_string(), record.1.map(origin => origin.source))
+  })
+  @expect.expect(origins).to_equal([
+    ("ir.layout", ["defaults"]),
+    ("ir.mode", ["command line"]),
+  ])
+  @expect.expect(config.reports()[0].kind.report_name()).to_equal("defaults")
+}
+```
 
 ## Excluding a subtree
 

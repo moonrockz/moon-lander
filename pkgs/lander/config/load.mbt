@@ -84,6 +84,7 @@ pub fn load(
   let results = sources.map(source => resolve(source, context, needs))
   guard expanded && needs.is_empty() else { return Need(needs) }
   let mut root = fields([])
+  let provenance : Map[KeyPath, Array[Origin]] = Map([])
   let reports : Array[SourceReport] = []
   for index, source in sources {
     // A source gives `None` only with a request, and no request is open.
@@ -107,6 +108,7 @@ pub fn load(
     }
     if value is Some(tree) {
       root = merge(root, tree)
+      record_origins(provenance, tree, origin)
     }
     reports.push({
       kind: source.kind,
@@ -118,7 +120,15 @@ pub fn load(
       warnings,
     })
   }
-  Done({ root, reports, notes })
+  // The configuration holds no null field, and a record only for each leaf.
+  root = without_nulls(root)
+  let leaf_origins : Map[KeyPath, Array[Origin]] = Map([])
+  for leaf in leaves(root) {
+    if provenance.get(leaf.0) is Some(origins) {
+      leaf_origins[leaf.0] = origins
+    }
+  }
+  Done({ root, reports, notes, provenance: leaf_origins })
 }
 
 ///|

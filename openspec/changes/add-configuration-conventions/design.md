@@ -349,6 +349,15 @@ by the walk-up depth plus the member expansion depth.
 Alternative: read the full tree first. Rejected because walk-up can reach the
 file-system root.
 
+Call (this change, tracer bullet): walk-up asks for one listing per round, nearest
+first, and stops at the root it finds, so it never lists parents above the project
+root. `add(builder, conventions)` takes no options until a part reads them; the
+group that first reads a `DiscoveryOptions` field adds `options?`. Discovery with
+no working directory, or a relative one, gives a skipped project source and a
+`Note` warning: the core would join a relative candidate to the working directory
+again, and a relative directory has no parents to walk to. With no
+primary, the candidate list at the start directory reports `NotFound`.
+
 ### D13. No host package in this change (Call (R1); Owner (O2))
 
 This change has no host package. File reading is in the core package

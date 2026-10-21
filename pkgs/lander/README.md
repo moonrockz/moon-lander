@@ -18,7 +18,7 @@ same inputs give the same configuration on every target.
 ```layers
 Hosting | @lander: arguments, lifecycle, exit codes (planned)
 Binding | typed values with source-aware errors (planned)
-Conventions | where configuration files are found (planned)
+Conventions | @conventions: where configuration files are found
 Configuration core | @config: sources, file tree, pure load, merge
 Formats | TOML today; YAML, JSON5 and Ion later
 ```
@@ -30,11 +30,11 @@ a load asks for. A `wasm` host gives the files itself.
 
 | Layer | Package | Status |
 | --- | --- | --- |
-| Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources and the builder, file tree and the pure load, merge, typed errors |
+| Configuration core | [`config`](config/README.mbt.md) | Value tree, key paths, sources and the builder, file tree and the pure load, merge with null rules, provenance, typed errors |
 | Formats | `config/formats/toml` | TOML strings, numbers, Booleans, arrays, and tables |
-| Configuration core, rest | `config` | Environment variables, provenance, merge policies, secrets, redaction, and helpers come next |
+| Configuration core, rest | `config` | Environment variables, merge policies, secrets, redaction, and helpers come next |
 | Host adapters | `config/host` | Planned |
-| Conventions | | Planned |
+| Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery of `<app>.<ext>`; the other layouts and locations come next |
 | Binding | | Planned |
 | Hosting | `@lander` | Planned |
 

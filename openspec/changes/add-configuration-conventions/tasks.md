@@ -12,11 +12,11 @@ Run `mise run format` and `mise run check` before each group is closed.
 
 Bead: lander-4us.3.1
 
-- [ ] 1.1 Create the package `pkgs/lander/config/conventions` for all four targets with a dependency on `@config` only, and verify `mise run build` passes.
-- [ ] 1.2 Add `Platform`, `DiscoveryOptions` and `base(name, prefix?, display?)` over the core `FileTree`, and verify a unit test that builds a complete tree and reads one listing.
-- [ ] 1.3 Add the `<app>.<ext>` layout with extensions from the registered formats and walk-up with no boundary, and verify the "Configuration found from a nested directory" scenario as a test.
-- [ ] 1.4 Add `@conventions.add` so that the core `@config.load(builder, tree)` runs discovery, return ordered `ConfigSource` values with role `Workspace` and priority 300, and verify a test that reads `project.name` from the merged result on wasm, wasm-gc, js and native.
-- [ ] 1.5 Add a package README with a runnable example of 1.3 and 1.4 that uses `|> @conventions.add(@conventions.app_dirs("acme"))`, and verify `mise run test` runs the example.
+- [x] 1.1 Create the package `pkgs/lander/config/conventions` for all four targets with a dependency on `@config` only, and verify `mise run build` passes.
+- [x] 1.2 Add `DiscoveryOptions` and `base(name, prefix?, display?)` over the core `FileTree`, using the core `@config.Platform` (core design D4a), and verify a unit test that builds a complete tree and reads one listing.
+- [x] 1.3 Add the `<app>.<ext>` layout with extensions from the registered formats and walk-up with no boundary, and verify the "Configuration found from a nested directory" scenario as a test.
+- [x] 1.4 Add `@conventions.add` so that the core `@config.load(builder, tree)` runs discovery, return ordered `ConfigSource` values with role `Workspace` and priority 300, and verify a test that reads `project.name` from the merged result on wasm, wasm-gc, js and native.
+- [x] 1.5 Add a package README with a runnable example of 1.3 and 1.4 that uses `|> @conventions.add(@conventions.app_dirs("acme"))`, and verify `mise run test` runs the example.
 
 ## 2. Candidate layouts, extensions, ambiguity and legacy fallback
 

@@ -36,10 +36,10 @@ Bead: lander-4us.2.3
 
 Bead: lander-4us.2.4
 
-- [ ] 4.1 Add null-overlay handling and null-field removal from the result; verify the "Null does not unset" and "Null with no base value" scenarios.
-- [ ] 4.2 Make merge copy only changed paths and keep inputs unchanged; verify "Inputs do not change" and "New keys follow base keys", plus an associativity property test over generated trees.
-- [ ] 4.3 Add the provenance map and stale-record removal ported from morphir-moonbit `merge`, over the `Origin` type that group 14 declares; verify the "Winning origins" and "Stale records go" scenarios, the origin part of "Defaults from JSON", and that excluded values have no provenance record.
-- [ ] 4.4 Add the Morphir kind names and `local-override` to the `SourceReport` that group 5 adds (kind, name, priority, path, candidates, status, and warnings); verify the "Report order and status" and "File role names" scenarios.
+- [x] 4.1 Add null-overlay handling and null-field removal from the result; verify the "Null does not unset" and "Null with no base value" scenarios.
+- [x] 4.2 Make merge copy only changed paths and keep inputs unchanged; verify "Inputs do not change" and "New keys follow base keys", plus an associativity property test over generated trees in which no path is a struct in one tree and a leaf in another (design D8).
+- [x] 4.3 Add the provenance map and stale-record removal ported from morphir-moonbit `merge`, over the `Origin` type that group 14 declares; verify the "Winning origins" and "Stale records go" scenarios, the origin part of "Defaults from JSON", and that excluded values have no provenance record.
+- [x] 4.4 Add the Morphir kind names (`SourceKind::report_name`) and `local-override` to the `SourceReport` that group 5 adds (kind, name, priority, path, candidates, status, and warnings); verify the "Report order and status" and "File role names" scenarios.
 
 ## 5. Source model: selection, file source, ambiguity, exclusion
 

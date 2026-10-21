@@ -5,6 +5,7 @@ pub struct Config {
   priv root : ConfigValue
   priv reports : Array[SourceReport]
   priv notes : Array[ConfigWarning]
+  priv provenance : Map[KeyPath, Array[Origin]]
 }
 
 ///|
@@ -16,6 +17,20 @@ pub fn build(sources : Array[ConfigSource]) -> Config raise ConfigError {
     Done(config) => config
     Need(_) => abort("a complete file tree never asks for files")
   }
+}
+
+///|
+/// The origins of the leaf at `key`: one origin for a replaced leaf or list.
+/// A struct has no origin of its own, so a struct or a missing key gives an
+/// empty array.
+pub fn Config::origins(self : Config, key : KeyPath) -> Array[Origin] {
+  self.provenance.get(key).map(origins => origins.copy()).unwrap_or([])
+}
+
+///|
+/// The origins of every leaf, in tree order. Each array is not empty.
+pub fn Config::provenance(self : Config) -> Array[(KeyPath, Array[Origin])] {
+  leaves(self.root).map(leaf => (leaf.0, self.origins(leaf.0)))
 }
 
 ///|

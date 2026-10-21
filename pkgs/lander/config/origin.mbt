@@ -53,9 +53,11 @@ pub extend Origin with Eq::{equal, not_equal}
 pub extend Origin with @debug.Debug::{to_repr}
 
 ///|
-/// The report name of a source kind. A file source shows the name of its role.
-fn kind_name(kind : SourceKind) -> String {
-  match kind {
+/// The report name of a source kind, as Morphir names its layers. A file
+/// source shows the name of its role: `project` for workspace, explicit, and
+/// legacy files.
+pub fn SourceKind::report_name(self : SourceKind) -> String {
+  match self {
     Defaults => "defaults"
     InMemory => "in-memory"
     File(System) => "system"
@@ -75,8 +77,8 @@ fn kind_name(kind : SourceKind) -> String {
 /// `environment` and the variable name, or else the kind name.
 fn origin_text(origin : Origin) -> String {
   match (origin.kind, origin.location) {
-    (File(_) as kind, Some(path)) => "\{kind_name(kind)} \{path}"
+    (File(_) as kind, Some(path)) => "\{kind.report_name()} \{path}"
     (Environment, Some(variable)) => "environment \{variable}"
-    (kind, _) => kind_name(kind)
+    (kind, _) => kind.report_name()
   }
 }

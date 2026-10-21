@@ -81,6 +81,11 @@ pub fn[R : SecretResolver] Config::secret(
     String(text) => return { text, }
     _ => ()
   }
+  guard self.secret_syntax is Standard else {
+    raise InvalidSecretValue(
+      reason="configuration key \{path} is not a secret reference",
+    )
+  }
   guard secret_ref_of(value) is Some(reference) else {
     raise InvalidSecretValue(reason="configuration key \{path} is not a secret")
   }

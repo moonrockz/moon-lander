@@ -41,12 +41,19 @@ fn record_origins(
   source_policy~ : MergePolicy = Replace,
   key_policies~ : Array[(KeyPath, MergePolicy)] = [],
   secret_syntax~ : SecretSyntax = Standard,
+  previous~ : ConfigValue = fields([]),
 ) -> Unit {
   for leaf in leaves(tree, secret_syntax~) {
     let (path, value) = leaf
     let policy = resolve_policy(path.names, source_policy, key_policies)
-    let list_merge = match (value.ion.kind(), policy) {
-      (List(_), Append | MergeByKey(_)) => true
+    // Append origins only when this overlay list merges with a base list.
+    // A list that replaces a scalar (or a missing path) has one origin.
+    let previous_was_list = match previous.at(path.names) {
+      Some(prior) => prior.ion.kind() is List(_)
+      None => false
+    }
+    let list_merge = match (value.ion.kind(), policy, previous_was_list) {
+      (List(_), Append | MergeByKey(_), true) => true
       _ => false
     }
     let stale = provenance

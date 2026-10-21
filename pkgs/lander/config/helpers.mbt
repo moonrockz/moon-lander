@@ -194,6 +194,47 @@ fn show_json_value(value : ConfigValue, path : KeyPath) -> Json raise ConfigErro
 }
 
 ///|
+/// Render an Ion timestamp as a TOML date-time value, not a quoted string.
+fn timestamp_to_toml(
+  stamp : @ion.Timestamp,
+  key : KeyPath,
+) -> @toml_lib.TomlValue raise ConfigError {
+  let text = stamp.to_ion_string()
+  let document = @toml_lib.parse("v = \{text}") catch {
+    err =>
+      raise Render(
+        format="TOML",
+        key~,
+        reason="cannot write timestamp as TOML date-time: \{err}",
+      )
+  }
+  match document {
+    TomlTable(entries) =>
+      match entries.get("v") {
+        Some(TomlDateTime(_) as value) => value
+        Some(_) =>
+          raise Render(
+            format="TOML",
+            key~,
+            reason="timestamp did not parse as a TOML date-time",
+          )
+        None =>
+          raise Render(
+            format="TOML",
+            key~,
+            reason="timestamp did not parse as a TOML date-time",
+          )
+      }
+    _ =>
+      raise Render(
+        format="TOML",
+        key~,
+        reason="timestamp did not parse as a TOML date-time",
+      )
+  }
+}
+
+///|
 fn to_toml_value(
   value : ConfigValue,
   path : Array[String],
@@ -209,7 +250,7 @@ fn to_toml_value(
     Int(number) => @toml_lib.TomlInteger(number.to_int64())
     Float(number) => @toml_lib.TomlFloat(number)
     Decimal(number) => @toml_lib.TomlString(number.to_ion_string())
-    Timestamp(stamp) => @toml_lib.TomlString(stamp.to_ion_string())
+    Timestamp(stamp) => timestamp_to_toml(stamp, key)
     Symbol(token) => @toml_lib.TomlString(token.text().unwrap_or(""))
     String(text) => @toml_lib.TomlString(text)
     Blob(bytes) | Clob(bytes) => @toml_lib.TomlString(@base64.encode(bytes[:]))

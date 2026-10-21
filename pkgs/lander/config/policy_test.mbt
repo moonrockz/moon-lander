@@ -125,3 +125,43 @@ fn named_value(value : @config.ConfigValue, name : String) -> @config.ConfigSour
     error => abort(error.message())
   }
 }
+
+///|
+test "Merge-by-key rejects a repeated key in one overlay list" {
+  try
+    @config.build([
+      named({ "servers": [{ "name": "a", "port": 1 }] }, "base"),
+      named(
+        {
+          "servers": [
+            { "name": "b", "port": 2 },
+            { "name": "b", "port": 3 },
+          ],
+        },
+        "overlay",
+      ).with_key_policy(key("servers"), MergeByKey("name")),
+    ])
+  catch {
+    error => {
+      guard error is MergeKey(key~, index~, source~) else {
+        fail("wrong error")
+      }
+      @expect.expect(key.to_string()).to_equal("servers")
+      @expect.expect(index).to_equal(1)
+      @expect.expect(source).to_equal("overlay")
+    }
+  } noraise {
+    _ => fail("expected MergeKey")
+  }
+}
+
+///|
+test "a list policy replacing a scalar keeps one origin" {
+  let config = @config.build([
+    named({ "plugins": "alone" }, "base"),
+    named({ "plugins": ["b"] }, "overlay").with_key_policy(key("plugins"), Append),
+  ])
+  @expect.expect(
+    config.origins(key("plugins")).map(origin => origin.source),
+  ).to_equal(["overlay"])
+}

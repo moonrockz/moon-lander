@@ -158,3 +158,27 @@ test "Resolver gets the origin" {
   @expect.expect(reference).to_equal(@config.File("s.txt"))
   @expect.expect(origin.location).to_equal(Some("/w/app.toml"))
 }
+
+///|
+test "SecretSyntax none does not resolve a one-field env table" {
+  let builder = @config.builder()
+    |> @config.secret_syntax(@config.SecretSyntax::none())
+    |> @config.add(
+      named({ "deploy": { "env": "prod" } }, "base"),
+    )
+  let config = match @config.load(builder, @config.FileTree::new(complete=true)) {
+    Done(config) => config
+    Need(_) => abort("complete tree")
+  }
+  @expect.expect(config.get(key("deploy.env"))).to_equal(
+    Some(@config.string("prod")),
+  )
+  try config.secret("deploy", @config.env_resolver({})) catch {
+    error =>
+      @expect.expect(error.message().has_prefix("invalid-secret-value")).to_equal(
+        true,
+      )
+  } noraise {
+    _ => fail("expected InvalidSecretValue when recognition is off")
+  }
+}

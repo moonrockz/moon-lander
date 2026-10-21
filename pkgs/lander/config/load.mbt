@@ -119,6 +119,7 @@ pub fn load(
     for piece in pieces {
       let piece_origin = piece.1.unwrap_or(source.name)
       check_secret_payloads(piece.0, piece_origin, secret_syntax)
+      let previous = root
       root = merge(
         root,
         piece.0,
@@ -134,6 +135,7 @@ pub fn load(
         source_policy=source.policy,
         key_policies=source.key_policies,
         secret_syntax=secret_syntax,
+        previous=previous,
       )
     }
     reports.push({

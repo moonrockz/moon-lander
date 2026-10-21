@@ -174,8 +174,13 @@ fn merge_lists_by_key(
     index_by_key[key] = result.length()
     result.push(item)
   }
+  let overlay_keys : Set[String] = Set([])
   for index, item in overlay_items {
     let key = list_item_key({ ion: item }, key_name, key_path, index, source)
+    if overlay_keys.contains(key) {
+      raise MergeKey(key=key_path, index~, source~)
+    }
+    overlay_keys.add(key)
     match index_by_key.get(key) {
       Some(position) => {
         let merged = merge_at(

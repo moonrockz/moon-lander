@@ -237,3 +237,23 @@ test "Explain a struct" {
     ),
   ).to_equal([("project.name", ["base"]), ("project.version", ["user"])])
 }
+
+///|
+test "Show writes a timestamp as a TOML date-time" {
+  let value = @config.ConfigValue::from_ion(
+    @ion.Ion::from_fields([
+      @ion.field(
+        "at",
+        @ion.Ion::timestamp(
+          @ion.Timestamp::parse("2026-09-28T12:30:00Z") catch {
+            err => abort(err.message())
+          },
+        ),
+      ),
+    ]),
+  )
+  let config = @config.build([@config.in_memory(value)])
+  let text = @config.show(config, Toml)
+  @expect.expect(text.contains("at = 2026-09-28T12:30:00Z")).to_equal(true)
+  @expect.expect(text.contains("\"2026-09-28")).to_be_false()
+}

@@ -12,6 +12,9 @@ node = "24.14.1"
 # Bun builds and bundles the TypeScript host adapter for the js target (pkgs/lander/adapters/node/)
 bun = "1.4.3"
 
+# Browser harness CLI; must match tests/browser/package.json exactly.
+"npm:@playwright/test" = "1.64.1"
+
 # YAML linting, pinned so lint results do not change between machines
 yamllint = "1.38.0"
 
@@ -126,6 +129,26 @@ run = "moonx scripts/test-node-adapter.mbtx"
 [tasks."test:scripts"]
 description = "Test the task scripts"
 run = "moonx scripts/test-scripts.mbtx"
+
+[tasks."build:browser-fixture"]
+description = "Generate the spike FFI and build the browser fixture"
+run = "moonx scripts/build-browser-fixture.mbtx"
+
+[tasks."check:browser-fixture"]
+description = "Check that the generated browser spike adapter is current"
+run = "moonx scripts/build-browser-fixture.mbtx --check"
+
+[tasks."browsers:install"]
+description = "Install the locked browser harness and three engines (args: --with-deps on Linux)"
+run = "moonx scripts/browser.mbtx install"
+
+[tasks."test:browser"]
+description = "Build once and test the fixture in Chromium, Firefox and WebKit"
+run = "moonx scripts/browser.mbtx test"
+
+[tasks."test:browser-failures"]
+description = "Prove browser assertion and missing-engine failures propagate"
+run = "moonx scripts/browser.mbtx test --verify-failures"
 
 [tasks."build:node-adapter"]
 description = "Bundle the TypeScript js host adapter with Bun"

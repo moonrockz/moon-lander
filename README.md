@@ -89,6 +89,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run test:node-adapter` | Test the js host adapter on Node and Bun |
 | `mise run browsers:install` | Install the locked Playwright harness and Chromium, Firefox, WebKit; add `-- --with-deps` on Linux |
 | `mise run test:browser` | Build the unpublished fixture once and test all three browser engines |
+| `mise run test:browser-zig` | Run the browser suite with zig as the C compiler, as CI does in the Playwright image |
 | `mise run test:browser-failures` | Also prove deliberate assertion and unavailable-engine failures propagate |
 | `mise run build:browser-fixture` | Generate the spike FFI and build the browser fixture |
 | `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |

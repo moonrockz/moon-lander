@@ -47,6 +47,12 @@ directory. It requires the specific failure messages and expected failed-test
 counts from the original smoke file, so an unrelated nonzero exit cannot satisfy those checks. No engine is
 skipped or retried. This command is the browser CI job's gate.
 
+The CI job runs in the pinned `mcr.microsoft.com/playwright` image, whose tag matches the Playwright
+pin. The image holds the three engines and their OS packages, so CI runs `browsers:install` without
+`--with-deps` and installs nothing with apt. The image has no C compiler, so CI runs the suite as
+`mise run test:browser-zig -- --verify-failures`, and zig builds the native parity reference.
+Change the image tag and digest in `.github/workflows/ci.yml` when you change the Playwright pin.
+
 The suite has a 300-second Playwright limit inside a 420-second MoonBit limit.
 The fixture build, with its four reference builds, has a 300-second limit.
 Installation has separate 5-minute dependency and 10-minute engine limits.

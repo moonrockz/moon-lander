@@ -133,6 +133,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     timeout-minutes: 20
+    # The pinned Playwright image holds the three pinned engines and their OS packages, so this job
+    # installs nothing with apt. Its tag must match the Playwright pin in .config/mise/config.toml.
+    container:
+      # A tag with a digest cannot be split.
+      # yamllint disable-line rule:line-length
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+      options: --user 1001
+    env:
+      # The image has no pipx, and this job does not lint YAML.
+      MISE_DISABLE_TOOLS: yamllint
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -140,10 +150,11 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install locked harness, engines and OS dependencies
-        run: mise run browsers:install -- --with-deps
+      - name: Install locked harness and check the engines
+        run: mise run browsers:install
       - name: Test browsers and failure propagation
-        run: mise run test:browser -- --verify-failures
+        # The image has no C compiler, so zig builds the native parity reference.
+        run: mise run test:browser-zig -- --verify-failures
 
   # Windows support is a project requirement, so PRs build and test native and js there.
   windows:

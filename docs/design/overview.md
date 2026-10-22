@@ -302,8 +302,8 @@ gives the same result on all four targets.
 | Change | What it owns |
 | --- | --- |
 | [add-configuration-core](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/archive/2026-10-21-add-configuration-core) | Value tree, sources, formats, merge, provenance, secrets, errors, FileTree, host file adapters |
-| [add-configuration-conventions](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/add-configuration-conventions) | Discovery, layouts, workspaces, environments, local and user overrides, Morphir preset |
-| [add-configuration-binding](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/add-configuration-binding) | Typed binding, validation, options |
+| [add-configuration-conventions](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/archive/2026-10-22-add-configuration-conventions) | Discovery, layouts, workspaces, environments, local and user overrides, Morphir preset |
+| [add-configuration-binding](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/archive/2026-10-22-add-configuration-binding) | Typed binding, validation, options |
 | [add-host-lifecycle](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/add-host-lifecycle) | Builder, starting values, defaults, arguments, services, lifetime, signals, exit codes |
 
 These items are not in scope now: a DI container, reload when a file changes, a new

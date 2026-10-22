@@ -18,7 +18,10 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
 - Follow `CONTRIBUTING.md` for the OpenSpec and beads workflow. Changes to behavior,
   public APIs or requirements start as an OpenSpec change in `openspec/changes/`.
 - Each task group in a change's `tasks.md` is one beads story; its `Bead:` line holds
-  the ID. Tick the tasks in `tasks.md` and close the bead when the group is verified.
+  the ID. Tick the tasks in `tasks.md` in the pull request.
+- Landing a pull request includes the tracker state. Follow "Land a change" in
+  `CONTRIBUTING.md`: the last group's pull request archives the change; after the
+  merge, close the beads with the PR and merge SHA, close a finished epic, and sync.
 - Run `mise exec -- openspec validate --all --strict` after you edit `openspec/`.
 
 ## Toolchain and tasks

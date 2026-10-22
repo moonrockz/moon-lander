@@ -28,7 +28,9 @@ let unknown_key_detail = "is an unknown key"
 /// Raise one `Validation` error with a failure for each key of `section`, the
 /// configured section at `key`, that `written`, the `ToJson` form of the bound
 /// value, does not hold. A key that a listed path names, or a key below it, is
-/// accepted. The check goes into tables and list items, and it stops where the
+/// accepted. A configured table above a listed path is checked against the
+/// listed paths, also when the written form leaves the table out. The check
+/// goes into tables and list items, and it stops where the
 /// written form has no table or list of the same length, because the type
 /// then reads that value in its own way.
 fn Config::check_unknown_keys(
@@ -59,9 +61,21 @@ fn Config::check_unknown_keys(
             continue
           }
           let child_steps : Array[DecodeStep] = [..steps, Field(name)]
+          let ancestor = accepted
+            .iter()
+            .any(listed => starts_with(listed, child_names))
           match written_fields.get(name) {
             Some(child) =>
               walk(child_steps, child_names, { ion: field.value() }, child)
+            // A table above a listed key path: the encoder may leave it out,
+            // so check its keys against the listed paths only.
+            None if ancestor && field.value().kind() is Struct(_) =>
+              walk(
+                child_steps,
+                child_names,
+                { ion: field.value() },
+                Json::object(Map([])),
+              )
             None => {
               let path = decode_path_below(Some(key), child_steps)
               failures.push({

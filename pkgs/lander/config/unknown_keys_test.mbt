@@ -167,6 +167,35 @@ test "a listed key accepts the keys below it" {
 }
 
 ///|
+test "a listed nested key works when the encoder leaves out its table" {
+  let config = load_files([
+    (
+      "/repo/morphir.toml",
+      Workspace,
+      (
+        #|ir.layout = "tree"
+        #|ir.legacy.port = 1
+        #|ir.legacy.host = "x"
+        #|ir.old = [1]
+      ),
+    ),
+  ])
+  let (failures, _) = unknown_key_failures(() => {
+    config
+    |> @config.bind_or(
+      "ir",
+      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      unknown=RejectExcept(["legacy.port", "old.value"]),
+    )
+    |> ignore
+  })
+  @expect.expect(failures.map(paths)).to_equal([
+    ["ir.legacy.host"],
+    ["ir.old"],
+  ])
+}
+
+///|
 test "the check goes into list items" {
   let config = load_files([
     (

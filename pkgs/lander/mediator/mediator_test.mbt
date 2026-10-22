@@ -6,7 +6,7 @@ struct Stop(Int32)
 
 ///|
 suberror AppError {
-  Rejected(String)
+  Denied(String)
 } derive(Debug)
 
 ///|
@@ -41,10 +41,10 @@ test "two senders stay separate" {
 test "a handler error passes out of send unchanged" {
   let echo : @mediator.Sender[Unit, Echo, String] = @mediator.sender((_, req) => {
     let Echo(text) = req
-    raise Rejected(text)
+    raise Denied(text)
   })
   try echo.send((), Echo("Hello")) catch {
-    Rejected(text) => assert_eq(text, "Hello")
+    Denied(text) => assert_eq(text, "Hello")
     other => fail("send raised another error: \{other}")
   } noraise {
     reply => fail("send gave a reply: \{reply}")

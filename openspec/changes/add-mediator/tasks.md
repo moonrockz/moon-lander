@@ -58,11 +58,11 @@ Bead: lander-4us.10.3
 
 Bead: lander-4us.10.4
 
-- [ ] 4.1 Fix the exact `MediatorError` cases of design D6: name only core-raised contract faults, each with a test that raises it; verify no case formats a request value into its text, with a test whose request holds a secret-like field
-- [ ] 4.2 Verify the context value passes unchanged: a handler and a middleware read a field of a services record from the context and get the value the caller gave; use a test that changes the record field value between two sends and sees each value
-- [ ] 4.3 Verify the core holds no context after a call: a test sends with one context value, then sends with a second, and the handler sees the second value only
-- [ ] 4.4 Verify a handler can raise `MediatorError` and an application error through the same sender, and `send` passes each out unchanged when no middleware catches it
-- [ ] 4.5 Document the context parameter and `MediatorError` in the package README with a runnable services-record example; verify the example runs on all four targets
+- [x] 4.1 Add `MediatorError` as in design D6 with the one case `Rejected(reason~)` that a handler or a middleware raises (the core raises no error of its own); verify a validation middleware that raises it ends the send without the handler, and verify that `message` holds the reason and no request value, with a test whose request holds a secret-like field
+- [x] 4.2 Verify the context value passes unchanged: a handler and a middleware read a field of a services record from the context and get the value the caller gave; use a test that changes the record field value between two sends and sees each value
+- [x] 4.3 Verify the core holds no context after a call: a test sends with one context value, then sends with a second, and the handler sees the second value only
+- [x] 4.4 Verify a handler can raise `MediatorError` and an application error through the same sender, and `send` passes each out unchanged when no middleware catches it
+- [x] 4.5 Document the context parameter and `MediatorError` in the package README with a runnable services-record example; verify the example runs on all four targets
 
 ## 5. Integration check, acceptance suite, and docs
 

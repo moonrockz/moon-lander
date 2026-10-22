@@ -228,21 +228,25 @@ pub fn[C, Req, Res] Sender::use_(
 ### D6. Errors are one suberror; the pipeline adds no hidden conversion
 
 ```moonbit
-pub suberror MediatorError {
-  // filled in by task group 1; at minimum a case for a middleware
-  // that ends a call with no reply where a reply is owed is NOT a case:
-  // short-circuit gives a reply value, so no such case exists.
+pub(all) suberror MediatorError {
+  /// A handler or a middleware refuses the request or the event.
+  Rejected(reason~ : String)
 }
+
+pub fn MediatorError::message(self : MediatorError) -> String
 ```
 
-- Call: task group 1 fixes the exact cases. The design constraint is that
-  the core itself has almost no runtime failure modes: there is no missing
-  handler (D1 makes it a compile error), no lookup, and no I/O. The
-  realistic core-raised case is a contract fault in a helper constructor
-  (for example an empty middleware list where the API requires one).
-  Handler and application errors pass through as themselves. If group 1
-  finds no core-raised case, it ships `MediatorError` with the cases it
-  can name and test, and no more.
+- Owner (option A, 2026-10-22): the core raises no error of its own.
+  There is no missing handler (D1 makes it a compile error), no lookup,
+  no I/O, and no constructor that can fail: `topic` takes one handler by
+  type and `use_` takes one middleware. Task group 4 found no core-raised
+  case. So `MediatorError` holds the cases that a handler or a middleware
+  raises for a mediator-level refusal. The one case is `Rejected(reason~)`,
+  for example from a validation or an authorization middleware.
+  Application errors pass through as themselves. A new case needs a
+  consumer that needs it and a test that raises it.
+- Call: `MediatorError` derives nothing, so the package imports nothing.
+  `message` gives the text for people, as `ConfigError::message` does.
 - Error text must not hold request field values. Requests can hold
   secrets; the core never formats a request. This follows the binding
   rule that error text does not show configured values
@@ -289,8 +293,7 @@ removal of `pkgs/lander/mediator` and of `tests/mediator-acceptance`.
 
 ## Open Questions
 
-- Exact `MediatorError` cases (D6). Task group 1 names and tests them;
-  the answer cannot change the specs, because the specs require only that
-  handler errors pass through and that the core raises typed errors.
+- Resolved in task group 4 (Owner, option A): `MediatorError` has the one
+  case `Rejected(reason~)`, which a handler or a middleware raises (D6).
 - Resolved in task group 2: `Sender::use_` takes a `Middleware` value
   (D3).

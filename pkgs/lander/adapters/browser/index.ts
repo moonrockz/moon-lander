@@ -178,7 +178,9 @@ export async function writeText(store: FileSystemDirectoryHandle, relative: stri
   const segments = relative.split("/");
   const name = segments.pop()!;
   let dir: FileSystemDirectoryHandle | undefined;
-  let created = false;
+  // The file name was not listed before this call, so an exact entry with that
+  // name after a failure is one that this call created.
+  let fresh = false;
   let writable: FileSystemWritableFileStream | undefined;
   try {
     dir = store;
@@ -191,9 +193,9 @@ export async function writeText(store: FileSystemDirectoryHandle, relative: stri
     let file: FileSystemFileHandle;
     if (await present(dir, name)) file = await dir.getFileHandle(name, { create: false });
     else {
+      fresh = true;
       file = await dir.getFileHandle(name, { create: true });
       if (!await present(dir, name)) return { kind: "conflict" };
-      created = true;
     }
     if (typeof file.createWritable !== "function") throw new DOMException("", "NotSupportedError");
     writable = await file.createWritable();
@@ -202,7 +204,11 @@ export async function writeText(store: FileSystemDirectoryHandle, relative: stri
     return { kind: "written" };
   } catch (error) {
     if (writable) { try { await writable.abort(); } catch { /* Keep the original failure. */ } }
-    if (created && dir) { try { await dir.removeEntry(name); } catch { /* Keep the original failure. */ } }
+    // Remove only an exact entry. On a host that folds names, removeEntry(name)
+    // could remove an entry with another exact name.
+    if (fresh && dir) {
+      try { if (await present(dir, name)) await dir.removeEntry(name); } catch { /* Keep the original failure. */ }
+    }
     const failure = storageFailure(error);
     return (error as { name?: unknown } | null)?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
   }

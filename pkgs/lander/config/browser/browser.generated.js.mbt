@@ -137,7 +137,7 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|      const segments = relative.split("/");
   #|      const name = segments.pop();
   #|      let dir;
-  #|      let created = false;
+  #|      let fresh = false;
   #|      let writable;
   #|      try {
   #|        dir = store;
@@ -152,10 +152,10 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        if (await present(dir, name))
   #|          file = await dir.getFileHandle(name, { create: false });
   #|        else {
+  #|          fresh = true;
   #|          file = await dir.getFileHandle(name, { create: true });
   #|          if (!await present(dir, name))
   #|            return { kind: "conflict" };
-  #|          created = true;
   #|        }
   #|        if (typeof file.createWritable !== "function")
   #|          throw new DOMException("", "NotSupportedError");
@@ -169,9 +169,10 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|            await writable.abort();
   #|          } catch {}
   #|        }
-  #|        if (created && dir) {
+  #|        if (fresh && dir) {
   #|          try {
-  #|            await dir.removeEntry(name);
+  #|            if (await present(dir, name))
+  #|              await dir.removeEntry(name);
   #|          } catch {}
   #|        }
   #|        const failure = storageFailure(error);

@@ -143,6 +143,20 @@ test("storage failures are typed and never fall back to other storage", async ({
     if (setup === "quota") patch(writable, "write", fail("QuotaExceededError"));
     // A close that rejects without releasing the stream; the adapter must abort it.
     if (setup === "close") patch(writable, "close", fail("InvalidStateError"));
+    // The listing after the create call fails once; the new file must still go.
+    if (setup === "listing") {
+      const proto = FileSystemDirectoryHandle.prototype as any;
+      const get = proto.getFileHandle, entries = proto.entries;
+      let broken = false;
+      patch(proto, "getFileHandle", function (this: any, name: string, options?: { create?: boolean }) {
+        if (options?.create) broken = true;
+        return get.call(this, name, options);
+      });
+      patch(proto, "entries", function (this: any) {
+        if (broken) { broken = false; throw new DOMException("storage-secret", "InvalidStateError"); }
+        return entries.call(this);
+      });
+    }
     try { return await (globalThis as any).landerRun({ mode: "store", ops: [op] }); }
     finally { for (const undo of restore.reverse()) undo(); }
   }, { setup, op });
@@ -168,6 +182,10 @@ test("storage failures are typed and never fall back to other storage", async ({
       expect(await run(page, { mounts: [store()], sources: ["new.toml"] }), setup).toEqual({ error: "FileNotFound", path: "/state/new.toml" });
     }
   }
+  const listing = await inject("listing", write("new.toml", acme("listing")));
+  expect(listing).toEqual([{ error: "Io", operation: "write_text", path: "/state/new.toml" }]);
+  expect(JSON.stringify(listing)).not.toContain("storage-secret");
+  expect(await run(page, { mounts: [store()], sources: ["new.toml"] })).toEqual({ error: "FileNotFound", path: "/state/new.toml" });
   // The failed close released the file: the next save succeeds.
   expect(await ops(page, write("acme.toml", acme("after")))).toEqual(["written"]);
   expect((await run(page, { mounts: [store()], sources: ["acme.toml"], keys: ["server.host"] })).values["server.host"]).toBe("after");

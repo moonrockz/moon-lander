@@ -91,8 +91,10 @@ qualification suite. The active evidence checkout MUST remain unchanged.
 #### Scenario: Existing qualification remains the parity gate
 
 - **WHEN** the migration is proposed as complete
-- **THEN** its unit, feature, plugin, isolated-consumer and `mise run test:openrpc`
-  checks pass across native, wasm, js, and wasm-gc with the exact public dependency
+- **THEN** its unit, plugin, isolated-consumer and `mise run test:openrpc` checks
+  pass across native, wasm, js, and wasm-gc with the exact public dependency
+- **AND** its feature checks pass on native, wasm, and js, the targets on which
+  Smithy's async feature runner can run
 - **AND** official conformance, embedded schemas, component closure, determinism,
   aliases, failed-build status, and actual runtime RPC agreement retain their checks
 - **AND** the record includes baseline, migration, and rollback source identities

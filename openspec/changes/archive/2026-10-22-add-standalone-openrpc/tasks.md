@@ -116,7 +116,7 @@ Depends on: `lander-bwk.12`.
 
 - [x] 12.1 Arrange a separate Smithy migration workspace from the recorded baseline, add its own tracked change and exact published import, and verify that migration work makes no edits in the active bristleworm checkout.
 - [x] 12.2 Replace shared OpenRPC work behind the existing adapter while retaining its public Json/warning/error APIs and loss policies; verify each compatibility matrix row or document an explicitly approved public change.
-- [x] 12.3 Pass existing unit, BDD, plugin, isolated-consumer and `mise run test:openrpc` qualification on all four targets using the published dependency; record source and rollback SHAs before closing the rollout.
+- [x] 12.3 Pass existing unit, plugin, isolated-consumer and `mise run test:openrpc` qualification on all four targets, and BDD features on native, wasm and js, using the published dependency; record source and rollback SHAs before closing the rollout.
 
 ## Workflow follow-up
 

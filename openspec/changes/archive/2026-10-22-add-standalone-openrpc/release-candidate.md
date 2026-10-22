@@ -113,5 +113,10 @@ Three things remain open:
 - The library's schema-graph limits cannot be raised by callers
   ([#56](https://github.com/moonrockz/moon-lander/issues/56)). The adapter skips
   `LimitExceeded` findings so that large services still convert.
-- Smithy's async BDD features, OpenRPC among them, do not run on wasm-gc. The
-  same was true at the base.
+- Smithy's BDD features, OpenRPC among them, do not run on wasm-gc, and did not
+  at the base either. The runner, `moonrockz/moonspec@0.11.0`, has only async
+  entry points, and `moonbitlang/async` does not support wasm-gc. On 2026-10-22,
+  during review of PR #61, the owner approved narrowing the feature-check
+  requirement to native, wasm and js. On wasm-gc, OpenRPC is covered by the unit
+  tests, the plugin tests, the isolated consumer and `mise run test:openrpc`. A
+  synchronous moonspec runner would bring the features back to wasm-gc.

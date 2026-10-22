@@ -79,6 +79,79 @@ async fn repository_files(root : String) -> Array[String] raise @model.Invalid {
 }
 
 ///|
+/// The commit of the repository at `root`, from `git rev-parse HEAD`.
+async fn head_commit(root : String) -> String raise @model.Invalid {
+  let (code, stdout, stderr) = @process.collect_output(
+    "git",
+    ["rev-parse", "HEAD"],
+    extra_env=git_env(),
+    inherit_env=false,
+    cwd=root,
+  ) catch {
+    error =>
+      raise @model.Invalid([@model.problem(root, "git does not run: \{error}")])
+  }
+  if code != 0 {
+    let detail = stderr.text() catch { _ => "" }
+    raise @model.Invalid([
+      @model.problem(root, "git rev-parse HEAD failed: \{detail}"),
+    ])
+  }
+  (stdout.text() catch { _ => "" }).trim().to_owned()
+}
+
+///|
+/// The `moon doc` output of each module directory in the `api` key, below `api_dir`: the output of
+/// `pkgs/notebooks` is in `<api_dir>/pkgs/notebooks/doc/`. The module name is the directory of
+/// `module_index.json` below `doc/`.
+async fn api_site(
+  root : String,
+  api_dir : String,
+  config : @model.SiteConfig,
+) -> @site.ApiSite {
+  if config.api.is_empty() {
+    return @site.no_api
+  }
+  let modules = []
+  for dir in config.api {
+    let doc_root = "\{api_dir}/\{dir}/doc"
+    if !@fs.exists(doc_root) {
+      raise @model.Invalid([
+        @model.problem(
+          "site/site.json",
+          "`api` lists `\{dir}`, but \{doc_root} has no `moon doc` output; run `mise run build:site`",
+        ),
+      ])
+    }
+    let files = list_files(doc_root)
+    let index_suffix = "/module_index.json"
+    guard files.iter().find_first(f => f.has_suffix(index_suffix)) is Some(index)
+    else {
+      raise @model.Invalid([
+        @model.problem(doc_root, "has no `module_index.json`"),
+      ])
+    }
+    let name = index[:index.length() - index_suffix.length()].to_owned()
+    let order = @model.api_index_packages(
+      "\{doc_root}/\{index}",
+      @fs.read_file("\{doc_root}/\{index}").text(),
+    )
+    let packages = []
+    let readmes : Map[String, String] = Map([])
+    for path in order {
+      let data = "\{doc_root}/\{path}/package_data.json"
+      packages.push(@model.ApiPackage::parse(data, @fs.read_file(data).text()))
+      let readme = "\{doc_root}/\{path}/README.md"
+      if @fs.exists(readme) {
+        readmes.set(path, @fs.read_file(readme).text())
+      }
+    }
+    modules.push(@site.ApiModule::{ dir, name, packages, readmes })
+  }
+  { commit: head_commit(root), modules }
+}
+
+///|
 async fn write_text(path : String, text : String) -> Unit {
   match path.rev_find("/") {
     Some(i) => @fs.mkdir(path[:i].to_owned(), recursive=true, allow_exist=true)
@@ -98,12 +171,14 @@ async fn copy_file(from : String, to : String) -> Unit {
 
 ///|
 /// Build the site of the repository at `root` into `out`, and copy each file below `assets_dir` to
-/// `<out>/assets/`. Returns the warnings.
+/// `<out>/assets/`. The API pages come from the `moon doc` output below `api_dir`. Returns the
+/// warnings.
 async fn generate(
   root : String,
   out : String,
   assets_dir : String,
   main_build : Bool,
+  api_dir~ : String = "\{root}/_build/site-api",
 ) -> Array[@model.Problem] {
   let config_path = "\{root}/site/site.json"
   let config = @model.SiteConfig::parse(
@@ -119,7 +194,8 @@ async fn generate(
     }
     sources.push(@site.SourceFile::{ path, text, })
   }
-  let built = @site.build(config, sources, main_build~)
+  let api = api_site(root, api_dir, config)
+  let built = @site.build(config, sources, main_build~, api~)
   for output in built.outputs {
     match output {
       Text(path, text) => write_text("\{out}/\{path}", text)

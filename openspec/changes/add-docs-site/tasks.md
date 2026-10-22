@@ -99,15 +99,15 @@ Bead: lander-4us.7.9
 
 Bead: lander-4us.7.10
 
-- [ ] 10.1 Add the `api` key to `site/site.json` with `pkgs/lander`, `pkgs/notebooks` and `pkgs/openrpc`, and its check (design D21); add the `moon doc` step to `scripts/site.mbtx build` for each listed module, with a staging copy if a later run removes earlier output (risk R12); verify the "Unpublished module in the API list" scenario and that `mise run build:site` leaves the JSON of both modules below `_build/`.
-- [ ] 10.2 Add the pure `moon doc` JSON reader to `model` with typed API items and a `Problem` for a bad shape; add fixtures copied from the pinned moon output of `pkgs/notebooks`; verify the "Fixture shape" and "Format change" scenarios on all four targets.
-- [ ] 10.3 Add the signature parser and the link rewrite (same package, other site package, outside the site); verify the "Signature text", "Unknown markup", "Same package" and "Package outside the site" scenarios with unit tests that use real signatures from the fixture.
-- [ ] 10.4 Add the API page view and the `generate` output at `/api/<package path>/` with the five sections, no empty section, methods and impls below each item, docstrings through the D8 passes, and the item and method anchors; verify the "Package page", "Empty section" and "Method anchor" scenarios with a `generate` test of the built page.
-- [ ] 10.5 Add source links at the built commit from `git rev-parse HEAD`, `loc.path` and `loc.file`; verify the "Source link" scenario with a unit test of the URL function.
-- [ ] 10.6 Add the package index at `/api/` from `module_index.json` with README summaries, and the header "API" link; verify the "Index" scenario.
+- [x] 10.1 Add the `api` key to `site/site.json` with `pkgs/lander`, `pkgs/notebooks` and `pkgs/openrpc`, and its check (design D21); add the `moon doc` step to `scripts/site.mbtx build` for each listed module, with a staging copy if a later run removes earlier output (risk R12); verify the "Unpublished module in the API list" scenario and that `mise run build:site` leaves the JSON of both modules below `_build/`.
+- [x] 10.2 Add the pure `moon doc` JSON reader to `model` with typed API items and a `Problem` for a bad shape; add fixtures copied from the pinned moon output of `pkgs/notebooks`; verify the "Fixture shape" and "Format change" scenarios on all four targets.
+- [x] 10.3 Add the signature parser and the link rewrite (same package, other site package, outside the site); verify the "Signature text", "Unknown markup", "Same package" and "Package outside the site" scenarios with unit tests that use real signatures from the fixture.
+- [x] 10.4 Add the API page view and the `generate` output at `/api/<package path>/` with the five sections, no empty section, methods and impls below each item, docstrings through the D8 passes, and the item and method anchors; verify the "Package page", "Empty section" and "Method anchor" scenarios with a `generate` test of the built page.
+- [x] 10.5 Add source links at the built commit from `git rev-parse HEAD`, `loc.path` and `loc.file`; verify the "Source link" scenario with a unit test of the URL function.
+- [x] 10.6 Add the package index at `/api/` from `module_index.json` with README summaries, and the header "API" link; verify the "Index" scenario.
 - [ ] 10.7 Add `api:` link resolution to the link pass and fail on an unknown package, item or method; document the syntax in `docs/WRITING_FOR_THE_SITE.md`; verify the "Item link" and "Unknown item" scenarios.
 - [ ] 10.8 Add API items and methods to the search index; verify the "API item result" scenario logic with a `model` search test.
-- [ ] 10.9 Add the missing-docstring warnings to `check:site`; verify the "Item without a docstring" scenario with a fixture.
+- [x] 10.9 Add the missing-docstring warnings to `check:site`; verify the "Item without a docstring" scenario with a fixture.
 - [ ] 10.10 Add the API page check of design D16 to the browser test; verify that `mise run test:site` passes and `mise run check` passes.
 
 ## 11. Versioned docs

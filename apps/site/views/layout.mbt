@@ -73,8 +73,13 @@ pub fn layout(meta : PageMeta, main : Html) -> Html {
             [
               nav_link(meta, Docs, "/docs/", "Docs"),
               nav_link(meta, Articles, "/articles/", "Articles"),
-              @html.a(href=config.repo_url, "GitHub"),
-            ],
+            ] +
+            (if config.api.is_empty() {
+              []
+            } else {
+              [nav_link(meta, Api, "/api/", "API")]
+            }) +
+            [@html.a(href=config.repo_url, "GitHub")],
           ),
         ]),
         @html.main_(id="content", [main]),

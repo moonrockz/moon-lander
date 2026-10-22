@@ -183,9 +183,12 @@ pub fn ValidationReport::artifact(self : ValidationReport) -> Coverage {
 }
 
 ///|
+/// A document whose required facets all passed for one profile and one
+/// explicit resource snapshot.
 pub struct ValidatedDocument {
   document : Document
   report : ValidationReport
+  priv resources : Array[@reference.UriReference]
 } derive(Debug)
 
 ///|
@@ -196,6 +199,26 @@ pub fn ValidatedDocument::document(self : ValidatedDocument) -> Document {
 ///|
 pub fn ValidatedDocument::report(self : ValidatedDocument) -> ValidationReport {
   self.report
+}
+
+///|
+pub fn ValidatedDocument::profile(
+  self : ValidatedDocument,
+) -> ValidationProfile {
+  self.report.profile
+}
+
+///|
+pub fn ValidatedDocument::version(self : ValidatedDocument) -> DocumentVersion {
+  self.document.version
+}
+
+///|
+/// Retrieval URIs of the resource snapshot the document was closed against.
+pub fn ValidatedDocument::resources(
+  self : ValidatedDocument,
+) -> Array[@reference.UriReference] {
+  self.resources.copy()
 }
 
 ///|
@@ -1294,12 +1317,26 @@ pub fn validate_closed(
     source_map~,
     limits~,
   )
+  // Specification gates on normative rules and keeps artifact results as
+  // information. Compatibility gates on the artifact; its normative facet
+  // passes only when every error was a listed discrepancy (now a warning).
   let passed = report.model == Passed &&
     report.schemas == Passed &&
     report.references == Passed &&
     report.normative == Passed &&
     (profile == Specification || report.artifact == Passed)
-  { report, document: if passed { Some({ document, report, }) } else { None }, }
+  {
+    report,
+    document: if passed {
+      Some({
+        document,
+        report,
+        resources: resources.resources().map(r => r.uri()),
+      })
+    } else {
+      None
+    },
+  }
 }
 
 ///|

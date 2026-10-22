@@ -432,10 +432,14 @@ pub fn Tag::to_repr(Self) -> @debug.Repr
 pub struct ValidatedDocument {
   document : Document
   report : ValidationReport
+  // private fields
 } derive(@debug.Debug)
 pub fn ValidatedDocument::document(Self) -> Document
+pub fn ValidatedDocument::profile(Self) -> ValidationProfile
 pub fn ValidatedDocument::report(Self) -> ValidationReport
+pub fn ValidatedDocument::resources(Self) -> Array[@reference.UriReference]
 pub fn ValidatedDocument::to_repr(Self) -> @debug.Repr
+pub fn ValidatedDocument::version(Self) -> DocumentVersion
 
 pub(all) enum ValidationProfile {
   Specification

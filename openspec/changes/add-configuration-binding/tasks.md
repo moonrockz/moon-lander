@@ -53,9 +53,9 @@ Bead: lander-4us.4.4
 
 Bead: lander-4us.4.5
 
-- [ ] 5.1 Add `NamedOptions[T]` and `named`, which calls the given binder for each child key and collects all `Decode` and `Validation` failures in one error; verify tests with two failing instances and an absent section
-- [ ] 5.2 Add acceptance scenarios for "Named options"; verify they pass
-- [ ] 5.3 Document `named` with `bind_or` as the binder in the package README; verify the example runs
+- [x] 5.1 Add `NamedOptions[T]` and `named`, which calls the given binder for each child key and collects all `Decode` and `Validation` failures in one error; verify tests with two failing instances and an absent section
+- [x] 5.2 Add acceptance scenarios for "Named options"; verify they pass
+- [x] 5.3 Document `named` with `bind_or` as the binder in the package README; verify the example runs
 
 ## 6. Exact decoding with FromConfig
 
@@ -72,9 +72,9 @@ Bead: lander-4us.4.6
 
 Bead: lander-4us.4.7
 
-- [ ] 7.1 Add `UnknownKeys` (`Allow`, `Reject`, `RejectExcept`) and the `unknown?` argument of `bind_or`; compare configured keys with the `ToJson` form of the result plus the listed keys; verify tests for a misspelled key, a `None` field, a map field and a hand-written alias with `RejectExcept`
-- [ ] 7.2 Add acceptance scenarios for "Optional unknown-key check"; verify they pass
-- [ ] 7.3 Document the check in the package README, including that `Reject` needs a `ToJson` that writes every key `FromJson` accepts; verify the README example runs
+- [x] 7.1 Add `UnknownKeys` (`Allow`, `Reject`, `RejectExcept`) and the `unknown?` argument of `bind_or`; compare configured keys with the `ToJson` form of the result plus the listed keys; verify tests for a misspelled key, a `None` field, a map field and a hand-written alias with `RejectExcept`
+- [x] 7.2 Add acceptance scenarios for "Optional unknown-key check"; verify they pass
+- [x] 7.3 Document the check in the package README, including that `Reject` needs a `ToJson` that writes every key `FromJson` accepts; verify the README example runs
 
 ## 8. Integration check
 

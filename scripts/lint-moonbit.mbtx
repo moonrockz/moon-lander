@@ -3,7 +3,8 @@
 ///
 /// The type checker runs for all targets. Without `--target all`, moon checks each module for its
 /// preferred target only, so it skips a package whose `supported_targets` excludes that target, such as
-/// a js-only package in a module that prefers native.
+/// a js-only package in a module that prefers native. `--no-mbti` keeps the check from writing
+/// `pkg.generated.mbti` files, which the workspace does not track.
 ///
 /// Usage: `mise run lint:moonbit`, or `moonx scripts/lint-moonbit.mbtx`.
 import {
@@ -34,7 +35,7 @@ async fn main {
     @sys.exit(if fmt > 0 { fmt } else { 1 })
   }
   println("🔍 Checking MoonBit code...")
-  let check = moon(["check", "--deny-warn", "--target", "all"])
+  let check = moon(["check", "--deny-warn", "--no-mbti", "--target", "all"])
   if check != 0 {
     println("❌ moon check reported problems.")
     @sys.exit(if check > 0 { check } else { 1 })
@@ -62,4 +63,26 @@ async test "moon check covers a package outside the preferred target" {
   let output = out.text() + err.text()
   assert_true(code != 0, msg=output)
   assert_true(output.contains("Unused function 'unused'"), msg=output)
+}
+
+///|
+async test "moon check leaves no generated interface files" {
+  let script = @fs.realpath("lint-moonbit.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-lint")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.mkdir("\{dir}/scripts")
+  @fs.mkdir("\{dir}/lib")
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  @fs.write_file("\{dir}/lib/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/lib/lib.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  let (code, out, err) = @process.collect_output("moonx", [script], cwd=dir)
+  let output = out.text() + err.text()
+  assert_true(code == 0, msg=output)
+  assert_false(@fs.exists("\{dir}/lib/pkg.generated.mbti"), msg=output)
 }

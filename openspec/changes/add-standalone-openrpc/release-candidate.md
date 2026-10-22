@@ -84,3 +84,34 @@ Merging PR #47 approved the `25215d9b...7556` candidate, not this archive. On
 identity: `moonrockz/openrpc@0.2.0` with archive SHA-256
 `8f5c8785377676aefd3e038aed21853e533354f9a378c70306f3efad7238a659`, built from
 `1de7e46`. That approval closes tasks 11.1 and 11.2 for the published archive.
+
+## Smithy migration
+
+Smithy PR [#55](https://github.com/moonrockz/smithy/pull/55) moved
+`pkgs/smithy-openrpc` onto the published `moonrockz/openrpc@0.2.0`. It imports
+the version from mooncakes.io and checks the archive checksum above. It uses no
+path override and no `moon.work` member. The owner approved and squash-merged it
+on 2026-10-22.
+
+| Item | Value |
+| --- | --- |
+| Recorded baseline | `c36698b3bd08be62d5d80e93b727ce736388adf6`, squash-merged as `edc6ba3` with an identical tree |
+| Branch base | `a9d3525135c0a8043705b8e31dadfcf39e7b4f2d` |
+| Source (merged) | `dfcb74e222f3169942f8e4a5e588c12e4a5c1da6` on Smithy `main` |
+| Rollback | revert `dfcb74e`; its parent is `5565fb7c5a4b1b21e660f4543ca2c17f1ceb0661` |
+| Public API | `pkg.generated.mbti` of `moonrockz/smithy-openrpc` unchanged |
+| Parity | 51 captured conversions: identical warnings and errors, documents equal by value |
+| Four targets | unit, plugin, isolated consumer and `mise run test:openrpc` passed on native, wasm, wasm-gc and js; the BDD suite passed on native, wasm and js |
+
+Smithy's own record is `docs/migrations/2026-10-22-openrpc-library.md`.
+
+Three things remain open:
+
+- Object members now follow the library's constructor order. The owner approved
+  this change; [#57](https://github.com/moonrockz/moon-lander/issues/57) asks the
+  library to define that order.
+- The library's schema-graph limits cannot be raised by callers
+  ([#56](https://github.com/moonrockz/moon-lander/issues/56)). The adapter skips
+  `LimitExceeded` findings so that large services still convert.
+- Smithy's async BDD features, OpenRPC among them, do not run on wasm-gc. The
+  same was true at the base.

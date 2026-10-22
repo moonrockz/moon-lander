@@ -1,0 +1,191 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/openrpc/schema"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/openrpc/domain",
+  "moonrockz/openrpc/json",
+  "moonrockz/openrpc/reference",
+}
+
+// Values
+pub fn check_pattern(String, limits? : @json.Limits) -> Result[Unit, PatternError]
+
+pub fn keyword_names() -> Array[String]
+
+pub fn validate(Schema, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+
+pub fn validate_in(Schema, index~ : @reference.SchemaIndex, resource? : @reference.UriReference?, path? : Array[String], max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+
+pub fn validate_json(@json.Value, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+
+// Errors
+
+// Types and methods
+pub(all) enum Dependency {
+  SchemaDependency(Schema)
+  PropertyDependencies(Array[String])
+} derive(@debug.Debug)
+pub fn Dependency::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Items {
+  SingleItems(Schema)
+  TupleItems(Array[Schema])
+} derive(@debug.Debug)
+pub fn Items::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Keyword {
+  Id(@reference.UriReference)
+  Dialect(@reference.UriReference)
+  Ref(@reference.Reference)
+  Comment(String)
+  Title(String)
+  Description(String)
+  Default(@json.Value)
+  ReadOnly(Bool)
+  WriteOnly(Bool)
+  Examples(Array[@json.Value])
+  MultipleOf(PositiveNumber)
+  Maximum(@json.Number)
+  ExclusiveMaximum(@json.Number)
+  Minimum(@json.Number)
+  ExclusiveMinimum(@json.Number)
+  MaxLength(NonNegativeInteger)
+  MinLength(NonNegativeInteger)
+  Pattern(String)
+  AdditionalItems(Schema)
+  Items(Items)
+  MaxItems(NonNegativeInteger)
+  MinItems(NonNegativeInteger)
+  UniqueItems(Bool)
+  Contains(Schema)
+  MaxProperties(NonNegativeInteger)
+  MinProperties(NonNegativeInteger)
+  Required(Array[String])
+  AdditionalProperties(Schema)
+  Definitions(Array[(String, Schema)])
+  Properties(Array[(String, Schema)])
+  PatternProperties(Array[(String, Schema)])
+  Dependencies(Array[(String, Dependency)])
+  PropertyNames(Schema)
+  Const(@json.Value)
+  Enum(Array[@json.Value])
+  Type(TypeConstraint)
+  Format(String)
+  ContentMediaType(String)
+  ContentEncoding(String)
+  If(Schema)
+  Then(Schema)
+  Else(Schema)
+  AllOf(Array[Schema])
+  AnyOf(Array[Schema])
+  OneOf(Array[Schema])
+  Not(Schema)
+} derive(@debug.Debug)
+pub fn Keyword::name(Self) -> String
+pub fn Keyword::to_json(Self) -> Result[@json.Value, @json.Diagnostic]
+pub fn Keyword::to_repr(Self) -> @debug.Repr
+
+pub struct NonNegativeInteger {
+  number : @json.Number
+} derive(Eq, @debug.Debug)
+pub fn NonNegativeInteger::equal(Self, Self) -> Bool
+pub fn NonNegativeInteger::from_number(@json.Number) -> Result[Self, @json.Diagnostic]
+pub fn NonNegativeInteger::not_equal(Self, Self) -> Bool
+pub fn NonNegativeInteger::number(Self) -> @json.Number
+pub fn NonNegativeInteger::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn NonNegativeInteger::to_repr(Self) -> @debug.Repr
+
+pub struct PatternError {
+  code : @json.Code
+  message : String
+  offset : Int
+} derive(@debug.Debug)
+pub fn PatternError::code(Self) -> @json.Code
+pub fn PatternError::message(Self) -> String
+pub fn PatternError::offset(Self) -> Int
+pub fn PatternError::to_repr(Self) -> @debug.Repr
+
+pub struct PositiveNumber {
+  number : @json.Number
+} derive(Eq, @debug.Debug)
+pub fn PositiveNumber::equal(Self, Self) -> Bool
+pub fn PositiveNumber::from_number(@json.Number) -> Result[Self, @json.Diagnostic]
+pub fn PositiveNumber::not_equal(Self, Self) -> Bool
+pub fn PositiveNumber::number(Self) -> @json.Number
+pub fn PositiveNumber::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn PositiveNumber::to_repr(Self) -> @debug.Repr
+
+pub struct ReferenceObject {
+  reference : @reference.Reference
+  siblings : @json.Value
+} derive(@debug.Debug)
+pub fn ReferenceObject::reference(Self) -> @reference.Reference
+pub fn ReferenceObject::siblings(Self) -> @json.Value
+pub fn ReferenceObject::to_repr(Self) -> @debug.Repr
+
+pub struct Report {
+  complete : Bool
+  references_complete : Bool
+  // private fields
+} derive(@debug.Debug)
+pub fn Report::diagnostics(Self) -> Array[@json.Diagnostic]
+pub fn Report::is_complete(Self) -> Bool
+pub fn Report::references_complete(Self) -> Bool
+pub fn Report::resolutions(Self) -> Array[@reference.Resolution]
+pub fn Report::to_repr(Self) -> @debug.Repr
+
+pub struct Schema {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Schema::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Schema::from_keywords(Array[Keyword], additional_fields? : Array[(String, @json.Value)], extensions? : @domain.Extensions, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Schema::kind(Self) -> SchemaKind
+pub fn Schema::to_json(Self) -> @json.Value
+pub fn Schema::to_repr(Self) -> @debug.Repr
+
+pub(all) enum SchemaKind {
+  BooleanSchema(Bool)
+  ObjectSchema(SchemaObject)
+  ReferenceSchema(ReferenceObject)
+  UnsupportedDialectSchema(@reference.UriReference, @json.Value)
+} derive(@debug.Debug)
+pub fn SchemaKind::to_repr(Self) -> @debug.Repr
+
+pub struct SchemaObject {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn SchemaObject::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn SchemaObject::extensions(Self) -> @domain.Extensions
+pub fn SchemaObject::keyword(Self, String) -> Keyword?
+pub fn SchemaObject::keywords(Self) -> Array[Keyword]
+pub fn SchemaObject::to_repr(Self) -> @debug.Repr
+
+pub(all) enum SimpleType {
+  ArrayType
+  BooleanType
+  IntegerType
+  NullType
+  NumberType
+  ObjectType
+  StringType
+} derive(Eq, @debug.Debug)
+pub fn SimpleType::equal(Self, Self) -> Bool
+pub fn SimpleType::not_equal(Self, Self) -> Bool
+pub fn SimpleType::to_repr(Self) -> @debug.Repr
+pub fn SimpleType::to_string(Self) -> String
+
+pub struct TypeConstraint {
+  types : Array[SimpleType]
+  union : Bool
+} derive(@debug.Debug)
+pub fn TypeConstraint::is_union(Self) -> Bool
+pub fn TypeConstraint::many(Array[SimpleType]) -> Result[Self, @json.Diagnostic]
+pub fn TypeConstraint::one(SimpleType) -> Self
+pub fn TypeConstraint::to_json(Self) -> @json.Value
+pub fn TypeConstraint::to_repr(Self) -> @debug.Repr
+pub fn TypeConstraint::types(Self) -> Array[SimpleType]
+
+// Type aliases
+
+// Traits

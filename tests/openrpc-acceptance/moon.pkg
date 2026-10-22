@@ -1,0 +1,4 @@
+import {
+  "moonrockz/openrpc",
+  "moonrockz/openrpc/json" @exact,
+} for "wbtest"

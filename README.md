@@ -70,6 +70,10 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
+| `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
+| `mise run check:openrpc` | Verify the developing OpenRPC library and isolated source consumer on all four targets |
+| `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |
+| `mise run check:openrpc-unicode` | Reject stale identifier tables and the associated Unicode license |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
@@ -99,6 +103,10 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
   and shared traversal, with runnable usage guides for all four targets.
+- `pkgs/openrpc/` contains the developing [`moonrockz/openrpc`](pkgs/openrpc/README.mbt.md)
+  document library. It provides complete typed OpenRPC and draft-07 models, exact
+  JSON and source text retention. Validation and release work remain tracked in
+  `add-standalone-openrpc`.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress

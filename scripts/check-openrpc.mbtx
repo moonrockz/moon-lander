@@ -1,0 +1,436 @@
+///|
+/// Verify a source-only isolated OpenRPC consumer. This is not registry proof.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/json" @core_json,
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "_build" || entry == ".mooncakes" || entry == ".git" {
+      continue
+    }
+    let from = source + "/" + entry
+    let to = destination + "/" + entry
+    match @fs.kind(from) {
+      Directory => copy_tree(from, to)
+      Regular => @fs.write_file(to, @fs.read_file(from))
+      _ => fail("Unexpected source entry: " + from)
+    }
+  }
+}
+
+///|
+async fn command(args : Array[String], cwd : String) -> String {
+  let (code, out, err) = @process.collect_output("moon", args, cwd~)
+  guard code == 0 else { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+fn workspace_version(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.has_prefix("version = \"") {
+      let rest = line[11:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+fn pattern_expectations(source : String) -> Result[String, String] {
+  let value = @core_json.parse(source) catch {
+    _ => return Err("Malformed pattern corpus JSON")
+  }
+  guard value is Json::Array(cases) else {
+    return Err("Pattern corpus must be an array")
+  }
+  if cases.is_empty() {
+    return Err("Pattern corpus must not be empty")
+  }
+  let expected = []
+  for case in cases {
+    guard case is Json::Object(fields) &&
+      fields.get("pattern") is Some(Json::String(_)) &&
+      fields.get("valid") is Some(Json::True | Json::False) else {
+      return Err("Pattern case requires pattern string and valid boolean")
+    }
+    expected.push(fields.get("valid").unwrap())
+  }
+  Ok(Json::array(expected).stringify())
+}
+
+///|
+fn pattern_consumer(source : String, schemas~ : String = "[]") -> String {
+  let value = @core_json.parse(source[:]) catch {
+    _ => abort("Validated pattern corpus invariant")
+  }
+  "fn main {\n  let source =\n    #|" +
+  value.stringify() +
+  "\n  let raw = @exact.parse(source).unwrap().lower().unwrap()\n  guard raw.kind() is @exact.Array(cases) else { abort(\"corpus\") }\n  let results = cases.map(case => @exact.Value::boolean(@schema.check_pattern(case.get(\"pattern\").unwrap().text().unwrap()) is Ok(_)))\n  println(@exact.write(@exact.Value::array(results)).unwrap())\n  schema_shapes()\n}\n" +
+  schema_consumer(schemas)
+}
+
+///|
+fn schema_expectations(
+  source : String,
+  oracle~ : Bool = false,
+) -> Result[String, String] {
+  let value = @core_json.parse(source[:]) catch {
+    _ => return Err("Malformed schema corpus JSON")
+  }
+  guard value is Json::Array(cases) && !cases.is_empty() else {
+    return Err("Schema corpus must be a nonempty array")
+  }
+  let expected = []
+  for case in cases {
+    guard case is Json::Object(fields) &&
+      fields.contains("schema") &&
+      fields.get("valid") is Some(Json::True | Json::False) else {
+      return Err("Schema case requires a schema value and valid boolean")
+    }
+    let valid = fields.get("valid").unwrap()
+    let oracle_valid = match fields.get("oracleValid") {
+      Some(Json::True | Json::False) => {
+        guard fields.get("difference")
+          is Some(Json::String("reference-siblings" | "numeric-range")) else {
+          return Err("Undocumented schema oracle difference")
+        }
+        fields.get("oracleValid").unwrap()
+      }
+      Some(_) => return Err("Oracle outcome must be boolean")
+      None => {
+        if fields.contains("difference") {
+          return Err("Difference requires oracleValid")
+        }
+        valid
+      }
+    }
+    expected.push(if oracle { oracle_valid } else { valid })
+  }
+  Ok(Json::array(expected).stringify())
+}
+
+///|
+fn schema_consumer(source : String) -> String {
+  let out = StringBuilder()
+  out.write_string("\nfn schema_shapes() -> Unit {\n  let source =\n")
+  // Raw multiline data retains every numeric token. It is never interpolated.
+  for line in source.split("\n") {
+    out.write_string("    #|" + line.to_owned() + "\n")
+  }
+  out.write_string(
+    "  let raw = @exact.parse(source).unwrap().lower().unwrap()\n  guard raw.kind() is @exact.Array(cases) else { abort(\"schema corpus\") }\n  let results = cases.map(case => {\n    let schema = case.get(\"schema\").unwrap()\n    let report = @schema.validate_json(schema, root=schema)\n    let invalid = report.diagnostics().any(d => match d.code() {\n      @exact.InvalidSchema | @exact.InvalidNumber | @exact.InvalidReference | @exact.WrongType => true\n      _ => false\n    })\n    @exact.Value::boolean(!invalid)\n  })\n  println(@exact.write(@exact.Value::array(results)).unwrap())\n}\n",
+  )
+  out.to_string()
+}
+
+///|
+test "pattern corpus validates shape before generating a data only consumer" {
+  for
+    source in [
+      "{}", "[]", "[{\"pattern\":17,\"valid\":true}]", "[{\"pattern\":\"x\"}]",
+    ] {
+    assert_true(pattern_expectations(source) is Err(_))
+  }
+  let source = "[{\"pattern\":\"a\\nb\",\"valid\":true},{\"pattern\":\"[\",\"valid\":false}]"
+  assert_eq(pattern_expectations(source), Ok("[true,false]"))
+  assert_true(pattern_consumer(source).contains("#|[{"))
+  assert_true(pattern_consumer(source).contains("a\\nb"))
+}
+
+///|
+test "schema comparison allows only documented oracle differences" {
+  assert_eq(
+    schema_expectations("[{\"schema\":true,\"valid\":true}]"),
+    Ok("[true]"),
+  )
+  let difference = "[{\"schema\":{},\"valid\":true,\"oracleValid\":false,\"difference\":\"reference-siblings\"}]"
+  assert_eq(schema_expectations(difference, oracle=true), Ok("[false]"))
+  for
+    source in [
+      "[]", "[{\"valid\":true}]", "[{\"schema\":{},\"valid\":true,\"oracleValid\":false}]",
+      "[{\"schema\":{},\"valid\":true,\"oracleValid\":false,\"difference\":\"guess\"}]",
+    ] {
+    assert_true(schema_expectations(source) is Err(_), msg=source)
+  }
+}
+
+///|
+fn keyword_inventory(text : String) -> Result[String, String] {
+  let schema = @core_json.parse(text[:]) catch {
+    _ => return Err("Invalid schema JSON")
+  }
+  guard schema is Json::Object(fields) else {
+    return Err("Schema must be an object")
+  }
+  guard fields.get("properties") is Some(Json::Object(properties)) else {
+    return Err("Schema properties must be an object")
+  }
+  let names = properties.keys().collect()
+  names.sort()
+  Ok(Json::array(names.map(name => Json::string(name))).stringify())
+}
+
+///|
+fn inventory_properties(
+  schema : Json,
+  path : Array[String],
+) -> Result[Array[String], String] {
+  let mut current = schema
+  for part in path {
+    guard current is Json::Object(fields) else {
+      return Err("Inventory path is not an object: " + Json(path).stringify())
+    }
+    guard fields.get(part) is Some(value) else {
+      return Err("Missing inventory path: " + Json(path).stringify())
+    }
+    current = value
+  }
+  guard current is Json::Object(properties) else {
+    return Err("Inventory properties are not an object")
+  }
+  Ok(properties.keys().collect())
+}
+
+///|
+fn object_inventory(text : String) -> Result[String, String] {
+  let schema = @core_json.parse(text[:]) catch {
+    _ => return Err("Invalid OpenRPC schema JSON")
+  }
+  let entries : Array[(String, Array[String])] = []
+  let positions : Array[(String, Array[String])] = [
+    ("openrpcDocument", ["properties"]),
+    ("components", ["properties", "components", "properties"]),
+    (
+      "serverVariableObject",
+      [
+        "definitions", "serverObject", "properties", "variables", "patternProperties",
+        "[0-z]+", "properties",
+      ],
+    ),
+  ]
+  for
+    name in [
+      "infoObject", "contactObject", "licenseObject", "serverObject", "externalDocumentationObject",
+      "methodObject", "contentDescriptorObject", "tagObject", "errorObject", "exampleObject",
+      "examplePairingObject", "linkObject", "referenceObject",
+    ] {
+    positions.push((name, ["definitions", name, "properties"]))
+  }
+  for (name, path) in positions {
+    let names = match inventory_properties(schema, path) {
+      Ok(names) => names
+      Err(message) => return Err(message)
+    }
+    // Union-model fields defined by frozen 1.3.2 prose but omitted by artifacts.
+    let extras = match name {
+      "exampleObject" => ["externalValue"]
+      "tagObject" | "examplePairingObject" => ["summary"]
+      "components" => ["examplePairingObjects"]
+      _ => []
+    }
+    for extra in extras {
+      if !names.contains(extra) {
+        names.push(extra)
+      }
+    }
+    names.sort()
+    entries.push((name, names))
+  }
+  entries.sort_by((a, b) => a.0.lexical_compare(b.0))
+  let out = StringBuilder()
+  out.write_string("{")
+  for i, (name, fields) in entries {
+    if i > 0 {
+      out.write_string(",")
+    }
+    out.write_string(Json::string(name).stringify())
+    out.write_string(":")
+    out.write_string(
+      Json::array(fields.map(field => Json::string(field))).stringify(),
+    )
+  }
+  out.write_string("}")
+  Ok(out.to_string())
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let version = workspace_version(@fs.read_file("moon.mod").text()).unwrap()
+  let corpus = @fs.read_file("tests/openrpc-qualification/pattern-cases.json").text()
+  let pattern_expected = pattern_expectations(corpus).unwrap() + "\n"
+  let schemas = @fs.read_file("tests/openrpc-qualification/schema-cases.json").text()
+  let schema_expected = schema_expectations(schemas).unwrap() + "\n"
+  let schema_oracle_expected = schema_expectations(schemas, oracle=true).unwrap() +
+    "\n"
+  let qualification = @fs.realpath("tests/openrpc-qualification")
+  let (installed, out, err) = @process.collect_output(
+    "bun",
+    ["install", "--frozen-lockfile", "--ignore-scripts"],
+    cwd=qualification,
+  )
+  guard installed == 0 else { fail(out.text() + err.text()) }
+  let (checked, out, err) = @process.collect_output(
+    "bun",
+    ["patterns.mjs", corpus],
+    cwd=qualification,
+  )
+  guard checked == 0 else { fail(out.text() + err.text()) }
+  assert_eq(
+    out.text().replace_all(old="\r\n", new="\n"),
+    pattern_expected,
+    msg="Pinned independent ECMAScript2018 parser",
+  )
+  let metaschema = @fs.read_file("tests/tck/openrpc/draft-07-schema.json").text()
+  let (checked, out, err) = @process.collect_output(
+    "bun",
+    ["schema-shapes.mjs", metaschema, schemas],
+    cwd=qualification,
+  )
+  guard checked == 0 else { fail(out.text() + err.text()) }
+  assert_eq(
+    out.text().replace_all(old="\r\n", new="\n"),
+    schema_oracle_expected,
+    msg="Pinned Ajv with the unchanged frozen draft07 metaschema",
+  )
+  let documents = @fs.read_file("tests/openrpc-consumer/expected.txt")
+    .text()
+    .replace_all(old="\r\n", new="\n")
+  let inventory = match
+    keyword_inventory(
+      @fs.read_file("tests/tck/openrpc/draft-07-schema.json").text(),
+    ) {
+    Ok(inventory) => inventory
+    Err(message) => fail(message)
+  }
+  let objects_132 = match
+    object_inventory(
+      @fs.read_file("tests/tck/openrpc/open-rpc-meta-schema.json").text(),
+    ) {
+    Ok(value) => value
+    Err(message) => fail(message)
+  }
+  let objects_14 = match
+    object_inventory(
+      @fs.read_file("tests/tck/openrpc/openrpc-1.4-schema.json").text(),
+    ) {
+    Ok(value) => value
+    Err(message) => fail(message)
+  }
+  assert_eq(
+    objects_132,
+    objects_14,
+    msg="The frozen version lines must agree with the unified model field inventory",
+  )
+  let expected = documents + inventory + "\n" + objects_132 + "\n"
+  let isolated = @fs.tmpdir(prefix="openrpc-source-consumer")
+  defer @fs.rmdir(isolated, recursive=true)
+  copy_tree("pkgs/openrpc", isolated + "/library")
+  @fs.write_file(
+    isolated + "/moon.work",
+    "members = [\n  \".\",\n  \"./library\",\n  \"./patterns\",\n]\n",
+  )
+  @fs.write_file(
+    isolated + "/moon.mod",
+    "name = \"openrpc-tracer-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+  )
+  @fs.write_file(
+    isolated + "/moon.pkg",
+    "import { \"moonrockz/openrpc\", \"moonrockz/openrpc/schema\", \"moonrockz/openrpc/json\" @exact }\npkgtype(kind: \"executable\")\n",
+  )
+  @fs.write_file(
+    isolated + "/main.mbt",
+    @fs.read_file("tests/openrpc-consumer/main.mbt"),
+  )
+  @fs.mkdir(isolated + "/patterns")
+  @fs.write_file(
+    isolated + "/patterns/moon.mod",
+    "name = \"openrpc-pattern-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+  )
+  @fs.write_file(
+    isolated + "/patterns/moon.pkg",
+    "import { \"moonrockz/openrpc/schema\", \"moonrockz/openrpc/json\" @exact }\npkgtype(kind: \"executable\")\n",
+  )
+  @fs.write_file(
+    isolated + "/patterns/main.mbt",
+    pattern_consumer(corpus, schemas~),
+  )
+  let graph = command(["tree"], isolated)
+  guard graph.contains("moonrockz/openrpc") else {
+    fail("OpenRPC missing from isolated dependency graph")
+  }
+  for
+    denied in [
+      "smithy", "ion@", "moon-lander", "notebooks", "async@", "rabbita", "proton",
+    ] {
+    guard !graph.contains(denied) else {
+      fail("Unexpected dependency: " + denied + "\n" + graph)
+    }
+  }
+  for target in ["native", "wasm", "js", "wasm-gc"] {
+    command(
+      [
+        "test", "-p", "moonrockz/openrpc", "-p", "moonrockz/openrpc/json", "-p",
+        "moonrockz/openrpc/reference", "-p", "moonrockz/openrpc/schema", "-p", "moonrockz/moon-lander-tests/openrpc-acceptance",
+        "--deny-warn", "--target", target,
+      ],
+      root,
+    )
+    |> ignore
+    let observed = command(
+      ["run", "--release", "--deny-warn", "--target", target, "."],
+      isolated,
+    ).replace_all(old="\r\n", new="\n")
+    assert_eq(
+      observed,
+      expected,
+      msg="Isolated OpenRPC source consumer on " +
+        target +
+        "\nExpected:\n" +
+        expected +
+        "\nObserved:\n" +
+        observed,
+    )
+    let pattern_observed = command(
+      ["run", "--release", "--deny-warn", "--target", target, "."],
+      isolated + "/patterns",
+    ).replace_all(old="\r\n", new="\n")
+    assert_eq(
+      pattern_observed,
+      pattern_expected + schema_expected,
+      msg="Portable ECMAScript2018 syntax corpus on " + target,
+    )
+    println("OpenRPC source consumer and focused tests agree: " + target)
+  }
+  println("Isolated source dependency graph:\n" + graph)
+  println(
+    "Source-consumer proof only; package and public-registry checks remain separate release gates.",
+  )
+}
+
+///|
+test "keyword inventory comes from the independent schema properties" {
+  assert_eq(
+    keyword_inventory("{\"properties\":{\"z\":true,\"a\":false}}"),
+    Ok("[\"a\",\"z\"]"),
+  )
+  assert_true(keyword_inventory("{\"properties\":false}") is Err(_))
+  assert_true(keyword_inventory("{}") is Err(_))
+  assert_true(keyword_inventory("not JSON") is Err(_))
+}
+
+///|
+test "object inventory rejects malformed official schema shapes" {
+  assert_true(object_inventory("not JSON") is Err(_))
+  assert_true(object_inventory("{}") is Err(_))
+  assert_true(object_inventory("{\"properties\":false}") is Err(_))
+}

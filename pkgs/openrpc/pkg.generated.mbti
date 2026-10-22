@@ -1,0 +1,447 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/openrpc"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/openrpc/domain",
+  "moonrockz/openrpc/json",
+  "moonrockz/openrpc/reference",
+  "moonrockz/openrpc/schema",
+}
+
+// Values
+pub fn field_names(ObjectKind) -> Array[String]
+
+pub fn lower(@json.CstDocument) -> ReadResult
+
+pub fn object_kinds() -> Array[ObjectKind]
+
+pub fn read(String, source_id? : String?, limits? : @json.Limits) -> ReadResult
+
+pub fn validate(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, limits? : @json.Limits) -> ValidationReport
+
+pub fn validate_closed(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, limits? : @json.Limits) -> ClosedValidation
+
+pub fn write(Document, limits? : @json.Limits) -> Result[String, @json.Diagnostic]
+
+// Errors
+
+// Types and methods
+pub struct ClosedValidation {
+  report : ValidationReport
+  document : ValidatedDocument?
+} derive(@debug.Debug)
+pub fn ClosedValidation::document(Self) -> ValidatedDocument?
+pub fn ClosedValidation::report(Self) -> ValidationReport
+pub fn ClosedValidation::to_repr(Self) -> @debug.Repr
+
+pub struct Components {
+  value : @json.Value
+  schemas : Array[(@domain.ComponentKey, @schema.Schema)]?
+  content_descriptors : Array[(@domain.ComponentKey, ContentDescriptor)]?
+  examples : Array[(@domain.ComponentKey, Example)]?
+  links : Array[(@domain.ComponentKey, Link)]?
+  errors : Array[(@domain.ComponentKey, ErrorObject)]?
+  tags : Array[(@domain.ComponentKey, Tag)]?
+  example_pairings : Array[(@domain.ComponentKey, ExamplePairing)]?
+  example_pairing_objects : Array[(@domain.ComponentKey, ExamplePairing)]?
+} derive(@debug.Debug)
+pub fn Components::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Components::content_descriptors(Self) -> Array[(@domain.ComponentKey, ContentDescriptor)]?
+pub fn Components::errors(Self) -> Array[(@domain.ComponentKey, ErrorObject)]?
+pub fn Components::example_pairing_objects(Self) -> Array[(@domain.ComponentKey, ExamplePairing)]?
+pub fn Components::example_pairings(Self) -> Array[(@domain.ComponentKey, ExamplePairing)]?
+pub fn Components::examples(Self) -> Array[(@domain.ComponentKey, Example)]?
+pub fn Components::extensions(Self) -> @domain.Extensions
+pub fn Components::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Components::links(Self) -> Array[(@domain.ComponentKey, Link)]?
+pub fn Components::new(schemas? : Array[(@domain.ComponentKey, @schema.Schema)]?, content_descriptors? : Array[(@domain.ComponentKey, ContentDescriptor)]?, examples? : Array[(@domain.ComponentKey, Example)]?, links? : Array[(@domain.ComponentKey, Link)]?, errors? : Array[(@domain.ComponentKey, ErrorObject)]?, tags? : Array[(@domain.ComponentKey, Tag)]?, example_pairings? : Array[(@domain.ComponentKey, ExamplePairing)]?, example_pairing_objects? : Array[(@domain.ComponentKey, ExamplePairing)]?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Components::schemas(Self) -> Array[(@domain.ComponentKey, @schema.Schema)]?
+pub fn Components::tags(Self) -> Array[(@domain.ComponentKey, Tag)]?
+pub fn Components::to_json(Self) -> @json.Value
+pub fn Components::to_repr(Self) -> @debug.Repr
+
+pub struct Contact {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Contact::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Contact::email(Self) -> String?
+pub fn Contact::extensions(Self) -> @domain.Extensions
+pub fn Contact::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Contact::name(Self) -> String?
+pub fn Contact::new(name? : String?, url? : @reference.UriReference?, email? : String?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Contact::to_json(Self) -> @json.Value
+pub fn Contact::to_repr(Self) -> @debug.Repr
+pub fn Contact::url(Self) -> @reference.UriReference?
+
+pub struct ContentDescriptor {
+  name : String
+  schema : @schema.Schema
+  required : Bool?
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn ContentDescriptor::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn ContentDescriptor::deprecated(Self) -> Bool?
+pub fn ContentDescriptor::description(Self) -> String?
+pub fn ContentDescriptor::extensions(Self) -> @domain.Extensions
+pub fn ContentDescriptor::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ContentDescriptor::name(Self) -> String
+pub fn ContentDescriptor::new(String, @schema.Schema, summary? : String?, description? : String?, required? : Bool?, deprecated? : Bool?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ContentDescriptor::required(Self) -> Bool?
+pub fn ContentDescriptor::schema(Self) -> @schema.Schema
+pub fn ContentDescriptor::summary(Self) -> String?
+pub fn ContentDescriptor::to_json(Self) -> @json.Value
+pub fn ContentDescriptor::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Coverage {
+  Passed
+  Failed
+  Incomplete
+} derive(Eq, @debug.Debug)
+pub fn Coverage::equal(Self, Self) -> Bool
+pub fn Coverage::not_equal(Self, Self) -> Bool
+pub fn Coverage::to_repr(Self) -> @debug.Repr
+
+pub struct Document {
+  version : DocumentVersion
+  info : Info
+  methods : Array[InlineOrReference[Method]]
+  value : @json.Value
+  schema_uri : @reference.UriReference?
+  servers : Array[Server]?
+  components : Components?
+  external_docs : ExternalDocumentation?
+} derive(@debug.Debug)
+pub fn Document::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Document::as_resource(Self, @reference.UriReference, aliases? : Array[@reference.UriReference], limits? : @json.Limits) -> Result[@reference.Resource, @json.Diagnostic]
+pub fn Document::components(Self) -> Components?
+pub fn Document::extensions(Self) -> @domain.Extensions
+pub fn Document::external_docs(Self) -> ExternalDocumentation?
+pub fn Document::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, Array[@json.Diagnostic]]
+pub fn Document::info(Self) -> Info
+pub fn Document::methods(Self) -> Array[InlineOrReference[Method]]
+pub fn Document::new(DocumentVersion, Info, Array[InlineOrReference[Method]], schema? : @reference.UriReference?, servers? : Array[Server]?, components? : Components?, external_docs? : ExternalDocumentation?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, Array[@json.Diagnostic]]
+pub fn Document::schema(Self) -> @reference.UriReference?
+pub fn Document::servers(Self) -> Array[Server]?
+pub fn Document::to_json(Self) -> @json.Value
+pub fn Document::to_repr(Self) -> @debug.Repr
+pub fn Document::version(Self) -> DocumentVersion
+
+pub struct DocumentVersion {
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn DocumentVersion::equal(Self, Self) -> Bool
+pub fn DocumentVersion::not_equal(Self, Self) -> Bool
+pub fn DocumentVersion::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn DocumentVersion::to_repr(Self) -> @debug.Repr
+pub fn DocumentVersion::to_string(Self) -> String
+
+pub struct ErrorObject {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn ErrorObject::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn ErrorObject::code(Self) -> @domain.ErrorCode
+pub fn ErrorObject::data(Self) -> @json.Value?
+pub fn ErrorObject::extensions(Self) -> @domain.Extensions
+pub fn ErrorObject::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ErrorObject::message(Self) -> String
+pub fn ErrorObject::new(@domain.ErrorCode, String, data? : @json.Value?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ErrorObject::to_json(Self) -> @json.Value
+pub fn ErrorObject::to_repr(Self) -> @debug.Repr
+
+pub struct Example {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Example::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Example::description(Self) -> String?
+pub fn Example::extensions(Self) -> @domain.Extensions
+pub fn Example::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Example::name(Self) -> String?
+pub fn Example::new(ExampleValue, name? : String?, summary? : String?, description? : String?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Example::payload(Self) -> ExampleValue
+pub fn Example::summary(Self) -> String?
+pub fn Example::to_json(Self) -> @json.Value
+pub fn Example::to_repr(Self) -> @debug.Repr
+
+pub struct ExamplePairing {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn ExamplePairing::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn ExamplePairing::description(Self) -> String?
+pub fn ExamplePairing::extensions(Self) -> @domain.Extensions
+pub fn ExamplePairing::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ExamplePairing::name(Self) -> String
+pub fn ExamplePairing::new(String, Array[InlineOrReference[Example]], summary? : String?, description? : String?, result? : InlineOrReference[Example]?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ExamplePairing::params(Self) -> Array[InlineOrReference[Example]]
+pub fn ExamplePairing::result(Self) -> InlineOrReference[Example]?
+pub fn ExamplePairing::summary(Self) -> String?
+pub fn ExamplePairing::to_json(Self) -> @json.Value
+pub fn ExamplePairing::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ExampleValue {
+  NoExampleValue
+  LiteralExample(@json.Value)
+  ExternalExample(@reference.UriReference)
+} derive(@debug.Debug)
+pub fn ExampleValue::to_repr(Self) -> @debug.Repr
+
+pub struct ExternalDocumentation {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn ExternalDocumentation::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn ExternalDocumentation::description(Self) -> String?
+pub fn ExternalDocumentation::extensions(Self) -> @domain.Extensions
+pub fn ExternalDocumentation::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ExternalDocumentation::new(@reference.UriReference, description? : String?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ExternalDocumentation::to_json(Self) -> @json.Value
+pub fn ExternalDocumentation::to_repr(Self) -> @debug.Repr
+pub fn ExternalDocumentation::url(Self) -> @reference.UriReference
+
+pub struct Finding {
+  diagnostic : @json.Diagnostic
+  severity : Severity
+  phase : Phase
+} derive(@debug.Debug)
+pub fn Finding::diagnostic(Self) -> @json.Diagnostic
+pub fn Finding::phase(Self) -> Phase
+pub fn Finding::severity(Self) -> Severity
+pub fn Finding::to_repr(Self) -> @debug.Repr
+
+pub struct Info {
+  title : String
+  version : String
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Info::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Info::contact(Self) -> Contact?
+pub fn Info::description(Self) -> String?
+pub fn Info::extensions(Self) -> @domain.Extensions
+pub fn Info::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Info::license(Self) -> License?
+pub fn Info::new(String, String, description? : String?, terms_of_service? : @reference.UriReference?, contact? : Contact?, license? : License?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Info::terms_of_service(Self) -> @reference.UriReference?
+pub fn Info::title(Self) -> String
+pub fn Info::to_json(Self) -> @json.Value
+pub fn Info::to_repr(Self) -> @debug.Repr
+pub fn Info::version(Self) -> String
+
+pub(all) enum InlineOrReference[T] {
+  Inline(T)
+  Reference(@reference.Reference)
+} derive(@debug.Debug)
+pub fn[T : @debug.Debug] InlineOrReference::to_repr(Self[T]) -> @debug.Repr
+
+pub struct License {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn License::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn License::extensions(Self) -> @domain.Extensions
+pub fn License::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn License::name(Self) -> String?
+pub fn License::new(name? : String?, url? : @reference.UriReference?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn License::to_json(Self) -> @json.Value
+pub fn License::to_repr(Self) -> @debug.Repr
+pub fn License::url(Self) -> @reference.UriReference?
+
+pub struct Link {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Link::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Link::description(Self) -> String?
+pub fn Link::extensions(Self) -> @domain.Extensions
+pub fn Link::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Link::name(Self) -> String?
+pub fn Link::new(name? : String?, summary? : String?, description? : String?, target_method? : MethodName?, params? : Array[(String, @json.Value)]?, server? : Server?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Link::params(Self) -> Array[(String, @json.Value)]?
+pub fn Link::server(Self) -> Server?
+pub fn Link::summary(Self) -> String?
+pub fn Link::target_method(Self) -> MethodName?
+pub fn Link::to_json(Self) -> @json.Value
+pub fn Link::to_repr(Self) -> @debug.Repr
+
+pub struct Method {
+  name : MethodName
+  params : Array[InlineOrReference[ContentDescriptor]]
+  result : InlineOrReference[ContentDescriptor]?
+  param_structure : ParamStructure?
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Method::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Method::deprecated(Self) -> Bool?
+pub fn Method::description(Self) -> String?
+pub fn Method::errors(Self) -> Array[InlineOrReference[ErrorObject]]?
+pub fn Method::examples(Self) -> Array[InlineOrReference[ExamplePairing]]?
+pub fn Method::extensions(Self) -> @domain.Extensions
+pub fn Method::external_docs(Self) -> ExternalDocumentation?
+pub fn Method::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Method::links(Self) -> Array[InlineOrReference[Link]]?
+pub fn Method::name(Self) -> MethodName
+pub fn Method::new(MethodName, Array[InlineOrReference[ContentDescriptor]], result? : InlineOrReference[ContentDescriptor]?, tags? : Array[InlineOrReference[Tag]]?, summary? : String?, description? : String?, external_docs? : ExternalDocumentation?, deprecated? : Bool?, servers? : Array[Server]?, errors? : Array[InlineOrReference[ErrorObject]]?, links? : Array[InlineOrReference[Link]]?, param_structure? : ParamStructure?, examples? : Array[InlineOrReference[ExamplePairing]]?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Method::param_structure(Self) -> ParamStructure?
+pub fn Method::params(Self) -> Array[InlineOrReference[ContentDescriptor]]
+pub fn Method::result(Self) -> InlineOrReference[ContentDescriptor]?
+pub fn Method::servers(Self) -> Array[Server]?
+pub fn Method::summary(Self) -> String?
+pub fn Method::tags(Self) -> Array[InlineOrReference[Tag]]?
+pub fn Method::to_json(Self) -> @json.Value
+pub fn Method::to_repr(Self) -> @debug.Repr
+
+pub struct MethodName {
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn MethodName::equal(Self, Self) -> Bool
+pub fn MethodName::not_equal(Self, Self) -> Bool
+pub fn MethodName::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn MethodName::to_repr(Self) -> @debug.Repr
+pub fn MethodName::to_string(Self) -> String
+
+pub(all) enum ObjectKind {
+  DocumentObject
+  InfoObject
+  ContactObject
+  LicenseObject
+  ExternalDocumentationObject
+  ServerVariableObject
+  ServerObject
+  MethodObject
+  ContentDescriptorObject
+  TagObject
+  ErrorObjectKind
+  ExampleObject
+  ExamplePairingObject
+  LinkObject
+  ComponentsObject
+  ReferenceObject
+} derive(Eq, @debug.Debug)
+pub fn ObjectKind::equal(Self, Self) -> Bool
+pub fn ObjectKind::name(Self) -> String
+pub fn ObjectKind::not_equal(Self, Self) -> Bool
+pub fn ObjectKind::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ParamStructure {
+  ByName
+  ByPosition
+  Either
+} derive(Eq, @debug.Debug)
+pub fn ParamStructure::equal(Self, Self) -> Bool
+pub fn ParamStructure::not_equal(Self, Self) -> Bool
+pub fn ParamStructure::to_repr(Self) -> @debug.Repr
+pub fn ParamStructure::to_string(Self) -> String
+
+pub(all) enum Phase {
+  Model
+  SchemaDocument
+  References
+  Normative
+  Artifact
+} derive(Eq, @debug.Debug)
+pub fn Phase::equal(Self, Self) -> Bool
+pub fn Phase::not_equal(Self, Self) -> Bool
+pub fn Phase::to_repr(Self) -> @debug.Repr
+
+pub struct ReadResult {
+  cst : @json.CstDocument?
+  document : Document?
+  diagnostics : Array[@json.Diagnostic]
+} derive(@debug.Debug)
+pub fn ReadResult::cst(Self) -> @json.CstDocument?
+pub fn ReadResult::diagnostics(Self) -> Array[@json.Diagnostic]
+pub fn ReadResult::document(Self) -> Document?
+pub fn ReadResult::source_map(Self) -> @json.SourceMap?
+pub fn ReadResult::to_repr(Self) -> @debug.Repr
+
+pub struct Server {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Server::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Server::description(Self) -> String?
+pub fn Server::extensions(Self) -> @domain.Extensions
+pub fn Server::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Server::name(Self) -> String?
+pub fn Server::new(String, name? : String?, summary? : String?, description? : String?, variables? : Array[(String, ServerVariable)]?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Server::summary(Self) -> String?
+pub fn Server::to_json(Self) -> @json.Value
+pub fn Server::to_repr(Self) -> @debug.Repr
+pub fn Server::url(Self) -> String
+pub fn Server::variables(Self) -> Array[(String, ServerVariable)]?
+
+pub struct ServerVariable {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn ServerVariable::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn ServerVariable::default_value(Self) -> String
+pub fn ServerVariable::description(Self) -> String?
+pub fn ServerVariable::enum_values(Self) -> Array[String]?
+pub fn ServerVariable::extensions(Self) -> @domain.Extensions
+pub fn ServerVariable::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ServerVariable::new(String, enum_values? : Array[String]?, description? : String?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ServerVariable::to_json(Self) -> @json.Value
+pub fn ServerVariable::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Severity {
+  Error
+  Warning
+  Information
+} derive(Eq, @debug.Debug)
+pub fn Severity::equal(Self, Self) -> Bool
+pub fn Severity::not_equal(Self, Self) -> Bool
+pub fn Severity::to_repr(Self) -> @debug.Repr
+
+pub struct Tag {
+  value : @json.Value
+} derive(@debug.Debug)
+pub fn Tag::additional_fields(Self) -> Array[(String, @json.Value)]
+pub fn Tag::description(Self) -> String?
+pub fn Tag::extensions(Self) -> @domain.Extensions
+pub fn Tag::external_docs(Self) -> ExternalDocumentation?
+pub fn Tag::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Tag::name(Self) -> String
+pub fn Tag::new(String, summary? : String?, description? : String?, external_docs? : ExternalDocumentation?, extensions? : @domain.Extensions, additional_fields? : Array[(String, @json.Value)], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Tag::summary(Self) -> String?
+pub fn Tag::to_json(Self) -> @json.Value
+pub fn Tag::to_repr(Self) -> @debug.Repr
+
+pub struct ValidatedDocument {
+  document : Document
+  report : ValidationReport
+} derive(@debug.Debug)
+pub fn ValidatedDocument::document(Self) -> Document
+pub fn ValidatedDocument::report(Self) -> ValidationReport
+pub fn ValidatedDocument::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ValidationProfile {
+  Specification
+  MetaschemaCompatibility
+} derive(Eq, @debug.Debug)
+pub fn ValidationProfile::equal(Self, Self) -> Bool
+pub fn ValidationProfile::not_equal(Self, Self) -> Bool
+pub fn ValidationProfile::to_repr(Self) -> @debug.Repr
+
+pub struct ValidationReport {
+  profile : ValidationProfile
+  findings : Array[Finding]
+  model : Coverage
+  schemas : Coverage
+  references : Coverage
+  normative : Coverage
+  artifact : Coverage
+} derive(@debug.Debug)
+pub fn ValidationReport::artifact(Self) -> Coverage
+pub fn ValidationReport::findings(Self) -> Array[Finding]
+pub fn ValidationReport::model(Self) -> Coverage
+pub fn ValidationReport::normative(Self) -> Coverage
+pub fn ValidationReport::profile(Self) -> ValidationProfile
+pub fn ValidationReport::references(Self) -> Coverage
+pub fn ValidationReport::schemas(Self) -> Coverage
+pub fn ValidationReport::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+pub using @domain {type ComponentKey}
+
+pub using @domain {type ErrorCode}
+
+pub using @domain {type ExtensionName}
+
+pub using @domain {type Extensions}
+
+// Traits

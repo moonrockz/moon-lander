@@ -16,7 +16,8 @@ async fn main {
     task in [
       "check:node-adapter", "check:browser-adapter", "check:browser-fixture", "lint",
       "validate", "test", "check:config", "check:formats", "check:formats-registry",
-      "test:scripts", "build", "test:browser",
+      "check:openrpc-assets", "check:openrpc-unicode", "check:openrpc", "test:scripts",
+      "build", "test:browser",
     ] {
     println("")
     println("=== \{task} ===")

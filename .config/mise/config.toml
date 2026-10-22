@@ -186,6 +186,22 @@ run = "moonx scripts/check-formats-registry.mbtx --published"
 description = "Run lint, validate, tests, task script tests and builds"
 run = "moonx scripts/check.mbtx"
 
+[tasks."check:openrpc-assets"]
+description = "Verify frozen OpenRPC source digests and deliberate failure status"
+run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
+
+[tasks."check:openrpc"]
+description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
+run = "moonx scripts/check-openrpc.mbtx"
+
+[tasks."build:openrpc-unicode"]
+description = "Generate portable OpenRPC regex identifier tables from frozen Unicode data"
+run = "moonx scripts/generate-openrpc-unicode.mbtx"
+
+[tasks."check:openrpc-unicode"]
+description = "Reject stale OpenRPC Unicode tables and license without rewriting"
+run = "moonx scripts/generate-openrpc-unicode.mbtx --check"
+
 [tasks.clean]
 description = "Remove build artifacts"
 run = "moonx scripts/clean.mbtx"

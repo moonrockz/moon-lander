@@ -1,0 +1,228 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/openrpc/json"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn from_core_json(Json, limits? : Limits) -> Result[Value, Diagnostic]
+
+pub fn parse(String, source_id? : String?, limits? : Limits) -> Result[CstDocument, Diagnostic]
+
+pub fn to_core_json(Value, limits? : Limits) -> Result[Json, Diagnostic]
+
+pub fn write(Value, limits? : Limits) -> Result[String, Diagnostic]
+
+// Errors
+
+// Types and methods
+pub(all) enum Code {
+  Syntax
+  DuplicateKey
+  LimitExceeded
+  InvalidNumber
+  InvalidReference
+  UnresolvedReference
+  WrongType
+  MissingField
+  UnsupportedVersion
+  UnsupportedDialect
+  UnsupportedCheck
+  InvalidSchema
+  ParameterOrder
+  MissingBaseUri
+  UnavailableResource
+  ConflictingIdentifier
+  ReferenceCycle
+} derive(Eq, @debug.Debug)
+pub fn Code::equal(Self, Self) -> Bool
+pub fn Code::not_equal(Self, Self) -> Bool
+pub fn Code::to_repr(Self) -> @debug.Repr
+
+pub struct CstDocument {
+  source : String
+  source_id : String?
+  nodes : Array[Node]
+  limits : Limits
+} derive(@debug.Debug)
+pub fn CstDocument::limits(Self) -> Limits
+pub fn CstDocument::lower(Self) -> Result[Value, Array[Diagnostic]]
+pub fn CstDocument::nodes(Self) -> Array[Node]
+pub fn CstDocument::path(Self, Int) -> Array[String]?
+pub fn CstDocument::reproduce(Self) -> String
+pub fn CstDocument::slice(Self, Span) -> String?
+pub fn CstDocument::source_id(Self) -> String?
+pub fn CstDocument::source_map(Self) -> SourceMap
+pub fn CstDocument::span_at(Self, Array[String]) -> Span?
+pub fn CstDocument::to_repr(Self) -> @debug.Repr
+pub fn CstDocument::tokens(Self) -> Array[Token]
+
+pub struct Diagnostic {
+  code : Code
+  message : String
+  path : Array[String]
+  span : Span?
+  related : Array[Span]
+} derive(@debug.Debug)
+pub fn Diagnostic::code(Self) -> Code
+pub fn Diagnostic::message(Self) -> String
+pub fn Diagnostic::new(Code, String, path? : Array[String], span? : Span?, related? : Array[Span]) -> Self
+pub fn Diagnostic::path(Self) -> Array[String]
+pub fn Diagnostic::related(Self) -> Array[Span]
+pub fn Diagnostic::span(Self) -> Span?
+pub fn Diagnostic::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Kind {
+  Null
+  Boolean(Bool)
+  String(String)
+  Numeric(Number)
+  Array(Array[Value])
+  Object(Array[(String, Value)])
+} derive(@debug.Debug)
+pub fn Kind::to_repr(Self) -> @debug.Repr
+
+pub struct Limits {
+  max_depth : Int
+  max_nodes : Int
+  max_source : Int
+  max_number : Int
+  max_findings : Int
+} derive(@debug.Debug)
+pub fn Limits::max_depth(Self) -> Int
+pub fn Limits::max_findings(Self) -> Int
+pub fn Limits::max_nodes(Self) -> Int
+pub fn Limits::max_number(Self) -> Int
+pub fn Limits::max_source(Self) -> Int
+pub fn Limits::new(max_depth? : Int, max_nodes? : Int, max_source? : Int, max_number? : Int, max_findings? : Int) -> Self
+pub fn Limits::to_repr(Self) -> @debug.Repr
+pub fn Limits::unlimited() -> Self
+
+pub struct Location {
+  source_id : String?
+  node_index : Int
+  value_span : Span
+  key_span : Span?
+} derive(@debug.Debug)
+pub fn Location::key_span(Self) -> Span?
+pub fn Location::node_index(Self) -> Int
+pub fn Location::source_id(Self) -> String?
+pub fn Location::to_repr(Self) -> @debug.Repr
+pub fn Location::value_span(Self) -> Span
+
+pub struct Node {
+  kind : NodeKind
+  span : Span
+  key : String?
+  key_span : Span?
+  children : Array[Int]
+  scalar : Value?
+  parent : Int?
+  ordinal : Int
+} derive(@debug.Debug)
+pub fn Node::children(Self) -> Array[Int]
+pub fn Node::key(Self) -> String?
+pub fn Node::key_span(Self) -> Span?
+pub fn Node::kind(Self) -> NodeKind
+pub fn Node::span(Self) -> Span
+pub fn Node::to_repr(Self) -> @debug.Repr
+
+pub(all) enum NodeKind {
+  Scalar
+  ArrayNode
+  ObjectNode
+} derive(Eq, @debug.Debug)
+pub fn NodeKind::equal(Self, Self) -> Bool
+pub fn NodeKind::not_equal(Self, Self) -> Bool
+pub fn NodeKind::to_repr(Self) -> @debug.Repr
+
+pub struct Number {
+  token : String
+} derive(Eq, @debug.Debug)
+pub fn Number::equal(Self, Self) -> Bool
+pub fn Number::is_integer(Self) -> Bool
+pub fn Number::not_equal(Self, Self) -> Bool
+pub fn Number::numeric_compare(Self, Self) -> Int
+pub fn Number::numeric_equal(Self, Self) -> Bool
+pub fn Number::parse(String) -> Result[Self, Diagnostic]
+pub fn Number::to_repr(Self) -> @debug.Repr
+pub fn Number::token(Self) -> String
+
+pub struct Position {
+  line : Int
+  column : Int
+} derive(Eq, @debug.Debug)
+pub fn Position::column(Self) -> Int
+pub fn Position::equal(Self, Self) -> Bool
+pub fn Position::line(Self) -> Int
+pub fn Position::not_equal(Self, Self) -> Bool
+pub fn Position::to_repr(Self) -> @debug.Repr
+
+pub struct SourceMap {
+  cst : CstDocument
+  line_starts : Array[Int]
+} derive(@debug.Debug)
+pub fn SourceMap::locations(Self, Array[String]) -> Array[Location]
+pub fn SourceMap::position(Self, Int) -> Position?
+pub fn SourceMap::to_repr(Self) -> @debug.Repr
+
+pub struct Span {
+  start : Int
+  end : Int
+} derive(Eq, @debug.Debug)
+pub fn Span::end(Self) -> Int
+pub fn Span::equal(Self, Self) -> Bool
+pub fn Span::new(Int, Int) -> Self?
+pub fn Span::not_equal(Self, Self) -> Bool
+pub fn Span::start(Self) -> Int
+pub fn Span::to_repr(Self) -> @debug.Repr
+
+pub struct Token {
+  kind : TokenKind
+  span : Span
+  text : String
+} derive(@debug.Debug)
+pub fn Token::kind(Self) -> TokenKind
+pub fn Token::span(Self) -> Span
+pub fn Token::text(Self) -> String
+pub fn Token::to_repr(Self) -> @debug.Repr
+
+pub(all) enum TokenKind {
+  Whitespace
+  OpenObject
+  CloseObject
+  OpenArray
+  CloseArray
+  Colon
+  Comma
+  StringToken
+  NumberToken
+  TrueToken
+  FalseToken
+  NullToken
+} derive(Eq, @debug.Debug)
+pub fn TokenKind::equal(Self, Self) -> Bool
+pub fn TokenKind::not_equal(Self, Self) -> Bool
+pub fn TokenKind::to_repr(Self) -> @debug.Repr
+
+pub struct Value {
+  // private fields
+} derive(@debug.Debug)
+pub fn Value::array(Array[Self]) -> Self
+pub fn Value::array_item(Self, Int) -> Self?
+pub fn Value::array_length(Self) -> Int?
+pub fn Value::boolean(Bool) -> Self
+pub fn Value::equals(Self, Self, numeric? : Bool, limits? : Limits) -> Result[Bool, Diagnostic]
+pub fn Value::get(Self, String) -> Self?
+pub fn Value::kind(Self) -> Kind
+pub fn Value::null() -> Self
+pub fn Value::number(Number) -> Self
+pub fn Value::object(Array[(String, Self)]) -> Result[Self, Diagnostic]
+pub fn Value::string(String) -> Self
+pub fn Value::text(Self) -> String?
+pub fn Value::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

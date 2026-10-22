@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/json" @core_json,
+  "moonbitlang/core/bigint",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/openrpc/json",
+} for "test"

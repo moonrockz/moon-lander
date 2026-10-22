@@ -201,10 +201,102 @@ fn locations(blame : @config.Blame) -> String {
 }
 
 ///|
+priv struct MorphirIr {
+  layout : String
+  strict_mode : Bool
+} derive(FromJson, ToJson)
+
+///|
+impl @config.Validate for MorphirIr with validate(self) {
+  if self.layout == "split" && !self.strict_mode {
+    [
+      @config.violation(
+        ["layout", "strict_mode"],
+        "split layout needs strict_mode = true",
+      ),
+    ]
+  } else {
+    []
+  }
+}
+
+///|
+priv struct MorphirPipeline {
+  target : String
+  components : Array[String]
+} derive(FromJson, ToJson)
+
+///|
+priv struct MorphirWorkspace {
+  members : Array[String]
+  out_dir : String
+} derive(FromJson)
+
+///|
+priv struct MorphirMetadata {
+  provider : String
+  lock : @config.Sourced[String]
+}
+
+///|
+impl @config.FromConfig for MorphirMetadata with from_config(node) {
+  { provider: node.get("provider"), lock: node.get("lock") }
+}
+
+///|
+/// The error text of `bind`, or `ok` when it succeeds.
+fn attempt(bind : () -> Unit raise @config.ConfigError) -> String {
+  try bind() catch {
+    error => error.message()
+  } noraise {
+    _ => "ok"
+  }
+}
+
+///|
+/// Bind each section of a Morphir-shaped configuration and give one text with
+/// the bound values and the error texts. Each target must give the same text.
+fn bind_morphir(
+  config : @config.Config,
+) -> String raise @config.ConfigError {
+  let ir = config
+    |> @config.bind_or("ir", ({ layout: "single-file", strict_mode: false } : MorphirIr))
+    |> @config.validated(config, "ir")
+  let pipeline_default : MorphirPipeline = {
+    target: "wasm",
+    components: ["parse", "typecheck"],
+  }
+  let pipeline = config |> @config.bind_or("pipeline", pipeline_default)
+  let timeout : Int64 = config |> @config.bind_with("pipeline.build_timeout")
+  let workspace : MorphirWorkspace = config |> @config.bind("workspace")
+  let metadata : MorphirMetadata = config |> @config.bind_with("metadata")
+  [
+    "ir: \{ir.key} \{ir.value.layout} \{ir.value.strict_mode}",
+    "pipeline: \{pipeline.target} \{pipeline.components.join(",")}",
+    "build_timeout: \{timeout}",
+    "workspace: \{workspace.members.join(",")} \{workspace.out_dir}",
+    "metadata: \{metadata.provider} \{metadata.lock.value} from \{locations(metadata.lock.blame)}",
+    attempt(() => {
+      let _ : Int64 = config |> @config.bind("pipeline.build_timeout")
+    }),
+    attempt(() => {
+      config
+      |> @config.bind_or("pipeline", pipeline_default, unknown=Reject)
+      |> ignore
+    }),
+    attempt(() => {
+      let _ : Bool = config |> @config.bind("workspace.out_dir")
+    }),
+  ].join("\n")
+}
+
+///|
 /// The files of one scenario, the loaded configuration, and the outcome of the
 /// last binding: a result text or an error.
 priv struct BindingWorld {
   files : Array[(String, @config.FileRole, String)]
+  /// The key path that a file appends to, by file path.
+  appends : Map[String, String]
   vars : Map[String, String]
   mut result : String?
   mut error : @config.ConfigError?
@@ -212,7 +304,7 @@ priv struct BindingWorld {
 
 ///|
 fn BindingWorld::BindingWorld() -> BindingWorld {
-  { files: [], vars: {}, result: None, error: None }
+  { files: [], appends: {}, vars: {}, result: None, error: None }
 }
 
 ///|
@@ -232,7 +324,11 @@ fn BindingWorld::config(self : BindingWorld) -> @config.Config raise {
     |> @config.format(@ion_format.format())
   let mut tree = @config.FileTree::new(complete=true)
   for file in self.files {
-    builder = builder |> @config.file(file.0, role=file.1)
+    let mut source = @config.ConfigSource::file(file.0, role=file.1)
+    if self.appends.get(file.0) is Some(key) {
+      source = source.with_key_policy(@config.KeyPath::parse(key), Append)
+    }
+    builder = builder |> @config.add(source)
     tree = tree.with_file(file.0, file.2)
   }
   if !self.vars.is_empty() {
@@ -274,6 +370,18 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
     path : String,
     source : @moonspec.DocString,
   ) => self.files.push((path, role(role_name), source.content)))
+  setup.given4("the {string} file {string} appends to {string}:", (
+    role_name : String,
+    path : String,
+    key : String,
+    source : @moonspec.DocString,
+  ) => {
+    self.files.push((path, role(role_name), source.content))
+    self.appends[path] = key
+  })
+  setup.when0("the application binds the Morphir configuration", () => self.run(config => {
+    bind_morphir(config)
+  }))
   setup.when1("the application binds {string} to the IR record", (
     key : String,
   ) => self.run(config => {
@@ -458,6 +566,9 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
     }
     guard self.result is Some(result) else { fail("binding failed") }
     @expect.expect(result.contains(secret)).to_be_false()
+  })
+  setup.then1("the result is:", (expected : @moonspec.DocString) => {
+    @expect.expect(self.result).to_equal(Some(expected.content))
   })
   setup.then1("the result is {string}", (expected : String) => {
     @expect.expect(self.result).to_equal(Some(expected))
@@ -830,6 +941,54 @@ let feature : String =
   #|    When the application binds "service" to the exact service record
   #|    Then the result is "https://example.org env SERVICE_TOKEN"
   #|    And the result does not contain the value of "SERVICE_TOKEN"
+  #|
+  #|  Scenario: Appended list names every source
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      targets = [{ level = 1 }]
+  #|      """
+  #|    And the "workspace-member" file "/repo/app/morphir.toml" appends to "targets":
+  #|      """toml
+  #|      targets = [{ level = "high" }]
+  #|      """
+  #|    When the application binds "targets" to a list of targets
+  #|    Then binding fails with a decode error at "targets[1].level"
+  #|    And the error text is "targets[1].level: Int::from_json: expected number (set in project /repo/morphir.toml, workspace-member /repo/app/morphir.toml)"
+  #|
+  #|  Scenario: Same result on all targets
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      [ir]
+  #|      layout = "split"
+  #|      strict_mode = true
+  #|
+  #|      [pipeline]
+  #|      target = "js"
+  #|      build_timeout = 9007199254740993
+  #|      strict_namng = true
+  #|
+  #|      [workspace]
+  #|      members = ["apps/a", "apps/b"]
+  #|      out_dir = "dist"
+  #|
+  #|      [metadata]
+  #|      provider = "lock-file"
+  #|      lock = "deps.lock"
+  #|      """
+  #|    And the environment variable "MORPHIR_WORKSPACE__OUT_DIR" is "out"
+  #|    When the application binds the Morphir configuration
+  #|    Then the result is:
+  #|      """
+  #|      ir: ir split true
+  #|      pipeline: js parse,typecheck
+  #|      build_timeout: 9007199254740993
+  #|      workspace: apps/a,apps/b out
+  #|      metadata: lock-file deps.lock from /repo/morphir.toml
+  #|      pipeline.build_timeout: Int64::from_json: expected number in string representation (set in project /repo/morphir.toml)
+  #|      pipeline.build_timeout: is an unknown key (set in project /repo/morphir.toml)
+  #|      pipeline.strict_namng: is an unknown key (set in project /repo/morphir.toml)
+  #|      workspace.out_dir: Bool::from_json: expected boolean (set in environment MORPHIR_WORKSPACE__OUT_DIR)
+  #|      """
 
 ///|
 /// Run each scenario of `text` with a fresh world and fail on the first scenario

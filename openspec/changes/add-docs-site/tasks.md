@@ -92,8 +92,8 @@ Bead: lander-4us.7.8
 
 Bead: lander-4us.7.9
 
-- [ ] 9.1 Write `docs/WRITING_FOR_THE_SITE.md` with the content of design D20 in ASD-STE100, with one example of each building block, and add it to `nav`; verify that `mise run build:site -- --main` and `mise run check:site` pass and the guide's Mermaid example renders as an SVG.
-- [ ] 9.2 State in the guide that `docs/superpowers/` goes in `.git/info/exclude` and never in the site; verify that the guide links resolve in the build.
+- [x] 9.1 Write `docs/WRITING_FOR_THE_SITE.md` with the content of design D20 in ASD-STE100, with one example of each building block, and add it to `nav`; verify that `mise run build:site -- --main` and `mise run check:site` pass and the guide's Mermaid example renders as an SVG.
+- [x] 9.2 State in the guide that `docs/superpowers/` goes in `.git/info/exclude` and never in the site; verify that the guide links resolve in the build.
 
 ## 10. API reference pages
 

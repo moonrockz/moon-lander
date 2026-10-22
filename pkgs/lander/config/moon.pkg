@@ -5,13 +5,19 @@ import {
   "moonbit-community/toml" @toml_lib,
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
+  "moonbitlang/core/int",
   "moonbitlang/core/int64",
+  "moonbitlang/core/uint64",
+  "moonbitlang/core/bigint",
   "moonbitlang/core/encoding/base64" @base64,
 }
 
 import {
   "moonrockz/expect",
   "moonrockz/moon-lander/config/formats/toml",
+  "moonrockz/moon-lander/config/formats/ion" @ion_format,
+  "moonbitlang/core/bigint",
+  "moonbitlang/core/json",
   "moonrockz/ion/ion" @ion,
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/quickcheck/shrink",

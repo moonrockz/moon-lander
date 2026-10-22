@@ -61,12 +61,12 @@ Bead: lander-4us.4.5
 
 Bead: lander-4us.4.6
 
-- [ ] 6.1 Add `ConfigNode` (decode path, value, blame, `child`, `children`, `items`, `get`, `json`, `fail`) and the `FromConfig` trait, and `bind_with`; verify a white-box test binds a hand-written `FromConfig` record
-- [ ] 6.2 Add `FromConfig` impls for `String`, `Bool`, `Int`, `Int64`, `UInt64`, `Double`, `BigInt`, `@ion.Decimal`, `@ion.Timestamp`, `T?`, `Array[T]` and `Map[String, T]`; verify `Int` rejects `80.5` and `Int64` keeps `9007199254740993`
-- [ ] 6.3 Add `Sourced[T]` and `FromConfig for SecretRef`; verify a relative path keeps its file origin and a secret stays unresolved
-- [ ] 6.4 Make `ConfigNode::json` use the same error translation as `bind`; verify a `FromJson` part inside a `FromConfig` record reports the full decode path
-- [ ] 6.5 Add acceptance scenarios for "Exact decoding from the value tree", "Value with its origin" and the second scenario of "Secret references are not resolved by binding", with Ion text sources; verify they pass on all four targets
-- [ ] 6.6 Document `FromConfig`, `bind_with` and `Sourced` in the package README; verify the example runs
+- [x] 6.1 Add `ConfigNode` (decode path, value, blame, `child`, `children`, `items`, `get`, `json`, `fail`) and the `FromConfig` trait, and `bind_with`; verify a white-box test binds a hand-written `FromConfig` record
+- [x] 6.2 Add `FromConfig` impls for `String`, `Bool`, `Int`, `Int64`, `UInt64`, `Double`, `BigInt`, `@ion.Decimal`, `@ion.Timestamp`, `T?`, `Array[T]` and `Map[String, T]`; verify `Int` rejects `80.5` and `Int64` keeps `9007199254740993`
+- [x] 6.3 Add `Sourced[T]` and `FromConfig for SecretRef`; verify a relative path keeps its file origin and a secret stays unresolved
+- [x] 6.4 Make `ConfigNode::json` use the same error translation as `bind`; verify a `FromJson` part inside a `FromConfig` record reports the full decode path
+- [x] 6.5 Add acceptance scenarios for "Exact decoding from the value tree", "Value with its origin" and the second scenario of "Secret references are not resolved by binding", with Ion text sources; verify they pass on all four targets
+- [x] 6.6 Document `FromConfig`, `bind_with` and `Sourced` in the package README; verify the example runs
 
 ## 7. Unknown-key check
 

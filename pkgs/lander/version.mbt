@@ -1,5 +1,5 @@
 ///|
 /// The module version, kept in sync with the root moon.mod.
 pub fn version() -> String {
-  "0.1.0"
+  "0.2.0"
 }

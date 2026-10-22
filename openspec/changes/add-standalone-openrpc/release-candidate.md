@@ -56,3 +56,25 @@ merging the release pull request from this branch to `main`. The workflow then:
 5. creates the GitHub release `v0.2.0` with the CHANGELOG.md section.
 
 Group 11 records the public result from that run.
+
+## Published
+
+The owner approved by merging PR #47 (merge commit
+`1de7e46e98d1c7093e14e43ae6317b6320118932`). Release workflow run
+[39802962627](https://github.com/moonrockz/moon-lander/actions/runs/39802962627)
+passed every job on 2026-10-22:
+
+| Item | Result |
+| --- | --- |
+| Validate | `mise run check` and `versions.mbtx check 0.2.0` passed at the merge commit |
+| Publish | `moonrockz/notebooks@0.2.0` and `moonrockz/openrpc@0.2.0` published |
+| Published archive SHA-256 | `8f5c8785377676aefd3e038aed21853e533354f9a378c70306f3efad7238a659`, equal to the archive the workflow built at the merge commit |
+| Public consumer | `check:openrpc-published --checksum <that SHA-256>`: a fresh consumer outside `moon.work` resolved `moonrockz/openrpc@0.2.0` from mooncakes.io and matched the source build on native, wasm, js and wasm-gc; graph `openrpc-consumer -> moonrockz/openrpc@0.2.0` only |
+| GitHub release | [`v0.2.0`](https://github.com/moonrockz/moon-lander/releases/tag/v0.2.0) at the merge commit |
+
+The published checksum differs from the pre-merge candidate checksum above
+(`25215d9b...7556`). `pkgs/openrpc` is identical between the candidate commit
+`792017b` and the merge commit; `main` had moved the pinned toolchain from moon
+`0.10.15` to `0.10.17`, which packages the same sources into different bytes. The
+release gate compares the public archive with the archive built from the released
+commit, so the published identity is `8f5c8785...a659` at `1de7e46`.

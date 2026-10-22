@@ -43,6 +43,10 @@ async test "Host adapter fills the inputs" {
   @expect.expect(@config.get_text(config, "a")).to_equal("1")
   guard seen.val is Some(context) else { fail("the provider did not run") }
   @expect.expect(context.env_vars.get("LANDER_HOST_INPUT_A")).to_equal(Some("1"))
+  // Another async test can set a variable between the load and the read below.
+  // Do the same here, so the compare must leave it out on every run.
+  @env.set_env_var("LANDER_HOST_INPUT_LATE", "1")
+  defer @env.unset_env_var("LANDER_HOST_INPUT_LATE")
   @expect.expect(without_test_vars(context.env_vars)).to_equal(
     without_test_vars(@env.get_env_vars()),
   )

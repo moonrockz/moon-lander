@@ -149,7 +149,28 @@ try {
   check(new URL(plainPage.url()).pathname === `${base}articles/`, 'without JavaScript a main link navigates');
   await plain.close();
 
-  // Task 10.10 adds the API page check here.
+  // One API page: the item anchor, a source link, and a search that opens an API item.
+  const apiPage = `${site}api/moonrockz/notebooks/`;
+  await page.goto(apiPage);
+  check((await page.locator('[id="CellKind"]').count()) === 1, 'the notebooks API page has the #CellKind anchor');
+  check(
+    (await page.locator('.api-source a[href^="https://github.com/moonrockz/moon-lander/blob/"]').count()) > 0,
+    'the notebooks API page has a source link on GitHub',
+  );
+  await page.goto(site);
+  await searchFor(page, 'CellKind');
+  await page.press('#search-input', 'Enter');
+  const apiItem = `${base}api/moonrockz/notebooks/#CellKind`;
+  await page.waitForURL((url) => pathAndHash(url) === apiItem, { timeout: 5000 }).catch(() => {});
+  check(pathAndHash(page.url()) === apiItem, `a search for "CellKind" opens ${apiItem}, not ${page.url()}`);
+  const apiPhone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  apiPhone.on('pageerror', (e) => errors.push(`${apiPhone.url()}: ${e.message}`));
+  await apiPhone.goto(apiPage);
+  check(
+    await apiPhone.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    `${base}api/moonrockz/notebooks/ has no horizontal scroll at 390 px`,
+  );
+  await apiPhone.close();
 
   check(errors.length === 0, `no page errors: ${errors.join('; ')}`);
 } finally {

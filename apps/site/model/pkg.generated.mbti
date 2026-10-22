@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn api_anchors(ApiPackage) -> Array[String]
+
 pub fn api_index_packages(String, String) -> Array[String] raise Invalid
 
 pub fn api_link(String, current~ : String, site_packages~ : Array[String], base_path~ : String) -> String?
@@ -14,7 +16,11 @@ pub fn api_method_anchor(String, String, via? : String) -> String
 
 pub fn api_missing_docstrings(ApiPackage) -> Array[String]
 
+pub fn api_prose_link(String, anchors~ : Map[String, Array[String]], base_path~ : String) -> Result[String, String]
+
 pub fn api_route(String) -> String
+
+pub fn api_search_entries(ApiPackage, (ApiEntry) -> String) -> Array[SearchEntry]
 
 pub fn api_source_url(repo_url~ : String, commit~ : String, module_dir~ : String, module_name~ : String, ApiLoc) -> String
 
@@ -23,6 +29,8 @@ pub fn article_parts(String) -> (String, String)?
 pub fn article_route(String) -> String
 
 pub fn doc_route(String) -> String
+
+pub fn first_sentence(String) -> String
 
 pub let forbidden_dir : String
 
@@ -39,6 +47,8 @@ pub fn next_theme(String) -> String
 pub fn package_route(String) -> String
 
 pub fn parse_signature(String) -> Result[Array[SignaturePart], String]
+
+pub fn percent_decode(String) -> String
 
 pub fn problem(String, String, line? : Int32) -> Problem
 

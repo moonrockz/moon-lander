@@ -185,3 +185,175 @@ pub fn api_missing_docstrings(api : ApiPackage) -> Array[String] {
   }
   out
 }
+
+///|
+/// The anchors of the items and methods on the API page of `api`, in page order: `#<item>`,
+/// `#<Type>.<method>`, and the method anchors of trait implementations.
+pub fn api_anchors(api : ApiPackage) -> Array[String] {
+  let out = []
+  let add_item = (item : ApiItem, below_trait : Bool) => {
+    let name = item.entry.name
+    out.push(name)
+    for entry in item.methods {
+      out.push(api_method_anchor(name, entry.name))
+    }
+    for impl_ in item.impls {
+      let via = impl_.via(below_trait~)
+      for entry in impl_.methods {
+        out.push(api_method_anchor(name, entry.name, via~))
+      }
+    }
+  }
+  for item in api.types {
+    add_item(item, false)
+  }
+  for item in api.errors {
+    add_item(item, false)
+  }
+  for item in api.traits {
+    add_item(item, true)
+  }
+  for entry in api.aliases + api.values {
+    out.push(entry.name)
+  }
+  out
+}
+
+///|
+/// `text` with each `%XX` escape of an ASCII character decoded. CommonMark writes some characters of
+/// a link target as escapes, for example `[` as `%5B`. Other text, and an escape of a byte above 127,
+/// stays as it is.
+pub fn percent_decode(text : String) -> String {
+  let out = StringBuilder()
+  let mut i = 0
+  while i < text.length() {
+    let c = text.code_unit_at(i)
+    if c == '%' && i + 2 < text.length() {
+      match (hex_digit(text.code_unit_at(i + 1)), hex_digit(text.code_unit_at(i + 2))) {
+        (Some(high), Some(low)) if high < 8 => {
+          out.write_char(Int::unsafe_to_char(high * 16 + low))
+          i += 3
+          continue
+        }
+        _ => ()
+      }
+    }
+    out.write_char(Int::unsafe_to_char(c.to_int()))
+    i += 1
+  }
+  out.to_string()
+}
+
+///|
+fn hex_digit(c : UInt16) -> Int? {
+  let n = c.to_int()
+  if n >= '0'.to_int() && n <= '9'.to_int() {
+    Some(n - '0'.to_int())
+  } else if n >= 'a'.to_int() && n <= 'f'.to_int() {
+    Some(n - 'a'.to_int() + 10)
+  } else if n >= 'A'.to_int() && n <= 'F'.to_int() {
+    Some(n - 'A'.to_int() + 10)
+  } else {
+    None
+  }
+}
+
+///|
+/// The site link of the Markdown link target `api:<package path>[#<anchor>]`, or `Err` with the reason
+/// when the package has no API page or the page has no such anchor. `anchors` maps each package path
+/// on the site to the anchors of its page. The check uses the percent-decoded target, and the link
+/// keeps the anchor as the target writes it.
+pub fn api_prose_link(
+  target : String,
+  anchors~ : Map[String, Array[String]],
+  base_path~ : String,
+) -> Result[String, String] {
+  let rest = if target.has_prefix("api:") {
+    target[4:].to_owned()
+  } else {
+    target
+  }
+  let (package_part, anchor_part) = match rest.find("#") {
+    Some(i) => (rest[:i].to_owned(), rest[i + 1:].to_owned())
+    None => (rest, "")
+  }
+  let package_path = percent_decode(package_part)
+  let anchor = percent_decode(anchor_part)
+  guard anchors.get(package_path) is Some(found) else {
+    return Err("no API page for the package `\{package_path}`")
+  }
+  if anchor != "" && !found.contains(anchor) {
+    return Err("the API page of `\{package_path}` has no item or method `#\{anchor}`")
+  }
+  let page = base_path + api_route(package_path)[1:].to_owned()
+  Ok(if anchor_part == "" { page } else { "\{page}#\{anchor_part}" })
+}
+
+///|
+/// The first sentence of plain text: the text up to the first `.`, `!` or `?` that ends a word, or all
+/// of the text.
+pub fn first_sentence(text : String) -> String {
+  let flat = text.split("\n").map(l => l.trim().to_owned()).collect().join(" ").trim().to_owned()
+  for i in 0..<flat.length() {
+    let c = flat.code_unit_at(i)
+    if (c == '.' || c == '!' || c == '?') &&
+      (i + 1 == flat.length() || flat.code_unit_at(i + 1) == ' ') {
+      return flat[:i + 1].to_owned()
+    }
+  }
+  flat
+}
+
+///|
+/// The search entries of the items and methods of `api`, in page order. The route is the API page
+/// with the anchor, the title is the name (`<Type>::<method>` for a method), the section is `API`,
+/// the heading is the package path, and the summary is the first sentence of `plain(entry)`, the
+/// docstring as plain text.
+pub fn api_search_entries(
+  api : ApiPackage,
+  plain : (ApiEntry) -> String,
+) -> Array[SearchEntry] {
+  let out = []
+  let route = api_route(api.path)
+  let add = (anchor : String, title : String, entry : ApiEntry) => {
+    let summary = first_sentence(plain(entry))
+    out.push({
+      route: "\{route}#\{anchor}",
+      title,
+      section: "API",
+      summary,
+      headings: [api.path],
+      text: "\{api.path} \{summary}",
+    })
+  }
+  let add_item = (item : ApiItem, below_trait : Bool) => {
+    let name = item.entry.name
+    add(name, name, item.entry)
+    for entry in item.methods {
+      add(api_method_anchor(name, entry.name), "\{name}::\{entry.name}", entry)
+    }
+    for impl_ in item.impls {
+      let via = impl_.via(below_trait~)
+      for entry in impl_.methods {
+        add(
+          api_method_anchor(name, entry.name, via~),
+          "\{name}::\{entry.name}",
+          entry,
+        )
+      }
+    }
+  }
+  for item in api.types {
+    add_item(item, false)
+  }
+  for item in api.errors {
+    add_item(item, false)
+  }
+  for item in api.traits {
+    add_item(item, true)
+  }
+  for entry in api.aliases + api.values {
+    add(entry.name, entry.name, entry)
+  }
+  out
+}

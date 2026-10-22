@@ -9,6 +9,8 @@ pub(all) struct LinkContext {
   dirs : Map[String, Bool]
   /// Every route the generator writes.
   site_routes : Map[String, Bool]
+  /// The anchors of the API page of each package path, for `api:` links.
+  api_anchors : Map[String, Array[String]]
 }
 
 ///|
@@ -17,6 +19,7 @@ pub fn LinkContext::new(
   routes : Map[String, String],
   files : Array[String],
   site_routes : Array[String],
+  api_anchors~ : Map[String, Array[String]] = Map([]),
 ) -> LinkContext {
   let file_set : Map[String, Bool] = Map([])
   let dirs : Map[String, Bool] = Map([])
@@ -32,7 +35,7 @@ pub fn LinkContext::new(
   for r in site_routes {
     route_set.set(r, true)
   }
-  { config, routes, files: file_set, dirs, site_routes: route_set, }
+  { config, routes, files: file_set, dirs, site_routes: route_set, api_anchors }
 }
 
 ///|
@@ -115,8 +118,21 @@ fn is_media(path : String) -> Bool {
 }
 
 ///|
-/// Resolve one `href` or `src` value of the page whose repository path is `from`.
+/// Resolve one `href` or `src` value of the page whose repository path is `from`. A link
+/// `api:<package path>[#<item>]` goes to an API page and must name a package and an anchor that
+/// exist.
 pub fn resolve(ctx : LinkContext, from : String, url : String) -> Resolution {
+  if url.has_prefix("api:") {
+    return match
+      @model.api_prose_link(
+        url,
+        anchors=ctx.api_anchors,
+        base_path=ctx.config.base_path,
+      ) {
+      Ok(href) => keep(href)
+      Err(reason) => broken(url, "API link `\{url}`: \{reason}")
+    }
+  }
   if url == "" ||
     url.contains("://") ||
     url.has_prefix("mailto:") ||

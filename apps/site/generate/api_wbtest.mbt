@@ -43,6 +43,16 @@ async test "Package page" {
       "href=\"https://example.org/repo/blob/\{commit}/pkgs/notebooks/navigation.mbt#L4\"",
     ),
   )
+  // Every anchor that an `api:` link can name is on the page.
+  let api = @model.ApiPackage::parse(
+    "package_data.json",
+    @fs.read_file(
+      "fixtures/api/doc/pkgs/notebooks/doc/moonrockz/notebooks/package_data.json",
+    ).text(),
+  )
+  for anchor in @model.api_anchors(api) {
+    assert_true(page.contains("id=\"\{anchor}\""), msg="no anchor \{anchor}")
+  }
   // Index
   let index = @fs.read_file("\{out}/api/index.html").text()
   assert_true(index.contains("href=\"/fixture/api/moonrockz/notebooks/\""))

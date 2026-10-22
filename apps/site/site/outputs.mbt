@@ -33,7 +33,7 @@ pub async fn build(
   main_build~ : Bool,
   api~ : ApiSite = no_api,
 ) -> Built {
-  let prepared = prepare(config, sources, main_build~)
+  let prepared = prepare(config, sources, main_build~, api~)
   let pages = prepared.pages
   let entries = nav_entries(pages)
   let nav = match config.nav {
@@ -135,7 +135,9 @@ pub async fn build(
     ),
   )
   outputs.push(Text("articles/atom.xml", atom_feed(config, articles)))
-  outputs.push(Text("search-index.json", search_index(pages)))
+  outputs.push(
+    Text("search-index.json", search_index(pages, api=api.search_entries())),
+  )
   outputs.append(api_outputs(config, api))
   for copy in prepared.copies {
     outputs.push(Copy(copy.0, copy.1))

@@ -202,6 +202,7 @@ pub fn prepare(
   config : @model.SiteConfig,
   sources : Array[SourceFile],
   main_build~ : Bool,
+  api~ : ApiSite = no_api,
 ) -> Prepared raise @model.Invalid {
   let problems : Array[@model.Problem] = []
   let warnings : Array[@model.Problem] = []
@@ -311,6 +312,7 @@ pub fn prepare(
     routes,
     sources.map(s => s.path),
     site_routes,
+    api_anchors=api.anchors(),
   )
   let anchors : Array[(String, String, String)] = []
   let copies : Array[(String, String)] = []

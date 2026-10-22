@@ -117,6 +117,10 @@ jobs:
         run: mise run check:openrpc
       - name: Verify generated OpenRPC Unicode data
         run: mise run check:openrpc-unicode
+      - name: Verify generated OpenRPC artifact metaschemas
+        run: mise run check:openrpc-artifacts
+      - name: Qualify OpenRPC against the frozen corpus
+        run: mise run qualify:openrpc
       - name: Test task scripts
         run: mise run test:scripts
 

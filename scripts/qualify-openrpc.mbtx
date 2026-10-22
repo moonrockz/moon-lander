@@ -1,0 +1,343 @@
+///|
+/// Qualify the OpenRPC library against the frozen document corpus.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+test "case manifests require complete, known and unique expectations" {
+  let good = "[{\"id\":\"a\",\"artifact\":true,\"normative\":\"passed\",\"specification\":true,\"compatibility\":false,\"note\":\"n\"}]"
+  assert_eq(parse_cases(good).map(cases => cases.length()), Ok(1))
+  for
+    bad in [
+      "{}",
+      "[{\"id\":\"a\"}]",
+      "[{\"id\":\"a\",\"artifact\":true,\"normative\":\"maybe\",\"specification\":true,\"compatibility\":false,\"note\":\"n\"}]",
+      "[{\"id\":\"a/b\",\"artifact\":true,\"normative\":\"passed\",\"specification\":true,\"compatibility\":false,\"note\":\"n\"}]",
+      "[" +
+      good[1:good.length() - 1].to_owned() +
+      "," +
+      good[1:good.length() - 1].to_owned() +
+      "]",
+      "[]",
+    ] {
+    assert_true(parse_cases(bad) is Err(_), msg=bad)
+  }
+}
+
+///|
+test "comparison names the first mismatching case" {
+  let cases = parse_cases(
+    "[{\"id\":\"a\",\"artifact\":true,\"normative\":\"passed\",\"specification\":true,\"compatibility\":true,\"note\":\"\"},{\"id\":\"b\",\"artifact\":false,\"normative\":\"failed\",\"specification\":false,\"compatibility\":false,\"note\":\"\"}]",
+  ).unwrap()
+  assert_eq(
+    compare(cases, [
+      "a artifact=true normative=passed specification=true compatibility=true", "b artifact=false normative=failed specification=false compatibility=false",
+    ]),
+    Ok(()),
+  )
+  guard compare(cases, [
+      "a artifact=true normative=passed specification=true compatibility=true", "b artifact=true normative=failed specification=false compatibility=false",
+    ])
+    is Err(message) else {
+    fail("mismatch accepted")
+  }
+  assert_true(message.contains("b"), msg=message)
+  assert_true(
+    compare(cases, [
+      "a artifact=true normative=passed specification=true compatibility=true",
+    ])
+    is Err(_),
+  )
+}
+
+///|
+priv struct Case {
+  id : String
+  artifact : Bool
+  normative : String
+  specification : Bool
+  compatibility : Bool
+}
+
+///|
+fn expected_line(case : Case) -> String {
+  "\{case.id} artifact=\{case.artifact} normative=\{case.normative} specification=\{case.specification} compatibility=\{case.compatibility}"
+}
+
+///|
+fn parse_cases(text : String) -> Result[Array[Case], String] {
+  let value = @json.parse(text) catch {
+    _ => return Err("Malformed cases.json")
+  }
+  guard value is Array(items) && !items.is_empty() else {
+    return Err("cases.json must be a nonempty array")
+  }
+  let cases = []
+  let ids : Set[String] = Set([])
+  for item in items {
+    guard item is Object(fields) &&
+      fields.get("id") is Some(String(id)) &&
+      fields.get("artifact") is Some(True | False as artifact) &&
+      fields.get("normative") is Some(String(normative)) &&
+      fields.get("specification") is Some(True | False as specification) &&
+      fields.get("compatibility") is Some(True | False as compatibility) &&
+      fields.get("note") is Some(String(_)) else {
+      return Err(
+        "Each case needs id, artifact, normative, specification, compatibility and note",
+      )
+    }
+    guard ["passed", "warnings", "failed"].contains(normative) else {
+      return Err("Unknown normative expectation \{normative} for \{id}")
+    }
+    guard !id.is_empty() &&
+      id
+      .iter()
+      .all(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') else {
+      return Err("Invalid case id \{id}")
+    }
+    guard ids.add_and_check(id) else { return Err("Duplicate case id \{id}") }
+    cases.push({
+      id,
+      artifact: artifact is True,
+      normative,
+      specification: specification is True,
+      compatibility: compatibility is True,
+    })
+  }
+  Ok(cases)
+}
+
+///|
+/// Compare observed lines with the expectations, in order.
+fn compare(
+  cases : Array[Case],
+  observed : Array[String],
+) -> Result[Unit, String] {
+  for i, case in cases {
+    guard observed.get(i) is Some(line) else {
+      return Err("No result for case \{case.id}")
+    }
+    let expected = expected_line(case)
+    guard line == expected else {
+      return Err(
+        "Case \{case.id} differs\n  expected: \{expected}\n  observed: \{line}",
+      )
+    }
+  }
+  guard observed.length() == cases.length() else {
+    return Err("Unexpected extra results")
+  }
+  Ok(())
+}
+
+///|
+fn literal(text : String) -> String {
+  "\"" +
+  text
+  .replace_all(old="\\", new="\\\\")
+  .replace_all(old="\"", new="\\\"")
+  .replace_all(old="\n", new="\\n") +
+  "\""
+}
+
+///|
+fn consumer_source(documents : Array[(String, String)]) -> String {
+  let out = StringBuilder()
+  out.write_string(
+    "///|\nfn main {\n  let cases : Array[(String, String)] = [\n",
+  )
+  for document in documents {
+    out.write_string("    (\{literal(document.0)}, \{literal(document.1)}),\n")
+  }
+  let body =
+    #|  ]
+    #|  for case in cases {
+    #|    let (id, source) = case
+    #|    guard @openrpc.read(source).document() is Some(document) else {
+    #|      println(id + " unreadable")
+    #|      continue
+    #|    }
+    #|    let report = @openrpc.validate(document)
+    #|    let normative = match report.normative() {
+    #|      @openrpc.Failed => "failed"
+    #|      @openrpc.Incomplete => "incomplete"
+    #|      @openrpc.Passed =>
+    #|        if report
+    #|          .findings()
+    #|          .any(f => f.phase() == @openrpc.Normative && f.severity() == @openrpc.Warning) {
+    #|          "warnings"
+    #|        } else {
+    #|          "passed"
+    #|        }
+    #|    }
+    #|    let specification = @openrpc.validate_closed(document).document() is Some(_)
+    #|    let compatibility = @openrpc.validate_closed(
+    #|      document,
+    #|      profile=@openrpc.MetaschemaCompatibility,
+    #|    ).document()
+    #|    is Some(_)
+    #|    let artifact = report.artifact() == @openrpc.Passed
+    #|    println(
+    #|      "\{id} artifact=\{artifact} normative=\{normative} specification=\{specification} compatibility=\{compatibility}",
+    #|    )
+    #|  }
+    #|}
+    #|
+  out.write_string(body)
+  out.to_string()
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "_build" || entry == ".mooncakes" || entry == ".git" {
+      continue
+    }
+    let from = source + "/" + entry
+    let to = destination + "/" + entry
+    match @fs.kind(from) {
+      Directory => copy_tree(from, to)
+      Regular => @fs.write_file(to, @fs.read_file(from))
+      _ => fail("Unexpected source entry: " + from)
+    }
+  }
+}
+
+///|
+async fn run(program : String, args : Array[String], cwd : String) -> String {
+  let (code, out, err) = @process.collect_output(program, args, cwd~)
+  guard code == 0 else {
+    fail(
+      "\{program} \{args.join(" ")} failed (\{code})\n\{out.text()}\{err.text()}",
+    )
+  }
+  out.text().replace_all(old="\r\n", new="\n")
+}
+
+///|
+fn workspace_version(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.has_prefix("version = \"") {
+      let rest = line[11:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+fn option(name : String, default : String) -> String {
+  let args = @env.args()
+  for i, arg in args {
+    if arg == name && i + 1 < args.length() {
+      return args[i + 1]
+    }
+  }
+  default
+}
+
+///|
+/// Check asset digests, the independent Ajv artifact results and the library
+/// on all four targets against the corpus expectations.
+async fn qualify(root : String, corpus : String, assets : String) -> Unit {
+  let _ = run(
+    "moonx",
+    ["\{root}/scripts/check-openrpc-assets.mbtx", "--assets", assets],
+    root,
+  )
+  let cases = match parse_cases(@fs.read_file("\{corpus}/cases.json").text()) {
+    Ok(cases) => cases
+    Err(message) => fail(message)
+  }
+  let documents = []
+  for case in cases {
+    let path = "\{corpus}/\{case.id}.json"
+    guard @fs.exists(path) else { fail("Missing corpus document \{path}") }
+    documents.push((case.id, @fs.read_file(path).text()))
+  }
+  let oracle = "\{root}/tests/openrpc-qualification"
+  let _ = run(
+    "bun",
+    ["install", "--frozen-lockfile", "--ignore-scripts"],
+    oracle,
+  )
+  let ajv = @json.parse(run("bun", ["documents.mjs", assets, corpus], oracle)) catch {
+    _ => fail("Ajv oracle output is not JSON")
+  }
+  guard ajv is Array(results) && results.length() == cases.length() else {
+    fail("Ajv oracle returned the wrong number of results")
+  }
+  for i, case in cases {
+    guard results[i] is Array([String(id), True | False as valid]) &&
+      id == case.id else {
+      fail("Ajv oracle result \{i} is malformed")
+    }
+    guard (valid is True) == case.artifact else {
+      fail("Ajv disagrees with the artifact expectation of \{case.id}")
+    }
+  }
+  println(
+    "Independent Ajv agrees with \{cases.length()} artifact expectations.",
+  )
+  let version = workspace_version(@fs.read_file("\{root}/moon.mod").text()).unwrap()
+  let isolated = @fs.tmpdir(prefix="openrpc-qualification")
+  defer @fs.rmdir(isolated, recursive=true)
+  copy_tree("\{root}/pkgs/openrpc", "\{isolated}/library")
+  @fs.write_file(
+    "\{isolated}/moon.work",
+    "members = [\n  \".\",\n  \"./library\",\n]\n",
+  )
+  @fs.write_file(
+    "\{isolated}/moon.mod",
+    "name = \"openrpc-qualification\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+  )
+  @fs.write_file(
+    "\{isolated}/moon.pkg",
+    "import { \"moonrockz/openrpc\" }\npkgtype(kind: \"executable\")\n",
+  )
+  @fs.write_file("\{isolated}/main.mbt", consumer_source(documents))
+  let mut first : String? = None
+  for target in ["native", "wasm", "js", "wasm-gc"] {
+    let output = run(
+      "moon",
+      ["run", "--release", "--deny-warn", "--target", target, "."],
+      isolated,
+    )
+    let lines = output
+      .split("\n")
+      .filter(l => !l.is_empty())
+      .map(l => l.to_owned())
+      .collect()
+    match compare(cases, lines) {
+      Ok(_) => ()
+      Err(message) => fail("Library on \{target}: \{message}")
+    }
+    match first {
+      None => first = Some(output)
+      Some(previous) =>
+        if previous != output {
+          fail("Library output on \{target} differs from native")
+        }
+    }
+    println("Library agrees with \{cases.length()} expectations: \{target}")
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let corpus = @fs.realpath(
+    option("--corpus", "tests/openrpc-qualification/corpus"),
+  )
+  let assets = @fs.realpath(option("--assets", "tests/tck/openrpc"))
+  qualify(root, corpus, assets)
+  println("OpenRPC qualification passed.")
+}

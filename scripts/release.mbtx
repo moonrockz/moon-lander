@@ -4,8 +4,9 @@
 /// - `plan` decides whether this run releases and writes `release`, `dry_run`,
 ///   `version` and `tag` to `$GITHUB_OUTPUT`.
 /// - `notes X.Y.Z` prints the CHANGELOG.md section of that version.
-/// - `github X.Y.Z NOTES` creates the GitHub release `vX.Y.Z` at the checked
-///   out commit, or does nothing when it exists.
+/// - `github X.Y.Z NOTES [ASSET...]` creates the GitHub release `vX.Y.Z` at the
+///   checked out commit with the files `ASSET...`, such as the site asset
+///   `site-X.Y.tar.gz`. When the release exists, it only attaches the files.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -182,18 +183,48 @@ async fn run_plan() -> Unit {
 }
 
 ///|
-async fn run_github(version : String, notes : String) -> Unit {
+/// The `gh` arguments that create the release `tag` at `target` with the notes file `notes` and the
+/// files `assets`.
+fn create_args(
+  tag : String,
+  target : String,
+  notes : String,
+  assets : Array[String],
+) -> Array[String] {
+  [
+    "release", "create", tag, "--target", target, "--title", tag, "--notes-file",
+    notes, ..assets,
+  ]
+}
+
+///|
+/// The `gh` arguments that attach `assets` to the existing release `tag`, and replace a file of the
+/// same name, so that a re-run is safe.
+fn upload_args(tag : String, assets : Array[String]) -> Array[String] {
+  ["release", "upload", tag, ..assets, "--clobber"]
+}
+
+///|
+async fn run_github(
+  version : String,
+  notes : String,
+  assets : Array[String],
+) -> Unit {
   let tag = "v\{version}"
   let (viewed, _) = output_of("gh", ["release", "view", tag])
   if viewed == 0 {
     println("\{tag} already has a GitHub release")
+    if !assets.is_empty() {
+      let (code, out) = output_of("gh", upload_args(tag, assets))
+      if code != 0 {
+        fail_with("gh release upload failed: \{out}")
+      }
+      println("Attached \{assets.join(", ")} to \{tag}")
+    }
     return
   }
   let target = @env.get_env_var("GITHUB_SHA").unwrap_or("HEAD")
-  let (code, out) = output_of("gh", [
-    "release", "create", tag, "--target", target, "--title", tag, "--notes-file",
-    notes,
-  ])
+  let (code, out) = output_of("gh", create_args(tag, target, notes, assets))
   if code != 0 {
     fail_with("gh release create failed: \{out}")
   }
@@ -209,9 +240,12 @@ async fn main {
         Some(section) => println(section)
         None => fail_with("CHANGELOG.md has no section for \{version}")
       }
-    ["github", version, notes] => run_github(version, notes)
+    ["github", version, notes, .. assets] =>
+      run_github(version, notes, assets.to_owned())
     _ =>
-      fail_with("Usage: release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES")
+      fail_with(
+        "Usage: release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES [ASSET...]",
+      )
   }
 }
 
@@ -268,4 +302,18 @@ test "changelog sections end at the next version heading" {
   assert_eq(changelog_section(text, "0.1.0"), Some("Old."))
   assert_eq(changelog_section(text, "0.3.0"), None)
   assert_eq(changelog_section(text, "0.2"), None)
+}
+
+///|
+test "Release with the site asset" {
+  assert_eq(
+    create_args("v0.3.0", "abc", "notes.md", ["/tmp/site-asset/site-0.3.tar.gz"]),
+    [
+      "release", "create", "v0.3.0", "--target", "abc", "--title", "v0.3.0", "--notes-file",
+      "notes.md", "/tmp/site-asset/site-0.3.tar.gz",
+    ],
+  )
+  assert_eq(upload_args("v0.3.0", ["site-0.3.tar.gz"]), [
+    "release", "upload", "v0.3.0", "site-0.3.tar.gz", "--clobber",
+  ])
 }

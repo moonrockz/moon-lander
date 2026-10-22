@@ -170,20 +170,36 @@ async fn copy_file(from : String, to : String) -> Unit {
 }
 
 ///|
+/// The configuration of the version tree at `tree_path` below the site, such as `next/` (design D22):
+/// the base path and the site URL move below the tree. An empty `tree_path` keeps `config`.
+fn tree_config(config : @model.SiteConfig, tree_path : String) -> @model.SiteConfig {
+  if tree_path == "" {
+    config
+  } else {
+    {
+      ..config,
+      base_path: config.base_path + tree_path,
+      site_url: config.site_url + tree_path,
+    }
+  }
+}
+
+///|
 /// Build the site of the repository at `root` into `out`, and copy each file below `assets_dir` to
-/// `<out>/assets/`. The API pages come from the `moon doc` output below `api_dir`. Returns the
-/// warnings.
+/// `<out>/assets/`. The API pages come from the `moon doc` output below `api_dir`. `tree_path` puts
+/// every link below a version tree, such as `next/`. Returns the warnings.
 async fn generate(
   root : String,
   out : String,
   assets_dir : String,
   main_build : Bool,
   api_dir~ : String = "\{root}/_build/site-api",
+  tree_path~ : String = "",
 ) -> Array[@model.Problem] {
   let config_path = "\{root}/site/site.json"
-  let config = @model.SiteConfig::parse(
-    "site/site.json",
-    @fs.read_file(config_path).text(),
+  let config = tree_config(
+    @model.SiteConfig::parse("site/site.json", @fs.read_file(config_path).text()),
+    tree_path,
   )
   let sources = []
   for path in repository_files(root) {

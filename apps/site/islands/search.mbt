@@ -151,7 +151,7 @@ fn search_box(id : String, base : String) -> Unit {
       if state.index is NotLoaded {
         state.index = Loading
         fetch_search_index(
-          base + "search-index.json",
+          @model.search_index_url(base),
           rows => {
             state.index = Ready(rows.filter_map(@model.SearchEntry::from_fields))
             render(state)

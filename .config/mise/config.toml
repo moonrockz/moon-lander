@@ -74,16 +74,20 @@ description = "Build all workspace members for native in release mode"
 run = "moonx scripts/build.mbtx native --release"
 
 [tasks."build:site"]
-description = "Build the docs site into _site/ (args: --main)"
+description = "Build the docs site into _site/ (args: --main, --tree next|<minor>)"
 run = "moonx scripts/site.mbtx build"
 
 [tasks."check:site"]
-description = "Check the built docs site in _site/"
+description = "Check the built docs site in _site/, tree by tree when it is assembled (args: --tree next|<minor>)"
 run = "moonx scripts/site.mbtx check"
 
 [tasks."test:site"]
-description = "Test the docs site packages and the highlight step, and run the browser smoke test on _site/"
+description = "Test the docs site packages and the highlight step, and run the browser smoke test on _site/ (args: --tree next|<minor>)"
 run = "moonx scripts/site.mbtx test"
+
+[tasks."assemble:site"]
+description = "Add the release trees to the next build in _site/ and write the versioned site (needs gh; CI deploy)"
+run = "moonx scripts/site.mbtx assemble"
 
 [tasks."dev:site"]
 description = "Build the docs site, serve it at http://127.0.0.1:4173/moon-lander/ and build again on change (args: --port <n>, --no-watch)"

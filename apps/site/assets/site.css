@@ -698,3 +698,30 @@ input:focus-visible {
     gap: 0;
   }
 }
+
+/* Version trees (design D22). The deploy fills the banner of an older or unreleased version; a build
+   writes it empty, and an empty banner takes no space. */
+.version-banner:empty {
+  display: none;
+}
+
+.version-banner {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--page-fg);
+  text-align: center;
+}
+
+.version-banner p {
+  margin: 0;
+}
+
+.version-select {
+  font: inherit;
+  color: var(--page-fg);
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}

@@ -10,9 +10,11 @@ fn option(args : Array[String], name : String, default : String) -> String {
 }
 
 ///|
-/// Usage: `check [--root <dir>] [--dir <dir>] [--api <dir>]`. The root is the repository, `../..` by
-/// default. The site directory is `<root>/_site` and the `moon doc` output of the API pages is below
-/// `<root>/_build/site-api` by default. An API item without a docstring gives a warning, not a problem.
+/// Usage: `check [--root <dir>] [--dir <dir>] [--base <path>] [--api <dir>]`. The root is the
+/// repository, `../..` by default. The site directory is `<root>/_site` and the `moon doc` output of the
+/// API pages is below `<root>/_build/site-api` by default. `--base` is the base path of the site in the
+/// site directory, the `base_path` of `site/site.json` by default. An API item without a docstring
+/// gives a warning, not a problem.
 async fn main {
   let args = @env.args()
   let root = option(args, "--root", "../..")
@@ -31,7 +33,12 @@ async fn main {
   for w in warnings {
     println("warning: \{w.render()}")
   }
-  let problems = check_site(root, dir) catch {
+  let base = if args.contains("--base") {
+    Some(option(args, "--base", ""))
+  } else {
+    None
+  }
+  let problems = check_site(root, dir, base?) catch {
     @model.Invalid(problems) => problems
     error => [@model.problem(dir, "\{error}")]
   }

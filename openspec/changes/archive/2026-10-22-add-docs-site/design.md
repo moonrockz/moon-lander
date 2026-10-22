@@ -500,6 +500,15 @@ package lands in `pkgs/lander`, with no change to the site. Until then the API
 section shows `moonrockz/notebooks`, `moonrockz/openrpc` and the root package
 `moonrockz/moon-lander`.
 
+Call: a method of a trait implementation has the anchor `#<Type>.<Trait>.<method>`
+on a type page and `#<Trait>.<Type>.<method>` on a trait page. `moon doc` lists a
+derived method under the type and under the trait, so `#<Type>.<method>` alone is
+not unique.
+
+Call: each module's `moon doc` output goes to its own folder
+`_build/site-api/<dir>/`, so a later run cannot remove the output of an earlier
+one. This replaces the staging copy that task 10.1 and risk R12 name.
+
 ### D22. Versioned docs
 
 Owner (2026-10-20): the site is versioned. A version is one minor line at
@@ -531,6 +540,13 @@ Owner (2026-10-22): the release workflow `.github/workflows/release.yml` exists
 release that it creates. This change edits `release.yml` for that call only. It
 does not cut a release: the next release pull request, which the owner approves,
 is the first to carry the asset.
+
+Call: after it creates the release, the release job starts the Site workflow with
+`gh workflow run site.yml --ref main` (job permission `actions: write`). The Site
+deploy of the version-bump push can run before the release exists, and a release
+event from `GITHUB_TOKEN` starts no workflow. `gh release create` publishes the
+release only after it uploads the asset, and the deploy skips drafts, so the early
+deploy does not fail; the started deploy adds the new line.
 
 Call: `site.mbtx assemble` runs only in the deploy. It reads every release with
 `gh api --paginate repos/{owner}/{repo}/releases`, so no page or count limit drops a

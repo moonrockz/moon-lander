@@ -81,10 +81,11 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run check:openrpc-artifacts` | Reject stale artifact metaschemas and the associated OpenRPC license |
 | `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |
 | `mise run check:openrpc-unicode` | Reject stale identifier tables and the associated Unicode license |
-| `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
+| `mise run build:site` | Build the docs site into `_site/` (args: `--main`, `--tree next` for `_site/next/`, or `--tree <minor>` for `_site/v/<minor>/`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
-| `mise run check:site` | Check the links of the built `_site/` |
-| `mise run test:site` | Test the docs site packages and the code highlight step, and run the browser smoke test on the built site |
+| `mise run check:site` | Check the links of the built `_site/`, or of one tree with `--tree`; an assembled site is checked tree by tree |
+| `mise run test:site` | Test the docs site packages and the code highlight step, and run the browser smoke test on the built site (args: `--tree`) |
+| `mise run assemble:site` | Add the site assets of the releases to a `next` build and write the versioned site (CI deploy; needs `gh`) |
 | `mise run build:node-adapter` | Regenerate the checked-in TypeScript host adapter bundle |
 | `mise run check:node-adapter` | Reject a stale host adapter bundle |
 | `mise run test:node-adapter` | Test the js host adapter on Node and Bun |
@@ -154,5 +155,14 @@ the workflow then runs the full check, publishes the public modules with the
 `MOONCAKES_USER_TOKEN` organization secret, verifies the published OpenRPC
 archive from the public registry on all four targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
+
+Each GitHub release from `0.3` on carries the docs site of its minor line as the
+asset `site-<minor>.tar.gz`. The Release workflow builds it through
+`.github/workflows/site-asset.yml`. The Site workflow downloads the asset of the
+newest release of each minor line and serves it at `/moon-lander/v/<minor>/`,
+with the newest release also at the root and at `/latest/`, and `main` at
+`/next/`. Releases `0.1.0` and `0.2.0` have no site asset, so `versions.since`
+in `site/site.json` is `0.3`. Until a `0.3` release exists, the root shows `main`
+with a pre-release banner.
 
 License: Apache-2.0.

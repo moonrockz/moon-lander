@@ -1,0 +1,56 @@
+name: Site asset
+
+# Builds the docs site of the minor line of the root moon.mod with the base path
+# /moon-lander/v/<minor>/, checks it, and gives site-<minor>.tar.gz to the caller as the workflow
+# artifact `site-asset` (openspec add-docs-site, design D22). The Release workflow calls it and
+# attaches the file to the GitHub release that it creates. This workflow creates no release.
+on:
+  workflow_call:
+    outputs:
+      minor:
+        description: The minor line of the root moon.mod, for example 0.3
+        value: ${{ jobs.build.outputs.minor }}
+      asset:
+        description: The file name of the site asset, for example site-0.3.tar.gz
+        value: ${{ jobs.build.outputs.asset }}
+
+permissions:
+  contents: read
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  build:
+    name: Build site asset
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      minor: ${{ steps.line.outputs.minor }}
+      asset: ${{ steps.line.outputs.asset }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read the minor line of moon.mod
+        id: line
+        run: |
+          set -euo pipefail
+          minor="$(moonx scripts/versions.mbtx minor)"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "asset=site-$minor.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: Build the site of ${{ steps.line.outputs.minor }}
+        run: mise run build:site -- --main --tree ${{ steps.line.outputs.minor }}
+      - name: Check the site of ${{ steps.line.outputs.minor }}
+        run: mise run check:site -- --tree ${{ steps.line.outputs.minor }}
+      - name: Pack ${{ steps.line.outputs.asset }}
+        run: tar -czf "${{ steps.line.outputs.asset }}" -C "_site/v/${{ steps.line.outputs.minor }}" .
+      - name: Upload the site asset
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-asset
+          path: ${{ steps.line.outputs.asset }}
+          if-no-files-found: error

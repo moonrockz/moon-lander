@@ -78,3 +78,9 @@ The published checksum differs from the pre-merge candidate checksum above
 `0.10.15` to `0.10.17`, which packages the same sources into different bytes. The
 release gate compares the public archive with the archive built from the released
 commit, so the published identity is `8f5c8785...a659` at `1de7e46`.
+
+Merging PR #47 approved the `25215d9b...7556` candidate, not this archive. On
+2026-10-22, during review of PR #51, the owner separately approved the published
+identity: `moonrockz/openrpc@0.2.0` with archive SHA-256
+`8f5c8785377676aefd3e038aed21853e533354f9a378c70306f3efad7238a659`, built from
+`1de7e46`. That approval closes tasks 11.1 and 11.2 for the published archive.

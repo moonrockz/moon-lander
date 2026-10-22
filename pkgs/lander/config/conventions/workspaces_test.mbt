@@ -197,6 +197,23 @@ test "Escaping entry skipped" {
 }
 
 ///|
+test "an exclude entry outside the workspace is skipped" {
+  let config = workspace_in("/w", [
+    (
+      "/w/acme.toml",
+      "workspace.members = [\"packages/*\"]\nworkspace.exclude = [\"/packages/billing\"]",
+    ),
+    ("/w/packages/billing/acme.toml", "a = 1"),
+  ])
+  @expect.expect(note_messages(config)).to_equal([
+    no_platform, "discovery skips the workspace entry /packages/billing, because it is not in the workspace directory",
+  ])
+  @expect.expect(member_report(config).map(report => report.path)).to_equal(
+    Some(Some("/w/packages/billing/acme.toml")),
+  )
+}
+
+///|
 test "Backslash member entry rejected" {
   let config = discover_in(
     "/w",

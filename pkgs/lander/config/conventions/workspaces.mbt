@@ -196,6 +196,7 @@ fn Scan::members(
   declaration : Declaration,
 ) -> Array[String]? {
   let members = []
+  let exclude = self.confined(declaration.exclude)
   let mut known = true
   for entry in self.confined(declaration.members) {
     let dirs = if entry.contains("*") {
@@ -209,7 +210,7 @@ fn Scan::members(
       [entry_dir(root, entry)]
     }
     for dir in dirs {
-      if !members.contains(dir) && is_member(root, declaration.exclude, dir) {
+      if !members.contains(dir) && is_member(root, exclude, dir) {
         members.push(dir)
       }
     }
@@ -293,7 +294,7 @@ fn Scan::selects(
   dir : String,
 ) -> Bool {
   patterns_select(root, self.confined(declaration.members), dir) &&
-  is_member(root, declaration.exclude, dir)
+  is_member(root, self.confined(declaration.exclude), dir)
 }
 
 ///|
@@ -403,7 +404,7 @@ fn Scan::automatic_member(
     guard self.confined([entry]) is [_] else { return Some(None) }
     let dir = entry_dir(root, entry)
     return Some(
-      if is_member(root, declaration.exclude, dir) {
+      if is_member(root, self.confined(declaration.exclude), dir) {
         Some(dir)
       } else {
         None

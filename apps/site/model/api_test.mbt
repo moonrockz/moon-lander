@@ -58,11 +58,30 @@ test "Format change" {
   @expect.expect(
     problems_in(() => {
       @model.ApiPackage::parse(
-        "p.json", "{\"name\":\"p\",\"types\":[{\"name\":\"T\"}],\"errors\":[],\"traits\":[],\"typealias\":[],\"values\":[]}",
+        "p.json", "{\"name\":\"p\",\"types\":[{\"name\":\"T\",\"methods\":[],\"impls\":[]}],\"errors\":[],\"traits\":[],\"typealias\":[],\"values\":[]}",
       )
       |> ignore
     }),
   ).to_equal(["p.json: missing key `types[0].loc`"])
+  let entry = "{\"name\":\"T\",\"docstring\":\"\",\"signature\":\"\",\"loc\":{\"path\":\"p\",\"file\":\"f.mbt\",\"line\":1},\"impls\":[]}"
+  @expect.expect(
+    problems_in(() => {
+      @model.ApiPackage::parse(
+        "p.json",
+        "{\"name\":\"p\",\"types\":[\{entry}],\"errors\":[],\"traits\":[],\"typealias\":[],\"values\":[]}",
+      )
+      |> ignore
+    }),
+  ).to_equal(["p.json: missing key `types[0].methods`"])
+  @expect.expect(
+    problems_in(() => {
+      @model.ApiPackage::parse(
+        "p.json",
+        "{\"name\":\"p\",\"types\":[],\"errors\":[],\"traits\":[\{entry}],\"typealias\":[],\"values\":[]}",
+      )
+      |> ignore
+    }),
+  ).to_equal([])
   @expect.expect(
     problems_in(() => {
       @model.ApiPackage::parse("p.json", "[]") |> ignore
@@ -224,4 +243,5 @@ test "missing docstrings are listed by anchor" {
   let missing = @model.api_missing_docstrings(api)
   @expect.expect(missing.contains("CellKind.equal")).to_be_true()
   @expect.expect(missing.contains("CellKind")).to_be_false()
+  @expect.expect(missing.contains("Metadata.Eq.equal")).to_be_true()
 }

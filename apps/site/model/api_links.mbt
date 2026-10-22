@@ -135,27 +135,48 @@ pub fn api_method_anchor(
 }
 
 ///|
-/// The anchors of the public items and methods of `package` that have no docstring, in page order.
+/// What goes between the item and the method in the anchor of a method of `impl_`: the trait name
+/// below a type or an error, or the implementing type below a trait.
+pub fn ApiImpl::via(self : ApiImpl, below_trait~ : Bool) -> String {
+  if below_trait {
+    self.self_type
+  } else {
+    self.trait_name
+  }
+}
+
+///|
+/// The anchors of the public items and methods of `api` that have no docstring, in page order. The
+/// methods of trait implementations count too.
 pub fn api_missing_docstrings(api : ApiPackage) -> Array[String] {
   let out = []
-  let check_item = (item : ApiItem) => {
+  let check_item = (item : ApiItem, below_trait : Bool) => {
+    let name = item.entry.name
     if item.entry.docstring.trim() == "" {
-      out.push(item.entry.name)
+      out.push(name)
     }
     for entry in item.methods {
       if entry.docstring.trim() == "" {
-        out.push(api_method_anchor(item.entry.name, entry.name))
+        out.push(api_method_anchor(name, entry.name))
+      }
+    }
+    for impl_ in item.impls {
+      let via = impl_.via(below_trait~)
+      for entry in impl_.methods {
+        if entry.docstring.trim() == "" {
+          out.push(api_method_anchor(name, entry.name, via~))
+        }
       }
     }
   }
   for item in api.types {
-    check_item(item)
+    check_item(item, false)
   }
   for item in api.errors {
-    check_item(item)
+    check_item(item, false)
   }
   for item in api.traits {
-    check_item(item)
+    check_item(item, true)
   }
   for entry in api.aliases + api.values {
     if entry.docstring.trim() == "" {

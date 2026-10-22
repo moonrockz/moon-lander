@@ -176,17 +176,22 @@ fn Reader::members(
 }
 
 ///|
-/// A type, error or trait. `methods` and `impls` are optional: a trait has no `methods` key.
-fn Reader::item(self : Reader, json : Json, at : String) -> ApiItem raise Invalid {
+/// A type, error or trait. Each has `impls`. A type or an error also has `methods`; a trait has
+/// none, so only a trait can be without that key.
+fn Reader::item(
+  self : Reader,
+  json : Json,
+  at : String,
+  is_trait~ : Bool,
+) -> ApiItem raise Invalid {
   let fields = self.object(json, at)
-  let methods = if fields.contains("methods") {
-    self.members(self.array(fields, at, "methods"), "\{at}.methods")
-  } else {
+  let methods = if is_trait && !fields.contains("methods") {
     []
+  } else {
+    self.members(self.array(fields, at, "methods"), "\{at}.methods")
   }
   let impls = []
-  if fields.contains("impls") {
-    for i, value in self.array(fields, at, "impls") {
+  for i, value in self.array(fields, at, "impls") {
       let impl_at = "\{at}.impls[\{i}]"
       let impl_fields = self.object(value, impl_at)
       let trait_at = "\{impl_at}.trait"
@@ -194,16 +199,15 @@ fn Reader::item(self : Reader, json : Json, at : String) -> ApiItem raise Invali
         self.field(impl_fields, impl_at, "trait"),
         trait_at,
       )
-      impls.push({
-        trait_name: self.text(trait_fields, trait_at, "name"),
-        trait_path: self.text(trait_fields, trait_at, "path"),
-        self_type: type_text(self.field(impl_fields, impl_at, "self")),
-        methods: self.members(
-          self.array(impl_fields, impl_at, "methods"),
-          "\{impl_at}.methods",
-        ),
-      })
-    }
+    impls.push({
+      trait_name: self.text(trait_fields, trait_at, "name"),
+      trait_path: self.text(trait_fields, trait_at, "path"),
+      self_type: type_text(self.field(impl_fields, impl_at, "self")),
+      methods: self.members(
+        self.array(impl_fields, impl_at, "methods"),
+        "\{impl_at}.methods",
+      ),
+    })
   }
   { entry: self.entry(json, at), methods, impls }
 }
@@ -216,7 +220,7 @@ fn Reader::items(
 ) -> Array[ApiItem] raise Invalid {
   let out = []
   for i, value in self.array(fields, "", name) {
-    out.push(self.item(value, "\{name}[\{i}]"))
+    out.push(self.item(value, "\{name}[\{i}]", is_trait=name == "traits"))
   }
   out
 }

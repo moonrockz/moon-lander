@@ -220,7 +220,7 @@ fn ApiContext::item(
     out.write_string(
       "<p class=\"api-impl\">impl <code>\{@content.escape(i.trait_name)}</code> for <code>\{@content.escape(i.self_type)}</code></p>",
     )
-    let via = if is_trait { i.self_type } else { i.trait_name }
+    let via = i.via(below_trait=is_trait)
     for m in i.methods {
       self.entry(
         out,

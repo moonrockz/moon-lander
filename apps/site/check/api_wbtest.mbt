@@ -12,6 +12,11 @@ async test "Item without a docstring" {
   assert_false(
     warnings.contains("moonrockz/notebooks: `#CellKind` has no docstring"),
   )
+  assert_true(
+    warnings.contains(
+      "moonrockz/notebooks: `#Metadata.Eq.equal` has no docstring",
+    ),
+  )
 }
 
 ///|

@@ -152,8 +152,9 @@ recorded in the bead.
 - Install the hooks with `mise run hooks:install`. Pre-commit checks formatting,
   compiler warnings and generated interfaces of the staged files. These checks read the
   working tree, so pre-commit first fails when a MoonBit file (`.mbt`, `.mbt.md`,
-  `.mbti`, `.mbtx` or a `moon.*` manifest) is untracked or has unstaged changes. Stage
-  those changes, or set them aside, and commit again. Pre-push runs lint, workspace
+  `.mbti`, `.mbtx` or a `moon.*` manifest) is untracked, has unstaged changes, or is
+  ignored by git but still read by moon. Build and dependency output in `_build/` and
+  `.mooncakes/` does not count. Stage those changes, or set them aside, and commit again. Pre-push runs lint, workspace
   validation and tests.
 - Commit the `pkg.generated.mbti` file of each package, as MoonBit convention
   recommends. `mise run lint` writes these files and fails when one is new or changed

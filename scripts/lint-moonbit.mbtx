@@ -14,8 +14,9 @@
 /// interface, so this check does not cover it.
 ///
 /// Both checks read the working tree. `--staged` makes lint check what a commit holds: it first fails
-/// when a MoonBit input differs from the index or is untracked, so the working tree equals the
-/// staged snapshot for every file the checks read. The pre-commit hook uses `--staged`.
+/// when a MoonBit input differs from the index, is untracked, or is ignored but still read by moon, so
+/// the working tree equals the staged snapshot for every file the checks read. Ignored build and
+/// dependency output under `_build/` and `.mooncakes/` does not count: CI makes it again. The pre-commit hook uses `--staged`.
 ///
 /// Usage: `mise run lint:moonbit [-- --staged]`, or `moonx scripts/lint-moonbit.mbtx [--staged]`.
 import {
@@ -38,6 +39,37 @@ let moonbit_inputs : Array[String] = [
   "*.mbt", "*.mbt.md", "*.mbti", "*.mbtx", "*moon.pkg", "*moon.mod", "*moon.work",
   "*moon.pkg.json", "*moon.mod.json",
 ]
+
+///|
+/// The MoonBit inputs that git ignores but moon still reads, in path order. Build and dependency
+/// output under `_build/` and `.mooncakes/` is left out, because CI makes it again from pinned
+/// versions.
+async fn ignored_inputs() -> Array[String] {
+  let (code, out, err) = @process.collect_output(
+    "git",
+    [
+      "ls-files", "--others", "--ignored", "--exclude-standard", "--", ..moonbit_inputs,
+    ],
+  )
+  if code != 0 {
+    println(err.text())
+    println("❌ git could not list the ignored files.")
+    @sys.exit(if code > 0 { code } else { 1 })
+    return []
+  }
+  let paths = []
+  for line in out.text().split("\n") {
+    let path = line.trim(chars=" \t\r").to_owned()
+    let output = path
+      .split("/")
+      .any(part => part == "_build" || part == ".mooncakes")
+    if !path.is_empty() && !output {
+      paths.push(path)
+    }
+  }
+  paths.sort()
+  paths
+}
 
 ///|
 /// The interface files that are untracked or differ from the index, in path order.
@@ -77,12 +109,13 @@ async fn main {
   if staged {
     println("🔍 Checking that the MoonBit inputs are staged...")
     let unstaged = changed_files(moonbit_inputs)
+    unstaged.append(ignored_inputs())
     if !unstaged.is_empty() {
       for path in unstaged {
         println("  \{path}")
       }
       println(
-        "❌ These MoonBit files are untracked or have changes that are not staged, so lint cannot check what the commit holds. Stage them, or set them aside, and commit again.",
+        "❌ These MoonBit files are untracked, ignored, or have changes that are not staged, so lint cannot check what the commit holds. Stage them, or set them aside, and commit again.",
       )
       @sys.exit(1)
     }
@@ -265,6 +298,17 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   assert_true(code != 0, msg=output)
   assert_true(output.contains("lib/extra.mbt"), msg=output)
   @fs.remove("\{dir}/lib/extra.mbt")
+  // An ignored MoonBit file is still compiled, so it blocks too.
+  @fs.write_file(
+    "\{dir}/lib/helper.mbt",
+    "///|\npub fn helper() -> Int {\n  1\n}\n",
+  )
+  @fs.write_file("\{dir}/.git/info/exclude", "lib/helper.mbt\n")
+  let (code, output) = lint(["--staged"])
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("lib/helper.mbt"), msg=output)
+  assert_true(output.contains("not staged"), msg=output)
+  @fs.remove("\{dir}/lib/helper.mbt")
   // An unstaged change outside the MoonBit inputs does not block.
   @fs.write_file("\{dir}/notes.txt", "draft\n")
   let (code, output) = lint(["--staged"])

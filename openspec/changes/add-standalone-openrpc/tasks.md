@@ -105,9 +105,9 @@ Depends on: `lander-bwk.10`.
 Bead: `lander-bwk.12`
 Depends on: `lander-bwk.11`.
 
-- [ ] 11.1 Obtain explicit owner approval for the concrete candidate's publication and GitHub release by the owner merging the release pull request; record the approved version, source SHA and archive identity before the workflow publishes.
-- [ ] 11.2 After the merge, let the release workflow upload the unchanged verified package and run a fresh exact-version public-registry consumer outside `moon.work` on all four targets without overrides or local substitution, against the archive checksum it built.
-- [ ] 11.3 Record public resolution, checksum and source identity; keep this gate open if approval, artifact identity or any target proof is absent or fails, and obtain separate release authority when it was not included.
+- [x] 11.1 Obtain explicit owner approval for the concrete candidate's publication and GitHub release by the owner merging the release pull request; record the approved version, source SHA and archive identity before the workflow publishes.
+- [x] 11.2 After the merge, let the release workflow upload the unchanged verified package and run a fresh exact-version public-registry consumer outside `moon.work` on all four targets without overrides or local substitution, against the archive checksum it built.
+- [x] 11.3 Record public resolution, checksum and source identity; keep this gate open if approval, artifact identity or any target proof is absent or fails, and obtain separate release authority when it was not included.
 
 ## 12. Migrate Smithy in its own workspace and prove parity
 

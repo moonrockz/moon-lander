@@ -33,7 +33,7 @@ pub async fn build(
   main_build~ : Bool,
   api~ : ApiSite = no_api,
 ) -> Built {
-  let prepared = prepare(config, sources, main_build~)
+  let prepared = prepare(config, sources, main_build~, api~)
   let pages = prepared.pages
   let entries = nav_entries(pages)
   let nav = match config.nav {

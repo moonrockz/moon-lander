@@ -28,7 +28,7 @@ pub let no_api : ApiSite
 
 pub fn normalize(String) -> String
 
-pub fn prepare(@model.SiteConfig, Array[SourceFile], main_build~ : Bool) -> Prepared raise @model.Invalid
+pub fn prepare(@model.SiteConfig, Array[SourceFile], main_build~ : Bool, api? : ApiSite) -> Prepared raise @model.Invalid
 
 pub fn resolve(LinkContext, String, String) -> Resolution
 
@@ -52,6 +52,7 @@ pub(all) struct ApiSite {
   commit : String
   modules : Array[ApiModule]
 }
+pub fn ApiSite::anchors(Self) -> Map[String, Array[String]]
 pub fn ApiSite::package_paths(Self) -> Array[String]
 
 pub(all) struct Built {
@@ -78,8 +79,9 @@ pub(all) struct LinkContext {
   files : Map[String, Bool]
   dirs : Map[String, Bool]
   site_routes : Map[String, Bool]
+  api_anchors : Map[String, Array[String]]
 }
-pub fn LinkContext::new(@model.SiteConfig, Map[String, String], Array[String], Array[String]) -> Self
+pub fn LinkContext::new(@model.SiteConfig, Map[String, String], Array[String], Array[String], api_anchors? : Map[String, Array[String]]) -> Self
 
 pub(all) struct NavEntry {
   route : String

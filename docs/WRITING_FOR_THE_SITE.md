@@ -81,8 +81,28 @@ adds it, so do not write `/moon-lander/` yourself.
 
 ## API links
 
-This section is a placeholder. The API reference pages add the syntax for a link
-from a page to an API item.
+To link to an API reference page, use a Markdown link with the target
+`api:<package path>`. Add `#<item>` to go to an item, or `#<Type>.<method>` to go to
+a method. The link text is free.
+
+```text
+[`CellKind`](api:moonrockz/notebooks#CellKind)
+[`CellKind::equal`](api:moonrockz/notebooks#CellKind.equal)
+[the notebooks API](api:moonrockz/notebooks)
+```
+
+The build changes the target to the route of the API page, for example
+`/moon-lander/api/moonrockz/notebooks/#CellKind`. This link goes to
+[`CellKind`](api:moonrockz/notebooks#CellKind).
+
+The build fails when the package has no API page, or when the page has no item or
+method with that name. The API pages show the packages of the modules in the `api`
+key of `site/site.json`.
+
+A method of a trait implementation has the trait name between the type and the
+method, for example `#Metadata.Eq.equal`. Below a trait, it has the type, for example
+`#Validate.Map[String,T].validate`. To find an anchor, open the API page and copy the
+link of the heading.
 
 ## Building blocks
 

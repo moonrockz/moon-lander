@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn api_anchors(ApiPackage) -> Array[String]
+
 pub fn api_index_packages(String, String) -> Array[String] raise Invalid
 
 pub fn api_link(String, current~ : String, site_packages~ : Array[String], base_path~ : String) -> String?
@@ -13,6 +15,8 @@ pub fn api_link(String, current~ : String, site_packages~ : Array[String], base_
 pub fn api_method_anchor(String, String, via? : String) -> String
 
 pub fn api_missing_docstrings(ApiPackage) -> Array[String]
+
+pub fn api_prose_link(String, anchors~ : Map[String, Array[String]], base_path~ : String) -> Result[String, String]
 
 pub fn api_route(String) -> String
 

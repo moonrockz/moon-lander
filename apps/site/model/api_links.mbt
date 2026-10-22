@@ -185,3 +185,64 @@ pub fn api_missing_docstrings(api : ApiPackage) -> Array[String] {
   }
   out
 }
+
+///|
+/// The anchors of the items and methods on the API page of `api`, in page order: `#<item>`,
+/// `#<Type>.<method>`, and the method anchors of trait implementations.
+pub fn api_anchors(api : ApiPackage) -> Array[String] {
+  let out = []
+  let add_item = (item : ApiItem, below_trait : Bool) => {
+    let name = item.entry.name
+    out.push(name)
+    for entry in item.methods {
+      out.push(api_method_anchor(name, entry.name))
+    }
+    for impl_ in item.impls {
+      let via = impl_.via(below_trait~)
+      for entry in impl_.methods {
+        out.push(api_method_anchor(name, entry.name, via~))
+      }
+    }
+  }
+  for item in api.types {
+    add_item(item, false)
+  }
+  for item in api.errors {
+    add_item(item, false)
+  }
+  for item in api.traits {
+    add_item(item, true)
+  }
+  for entry in api.aliases + api.values {
+    out.push(entry.name)
+  }
+  out
+}
+
+///|
+/// The site link of the Markdown link target `api:<package path>[#<anchor>]`, or `Err` with the reason
+/// when the package has no API page or the page has no such anchor. `anchors` maps each package path
+/// on the site to the anchors of its page.
+pub fn api_prose_link(
+  target : String,
+  anchors~ : Map[String, Array[String]],
+  base_path~ : String,
+) -> Result[String, String] {
+  let rest = if target.has_prefix("api:") {
+    target[4:].to_owned()
+  } else {
+    target
+  }
+  let (package_path, anchor) = match rest.find("#") {
+    Some(i) => (rest[:i].to_owned(), rest[i + 1:].to_owned())
+    None => (rest, "")
+  }
+  guard anchors.get(package_path) is Some(found) else {
+    return Err("no API page for the package `\{package_path}`")
+  }
+  if anchor != "" && !found.contains(anchor) {
+    return Err("the API page of `\{package_path}` has no item or method `#\{anchor}`")
+  }
+  let page = base_path + api_route(package_path)[1:].to_owned()
+  Ok(if anchor == "" { page } else { "\{page}#\{anchor}" })
+}

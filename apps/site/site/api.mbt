@@ -35,6 +35,18 @@ pub fn ApiSite::package_paths(self : ApiSite) -> Array[String] {
 }
 
 ///|
+/// The anchors of the API page of each package, for `api:` links in prose.
+pub fn ApiSite::anchors(self : ApiSite) -> Map[String, Array[String]] {
+  let out : Map[String, Array[String]] = Map([])
+  for m in self.modules {
+    for p in m.packages {
+      out.set(p.path, @model.api_anchors(p))
+    }
+  }
+  out
+}
+
+///|
 /// The sidebar of the API pages: the index, then each module with its packages.
 fn api_nav(site : ApiSite) -> Array[@model.NavItem] {
   let items : Array[@model.NavItem] = [

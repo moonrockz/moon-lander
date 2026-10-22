@@ -80,6 +80,6 @@ Bead: lander-4us.4.7
 
 Bead: lander-4us.4.8
 
-- [ ] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure"); also add "Appended list names every source" to the acceptance suite
-- [ ] 8.2 Run `mise run format` and `mise run check`; verify both pass, and verify the windows-latest CI leg passes the binding tests for `native` and `js`
-- [ ] 8.3 Run `mise exec -- openspec validate add-configuration-binding --strict`; verify it passes
+- [x] 8.1 Add one acceptance test that binds the same in-memory Morphir-shaped configuration (`ir`, `pipeline`, `workspace`, `metadata`) on all four targets and compares bound values and error text; verify it passes ("Binding is pure"); also add "Appended list names every source" to the acceptance suite
+- [x] 8.2 Run `mise run format` and `mise run check`; verify both pass, and verify the windows-latest CI leg passes the binding tests for `native` and `js`
+- [x] 8.3 Run `mise exec -- openspec validate add-configuration-binding --strict`; verify it passes

@@ -36,6 +36,8 @@ pub fn search_index(Array[Page]) -> String
 
 pub fn toc_entries(Array[@content.Heading]) -> Array[@model.TocEntry]
 
+pub fn unescaped_links(String) -> Array[Int32]
+
 // Errors
 
 // Types and methods

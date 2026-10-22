@@ -15,6 +15,18 @@
   --important: #7c4dbd;
   --warning: #9a6b12;
   --caution: #b3402f;
+  --ok: #2e7d4f;
+  --danger: #b3402f;
+  /* Layer colors of the explainer palette, from the foil-gold top layer to the slate base. */
+  --s0: #8a5a0b;
+  --s1: #9a6b12;
+  --s2: #a97f2a;
+  --s3: #8c7a4f;
+  --s4: #6f6a5c;
+  --s5: #5b6b73;
+  --s6: #4b6a86;
+  --s7: #44608f;
+  --s8: #4a5578;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -34,6 +46,17 @@
     --important: #b48ef0;
     --warning: #d9a441;
     --caution: #ec7d6c;
+    --ok: #6cc08f;
+    --danger: #ec7d6c;
+    --s0: #e0b050;
+    --s1: #d9a441;
+    --s2: #cfa060;
+    --s3: #bba67a;
+    --s4: #a8a399;
+    --s5: #93a8b3;
+    --s6: #86a7c6;
+    --s7: #8aa3d4;
+    --s8: #9aa3c8;
   }
 }
 
@@ -51,6 +74,17 @@
   --important: #b48ef0;
   --warning: #d9a441;
   --caution: #ec7d6c;
+  --ok: #6cc08f;
+  --danger: #ec7d6c;
+  --s0: #e0b050;
+  --s1: #d9a441;
+  --s2: #cfa060;
+  --s3: #bba67a;
+  --s4: #a8a399;
+  --s5: #93a8b3;
+  --s6: #86a7c6;
+  --s7: #8aa3d4;
+  --s8: #9aa3c8;
 }
 
 /* Base */
@@ -196,6 +230,249 @@ main {
   font-size: 0.875rem;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Islands. Each mount is empty without JavaScript, so it takes no space. */
+
+#site-search {
+  position: relative;
+  margin-left: auto;
+}
+
+.search input {
+  width: 16rem;
+  max-width: 60vw;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font: inherit;
+}
+
+.search-results {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  width: 22rem;
+  max-width: calc(100vw - 32px);
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.search-results li a {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 8px;
+  color: var(--page-fg);
+  text-decoration: none;
+}
+
+.search-results li.selected a,
+.search-results li a:hover {
+  background: var(--surface);
+}
+
+.search-results small,
+.search-empty {
+  color: var(--muted);
+}
+
+.search-empty {
+  padding: 6px 8px;
+}
+
+.theme-toggle,
+.menu-toggle {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.menu-toggle {
+  display: none;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+
+.theme-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+.theme-system {
+  --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='3' width='20' height='14' rx='2'/><path d='M8 21h8M12 17v4'/></svg>");
+}
+
+.theme-light {
+  --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>");
+}
+
+.theme-dark {
+  --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/></svg>");
+}
+
+/* The copy button of a code block. The islands wrap each block in div.code-block. */
+
+.code-block {
+  position: relative;
+  margin: 1em 0;
+}
+
+.code-block > pre {
+  margin: 0;
+}
+
+.copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--page-bg);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.copy-button::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+  --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><rect x='9' y='9' width='12' height='12' rx='2'/><path d='M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1'/></svg>");
+}
+
+.copy-button[data-state="copied"] {
+  color: var(--ok);
+}
+
+.copy-button[data-state="copied"]::before {
+  --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6L9 17l-5-5'/></svg>");
+}
+
+.copy-button[data-state="failed"] {
+  color: var(--danger);
+}
+
+.copy-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  transform: translateY(-50%);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--page-fg);
+  color: var(--page-bg);
+  font: 600 0.75rem/1.4 var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.code-block:hover .copy-button,
+.copy-button:focus-visible,
+.copy-button:not([data-state="idle"])[data-state] {
+  opacity: 1;
+}
+
+.copy-button:hover::after,
+.copy-button:focus-visible::after,
+.copy-button:not([data-state="idle"])[data-state]::after {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .copy-button {
+    opacity: 1;
+  }
+}
+
+/* A narrow screen shows the menu button. The main links stay visible without JavaScript. */
+
+@media (max-width: 760px) {
+  .menu-toggle {
+    display: inline-block;
+  }
+
+  .site-header {
+    gap: 8px 16px;
+  }
+
+  #site-theme {
+    margin-left: auto;
+  }
+
+  #site-search {
+    order: 3;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .search input {
+    width: 100%;
+    max-width: none;
+  }
+
+  .site-links {
+    order: 4;
+  }
+
+  :root[data-js] .site-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  :root[data-js][data-nav-open] .site-links {
+    display: flex;
+  }
+}
+
 /* Landing page and articles */
 
 .hero h1 {
@@ -269,6 +546,11 @@ main {
 .docs-sidebar a:hover,
 .docs-toc a:hover {
   color: var(--page-fg);
+}
+
+.docs-toc a[aria-current] {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .docs-sidebar a.current {
@@ -389,6 +671,16 @@ main {
   margin: 4px 0;
   padding: 6px 12px;
 }
+
+.layer-stack li:nth-child(1) { border-left-color: var(--s0); }
+.layer-stack li:nth-child(2) { border-left-color: var(--s1); }
+.layer-stack li:nth-child(3) { border-left-color: var(--s2); }
+.layer-stack li:nth-child(4) { border-left-color: var(--s3); }
+.layer-stack li:nth-child(5) { border-left-color: var(--s4); }
+.layer-stack li:nth-child(6) { border-left-color: var(--s5); }
+.layer-stack li:nth-child(7) { border-left-color: var(--s6); }
+.layer-stack li:nth-child(8) { border-left-color: var(--s7); }
+.layer-stack li:nth-child(n + 9) { border-left-color: var(--s8); }
 
 .layer-name {
   font-weight: 600;

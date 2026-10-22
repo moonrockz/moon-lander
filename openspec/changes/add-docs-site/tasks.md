@@ -45,12 +45,12 @@ Bead: lander-4us.7.3
 
 Bead: lander-4us.7.4
 
-- [ ] 4.1 Add the CSS tokens of design D7 with the explainer palette, dark tokens for `prefers-color-scheme` and `data-theme`, Shiki color variables, system font stacks, and the theme script before the first paint; verify a views test that the script is in `<head>` before the stylesheet link.
-- [ ] 4.2 Add the `islands` package (js only) with the theme toggle, menu, copy buttons and "On this page" marker, empty mounts with `inner_html("")`, and `data-base` on `<html>`; verify a views test of the mount markup and the "Cycle" scenario logic in a unit test of `next_theme`.
-- [ ] 4.3 Add the search island with `extern "js"` fetch and `location.assign`, without `rabbita/http`, `rabbita/nav` or `@json` (design D11); verify search ranking with `model` tests on all four targets.
-- [ ] 4.4 Port the link-capture scanner to MoonBit with the six model cases, and a native test that scans `apps/site/islands/*.mbt`; verify the "Guard test" scenario with a fixture that has an unescaped anchor.
-- [ ] 4.5 Make the gzip budget step warn above 25 KB and fail above 27 KB; verify the "Bundle too large" scenario with a test of the pure size rule.
-- [ ] 4.6 Verify the "No JavaScript" scenario: a test of the rendered docs page finds the sidebar, the content and plain `href` values with no island code required.
+- [x] 4.1 Add the CSS tokens of design D7 with the explainer palette, dark tokens for `prefers-color-scheme` and `data-theme`, Shiki color variables, system font stacks, and the theme script before the first paint; verify a views test that the script is in `<head>` before the stylesheet link.
+- [x] 4.2 Add the `islands` package (js only) with the theme toggle, menu, copy buttons and "On this page" marker, empty mounts with `inner_html("")`, and `data-base` on `<html>`; verify a views test of the mount markup and the "Cycle" scenario logic in a unit test of `next_theme`.
+- [x] 4.3 Add the search island with `extern "js"` fetch and `location.assign`, without `rabbita/http`, `rabbita/nav` or `@json` (design D11); verify search ranking with `model` tests on all four targets.
+- [x] 4.4 Port the link-capture scanner to MoonBit with the six model cases, and a native test that scans `apps/site/islands/*.mbt`; verify the "Guard test" scenario with a fixture that has an unescaped anchor.
+- [x] 4.5 Make the gzip budget step warn above 25 KB and fail above 27 KB; verify the "Bundle too large" scenario with a test of the pure size rule.
+- [x] 4.6 Verify the "No JavaScript" scenario: a test of the rendered docs page finds the sidebar, the content and plain `href` values with no island code required.
 
 ## 5. Docs building blocks
 

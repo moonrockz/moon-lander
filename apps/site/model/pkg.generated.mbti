@@ -28,11 +28,17 @@ pub fn internal_links(String) -> Array[String]
 
 pub fn link_file(String, String) -> String?
 
+pub fn move_selection(Int32, Int32, String) -> Int32
+
+pub fn next_theme(String) -> String
+
 pub fn package_route(String) -> String
 
 pub fn parse_signature(String) -> Result[Array[SignaturePart], String]
 
 pub fn problem(String, String, line? : Int32) -> Problem
+
+pub fn result_url(String, SearchEntry) -> String
 
 pub fn route_file(String) -> String
 
@@ -157,6 +163,7 @@ pub(all) struct SearchEntry {
   text : String
 } derive(Eq, @debug.Debug)
 pub fn SearchEntry::equal(Self, Self) -> Bool
+pub fn SearchEntry::from_fields(Array[String]) -> Self?
 pub fn SearchEntry::from_json(Json) -> Self?
 pub fn SearchEntry::not_equal(Self, Self) -> Bool
 pub fn SearchEntry::to_json(Self) -> Json

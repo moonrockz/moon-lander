@@ -30,7 +30,7 @@ let article : @model.ArticleSummary = {
 }
 
 ///|
-async test "layout has head, nav and main, and no script" {
+async test "layout has head, nav and main" {
   let m = meta("/docs/a/", "A", Docs)
   let out = @views.render(m, @views.raw("<p>hi</p>"))
   assert_true(
@@ -49,8 +49,53 @@ async test "layout has head, nav and main, and no script" {
       "<main id=\"content\"><div class=\"prose\"><p>hi</p></div></main>",
     ),
   )
-  // Pages work without JavaScript. The only script is the hydration transcript of Rabbita.
-  assert_false(out.contains("<script src="))
+}
+
+///|
+async test "the theme script is in head before the stylesheet link" {
+  let out = @views.render(meta("/docs/a/", "A", Docs), @views.raw("<p>hi</p>"))
+  let head_end = out.find("</head>").unwrap()
+  let script = out.find(@views.theme_script).unwrap()
+  let stylesheet = out.find("<link href=\"/m/assets/site.css\"").unwrap()
+  assert_true(script < stylesheet)
+  assert_true(stylesheet < head_end)
+}
+
+///|
+async test "islands mount in empty elements and read the base path" {
+  let out = @views.render(meta("/docs/a/", "A", Docs), @views.raw("<p>hi</p>"))
+  assert_true(out.contains("<html data-base=\"/m/\""))
+  for id in ["site-search", "site-theme", "site-nav"] {
+    assert_true(out.contains("<div id=\"\{id}\"></div>"))
+  }
+  // A module script runs after the page is parsed, so it does not block the first paint.
+  assert_true(
+    out.contains("<script src=\"/m/assets/islands.js\" type=\"module\"></script>"),
+  )
+}
+
+///|
+async test "No JavaScript" {
+  // The docs page has its sidebar, its content and plain links in the server-rendered HTML. The
+  // islands only fill the empty mounts, so the page needs no island code.
+  let nav : Array[@model.NavItem] = [
+    { route: "/docs/", title: "Docs", depth: 0, proposed: false },
+    { route: "/docs/a/", title: "A", depth: 0, proposed: false },
+  ]
+  let m = meta("/docs/a/", "A", Docs)
+  let out = @views.render(
+    m,
+    @views.docs_page(m, nav, "<h1>A</h1><p>Body text.</p>", None),
+  )
+  assert_true(out.contains("<aside class=\"docs-sidebar\">"))
+  assert_true(out.contains("<a href=\"/m/docs/\" target=\"_self\">Docs</a>"))
+  assert_true(out.contains("<h1>A</h1><p>Body text.</p>"))
+  assert_true(
+    out.contains(
+      "<nav aria-label=\"Main\" class=\"site-links\" id=\"site-links\"><a aria-current=\"page\" href=\"/m/docs/\"",
+    ),
+  )
+  assert_true(out.contains("<a href=\"/m/articles/\" target=\"_self\">Articles</a>"))
 }
 
 ///|
@@ -158,7 +203,8 @@ async test "snapshot: layout" {
   inspect(
     out,
     content=(
-      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>A · Moon-Lander</title><meta name="description" content="d"><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a aria-current="page" href="/m/docs/" target="_self" class="current">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav></header><main id="content"><div class="prose"><p>hi</p></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>A · Moon-Lander</title><meta name="description" content="d"><script>try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script src="/m/assets/islands.js" type="module"></script><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a aria-current="page" href="/m/docs/" target="_self" class="current">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav><div id="site-search"></div><div id="site-theme"></div><div id="site-nav"></div></header><main id="content"><div class="prose"><p>hi</p></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+
 
     ),
   )
@@ -183,7 +229,8 @@ async test "snapshot: docs page" {
   inspect(
     out,
     content=(
-      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>First · Moon-Lander</title><meta name="description" content="d"><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a aria-current="page" href="/m/docs/" target="_self" class="current">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav></header><main id="content"><div class="docs-layout"><aside class="docs-sidebar"><nav aria-label="Documentation"><ul><li class="depth-0"><span class="nav-label">Adr</span></li><li class="depth-1"><a aria-current="page" href="/m/docs/adr/a/" target="_self" class="current">First</a></li></ul></nav></aside><article class="docs-article"><div class="prose"><h1 id="first">First</h1></div><p class="page-source"><a href="https://g/x.md" target="_self">View source on GitHub</a></p></article></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>First · Moon-Lander</title><meta name="description" content="d"><script>try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script src="/m/assets/islands.js" type="module"></script><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a aria-current="page" href="/m/docs/" target="_self" class="current">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav><div id="site-search"></div><div id="site-theme"></div><div id="site-nav"></div></header><main id="content"><div class="docs-layout"><aside class="docs-sidebar"><nav aria-label="Documentation"><ul><li class="depth-0"><span class="nav-label">Adr</span></li><li class="depth-1"><a aria-current="page" href="/m/docs/adr/a/" target="_self" class="current">First</a></li></ul></nav></aside><article class="docs-article"><div class="prose"><h1 id="first">First</h1></div><p class="page-source"><a href="https://g/x.md" target="_self">View source on GitHub</a></p></article></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+
 
     ),
   )
@@ -195,7 +242,8 @@ async test "snapshot: article page" {
   inspect(
     @views.render(m, @views.article_page(m, article, "<p>body</p>")),
     content=(
-      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hello · Moon-Lander</title><meta name="description" content="d"><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a aria-current="page" href="/m/articles/" target="_self" class="current">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav></header><main id="content"><article class="article"><header><h1>Hello</h1><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p></header><div class="prose"><p>body</p></div></article></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hello · Moon-Lander</title><meta name="description" content="d"><script>try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script src="/m/assets/islands.js" type="module"></script><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a aria-current="page" href="/m/articles/" target="_self" class="current">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav><div id="site-search"></div><div id="site-theme"></div><div id="site-nav"></div></header><main id="content"><article class="article"><header><h1>Hello</h1><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p></header><div class="prose"><p>body</p></div></article></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+
 
     ),
   )
@@ -207,7 +255,8 @@ async test "snapshot: articles index" {
   inspect(
     @views.render(m, @views.articles_index(m, [article])),
     content=(
-      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Articles · Moon-Lander</title><meta name="description" content="d"><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a aria-current="page" href="/m/articles/" target="_self" class="current">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav></header><main id="content"><section class="articles-index"><h1>Articles</h1><p><a href="/m/articles/atom.xml" target="_self">Atom feed</a></p><ul class="article-list"><li class="article-card"><a href="/m/articles/hello/" target="_self">Hello</a><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p><p>First article.</p></li></ul></section></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Articles · Moon-Lander</title><meta name="description" content="d"><script>try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script src="/m/assets/islands.js" type="module"></script><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a aria-current="page" href="/m/articles/" target="_self" class="current">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav><div id="site-search"></div><div id="site-theme"></div><div id="site-nav"></div></header><main id="content"><section class="articles-index"><h1>Articles</h1><p><a href="/m/articles/atom.xml" target="_self">Atom feed</a></p><ul class="article-list"><li class="article-card"><a href="/m/articles/hello/" target="_self">Hello</a><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p><p>First article.</p></li></ul></section></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+
 
     ),
   )
@@ -222,7 +271,8 @@ async test "snapshot: home page" {
   inspect(
     @views.render(m, @views.home_page(m, landing, [article])),
     content=(
-      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Moon-Lander</title><meta name="description" content="d"><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav></header><main id="content"><div class="home"><div class="landing"><section class="hero">h</section></div><section class="latest-articles"><h2>Latest articles</h2><ul class="article-list"><li class="article-card"><a href="/m/articles/hello/" target="_self">Hello</a><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p><p>First article.</p></li></ul></section><div class="landing"><section>after</section></div></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+      #|<!DOCTYPE html><html data-base="/m/" lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Moon-Lander</title><meta name="description" content="d"><script>try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script><link href="/m/assets/site.css" rel="stylesheet"><link title="Moon-Lander articles" href="/m/articles/atom.xml" rel="alternate" type="application/atom+xml"><script src="/m/assets/islands.js" type="module"></script><script id="__rabbita_transcript" type="application/json">{}</script></head><body><a href="#content" target="_self" class="skip-link">Skip to content</a><header class="site-header"><a href="/m/" target="_self" class="brand">Moon-Lander</a><nav aria-label="Main" class="site-links" id="site-links"><a href="/m/docs/" target="_self">Docs</a><a href="/m/articles/" target="_self">Articles</a><a href="https://github.com/moonrockz/moon-lander" target="_self">GitHub</a></nav><div id="site-search"></div><div id="site-theme"></div><div id="site-nav"></div></header><main id="content"><div class="home"><div class="landing"><section class="hero">h</section></div><section class="latest-articles"><h2>Latest articles</h2><ul class="article-list"><li class="article-card"><a href="/m/articles/hello/" target="_self">Hello</a><p class="article-meta"><time datetime="2026-10-13">2026-10-13</time> · Ada, Zoë</p><p>First article.</p></li></ul></section><div class="landing"><section>after</section></div></div></main><footer class="site-footer"><p>Apache-2.0 · Moon-Lander, an application framework for MoonBit</p></footer></body></html>
+
 
     ),
   )

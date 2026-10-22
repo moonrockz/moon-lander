@@ -150,8 +150,12 @@ recorded in the bead.
   `feat(config): add the TOML source` or `docs(openspec): propose add-host-lifecycle`.
 - Do not add AI attribution lines to commits, pull requests or issues.
 - Install the hooks with `mise run hooks:install`. Pre-commit checks formatting,
-  compiler warnings and generated interfaces. Pre-push runs lint, workspace validation
-  and tests.
+  compiler warnings and generated interfaces of the staged files. These checks read the
+  working tree, so pre-commit first fails when a MoonBit file (`.mbt`, `.mbt.md`,
+  `.mbti`, `.mbtx` or a `moon.*` manifest) is untracked, has unstaged changes, or is
+  ignored by git but still read by moon. Build and dependency output in `_build/` and
+  `.mooncakes/` does not count. Stage those changes, or set them aside, and commit again. Pre-push runs lint, workspace
+  validation and tests.
 - Commit the `pkg.generated.mbti` file of each package, as MoonBit convention
   recommends. `mise run lint` writes these files and fails when one is new or changed
   and not staged. Review the interface change, stage the file, and run lint again.

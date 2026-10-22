@@ -4,7 +4,8 @@
 pre-commit:
   commands:
     lint-check:
-      run: mise run lint:moonbit
+      # --staged fails when a MoonBit file has unstaged changes, so lint checks what the commit holds.
+      run: mise run lint:moonbit -- --staged
 
 pre-push:
   commands:

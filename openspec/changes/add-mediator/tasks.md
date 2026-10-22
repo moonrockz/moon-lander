@@ -47,12 +47,12 @@ Bead: lander-4us.10.2
 
 Bead: lander-4us.10.3
 
-- [ ] 3.1 Add `Topic[C, Ev]`, `topic`, `Topic::add`, and `Topic::publish` as in design D2; verify `add` gives a new topic value and the original topic keeps its handler count
-- [ ] 3.2 Verify a publish over three handlers runs each handler one time, in add order
-- [ ] 3.3 Verify publish stops at the first handler that raises: the handler before it has run, the handler after it has not run, and publish raises that error
-- [ ] 3.4 Add `Topic::use_` with the same middleware shape as group 2; verify the middleware order test of 2.6 passes in publish form
-- [ ] 3.5 Verify an event handler gives no reply value: the publish call type is `Unit` in the `moon info` output for the package
-- [ ] 3.6 Document publish with a runnable two-handler example in the package README; verify the example runs on all four targets
+- [x] 3.1 Add `Topic[C, Ev]`, `topic`, `Topic::add`, and `Topic::publish` as in design D2; verify `add` gives a new topic value and the original topic keeps its handler count
+- [x] 3.2 Verify a publish over three handlers runs each handler one time, in add order
+- [x] 3.3 Verify publish stops at the first handler that raises: the handler before it has run, the handler after it has not run, and publish raises that error
+- [x] 3.4 Add `Topic::use_` with the same middleware shape as group 2; verify the middleware order test of 2.6 passes in publish form
+- [x] 3.5 Verify an event handler gives no reply value: the publish call type is `Unit` in the `moon info` output for the package
+- [x] 3.6 Document publish with a runnable two-handler example in the package README; verify the example runs on all four targets
 
 ## 4. Context passing and typed errors
 

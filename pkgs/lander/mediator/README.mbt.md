@@ -13,8 +13,8 @@ synchronous, so it has the same API and the same behavior on `wasm`, `wasm-gc`,
 
 > [!NOTE]
 > The mediator is in progress. This page shows the API that exists today:
-> typed senders and middleware. Publish to many handlers and typed errors come
-> in later task groups of the `add-mediator` change.
+> typed senders, publish to many handlers, and middleware. Typed errors come
+> in a later task group of the `add-mediator` change.
 
 ## Send a request
 
@@ -51,16 +51,49 @@ send that request type, so the gap is a compile error and not a runtime error.
 A handler can raise an error. `send` raises the same error and gives no reply.
 The mediator does not turn an error into a reply.
 
+## Publish an event
+
+A topic sends one event to many handlers. `@mediator.topic` takes the first
+event handler and gives a `Topic[C, Ev]` value, so a topic always has at least
+one handler. `Topic::add` gives a new topic with one more handler at the end.
+`Topic::publish` calls each handler one time, in add order. An event has no
+reply: publish gives `Unit`. A caller that needs a reply uses a sender.
+
+```mbt check
+///|
+struct Joined(String)
+
+///|
+test "publish to two handlers" {
+  let log = []
+  let joined : @mediator.Topic[Unit, Joined] = @mediator.topic((_, ev) => {
+    let Joined(name) = ev
+    log.push("welcome " + name)
+  })
+  let all = joined.add((_, ev) => {
+    let Joined(name) = ev
+    log.push("count " + name)
+  })
+  all.publish((), Joined("Ann"))
+  assert_eq(log, ["welcome Ann", "count Ann"])
+}
+```
+
+Publish stops at the first handler that raises, and raises that error. The
+handlers after it do not run for that publish. A topic that must run all
+handlers catches the error inside the handler.
+
 ## Middleware
 
-A middleware wraps the next step of a send. It gets `next`, the context value,
-and the request. It can run code before and after `next`, change the request or
+A middleware wraps the next step of a send or a publish. It gets `next`, the
+context value, and the request or event. It can run code before and after `next`, change the request or
 the reply, give a reply without a call to `next`, or catch the error of `next`.
 Cross-cutting work such as logs, validation, and timing goes in middleware, not
 in handlers.
 
-`Sender::use_` gives a new sender with one more middleware. The sender that you
-start from does not change. The first middleware that you attach is the
+`Sender::use_` gives a new sender with one more middleware, and `Topic::use_`
+does the same for a topic. The value that you start from does not change. A
+topic middleware wraps the whole publish: its `next` runs all handlers. The first middleware that you attach is the
 outermost step, so it runs first on the way in and last on the way out.
 
 | Constructor | Runs |

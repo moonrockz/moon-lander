@@ -134,6 +134,10 @@ pub fn[C, Ev] Topic::publish(self : Topic[C, Ev], ctx : C, ev : Ev) -> Unit rais
   different contract; it is not in this change.
 - Call: event handlers give `Unit`. An event has no reply. A caller that
   needs a reply uses `send`.
+- Call (task group 3): a topic middleware wraps the whole publish. Its
+  next step runs all handlers in add order, so the order rule of D3 reads
+  the same for send and publish, and a middleware can end a publish before
+  any handler runs.
 - No dynamic subscription. A topic is a value the application builds.
   Foundatio's `SubscribeAsync` over arbitrary types needs runtime type
   identity and is out of scope.

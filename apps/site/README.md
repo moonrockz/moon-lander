@@ -5,12 +5,12 @@ docs tool and is not published.
 
 | Package | Content | Targets |
 | --- | --- | --- |
-| `model` | Site configuration, routes, search entries and build problems | all four |
+| `model` | Site configuration, routes, search entries, build problems, and the `moon doc` reader and signature links of the API pages | all four |
 | `content` | Front matter, Markdown, heading anchors and the HTML passes of the building blocks | `native` |
 | `views` | Rabbita components for each page kind | `native` |
-| `site` | Sources to outputs: pages, links, sidebar, articles, feed and search index | `native` |
+| `site` | Sources to outputs: pages, links, sidebar, articles, feed, search index and API pages | `native` |
 | `generate` | Executable that reads the repository and writes `_site/` | `native` |
-| `check` | Executable that checks the links of a built `_site/` | `native` |
+| `check` | Executable that checks the links of a built `_site/` and warns about API items without a docstring | `native` |
 | `islands` | Client islands, bundled with Bun into `_site/assets/islands.js` | `js` |
 
 `scripts/highlight.ts` highlights code blocks with Shiki after `generate`. It is the
@@ -24,9 +24,22 @@ only TypeScript step.
 | `site/articles/YYYY-MM-DD-slug.md` | `/articles/slug/`, also in `/articles/atom.xml` |
 | `README.md` or `README.mbt.md` of a package in `packages` | `/docs/packages/<name>/` |
 | `site/pages/index.html` | `/` |
+| `moon doc` output of a module directory in `api` | `/api/<package path>/`, and the index `/api/` |
 
 The sidebar groups come from `nav` in `site/site.json`. Each page below `docs/` must
 match a `nav` item, or the build fails.
+
+## API pages
+
+`build:site` runs `moon doc` in each module directory of `api` in `site/site.json`, with
+the output below `_build/site-api/<module directory>/`. `generate` reads
+`module_index.json` and `package_data.json` and writes one page for each package. The
+sections are Types, Errors, Traits, Type aliases and Values; an empty section is not
+shown. Each item has the anchor `#<name>`. A method has `#<Type>.<method>`, and a method
+of a trait implementation has `#<Type>.<Trait>.<method>`, or `#<Trait>.<Type>.<method>`
+below a trait. A signature link to a package on the site goes to its API page; any other
+target is plain text. `check:site` prints a warning for each item and method without a
+docstring.
 
 ## Building blocks
 

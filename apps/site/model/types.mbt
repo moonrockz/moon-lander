@@ -3,6 +3,8 @@ pub(all) enum Section {
   Home
   Docs
   Articles
+  /// The API pages below `/api/`.
+  Api
 } derive(Eq, Debug)
 
 ///|

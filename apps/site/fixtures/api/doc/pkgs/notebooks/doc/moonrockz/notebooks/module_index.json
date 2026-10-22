@@ -1,0 +1,95 @@
+{
+  "name": "moonrockz",
+  "package": null,
+  "childs": [
+    {
+      "name": "notebooks",
+      "package": {
+        "path": "moonrockz/notebooks",
+        "traits": [
+          {
+            "name": "CellView",
+            "impls": []
+          },
+          {
+            "name": "MimeTyped",
+            "impls": []
+          },
+          {
+            "name": "Node",
+            "impls": []
+          }
+        ],
+        "errors": [
+          {
+            "name": "MetadataError",
+            "impls": [],
+            "methods": [
+              "equal",
+              "message",
+              "not_equal",
+              "to_repr"
+            ]
+          }
+        ],
+        "types": [
+          {
+            "name": "CellKind",
+            "impls": [],
+            "methods": [
+              "equal",
+              "not_equal",
+              "to_repr"
+            ]
+          },
+          {
+            "name": "Metadata",
+            "impls": [
+              {
+                "self": {
+                  "kind": "constr",
+                  "constructor": {
+                    "name": "Metadata",
+                    "path": "moonrockz/notebooks"
+                  },
+                  "arguments": []
+                },
+                "trait": {
+                  "name": "Eq",
+                  "path": "moonbitlang/core/builtin"
+                },
+                "methods": [
+                  "equal"
+                ]
+              }
+            ],
+            "methods": [
+              "Metadata",
+              "empty",
+              "equal",
+              "from_ion",
+              "get",
+              "get_json",
+              "is_empty",
+              "keys",
+              "not_equal",
+              "to_ion",
+              "to_json",
+              "to_repr"
+            ]
+          }
+        ],
+        "typealias": [],
+        "values": [
+          "at",
+          "cells_by_mime_type",
+          "fold",
+          "walk",
+          "walk_cursor"
+        ],
+        "misc": []
+      },
+      "childs": []
+    }
+  ]
+}

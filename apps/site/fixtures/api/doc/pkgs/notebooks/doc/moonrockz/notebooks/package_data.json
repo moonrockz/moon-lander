@@ -1,0 +1,243 @@
+{
+  "name": "moonrockz/notebooks",
+  "traits": [],
+  "errors": [],
+  "types": [
+    {
+      "name": "CellKind",
+      "docstring": "\n The common role of a cell, independent of its file format.\n Unknown retains the original format's cell-type name.",
+      "signature": "pub(all) enum CellKind {\n  Code\n  Markdown\n  Raw\n  Unknown(String)\n} derive(<a href=\"moonbitlang/core/builtin#Eq\">Eq</a>, <a href=\"moonbitlang/core/debug#Debug\">@moonbitlang/core/debug.Debug</a>)",
+      "loc": {
+        "path": "moonrockz/notebooks",
+        "file": "navigation.mbt",
+        "line": 4,
+        "column": 15
+      },
+      "methods": [
+        {
+          "name": "equal",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>::equal(<a href=\"moonrockz/notebooks#CellKind\">CellKind</a>, <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>) -> Bool",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "navigation.mbt",
+            "line": 16,
+            "column": 31
+          }
+        },
+        {
+          "name": "not_equal",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>::not_equal(x : <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>, y : <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>) -> Bool",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "navigation.mbt",
+            "line": 16,
+            "column": 38
+          }
+        },
+        {
+          "name": "to_repr",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#CellKind\">CellKind</a>::to_repr(<a href=\"moonrockz/notebooks#CellKind\">CellKind</a>) -> <a href=\"moonbitlang/core/debug#Repr\">@moonbitlang/core/debug.Repr</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "navigation.mbt",
+            "line": 19,
+            "column": 41
+          }
+        }
+      ],
+      "impls": []
+    },
+    {
+      "name": "Metadata",
+      "docstring": "\n Immutable Ion metadata with unique, textual top-level field names.\n Import and export copy nested containers and annotations defensively.",
+      "signature": "type Metadata derive(<a href=\"moonbitlang/core/debug#Debug\">@moonbitlang/core/debug.Debug</a>)",
+      "loc": {
+        "path": "moonrockz/notebooks",
+        "file": "metadata.mbt",
+        "line": 27,
+        "column": 8
+      },
+      "methods": [
+        {
+          "name": "Metadata",
+          "docstring": "\n Construct from a JSON object. Use from_ion for the richer Ion data model.\n This JSON input adapter retains the existing constructor's behavior.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::Metadata(value : <a href=\"moonbitlang/core/builtin#Json\">Json</a>) -> <a href=\"moonrockz/notebooks#Metadata\">Metadata</a> raise <a href=\"moonrockz/notebooks#MetadataError\">MetadataError</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 58,
+            "column": 18
+          }
+        },
+        {
+          "name": "empty",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::empty() -> <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 81,
+            "column": 18
+          }
+        },
+        {
+          "name": "equal",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::equal(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>, other : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> Bool",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 37,
+            "column": 31
+          }
+        },
+        {
+          "name": "from_ion",
+          "docstring": "\n Require a non-null Ion struct with unique, textual top-level field names.\n Nested Ion values retain their types, annotations and repeated fields.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::from_ion(value : <a href=\"moonrockz/ion/ion#Ion\">@moonrockz/ion/ion.Ion</a>) -> <a href=\"moonrockz/notebooks#Metadata\">Metadata</a> raise <a href=\"moonrockz/notebooks#MetadataError\">MetadataError</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 65,
+            "column": 18
+          }
+        },
+        {
+          "name": "get",
+          "docstring": "\n Look up a field as an independent Ion value. Typed nulls are present;\n an absent field is None. No format conversion is performed.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::get(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>, key : String) -> <a href=\"moonrockz/ion/ion#Ion\">@moonrockz/ion/ion.Ion</a>?",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 88,
+            "column": 18
+          }
+        },
+        {
+          "name": "get_json",
+          "docstring": "\n Explicit JSON lookup. Raise NotJson if the selected value needs Ion's\n richer types; None still means the key is absent.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::get_json(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>, key : String) -> <a href=\"moonbitlang/core/builtin#Json\">Json</a>? raise <a href=\"moonrockz/notebooks#MetadataError\">MetadataError</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 102,
+            "column": 18
+          }
+        },
+        {
+          "name": "is_empty",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::is_empty(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> Bool",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 117,
+            "column": 18
+          }
+        },
+        {
+          "name": "keys",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::keys(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> ReadOnlyArray[String]",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 107,
+            "column": 18
+          }
+        },
+        {
+          "name": "not_equal",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::not_equal(x : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>, y : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> Bool",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 37,
+            "column": 38
+          }
+        },
+        {
+          "name": "to_ion",
+          "docstring": "\n Export a defensive copy of the native Ion value, retaining every type.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::to_ion(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> <a href=\"moonrockz/ion/ion#Ion\">@moonrockz/ion/ion.Ion</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 126,
+            "column": 18
+          }
+        },
+        {
+          "name": "to_json",
+          "docstring": "\n Export independent JSON. Reject annotations, typed nulls, non-finite\n floats, symbols, timestamps, lob values, sexps and repeated struct fields.\n Integers and decimals retain their exact numeric spelling.",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::to_json(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> <a href=\"moonbitlang/core/builtin#Json\">Json</a> raise <a href=\"moonrockz/notebooks#MetadataError\">MetadataError</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 134,
+            "column": 18
+          }
+        },
+        {
+          "name": "to_repr",
+          "docstring": "",
+          "signature": "fn <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>::to_repr(<a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> <a href=\"moonbitlang/core/debug#Repr\">@moonbitlang/core/debug.Repr</a>",
+          "loc": {
+            "path": "moonrockz/notebooks",
+            "file": "metadata.mbt",
+            "line": 40,
+            "column": 41
+          }
+        }
+      ],
+      "impls": [
+        {
+          "self": {
+            "kind": "constr",
+            "constructor": {
+              "name": "Metadata",
+              "path": "moonrockz/notebooks"
+            },
+            "arguments": []
+          },
+          "trait": {
+            "name": "Eq",
+            "path": "moonbitlang/core/builtin"
+          },
+          "methods": [
+            {
+              "name": "equal",
+              "docstring": "",
+              "signature": "fn equal(self : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>, other : <a href=\"moonrockz/notebooks#Metadata\">Metadata</a>) -> Bool",
+              "loc": {
+                "path": "moonrockz/notebooks",
+                "file": "metadata.mbt",
+                "line": 32,
+                "column": 34
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "typealias": [],
+  "values": [
+    {
+      "name": "at",
+      "docstring": "\n Resolve a traversal path relative to root. Return None for any invalid\n child index, including a negative index. An empty path returns root.",
+      "signature": "fn[N : <a href=\"moonrockz/notebooks#Node\">Node</a>] at(root : N, path : <a href=\"moonrockz/notebooks#NodePath\">NodePath</a>) -> N?",
+      "loc": {
+        "path": "moonrockz/notebooks",
+        "file": "navigation.mbt",
+        "line": 118,
+        "column": 18
+      }
+    }
+  ],
+  "misc": []
+}

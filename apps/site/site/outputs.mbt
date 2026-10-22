@@ -24,12 +24,14 @@ fn meta(
 }
 
 ///|
-/// Prepare, then render every page, the docs index, the articles index, the feed and
-/// the search index. Outputs keep source order, then generated files, then copies.
+/// Prepare, then render every page, the docs index, the articles index, the feed, the
+/// search index and the API pages of `api`. Outputs keep source order, then generated
+/// files, then copies.
 pub async fn build(
   config : @model.SiteConfig,
   sources : Array[SourceFile],
   main_build~ : Bool,
+  api~ : ApiSite = no_api,
 ) -> Built {
   let prepared = prepare(config, sources, main_build~)
   let pages = prepared.pages
@@ -134,6 +136,7 @@ pub async fn build(
   )
   outputs.push(Text("articles/atom.xml", atom_feed(config, articles)))
   outputs.push(Text("search-index.json", search_index(pages)))
+  outputs.append(api_outputs(config, api))
   for copy in prepared.copies {
     outputs.push(Copy(copy.0, copy.1))
   }

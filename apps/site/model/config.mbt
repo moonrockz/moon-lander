@@ -6,6 +6,8 @@ pub(all) struct SiteConfig {
   site_url : String
   repo_url : String
   packages : Array[String]
+  /// The module directories whose `moon doc` output gives the API pages, such as `pkgs/notebooks`.
+  api : Array[String]
   /// Docs sidebar groups. `None` sorts the sidebar by `order` and title.
   nav : Array[NavGroup]?
   /// The sidebar order of listed packages' sub-package pages; empty when `site.json` has no `chapters`.
@@ -103,6 +105,10 @@ pub fn SiteConfig::parse(
       []
     }
   }
+  let api = match fields.get("api") {
+    None => []
+    Some(value) => parse_api(file, value, problems)
+  }
   if base_path != "" &&
     !(base_path.has_prefix("/") && base_path.has_suffix("/")) {
     problems.push(problem(file, "`base_path` must start and end with `/`"))
@@ -128,9 +134,51 @@ pub fn SiteConfig::parse(
     site_url,
     repo_url,
     packages,
+    api,
     nav,
     chapters,
   }
+}
+
+///|
+/// A module directory below `pkgs/`, such as `pkgs/notebooks`: no empty name, `.` or `..`.
+fn is_module_dir(dir : String) -> Bool {
+  dir.has_prefix("pkgs/") &&
+  dir
+  .split("/")
+  .all(part => part != "" && part != "." && part != "..") &&
+  dir.split("/").count() >= 2
+}
+
+///|
+/// The `api` key: module directories below `pkgs/`, each listed once. A docs tool or a test module
+/// is not published, so it has no API pages.
+fn parse_api(
+  file : String,
+  value : Json,
+  problems : Array[Problem],
+) -> Array[String] {
+  guard value is Array(items) && items.iter().all(item => item is String(_)) else {
+    problems.push(problem(file, "`api` must be an array of module directories"))
+    return []
+  }
+  let dirs : Array[String] = []
+  for item in items {
+    guard item is String(dir) else { continue }
+    if !is_module_dir(dir) {
+      problems.push(
+        problem(
+          file,
+          "`api` lists `\{dir}`: only module directories below `pkgs/` have API pages",
+        ),
+      )
+    } else if dirs.contains(dir) {
+      problems.push(problem(file, "`api` lists `\{dir}` more than once"))
+    } else {
+      dirs.push(dir)
+    }
+  }
+  dirs
 }
 
 ///|

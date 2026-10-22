@@ -31,6 +31,7 @@ test "parse reads the site configuration" {
     site_url: "https://moonrockz.github.io/moon-lander/",
     repo_url: "https://github.com/moonrockz/moon-lander",
     packages: ["notebooks"],
+    api: [],
     nav: None,
     chapters: [],
   })

@@ -16,6 +16,7 @@ import {
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/core/env",
+  "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
 
@@ -29,6 +30,37 @@ let out_dir : String = "_site"
 ///|
 /// The islands bundle that `moon build` writes, relative to the workspace root.
 let islands_build : String = "_build/js/release/build/moonrockz/moon-lander-site/islands/islands.js"
+
+///|
+/// The directory of the `moon doc` output of the API pages, relative to the workspace root. The
+/// output of the module directory `pkgs/notebooks` is in `_build/site-api/pkgs/notebooks/doc/`.
+let api_dir : String = "_build/site-api"
+
+///|
+/// The step that runs `moon doc` in the module directory `dir`. `moon -C` reads `--target-dir`
+/// relative to `dir`, so the target goes up to the workspace root first. Each module has its own
+/// target directory, so a later run does not remove the output of an earlier one.
+fn api_doc_step(dir : String) -> Step {
+  let up = dir.split("/").map(_ => "..").collect().join("/")
+  run("moon doc \{dir}", "moon", [
+    "-C",
+    dir,
+    "doc",
+    "--target-dir",
+    "\{up}/\{api_dir}/\{dir}",
+  ])
+}
+
+///|
+/// The module directories of the `api` key of `site/site.json`. The generator checks the key; a
+/// value that is not an array of strings gives no steps here.
+fn api_dirs(site_json : String) -> Array[String] {
+  let json = @json.parse(site_json) catch { _ => return [] }
+  guard json is Object(fields) && fields.get("api") is Some(Array(items)) else {
+    return []
+  }
+  items.filter_map(item => if item is String(dir) { Some(dir) } else { None })
+}
 
 ///|
 /// The bundled islands in the output directory.
@@ -70,8 +102,12 @@ let install_step : Step = run("install site dependencies", "bun", [
 ])
 
 ///|
-/// The steps of `build`. `--main` marks a build for the deployed site.
-fn build_steps(args : Array[String]) -> Array[Step] raise Failure {
+/// The steps of `build`. `--main` marks a build for the deployed site. `api` holds the module
+/// directories of the API pages; `moon doc` runs in each before `generate`.
+fn build_steps(
+  args : Array[String],
+  api~ : Array[String] = [],
+) -> Array[Step] raise Failure {
   for arg in args {
     if arg != "--main" {
       raise Failure("unknown option `\{arg}`. \{usage}")
@@ -101,6 +137,7 @@ fn build_steps(args : Array[String]) -> Array[Step] raise Failure {
       "\{out_dir}/assets",
     ]),
     { name: "check islands size", action: GzipBudget(islands_bundle), },
+    ..api.map(api_doc_step),
     run("generate", "moon", generate_args),
     run("highlight", "bun", ["apps/site/scripts/highlight.ts", out_dir]),
   ]
@@ -289,7 +326,14 @@ async fn main {
   let rest = rest.to_owned()
   let (steps, done) = try {
     match command {
-      "build" => (build_steps(rest), "✅ Built \{out_dir}/")
+      "build" =>
+        (
+          build_steps(
+            rest,
+            api=api_dirs(@fs.read_file("site/site.json").text()),
+          ),
+          "✅ Built \{out_dir}/",
+        )
       "check" => (check_steps(rest), "✅ Checked \{out_dir}/")
       "test" =>
         (
@@ -334,6 +378,30 @@ test "build runs the steps of design D6 in order" {
     ]),
   })
   assert_eq(build_steps([])[3].action, GzipBudget("_site/assets/islands.js"))
+}
+
+///|
+test "moon doc runs in each API module before generate" {
+  let steps = build_steps([], api=["pkgs/lander", "pkgs/notebooks"])
+  assert_eq(steps.map(step => step.name), [
+    "install site dependencies", "build islands", "bundle islands", "check islands size",
+    "moon doc pkgs/lander", "moon doc pkgs/notebooks", "generate", "highlight",
+  ])
+  assert_eq(
+    steps[5].action,
+    Run("moon", [
+      "-C", "pkgs/notebooks", "doc", "--target-dir", "../../_build/site-api/pkgs/notebooks",
+    ]),
+  )
+}
+
+///|
+test "the api key gives the module directories" {
+  assert_eq(api_dirs("{\"api\": [\"pkgs/lander\", \"pkgs/notebooks\"]}"), [
+    "pkgs/lander", "pkgs/notebooks",
+  ])
+  assert_eq(api_dirs("{}"), [])
+  assert_eq(api_dirs("not json"), [])
 }
 
 ///|

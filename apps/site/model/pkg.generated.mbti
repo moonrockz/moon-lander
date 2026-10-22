@@ -6,6 +6,18 @@ import {
 }
 
 // Values
+pub fn api_index_packages(String, String) -> Array[String] raise Invalid
+
+pub fn api_link(String, current~ : String, site_packages~ : Array[String], base_path~ : String) -> String?
+
+pub fn api_method_anchor(String, String, via? : String) -> String
+
+pub fn api_missing_docstrings(ApiPackage) -> Array[String]
+
+pub fn api_route(String) -> String
+
+pub fn api_source_url(repo_url~ : String, commit~ : String, module_dir~ : String, module_name~ : String, ApiLoc) -> String
+
 pub fn article_parts(String) -> (String, String)?
 
 pub fn article_route(String) -> String
@@ -17,6 +29,8 @@ pub fn internal_links(String) -> Array[String]
 pub fn link_file(String, String) -> String?
 
 pub fn package_route(String) -> String
+
+pub fn parse_signature(String) -> Result[Array[SignaturePart], String]
 
 pub fn problem(String, String, line? : Int32) -> Problem
 
@@ -35,6 +49,58 @@ pub fn Invalid::not_equal(Self, Self) -> Bool
 pub fn Invalid::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub(all) struct ApiEntry {
+  name : String
+  docstring : String
+  signature : String
+  loc : ApiLoc
+} derive(Eq, @debug.Debug)
+pub fn ApiEntry::equal(Self, Self) -> Bool
+pub fn ApiEntry::not_equal(Self, Self) -> Bool
+pub fn ApiEntry::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ApiImpl {
+  trait_name : String
+  trait_path : String
+  self_type : String
+  methods : Array[ApiEntry]
+} derive(Eq, @debug.Debug)
+pub fn ApiImpl::equal(Self, Self) -> Bool
+pub fn ApiImpl::not_equal(Self, Self) -> Bool
+pub fn ApiImpl::to_repr(Self) -> @debug.Repr
+pub fn ApiImpl::via(Self, below_trait~ : Bool) -> String
+
+pub(all) struct ApiItem {
+  entry : ApiEntry
+  methods : Array[ApiEntry]
+  impls : Array[ApiImpl]
+} derive(Eq, @debug.Debug)
+pub fn ApiItem::equal(Self, Self) -> Bool
+pub fn ApiItem::not_equal(Self, Self) -> Bool
+pub fn ApiItem::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ApiLoc {
+  path : String
+  file : String
+  line : Int32
+} derive(Eq, @debug.Debug)
+pub fn ApiLoc::equal(Self, Self) -> Bool
+pub fn ApiLoc::not_equal(Self, Self) -> Bool
+pub fn ApiLoc::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ApiPackage {
+  path : String
+  types : Array[ApiItem]
+  errors : Array[ApiItem]
+  traits : Array[ApiItem]
+  aliases : Array[ApiEntry]
+  values : Array[ApiEntry]
+} derive(Eq, @debug.Debug)
+pub fn ApiPackage::equal(Self, Self) -> Bool
+pub fn ApiPackage::not_equal(Self, Self) -> Bool
+pub fn ApiPackage::parse(String, String) -> Self raise Invalid
+pub fn ApiPackage::to_repr(Self) -> @debug.Repr
+
 pub(all) struct ArticleSummary {
   route : String
   title : String
@@ -100,10 +166,19 @@ pub(all) enum Section {
   Home
   Docs
   Articles
+  Api
 } derive(Eq, @debug.Debug)
 pub fn Section::equal(Self, Self) -> Bool
 pub fn Section::not_equal(Self, Self) -> Bool
 pub fn Section::to_repr(Self) -> @debug.Repr
+
+pub(all) enum SignaturePart {
+  Text(String)
+  Link(String, String)
+} derive(Eq, @debug.Debug)
+pub fn SignaturePart::equal(Self, Self) -> Bool
+pub fn SignaturePart::not_equal(Self, Self) -> Bool
+pub fn SignaturePart::to_repr(Self) -> @debug.Repr
 
 pub(all) struct SiteConfig {
   title : String
@@ -112,6 +187,7 @@ pub(all) struct SiteConfig {
   site_url : String
   repo_url : String
   packages : Array[String]
+  api : Array[String]
   nav : Array[NavGroup]?
   chapters : Array[ChapterOrder]
 } derive(Eq, @debug.Debug)

@@ -8,9 +8,11 @@ import {
 }
 
 // Values
+pub async fn api_outputs(@model.SiteConfig, ApiSite) -> Array[Output]
+
 pub fn atom_feed(@model.SiteConfig, Array[Page]) -> String
 
-pub async fn build(@model.SiteConfig, Array[SourceFile], main_build~ : Bool) -> Built
+pub async fn build(@model.SiteConfig, Array[SourceFile], main_build~ : Bool, api? : ApiSite) -> Built
 
 pub fn build_grouped_nav(Array[@model.NavGroup], Array[NavEntry]) -> (Array[@model.NavItem], Array[String])
 
@@ -21,6 +23,8 @@ pub fn classify(String, @model.SiteConfig) -> Kind
 pub fn glob_match(String, String) -> Bool
 
 pub fn needs_text(String, @model.SiteConfig) -> Bool
+
+pub let no_api : ApiSite
 
 pub fn normalize(String) -> String
 
@@ -35,6 +39,19 @@ pub fn toc_entries(Array[@content.Heading]) -> Array[@model.TocEntry]
 // Errors
 
 // Types and methods
+pub(all) struct ApiModule {
+  dir : String
+  name : String
+  packages : Array[@model.ApiPackage]
+  readmes : Map[String, String]
+}
+
+pub(all) struct ApiSite {
+  commit : String
+  modules : Array[ApiModule]
+}
+pub fn ApiSite::package_paths(Self) -> Array[String]
+
 pub(all) struct Built {
   outputs : Array[Output]
   warnings : Array[@model.Problem]

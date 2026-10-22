@@ -10,6 +10,9 @@ test "a schema location is checked once per validation" {
     findings: [],
     checked: Set([]),
     limits: @exact.Limits::new(),
+    version: DocumentVersion::parse("1.4.0").unwrap(),
+    profile: Specification,
+    links: [],
   }
   check.schema(schema, None, [])
   let first = check.findings.length()

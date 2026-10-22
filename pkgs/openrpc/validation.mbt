@@ -69,6 +69,7 @@ pub struct Finding {
   priv related : Array[FindingLocation]
   priv chain : Array[FindingLocation]
   priv expected : String?
+  priv discrepancy : Discrepancy?
   priv version : DocumentVersion
   priv profile : ValidationProfile
 } derive(Debug)
@@ -109,6 +110,12 @@ pub fn Finding::chain(self : Finding) -> Array[FindingLocation] {
 /// The missing member's name when the location is its parent object.
 pub fn Finding::expected_field(self : Finding) -> String? {
   self.expected
+}
+
+///|
+/// The recorded prose/artifact discrepancy this normative finding belongs to.
+pub fn Finding::discrepancy(self : Finding) -> Discrepancy? {
+  self.discrepancy
 }
 
 ///|
@@ -226,6 +233,7 @@ priv struct Draft {
   related : Array[Site]
   chain : Array[Site]
   expected : String?
+  discrepancy : Discrepancy?
 }
 
 ///|
@@ -240,6 +248,7 @@ fn add(
   related~ : Array[Site] = [],
   chain~ : Array[Site] = [],
   expected~ : String? = None,
+  discrepancy~ : Discrepancy? = None,
 ) -> Unit {
   findings.push({
     diagnostic: @exact.Diagnostic::new(code, message, path~),
@@ -249,31 +258,8 @@ fn add(
     related,
     chain,
     expected,
+    discrepancy,
   })
-}
-
-///|
-fn unsupported_fields(
-  value : @exact.Value,
-  allowed : Array[String],
-  path : Array[String],
-  findings : Array[Draft],
-  resource~ : @reference.UriReference? = None,
-) -> Unit {
-  guard value.kind() is @exact.Object(fields) else { return }
-  for (key, _) in fields {
-    if !allowed.contains(key) && !key.has_prefix("x-") {
-      add(
-        findings,
-        @exact.UnsupportedCheck,
-        "Field retained; complete model checks require a later implementation story",
-        child(path, key),
-        Model,
-        severity=Information,
-        resource~,
-      )
-    }
-  }
 }
 
 ///|
@@ -300,6 +286,9 @@ priv struct Check {
   findings : Array[Draft]
   checked : Set[String]
   limits : @exact.Limits
+  version : DocumentVersion
+  profile : ValidationProfile
+  links : Array[(String, Site, Array[Site])]
 }
 
 ///|
@@ -547,32 +536,53 @@ fn Check::pairing(
   if !self.checked.add_and_check("pairing " + site_key(pairing.owner, pairing.path)) {
     return
   }
+  self.fields(
+    ExamplePairingObject,
+    pairing.value.value,
+    pairing.owner,
+    pairing.path,
+    chain=pairing.chain,
+  )
   let example = (v, p) => example_(v, p, limits)
   let at = pairing.path
+  let examples = []
   if pairing.value.value.get("params") is Some(params) &&
     params.kind() is @exact.Array(items) {
     for i, item in items {
-      self.typed(
-        item,
-        pairing.owner,
-        child(child(at, "params"), i.to_string()),
-        "example",
-        example,
-        chain=pairing.chain,
+      examples.push(
+        self.typed(
+          item,
+          pairing.owner,
+          child(child(at, "params"), i.to_string()),
+          "example",
+          example,
+          chain=pairing.chain,
+        ),
       )
-      |> ignore
     }
   }
   if pairing.value.value.get("result") is Some(result) {
-    self.typed(
-      result,
-      pairing.owner,
-      child(at, "result"),
-      "example",
-      example,
-      chain=pairing.chain,
+    examples.push(
+      self.typed(
+        result,
+        pairing.owner,
+        child(at, "result"),
+        "example",
+        example,
+        chain=pairing.chain,
+      ),
     )
-    |> ignore
+  }
+  for resolved in examples {
+    if resolved is Some(target) {
+      self.fields(
+        ExampleObject,
+        target.value.value,
+        target.owner,
+        target.path,
+        chain=target.chain,
+      )
+    }
   }
 }
 
@@ -880,6 +890,7 @@ fn finish(
       related: d.related.map(locate),
       chain: d.chain.map(locate),
       expected: d.expected,
+      discrepancy: d.discrepancy,
       version,
       profile,
     })
@@ -893,6 +904,7 @@ fn finish(
     related: [],
     chain: [],
     expected: None,
+    discrepancy: None,
     version,
     profile,
   }
@@ -969,22 +981,34 @@ pub fn validate(
       severity=reference_severity(d.code()),
     )
   }
-  let check = Check::{ index, findings, checked: Set([]), limits }
+  let check = Check::{
+    index,
+    findings,
+    checked: Set([]),
+    limits,
+    version: document.version,
+    profile,
+    links: [],
+  }
   let root = document.value
-  unsupported_fields(
-    root,
-    ["openrpc", "info", "methods", "components", "$schema"],
-    [],
-    findings,
-    resource=owner,
-  )
-  unsupported_fields(
-    document.info.value,
-    ["title", "version"],
-    ["info"],
-    findings,
-    resource=owner,
-  )
+  check.fields(DocumentObject, root, owner, [])
+  let info = document.info
+  check.fields(InfoObject, info.value, owner, ["info"])
+  if info.contact() is Some(contact) {
+    check.fields(ContactObject, contact.value, owner, ["info", "contact"])
+  }
+  if info.license() is Some(license) {
+    check.fields(LicenseObject, license.value, owner, ["info", "license"])
+    check.named(
+      license.name(),
+      owner,
+      ["info", "license"],
+      "License",
+      discrepancy=Some(LicenseNameOmitted),
+    )
+  }
+  check.external_docs(document.external_docs(), owner, [])
+  check.servers(document.servers(), owner, ["servers"])
   if root.get("$schema") is Some(value) && value.text() is None {
     add(
       findings,
@@ -995,7 +1019,6 @@ pub fn validate(
       resource=owner,
     )
   }
-  let names : Map[String, Site] = Map([])
   let raw_methods = match root.get("methods") {
     Some(raw) =>
       match raw.kind() {
@@ -1017,6 +1040,8 @@ pub fn validate(
         )
     }
   }
+  let methods = []
+  let errors = []
   for i, raw_method in raw_methods {
     guard check.typed(
         raw_method,
@@ -1028,31 +1053,27 @@ pub fn validate(
       is Some(method_) else {
       continue
     }
-    unsupported_fields(
+    methods.push(method_)
+    let chain = method_.chain
+    check.fields(
+      MethodObject,
       method_.value.value,
-      ["name", "params", "result", "paramStructure"],
+      method_.owner,
       method_.path,
-      findings,
-      resource=method_.owner,
+      chain~,
     )
-    let name_site = Site::{
-      resource: method_.owner,
-      path: child(method_.path, "name"),
-    }
-    match names.get(method_.value.name.text) {
-      Some(first) =>
-        add(
-          findings,
-          @exact.DuplicateKey,
-          "Method names must be unique",
-          name_site.path,
-          Normative,
-          resource=name_site.resource,
-          related=[first],
-          chain=method_.chain,
-        )
-      None => names[method_.value.name.text] = name_site
-    }
+    check.external_docs(
+      method_.value.external_docs(),
+      method_.owner,
+      method_.path,
+      chain~,
+    )
+    check.servers(
+      method_.value.servers(),
+      method_.owner,
+      child(method_.path, "servers"),
+      chain~,
+    )
     let param_names : Map[String, Site] = Map([])
     let mut optional_seen = false
     let raw_params = match method_.value.value.get("params") {
@@ -1071,17 +1092,17 @@ pub fn validate(
           param_path,
           "content descriptor",
           descriptor_decoder(limits),
-          chain=method_.chain,
+          chain~,
         )
         is Some(desc) else {
         continue
       }
-      unsupported_fields(
+      check.fields(
+        ContentDescriptorObject,
         desc.value.value,
-        ["name", "schema", "required"],
+        desc.owner,
         desc.path,
-        findings,
-        resource=desc.owner,
+        chain=desc.chain,
       )
       let param_site = Site::{
         resource: desc.owner,
@@ -1089,29 +1110,23 @@ pub fn validate(
       }
       match param_names.get(desc.value.name) {
         Some(first) =>
-          add(
-            findings,
-            @exact.DuplicateKey,
+          check.normative(
+            @exact.DuplicateName,
             "Parameter names must be unique",
-            param_site.path,
-            Normative,
-            resource=param_site.resource,
-            related=[first],
+            param_site,
             chain=desc.chain,
+            related=[first],
           )
         None => param_names[desc.value.name] = param_site
       }
       let required = desc.value.required.unwrap_or(false)
       if required && optional_seen {
-        add(
-          findings,
+        check.normative(
           @exact.ParameterOrder,
           "Optional parameters precede a required parameter",
-          param_path,
-          Normative,
-          severity=if profile == Specification { Error } else { Warning },
-          resource=method_.owner,
-          chain=method_.chain,
+          { resource: method_.owner, path: param_path },
+          chain~,
+          discrepancy=Some(OptionalParameterBeforeRequired),
         )
       }
       if !required {
@@ -1126,24 +1141,40 @@ pub fn validate(
           child(method_.path, "result"),
           "content descriptor",
           descriptor_decoder(limits),
-          chain=method_.chain,
+          chain~,
         )
         is Some(desc) {
-        unsupported_fields(
+        check.fields(
+          ContentDescriptorObject,
           desc.value.value,
-          ["name", "schema", "required"],
+          desc.owner,
           desc.path,
-          findings,
-          resource=desc.owner,
+          chain=desc.chain,
         )
         check.schema(desc.value.schema, desc.owner, child(desc.path, "schema"))
       }
     }
-    check.items(method_, "errors", "error", (v, p) => error_object_(v, p, limits))
-    |> ignore
-    check.items(method_, "links", "link", (v, p) => link_(v, p, limits))
-    |> ignore
-    check.items(method_, "tags", "tag", (v, p) => tag_(v, p, limits)) |> ignore
+    let method_errors = check.items(method_, "errors", "error", (v, p) => {
+      error_object_(v, p, limits)
+    })
+    for error in method_errors {
+      check.fields(
+        ErrorObjectKind,
+        error.value.value,
+        error.owner,
+        error.path,
+        chain=error.chain,
+      )
+    }
+    errors.push(method_errors)
+    for link in check.items(method_, "links", "link", (v, p) => {
+      link_(v, p, limits)
+    }) {
+      check.link(link.value, link.owner, link.path, chain=link.chain)
+    }
+    for tag in check.items(method_, "tags", "tag", (v, p) => tag_(v, p, limits)) {
+      check.tag(tag.value, tag.owner, tag.path, chain=tag.chain)
+    }
     if method_.value.value.get("examples") is Some(raw) &&
       raw.kind() is @exact.Array(items) {
       for ei, item in items {
@@ -1151,7 +1182,7 @@ pub fn validate(
           item,
           method_.owner,
           child(child(method_.path, "examples"), ei.to_string()),
-          chain=method_.chain,
+          chain~,
         )
       }
     }
@@ -1159,28 +1190,12 @@ pub fn validate(
   if root.get("components") is Some(components) {
     match components.kind() {
       @exact.Object(_) => {
-        unsupported_fields(
-          components,
-          ["schemas"],
-          ["components"],
-          findings,
-          resource=owner,
-        )
+        check.fields(ComponentsObject, components, owner, ["components"])
         if components.get("schemas") is Some(schemas) {
           match schemas.kind() {
             @exact.Object(entries) =>
               for (name, value) in entries {
                 let path = ["components", "schemas", name]
-                if ComponentKey::parse(name) is Err(_) {
-                  add(
-                    findings,
-                    @exact.WrongType,
-                    "Component keys must match ^[a-zA-Z0-9.\\-_]+$",
-                    path,
-                    Normative,
-                    resource=owner,
-                  )
-                }
                 match @schema.Schema::from_json(value, limits~) {
                   Ok(schema) => check.schema(schema, owner, path)
                   Err(d) =>
@@ -1205,21 +1220,36 @@ pub fn validate(
               )
           }
         }
-        if document.components is Some(typed) &&
-          typed.content_descriptors() is Some(descriptors) {
-          for entry in descriptors {
-            check.schema(entry.1.schema(), owner, [
-              "components",
-              "contentDescriptors",
-              entry.0.to_string(),
-              "schema",
-            ])
+        if document.components is Some(typed) {
+          let at = (table, key : ComponentKey) => {
+            ["components", table, key.to_string()]
           }
-        }
-        if components.get("examplePairings") is Some(pairings) &&
-          pairings.kind() is @exact.Object(entries) {
-          for (name, value) in entries {
-            check.pairing(value, owner, ["components", "examplePairings", name])
+          for entry in typed.content_descriptors().unwrap_or([]) {
+            let path = at("contentDescriptors", entry.0)
+            check.fields(ContentDescriptorObject, entry.1.value, owner, path)
+            check.schema(entry.1.schema(), owner, child(path, "schema"))
+          }
+          for entry in typed.examples().unwrap_or([]) {
+            check.fields(ExampleObject, entry.1.value, owner, at("examples", entry.0))
+          }
+          for entry in typed.links().unwrap_or([]) {
+            check.link(entry.1, owner, at("links", entry.0))
+          }
+          for entry in typed.errors().unwrap_or([]) {
+            check.fields(ErrorObjectKind, entry.1.value, owner, at("errors", entry.0))
+          }
+          for entry in typed.tags().unwrap_or([]) {
+            check.tag(entry.1, owner, at("tags", entry.0))
+          }
+          for entry in typed.example_pairings().unwrap_or([]) {
+            check.pairing(entry.1.value, owner, at("examplePairings", entry.0))
+          }
+          for entry in typed.example_pairing_objects().unwrap_or([]) {
+            check.pairing(
+              entry.1.value,
+              owner,
+              at("examplePairingObjects", entry.0),
+            )
           }
         }
       }
@@ -1234,6 +1264,7 @@ pub fn validate(
         )
     }
   }
+  check.uniqueness(methods, errors)
   add(
     findings,
     @exact.UnsupportedCheck,

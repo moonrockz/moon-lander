@@ -10,6 +10,8 @@ import {
 }
 
 // Values
+pub fn compatibility_discrepancies() -> Array[Discrepancy]
+
 pub fn field_names(ObjectKind) -> Array[String]
 
 pub fn lower(@json.CstDocument) -> ReadResult
@@ -101,6 +103,15 @@ pub(all) enum Coverage {
 pub fn Coverage::equal(Self, Self) -> Bool
 pub fn Coverage::not_equal(Self, Self) -> Bool
 pub fn Coverage::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Discrepancy {
+  OptionalParameterBeforeRequired
+  ServerNameOmitted
+  LicenseNameOmitted
+} derive(Eq, @debug.Debug)
+pub fn Discrepancy::equal(Self, Self) -> Bool
+pub fn Discrepancy::not_equal(Self, Self) -> Bool
+pub fn Discrepancy::to_repr(Self) -> @debug.Repr
 
 pub struct Document {
   version : DocumentVersion
@@ -205,6 +216,7 @@ pub struct Finding {
 } derive(@debug.Debug)
 pub fn Finding::chain(Self) -> Array[FindingLocation]
 pub fn Finding::diagnostic(Self) -> @json.Diagnostic
+pub fn Finding::discrepancy(Self) -> Discrepancy?
 pub fn Finding::expected_field(Self) -> String?
 pub fn Finding::location(Self) -> FindingLocation
 pub fn Finding::phase(Self) -> Phase

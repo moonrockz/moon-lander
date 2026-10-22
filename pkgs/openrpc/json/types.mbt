@@ -17,6 +17,11 @@ pub(all) enum Code {
   UnavailableResource
   ConflictingIdentifier
   ReferenceCycle
+  DuplicateName
+  DuplicateErrorCode
+  UnknownMethod
+  UnknownField
+  InvalidValue
 } derive(Eq, Debug)
 
 ///|

@@ -8,8 +8,9 @@ to plan a change, track it, and get it ready for review.
 1. Write or update an OpenSpec change. It holds the requirements and the design.
 2. Track the implementation in beads (`bd`). Each task group in the change has one bead.
 3. Implement one bead at a time. Tick its tasks in the change.
-4. Run the checks and open a pull request.
-5. Archive the change after it merges.
+4. Run the checks and open a pull request. The pull request that lands the last
+   task group also archives the change.
+5. After the merge, close the beads and sync them. See [Land a change](#land-a-change).
 
 A typo fix, a dependency bump or a build-only change does not need an OpenSpec change.
 A change to public behavior, a public API or a requirement needs one.
@@ -87,15 +88,43 @@ bd update <id> --claim       # start work on a bead
 bd close <id>                # after its tasks are done and verified
 ```
 
-### Implement and finish
+### Implement a task group
 
 1. Claim a bead. Do the tasks of its group, then tick each one in `tasks.md` (`- [x]`).
 2. Run `mise run format` and `mise run check`.
-3. Close the bead.
-4. When all groups are done, archive the change:
-   `mise exec -- openspec archive <change>`. This moves the change to
-   `openspec/changes/archive/` and merges its requirement changes into
-   `openspec/specs/`.
+
+### Land a change
+
+A pull request is not landed until the specification and the beads show its result.
+Do these steps for each pull request, also for a bug fix that a bead tracks.
+
+In the pull request:
+
+1. Tick the tasks of each group that the pull request completes.
+2. If no open task stays in the change after this pull request, archive the change
+   in the same pull request: `mise exec -- openspec archive <change> --yes`. This
+   moves the change to `openspec/changes/archive/` and merges its requirement
+   changes into `openspec/specs/`. Update the links that point to the old folder.
+3. Run `mise exec -- openspec validate --all --strict`, `mise run format` and
+   `mise run check`.
+4. In the description, name each bead that the pull request completes.
+
+After the merge:
+
+1. Close each bead that the pull request completes. Give the pull request and the
+   merge commit as the reason:
+   `bd close <id> --reason "Landed in #<pr> (<sha>)"`.
+2. If all the child beads of an epic are closed, point the epic to the archived
+   change and close it:
+   `bd update <epic> --spec-id openspec/changes/archive/<folder>`, then
+   `bd close <epic> --reason "All stories landed; change archived in #<pr> (<sha>)"`.
+3. Run `bd dolt pull`, then `bd dolt push`. Make sure that the push succeeds.
+4. Delete the branch.
+
+Do not close a bead before its pull request merges. Do not close an epic while it has
+an open child bead, for example a bug that a review found.
+
+## Releases
 
 Releases run only in GitHub Actions (`.github/workflows/release.yml`, adapted
 from [Smithy's release flow](https://github.com/moonrockz/smithy/blob/main/.github/workflows/release.yml)).

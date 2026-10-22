@@ -12,8 +12,8 @@ Import `moonrockz/moon-lander/config/conventions` as `@conventions`. Each
 > Discovery finds the system file, the global user file, and the project file in
 > three layouts by walking up from the working directory, with local and user
 > overrides next to the project file, an explicit project file, a stop boundary,
-> a legacy fallback, isolated mode, and environment files. Workspaces come in a
-> later part.
+> a legacy fallback, isolated mode, environment files, and workspaces with
+> members and key filters.
 
 `app_dirs("acme")` gives these sources, in merge order:
 
@@ -22,6 +22,7 @@ Import `moonrockz/moon-lander/config/conventions` as `@conventions`. Each
 | 100 | System | `System` | `/etc/acme/acme.toml` |
 | 200 | Global user | `Global` | `~/.config/acme/acme.toml` or `~/.acme/acme.toml` |
 | 300 | Project | `Workspace` | `acme.toml`, `.acme/acme.toml`, or `.config/acme/config.toml`, found by walk-up |
+| 350 | Member | `Member` | `packages/billing/acme.toml`, when the workspace part selects a member |
 | 375 | Environment file | `EnvironmentFile` | `acme.Production.toml` next to the project file, when environments are on |
 | 390 | Local override | `LocalOverride` | `acme.local.toml` next to the project file |
 | 400 | User override | `UserOverride` | `acme.user.toml` next to the project file |
@@ -131,8 +132,9 @@ Isolated mode comes from `DiscoveryOptions(isolated=true)`, for example from an
 `--isolated` flag that a host parses. It skips the files of the user and the
 machine: the system directory, the global user directory, and the local and
 user overrides. Each of them reports `Skipped`. The project file, its
-environment file and the environment variables stay. Discovery does not read
-the `project` option yet, and a given value adds a `Note` warning.
+environment file and the environment variables stay. The `project` option
+selects a workspace member, as [Workspaces and members](#workspaces-and-members)
+shows.
 
 ## System and global user directories
 
@@ -343,6 +345,151 @@ test "remove the system part, or build from single parts" {
 }
 ```
 
+## Workspaces and members
+
+`workspace()` turns on workspaces. A project file that sets `workspace.members`
+or `workspace.default_member` is a workspace, and each member directory has its
+own primary file. The member primary loads after the workspace primary, with
+the role `Member` and the priority 350. Then the adjacent files load in pairs,
+the workspace file first: the environment files, the local overrides, and the
+user overrides.
+
+```text
+/w/acme.toml                        <- workspace primary: members = ["packages/*"]
+/w/acme.user.toml                   <- workspace user override
+/w/packages/billing/acme.toml       <- member primary
+/w/packages/billing/acme.user.toml  <- member user override, which wins
+/w/packages/billing/src/            <- the working directory
+```
+
+The walk-up finds the nearest primary first. Then discovery looks from the
+parent of that root up to the boundary for a workspace that has the root as a
+member. It passes over a directory with no file, with two files, with a file
+that does not parse, or with a file that is not a workspace. With no enclosing
+workspace, the found file is the project primary, and when it is a workspace,
+discovery selects a member in this order:
+
+| Order | Member |
+| --- | --- |
+| 1 | The member that holds the working directory |
+| 2 | The default member, when it is in the workspace and not excluded |
+| 3 | The only member, when the member entries give one |
+
+With none of them, no member source loads.
+
+A member entry is a path relative to the workspace root, with `/` between
+segments. `*` matches any run of characters in one segment, and `**` matches
+zero or more segments. Other characters, such as `?` and `[`, match themselves.
+A literal entry, such as `members/alpha`, names its directory whether or not
+it exists, so a missing member reports `NotFound` with its candidates. A
+wildcard entry gives only the directories that hold a primary or legacy file,
+and it never enters a hidden directory. An entry that is absolute, starts with
+a drive, holds `\`, or holds a `..` segment gives a `Note` warning, and
+discovery skips it. The workspace root is never its own member.
+
+The members, exclude entries and default member come from the system file, the
+global user file and the workspace primary, merged. `workspace(members?,
+exclude?, default_member?, project_name?)` gives other key paths.
+
+```mbt check
+///|
+test "the member file wins over the workspace file" {
+  let builder = @config.builder()
+    |> @config.working_dir("/w/packages/billing/src")
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.app_dirs("acme") |> @conventions.workspace)
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing("/w", [
+      { name: "acme.toml", kind: File },
+      { name: "packages", kind: Directory },
+    ])
+    .with_listing("/w/packages", [{ name: "billing", kind: Directory }])
+    .with_listing("/w/packages/billing", [
+      { name: "acme.toml", kind: File },
+      { name: "src", kind: Directory },
+    ])
+    .with_listing("/w/packages/billing/src", [])
+    .with_file(
+      "/w/acme.toml",
+      "workspace.members = [\"packages/*\"]\nui.theme = \"light\"",
+    )
+    .with_file("/w/packages/billing/acme.toml", "ui.theme = \"dark\"")
+  guard @config.load(builder, tree) is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  @expect.expect(@config.get_text(config, "ui.theme")).to_equal("dark")
+  let roles = config
+    .reports()
+    .filter(report => report.kind is File(Workspace | Member))
+    .map(report => (report.kind, report.priority, report.path))
+  @expect.expect(roles).to_equal([
+    (File(Workspace), 300, Some("/w/acme.toml")),
+    (File(Member), 350, Some("/w/packages/billing/acme.toml")),
+  ])
+}
+```
+
+`DiscoveryOptions(project=selector)`, for example from a `--project` flag,
+selects a project by name or path. `.` selects the root project. Then the
+selector matches a member path, such as `packages/billing`. Then it matches the
+project name of the root or of a member primary. No match is an error,
+`UnknownProject`. Two name matches are an error, `AmbiguousProject`, and the
+message asks for a member path. Without the workspace part, a given `project`
+option adds a `Note` warning.
+
+### Key filters
+
+Two filters remove keys from layers through the core `exclude`. A removed value
+has no origin.
+
+| Filter | Removes the keys from | Warning |
+| --- | --- | --- |
+| `member_scope_keys(paths)` | The member primary and its environment file, local override and user override | `KeyRemoved` in the report of the source, when the key was set |
+| `inherited_filter(keys)` | The system file, the global user file, and the workspace primary and its adjacent files, when a member is selected | None |
+
+Use `member_scope_keys` for a key that only the workspace can set, such as an
+output directory. Use `inherited_filter` for the tables that describe the root
+project, so that a member does not inherit them.
+
+```mbt check
+///|
+test "a member cannot set a workspace key and does not inherit the root project" {
+  let conventions = @conventions.app_dirs("acme")
+    |> @conventions.workspace
+    |> @conventions.member_scope_keys(["workspace.out_dir"])
+    |> @conventions.inherited_filter(["project"])
+  let builder = @config.builder()
+    |> @config.working_dir("/w/app")
+    |> @config.format(@toml.format())
+    |> @conventions.add(conventions)
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing("/w", [
+      { name: "acme.toml", kind: File },
+      { name: "app", kind: Directory },
+    ])
+    .with_listing("/w/app", [{ name: "acme.toml", kind: File }])
+    .with_file(
+      "/w/acme.toml",
+      "workspace.members = [\"app\"]\nworkspace.out_dir = \"out\"\nproject.name = \"root\"",
+    )
+    .with_file("/w/app/acme.toml", "workspace.out_dir = \"mine\"")
+  guard @config.load(builder, tree) is Done(config) else {
+    fail("a complete tree never asks for files")
+  }
+  @expect.expect(@config.get_text(config, "workspace.out_dir")).to_equal("out")
+  @expect.expect(config.get(@config.KeyPath::parse("project.name"))).to_equal(
+    None,
+  )
+  let member_report = config
+    .reports()
+    .iter()
+    .find_first(report => report.kind == File(Member))
+  @expect.expect(member_report.map(report => report.warnings.length())).to_equal(
+    Some(1),
+  )
+}
+```
+
 ## Legacy fallback
 
 `legacy(name, format~, decode~)` names an older file, for example `acme.json`.
@@ -388,6 +535,9 @@ test "discovery asks for the listing of the working directory first" {
 | `boundary(dir)` | The walk-up stop; a relative `dir` joins the working directory |
 | `legacy(name, format~, decode~)` | A legacy fallback file with its own format |
 | `environments(default?)` | Turns on environment files, with an optional default name |
+| `workspace(members?, exclude?, default_member?, project_name?)` | Turns on workspaces and member selection, with the key paths of the workspace values |
+| `member_scope_keys(paths)` | Keys that only the workspace can set; a member layer loses them with a `KeyRemoved` warning |
+| `inherited_filter(keys)` | Keys that a selected member does not inherit from the system, global and workspace layers |
 | `environment_name(conventions, options?, env_vars)` | The environment name of the run, or `None` |
 | `check_environment_name(name, source~)` | Checks a name with the environment name rules |
 | `add(builder, conventions, options?)` | The provider that runs discovery during `@config.load` |

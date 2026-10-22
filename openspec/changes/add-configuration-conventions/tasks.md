@@ -59,19 +59,19 @@ Bead: lander-4us.3.5
 
 Bead: lander-4us.3.6
 
-- [ ] 6.1 Add the `*` and `**` matcher with literal other characters, and verify the "Member glob patterns" scenarios with property tests over generated segment lists.
-- [ ] 6.2 Add confinement checks that skip and warn, and the rule that the root is never its own member, and verify the two "Member entries stay in the workspace" scenarios.
-- [ ] 6.3 Add the enclosing-workspace search that parses ancestors through the core parse and merge with the registered formats, obeys the boundary, and passes over unreadable, ambiguous and non-workspace files, and verify the three "Enclosing workspace discovery" scenarios.
-- [ ] 6.4 Add automatic member selection (enclosing, default, single) with key paths from the application, and verify the four "Automatic member selection" scenarios and the "Listed member is missing" scenario.
-- [ ] 6.5 Add explicit project selection from the `project` value of `DiscoveryOptions`, by path then by name, with `UnknownProject` and `AmbiguousProject`, and verify the three "Explicit project selection" scenarios.
-- [ ] 6.6 Order the project-tier sources with roles `Workspace`, `Member`, `LocalOverride` and `UserOverride` and priorities 300, 350, 390 and 400, and verify the three "Project layer order" scenarios and the "Reports in merge order" and "Member roles" scenarios.
+- [x] 6.1 Add the `*` and `**` matcher with literal other characters, and verify the "Member glob patterns" scenarios with property tests over generated segment lists.
+- [x] 6.2 Add confinement checks that skip and warn, and the rule that the root is never its own member, and verify the two "Member entries stay in the workspace" scenarios.
+- [x] 6.3 Add the enclosing-workspace search that parses ancestors through the core parse and merge with the registered formats, obeys the boundary, and passes over unreadable, ambiguous and non-workspace files, and verify the three "Enclosing workspace discovery" scenarios.
+- [x] 6.4 Add automatic member selection (enclosing, default, single) with key paths from the application, and verify the four "Automatic member selection" scenarios and the "Listed member is missing" scenario.
+- [x] 6.5 Add explicit project selection from the `project` value of `DiscoveryOptions`, by path then by name, with `UnknownProject` and `AmbiguousProject`, and verify the three "Explicit project selection" scenarios.
+- [x] 6.6 Order the project-tier sources with roles `Workspace`, `Member`, `LocalOverride` and `UserOverride` and priorities 300, 350, 390 and 400, and verify the three "Project layer order" scenarios and the "Reports in merge order" and "Member roles" scenarios.
 
 ## 7. Member-scope and inherited-layer key filters
 
 Bead: lander-4us.3.7
 
-- [ ] 7.1 Add `member_scope_keys` that declares the core `exclude(paths, warn=true)` on member layers, and verify the "Member cannot set a workspace key" scenario and that the removed key has no `Origin`.
-- [ ] 7.2 Add `inherited_filter` that declares the core `exclude(paths, warn=false)` on system, global and workspace layers when a member is selected, and verify the two "Inherited-layer key filter" scenarios.
+- [x] 7.1 Add `member_scope_keys` that declares the core `exclude(paths, warn=true)` on member layers, and verify the "Member cannot set a workspace key" scenario and that the removed key has no `Origin`.
+- [x] 7.2 Add `inherited_filter` that declares the core `exclude(paths, warn=false)` on system, global and workspace layers when a member is selected, and verify the two "Inherited-layer key filter" scenarios.
 
 ## 8. Environments
 

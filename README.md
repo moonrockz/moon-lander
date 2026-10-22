@@ -114,8 +114,9 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 - `pkgs/openrpc/` contains the [`moonrockz/openrpc`](pkgs/openrpc/README.mbt.md)
   document library: typed OpenRPC 1.3.2/1.4.x and draft-07 models, exact JSON,
   source-preserving reading and edits, explicit reference resolution, profiled
-  validation and canonical writing. Its release and the Smithy migration are
-  tracked in `add-standalone-openrpc`.
+  validation and canonical writing. Its requirements are in
+  `openspec/specs/openrpc-documents/` and `openspec/specs/openrpc-rollout/`;
+  Smithy consumes the published `0.2.0`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
   builds the static site at `https://moonrockz.github.io/moon-lander/` with Rabbita.
 - `tests/` is an unpublished workspace module containing the notebook acceptance

@@ -162,6 +162,52 @@ let builder = @config.builder()
 let config = @browser.load(builder, [defaults, project])
 ```
 
+## Explicit persistence
+
+`@browser.open_store(name, root~)` opens the OPFS store of one application
+namespace. The namespace is one path segment below the library-owned OPFS
+directory `moon-lander`. The virtual root is required. Both are validated before
+any storage access. `store.mount()` gives a read-only directory mount at that
+root. Reopening the same namespace at `/restored` instead of `/state` reads the
+same files and reports `/restored/...` paths.
+
+```moonbit
+let store = @browser.open_store("acme", root="/state")
+@browser.write_text(store, "acme.toml", "[server]\nport = 9999\n")
+let builder = @config.builder()
+  |> @config.format(@toml.format())
+  |> @config.file("/defaults/acme.toml")
+  |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+  // The core requires priorities that do not decrease. Give the stored
+  // overrides a priority above the workspace sources.
+  |> @config.file("/state/acme.toml", priority=500)
+let config = @browser.load(builder, [defaults, project, store.mount()])
+```
+
+Only the application opens, writes or removes a store. A load never writes,
+and URL, selected-file and directory mounts never create a namespace.
+`write_text(store, path, text)` creates parent directories only inside the store
+and reports success only after the write and its close complete. A failed write
+or close aborts the stream and keeps the previous file. A failed first save
+removes the new file again, so no empty file stays. `remove(store, path)` removes
+one named file and gives `false` when the file is absent; it never removes a
+directory. Paths are relative and cannot leave the store.
+
+Failures are typed and there is no fallback to `localStorage`, IndexedDB or
+another store. Missing OPFS or `createWritable`, or an origin without usable
+OPFS (for example a private window), raises `Unsupported`. `NotAllowedError`
+and `SecurityError` raise `PermissionDenied`. A quota failure raises
+`LimitExceeded` with the `quota` limit. Other write or close failures raise
+`Io`.
+
+Stored text is site data of one origin. It survives a reload of that origin,
+but the browser or the user can clear or evict it. Each write is one file: there
+are no multi-file transactions and no automatic reload after a write. The
+application owns recovery, for example: keep hosted defaults in the builder,
+write again after a failure, and tell the user when stored overrides are gone.
+The store saves text that the application supplies; it does not render a
+configuration or resolve secrets.
+
 ## Authority and ordering
 
 Mounts are opaque immutable values. Their canonical absolute virtual roots must
@@ -217,5 +263,5 @@ Playwright. Repository adapter development uses `mise run build:browser-adapter`
 `check:browser-adapter` rejects stale output without rewriting it. The fixture has
 its own generated file, outside the published module.
 
-OPFS persistence belongs to a later story. This package currently provides
-hosted URL mounts, selected-file mounts and directory-handle mounts.
+The package provides hosted URL mounts, selected-file mounts, directory-handle
+mounts and explicit OPFS stores.

@@ -113,6 +113,108 @@ export async function readDirectoryFile(
   });
 }
 
+/** The fixed library-owned OPFS directory. Each store is one namespace below it. */
+const storeDirectory = "moon-lander";
+
+type StoreReply = { kind: string; handle?: FileSystemDirectoryHandle; removed?: boolean };
+
+/** Classify a rejected storage call. Exception text is never returned. */
+function storageFailure(error: unknown): StoreReply {
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === "NotAllowedError" || name === "SecurityError") return { kind: "permission" };
+  if (name === "QuotaExceededError") return { kind: "quota" };
+  return { kind: "io" };
+}
+
+/**
+ * Open or create one store namespace. The caller validates the namespace and the
+ * virtual root first. A failure of getDirectory() other than denial means that
+ * the origin has no usable OPFS, as in private browsing.
+ */
+export async function openStore(namespace: string): Promise<StoreReply> {
+  const storage = typeof navigator === "object" ? navigator.storage : undefined;
+  if (typeof storage?.getDirectory !== "function") return { kind: "unsupported" };
+  let root: FileSystemDirectoryHandle;
+  try { root = await storage.getDirectory(); } catch (error) {
+    const failure = storageFailure(error);
+    return failure.kind === "io" ? { kind: "unsupported" } : failure;
+  }
+  try {
+    const owned = await root.getDirectoryHandle(storeDirectory, { create: true });
+    return { kind: "store", handle: await owned.getDirectoryHandle(namespace, { create: true }) };
+  } catch (error) { return storageFailure(error); }
+}
+
+/**
+ * Write text to a relative file inside a store. Parent directories are created
+ * only inside the store. Success is reported only after close() resolves. A
+ * failed write or close aborts the writable stream, so the previous content
+ * remains and the file lock is released. A file that this call created is
+ * removed again after a failure, so a failed first save leaves no entry.
+ */
+export async function writeText(store: FileSystemDirectoryHandle, relative: string, text: string): Promise<StoreReply> {
+  if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
+    return { kind: "unsupported" };
+  }
+  const segments = relative.split("/");
+  const name = segments.pop()!;
+  let dir: FileSystemDirectoryHandle | undefined;
+  let created = false;
+  let writable: FileSystemWritableFileStream | undefined;
+  try {
+    dir = store;
+    for (const segment of segments) dir = await dir.getDirectoryHandle(segment, { create: true });
+    let file: FileSystemFileHandle;
+    try { file = await dir.getFileHandle(name, { create: false }); } catch (error) {
+      if ((error as { name?: unknown } | null)?.name !== "NotFoundError") throw error;
+      file = await dir.getFileHandle(name, { create: true });
+      created = true;
+    }
+    if (typeof file.createWritable !== "function") throw new DOMException("", "NotSupportedError");
+    writable = await file.createWritable();
+    await writable.write(text);
+    await writable.close();
+    return { kind: "written" };
+  } catch (error) {
+    if (writable) { try { await writable.abort(); } catch { /* Keep the original failure. */ } }
+    if (created && dir) { try { await dir.removeEntry(name); } catch { /* Keep the original failure. */ } }
+    const failure = storageFailure(error);
+    return (error as { name?: unknown } | null)?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
+  }
+}
+
+/**
+ * Require an exact child name before a removal. Some engines resolve a name
+ * without case on a case-insensitive host file system.
+ */
+async function exact(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
+  for await (const [entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+    if (entry === name) return;
+  }
+  throw new DOMException("", "NotFoundError");
+}
+
+/** Remove one named file inside a store. A missing file is not an error. */
+export async function removeFile(store: FileSystemDirectoryHandle, relative: string): Promise<StoreReply> {
+  const segments = relative.split("/");
+  const name = segments.pop()!;
+  try {
+    let dir = store;
+    for (const segment of segments) {
+      await exact(dir, segment);
+      dir = await dir.getDirectoryHandle(segment, { create: false });
+    }
+    await exact(dir, name);
+    await dir.getFileHandle(name, { create: false });
+    await dir.removeEntry(name);
+    return { kind: "removed", removed: true };
+  } catch (error) {
+    const kind = (error as { name?: unknown } | null)?.name;
+    if (kind === "NotFoundError") return { kind: "removed", removed: false };
+    return storageFailure(error);
+  }
+}
+
 export function normalizeBase(base: string): string {
   try {
     const url = new URL(base);

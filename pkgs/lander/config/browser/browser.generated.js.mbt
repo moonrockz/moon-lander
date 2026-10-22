@@ -92,6 +92,103 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        return text(file, budget).catch((error) => failure(classify(error)));
   #|      });
   #|    }
+  #|    var storeDirectory = "moon-lander";
+  #|    function storageFailure(error) {
+  #|      const name = error?.name;
+  #|      if (name === "NotAllowedError" || name === "SecurityError")
+  #|        return { kind: "permission" };
+  #|      if (name === "QuotaExceededError")
+  #|        return { kind: "quota" };
+  #|      return { kind: "io" };
+  #|    }
+  #|    async function openStore(namespace) {
+  #|      const storage = typeof navigator === "object" ? navigator.storage : undefined;
+  #|      if (typeof storage?.getDirectory !== "function")
+  #|        return { kind: "unsupported" };
+  #|      let root;
+  #|      try {
+  #|        root = await storage.getDirectory();
+  #|      } catch (error) {
+  #|        const failure = storageFailure(error);
+  #|        return failure.kind === "io" ? { kind: "unsupported" } : failure;
+  #|      }
+  #|      try {
+  #|        const owned = await root.getDirectoryHandle(storeDirectory, { create: true });
+  #|        return { kind: "store", handle: await owned.getDirectoryHandle(namespace, { create: true }) };
+  #|      } catch (error) {
+  #|        return storageFailure(error);
+  #|      }
+  #|    }
+  #|    async function writeText(store, relative, text) {
+  #|      if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
+  #|        return { kind: "unsupported" };
+  #|      }
+  #|      const segments = relative.split("/");
+  #|      const name = segments.pop();
+  #|      let dir;
+  #|      let created = false;
+  #|      let writable;
+  #|      try {
+  #|        dir = store;
+  #|        for (const segment of segments)
+  #|          dir = await dir.getDirectoryHandle(segment, { create: true });
+  #|        let file;
+  #|        try {
+  #|          file = await dir.getFileHandle(name, { create: false });
+  #|        } catch (error) {
+  #|          if (error?.name !== "NotFoundError")
+  #|            throw error;
+  #|          file = await dir.getFileHandle(name, { create: true });
+  #|          created = true;
+  #|        }
+  #|        if (typeof file.createWritable !== "function")
+  #|          throw new DOMException("", "NotSupportedError");
+  #|        writable = await file.createWritable();
+  #|        await writable.write(text);
+  #|        await writable.close();
+  #|        return { kind: "written" };
+  #|      } catch (error) {
+  #|        if (writable) {
+  #|          try {
+  #|            await writable.abort();
+  #|          } catch {}
+  #|        }
+  #|        if (created && dir) {
+  #|          try {
+  #|            await dir.removeEntry(name);
+  #|          } catch {}
+  #|        }
+  #|        const failure = storageFailure(error);
+  #|        return error?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
+  #|      }
+  #|    }
+  #|    async function exact(dir, name) {
+  #|      for await (const [entry] of dir.entries()) {
+  #|        if (entry === name)
+  #|          return;
+  #|      }
+  #|      throw new DOMException("", "NotFoundError");
+  #|    }
+  #|    async function removeFile(store, relative) {
+  #|      const segments = relative.split("/");
+  #|      const name = segments.pop();
+  #|      try {
+  #|        let dir = store;
+  #|        for (const segment of segments) {
+  #|          await exact(dir, segment);
+  #|          dir = await dir.getDirectoryHandle(segment, { create: false });
+  #|        }
+  #|        await exact(dir, name);
+  #|        await dir.getFileHandle(name, { create: false });
+  #|        await dir.removeEntry(name);
+  #|        return { kind: "removed", removed: true };
+  #|      } catch (error) {
+  #|        const kind = error?.name;
+  #|        if (kind === "NotFoundError")
+  #|          return { kind: "removed", removed: false };
+  #|        return storageFailure(error);
+  #|      }
+  #|    }
   #|    function normalizeBase(base) {
   #|      try {
   #|        const url = new URL(base);
@@ -184,7 +281,17 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|    }
   #|
   #|    // pkgs/lander/adapters/browser/entry.ts
-  #|    receiveBrowserAdapter({ read, readFile, listDirectory, readDirectoryFile, normalizeBase, supported });
+  #|    receiveBrowserAdapter({
+  #|      read,
+  #|      readFile,
+  #|      listDirectory,
+  #|      readDirectoryFile,
+  #|      openStore,
+  #|      writeText,
+  #|      removeFile,
+  #|      normalizeBase,
+  #|      supported
+  #|    });
   #|  })();
   #|  return adapter;
   #|}

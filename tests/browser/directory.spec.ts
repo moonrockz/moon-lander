@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./persistent";
+import { clearStorage, expect, test } from "./persistent";
 
 type Tree = Record<string, string>;
 
@@ -58,6 +58,7 @@ const project: Tree = {
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   expect(await page.evaluate(() => typeof (globalThis as any).landerRun)).toBe("function");
+  await clearStorage(page);
   // Record writes, creation options, reads, pickers and permission requests.
   await page.evaluate(() => {
     const log: string[] = [];

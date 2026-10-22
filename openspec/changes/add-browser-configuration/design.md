@@ -502,6 +502,36 @@ not test native picker UI. Spies on handle methods, pickers and permission
 requests, and a full OPFS snapshot, prove that loads create or change nothing.
 The adapter build rejects picker and permission APIs in the library bundle.
 
+## Group 5 scoped OPFS persistence
+
+`open_store(name, root~)` validates the virtual root and the one-segment
+namespace before any storage call. `namespace` is a reserved MoonBit word, so
+the positional parameter and the accessor are `name`. The store directory is
+`moon-lander/<name>` below the OPFS root. Opening creates it; that is an explicit
+caller action. `Store::mount()` uses the group 4 directory backend at the
+supplied root, so a different root does not change the backing namespace.
+
+`write_text` checks `createWritable` before it creates anything. It creates
+parent directories inside the store, writes through `createWritable()`, and
+reports success only after `close()` resolves. A failed write or close calls
+`abort()`, so the previous text remains and the file lock is released. If the
+call created the file, a failure removes it again. `remove` checks exact names,
+removes one file and returns whether it existed; a directory gives `Io`.
+A missing `getDirectory` or `createWritable` gives `Unsupported`. A failure of
+`getDirectory()` other than denial also gives `Unsupported`, because WebKit
+private sessions reject it with `UnknownError`. `NotAllowedError` and
+`SecurityError` give `PermissionDenied`, `QuotaExceededError` gives
+`LimitExceeded` with the `quota` limit, and other failures give `Io`.
+
+The core requires source priorities that do not decrease. The merge test gives
+the stored override file priority 500, after workspace discovery (300-400).
+Real OPFS proves save, reload and load in all three engines with persistent
+profiles. WebKit kept OPFS data across new profile directories, so each test
+first removes all OPFS entries of the origin. Controlled failures patch the
+storage prototypes for blocked, denied, unsupported, quota and close failures.
+Spies prove that no load creates or writes entries and that no failure uses
+`localStorage` or IndexedDB.
+
 ## Risks / Trade-offs
 
 - Promise or generated-FFI integration can fail in a real browser. Group 1 proves

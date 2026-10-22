@@ -194,6 +194,14 @@ run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
 description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
 run = "moonx scripts/check-openrpc.mbtx"
 
+[tasks."check:openrpc-registry"]
+description = "Verify the packaged OpenRPC candidate through an isolated loopback registry consumer"
+run = "moonx scripts/check-openrpc-registry.mbtx"
+
+[tasks."check:openrpc-published"]
+description = "Release gate: verify the published OpenRPC module outside the workspace"
+run = "moonx scripts/check-openrpc-registry.mbtx --published"
+
 [tasks."qualify:openrpc"]
 description = "Qualify OpenRPC against the frozen corpus with independent Ajv and four targets"
 run = "moonx scripts/qualify-openrpc.mbtx"

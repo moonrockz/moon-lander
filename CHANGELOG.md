@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `moonrockz/openrpc` 0.1.0, a portable OpenRPC 1.3.2 and 1.4.x document
+  library with no framework dependency. It reads strict JSON into a
+  source-preserving CST and a typed AST, keeps exact number tokens and
+  extensions, and writes canonical or pretty JSON. It models and checks
+  draft-07 schema documents, including portable ECMAScript 2018 regex syntax,
+  and resolves references only through explicit resources. Validation reports
+  model, schema, reference, normative and pinned-artifact facets under the
+  `Specification` and `MetaschemaCompatibility` profiles, with structured,
+  ordered findings. Checked edits replace one value while keeping the rest of
+  the source.
+
+
 ## 0.1.0 - 2026-10-19
 
 Moon-Lander now owns `moonrockz/notebooks`, migrated from Moonbase with its

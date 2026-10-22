@@ -1,0 +1,337 @@
+///|
+/// Package the OpenRPC candidate and verify a consumer through a loopback
+/// registry. No workspace overrides, public uploads or credentials.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+test "archive audit requires package files and rejects foreign entries" {
+  let good = [
+    "moon.mod", "moon.pkg", "LICENSE", "README.mbt.md", "OPENRPC-LICENSE.txt", "UNICODE-LICENSE.txt",
+    "reader.mbt", "json/parser.mbt",
+  ]
+  assert_eq(archive_audit(good), [])
+  assert_eq(archive_audit(good.filter(n => n != "LICENSE")), ["missing LICENSE"])
+  for
+    bad in [
+      "_build/x.c", ".mooncakes/a/b.mbt", "node_modules/a.js", "docs/superpowers/p.md",
+      "../escape.mbt", "/abs.mbt", "tests/x.mbt",
+    ] {
+    assert_true(archive_audit([..good, bad]).length() == 1, msg=bad)
+  }
+}
+
+///|
+test "graph leak check accepts only the candidate module" {
+  let clean = "consumer@0.1.0 (local /tmp/c) [workspace member]:\n└─ moonrockz/openrpc -> moonrockz/openrpc@0.1.0\n"
+  assert_eq(graph_leaks(clean, "consumer"), [])
+  let leaky = clean + "   └─ moonrockz/ion -> moonrockz/ion@0.6.0\n"
+  assert_eq(graph_leaks(leaky, "consumer"), ["moonrockz/ion"])
+  assert_eq(graph_leaks("consumer@0.1.0:\n", "consumer"), [
+    "moonrockz/openrpc missing",
+  ])
+}
+
+///|
+let required_entries : Array[String] = [
+  "moon.mod", "moon.pkg", "LICENSE", "README.mbt.md", "OPENRPC-LICENSE.txt", "UNICODE-LICENSE.txt",
+]
+
+///|
+/// Problems with an archive's entry names: missing required files, entries
+/// that escape the package, and build, cache, test-module or local-plan files.
+fn archive_audit(names : Array[String]) -> Array[String] {
+  let problems = []
+  for name in required_entries {
+    if !names.contains(name) {
+      problems.push("missing \{name}")
+    }
+  }
+  for name in names {
+    let foreign = name.has_prefix("/") ||
+      name.contains("..") ||
+      ["_build/", ".mooncakes/", "node_modules/", "docs/", "tests/", ".git/"].any(p => {
+          name.has_prefix(p) || name.contains("/" + p)
+        },
+      )
+    if foreign {
+      problems.push("foreign entry \{name}")
+    }
+  }
+  problems
+}
+
+///|
+/// Modules other than the candidate in `moon tree` output of the consumer.
+fn graph_leaks(tree : String, consumer : String) -> Array[String] {
+  let leaks = []
+  let mut found = false
+  for line in tree.split("\n") {
+    guard line.find("─ ") is Some(at) else { continue }
+    let rest = line[at + 2:].to_owned()
+    let name = match rest.find(" ") {
+      Some(end) => rest[:end].to_owned()
+      None => rest
+    }
+    if name == "moonrockz/openrpc" {
+      found = true
+    } else if name != consumer {
+      leaks.push(name)
+    }
+  }
+  if !found {
+    leaks.push("moonrockz/openrpc missing")
+  }
+  leaks
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "_build" || entry == ".mooncakes" {
+      continue
+    }
+    let from = "\{source}/\{entry}"
+    let to = "\{destination}/\{entry}"
+    if @fs.kind(from) is Directory {
+      copy_tree(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+async fn moon(
+  args : Array[String],
+  cwd : String,
+  extra_env~ : Map[String, String] = Map([]),
+) -> String {
+  let (code, out, err) = @process.collect_output("moon", args, cwd~, extra_env~)
+  guard code == 0 else {
+    fail("moon \{args.join(" ")}\n\{out.text()}\{err.text()}")
+  }
+  out.text().replace_all(old="\r\n", new="\n")
+}
+
+///|
+fn module_version(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.has_prefix("version = \"") {
+      let rest = line[11:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+/// Write the consumer program and manifest. With `library`, the candidate is
+/// a workspace member built from source; otherwise it is a registry import.
+async fn write_consumer(
+  root : String,
+  dir : String,
+  version : String,
+  library~ : Bool,
+) -> Unit {
+  @fs.mkdir(dir, recursive=true, allow_exist=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"openrpc-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+  )
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import { \"moonrockz/openrpc\", \"moonrockz/openrpc/schema\", \"moonrockz/openrpc/json\" @exact }\npkgtype(kind: \"executable\")\n",
+  )
+  @fs.write_file(
+    "\{dir}/main.mbt",
+    @fs.read_file("\{root}/tests/openrpc-consumer/main.mbt"),
+  )
+  if library {
+    copy_tree("\{root}/pkgs/openrpc", "\{dir}/library")
+    @fs.write_file(
+      "\{dir}/moon.work",
+      "members = [\n  \".\",\n  \"./library\",\n]\n",
+    )
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let version = module_version(@fs.read_file("pkgs/openrpc/moon.mod").text()).unwrap()
+  let workspace = module_version(@fs.read_file("moon.mod").text()).unwrap()
+  guard version == workspace else {
+    fail(
+      "moonrockz/openrpc \{version} differs from the workspace version \{workspace}",
+    )
+  }
+  let dir = @fs.tmpdir(prefix="openrpc-registry")
+  defer @fs.rmdir(dir, recursive=true)
+  // Reference output from source, which check:openrpc compares with the
+  // expected consumer output.
+  write_consumer(root, "\{dir}/source", version, library=true)
+  let reference = moon(
+    ["run", "--release", "--deny-warn", "--target", "native", "."],
+    "\{dir}/source",
+  )
+  let home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => {
+    let user = @env.get_env_var("HOME").unwrap_or_else(() => {
+      @env.get_env_var("USERPROFILE").unwrap()
+    })
+    user + "/.moon"
+  })
+  let isolated = "\{dir}/moon"
+  let (code, toolchain, err) = @process.collect_output("mise", [
+    "where", "http:moonbit",
+  ])
+  guard code == 0 else { fail(err.text()) }
+  let consumer_env = {
+    "MOON_HOME": isolated,
+    "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
+    "MOON_DEP_CACHE": "\{dir}/dependencies",
+    "MOON_BUILD_CACHE": "\{dir}/build-cache",
+  }
+  let consumer = "\{dir}/consumer"
+  write_consumer(root, consumer, version, library=false)
+  let verify = async fn() -> String {
+    let graph = moon(["tree"], consumer, extra_env=consumer_env)
+    let leaks = graph_leaks(graph, "openrpc-consumer")
+    guard leaks.is_empty() else {
+      fail(
+        "Unexpected modules in the consumer graph: \{leaks.join(", ")}\n\{graph}",
+      )
+    }
+    for target in ["native", "wasm", "js", "wasm-gc"] {
+      let observed = moon(
+        ["run", "--release", "--deny-warn", "--target", target, "."],
+        consumer,
+        extra_env=consumer_env,
+      )
+      guard observed == reference else {
+        fail(
+          "Registry consumer on \{target} differs from the source build\nExpected:\n\{reference}\nObserved:\n\{observed}",
+        )
+      }
+      println("Registry consumer agrees with the source build: \{target}")
+    }
+    graph
+  }
+  if @env.args().contains("--published") {
+    // Release gate: the public registry only, no candidate index entry.
+    @fs.mkdir("\{isolated}", recursive=true, allow_exist=true)
+    @fs.write_file(
+      "\{isolated}/config.json",
+      (
+        {
+          "registry": "https://mooncakes.io",
+          "index": "https://mooncakes.io/git/index",
+        } : Json).stringify(),
+    )
+    @async.with_timeout(600_000, () => {
+      ignore(moon(["update"], consumer, extra_env=consumer_env))
+      let graph = verify()
+      println("Public dependency graph:\n\{graph}")
+    })
+    let published = @fs.read_file(
+      "\{isolated}/registry/cache/moonrockz/openrpc/\{version}.zip",
+    ).binary()
+    println(
+      "Public registry consumer verified moonrockz/openrpc@\{version} on all four targets; archive SHA-256 \{@crypto.bytes_to_hex_string(@crypto.sha256(published))}",
+    )
+    return
+  }
+  ignore(moon(["-C", "pkgs/openrpc", "package"], root))
+  let archive_path = "\{root}/_build/publish/moonrockz-openrpc-\{version}.zip"
+  let archive = @fs.read_file(archive_path).binary()
+  let checksum = @crypto.bytes_to_hex_string(@crypto.sha256(archive))
+  let (code, listing, err) = @process.collect_output("unzip", [
+    "-Z1", archive_path,
+  ])
+  guard code == 0 else { fail(err.text()) }
+  let names = listing
+    .text()
+    .split("\n")
+    .filter(n => !n.is_empty())
+    .map(n => n.to_owned())
+    .collect()
+  let problems = archive_audit(names)
+  guard problems.is_empty() else {
+    fail("Archive audit: \{problems.join(", ")}")
+  }
+  copy_tree("\{home}/registry/index/user", "\{isolated}/registry/index/user")
+  @fs.mkdir(
+    "\{isolated}/registry/index/user/moonrockz",
+    recursive=true,
+    allow_exist=true,
+  )
+  @fs.write_file(
+    "\{isolated}/registry/index/user/moonrockz/openrpc.index",
+    (
+      {
+        "name": "moonrockz/openrpc",
+        "version": Json::string(version),
+        "deps": Json::object(Map([])),
+        "checksum": Json::string(checksum),
+      } : Json).stringify() +
+    "\n",
+  )
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let url = "http://\{server.addr}"
+  @fs.write_file(
+    "\{isolated}/config.json",
+    (
+      {
+        "registry": Json::string(url),
+        "index": Json::string("\{dir}/unused-index"),
+      } : Json).stringify(),
+  )
+  let requests : Array[String] = []
+  let mut graph = ""
+  @async.with_timeout(600_000, () => {
+    @async.with_task_group() <| group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, conn) => {
+          let path = request.path.replace_all(old="%2F", new="/")
+          requests.push(path)
+          guard path == "/user/moonrockz/openrpc/\{version}.zip" else {
+            conn.send_response(404, "Not Found")
+            return
+          }
+          conn.send_response(
+            200,
+            "OK",
+            extra_headers=Map::from_array([
+              (
+                @http.CaseInsensitiveString("Content-Length"),
+                archive.length().to_string(),
+              ),
+            ]),
+          )
+          conn.write(archive)
+        })
+      })
+      graph = verify()
+    }
+  })
+  guard requests.contains("/user/moonrockz/openrpc/\{version}.zip") else {
+    fail("Consumer did not download the candidate from the loopback registry")
+  }
+  println("Candidate moonrockz/openrpc@\{version}")
+  println(
+    "Archive \{archive_path}: \{names.length()} entries, \{archive.length()} bytes",
+  )
+  println("Archive SHA-256 \{checksum}")
+  println("Consumer dependency graph:\n\{graph}")
+}

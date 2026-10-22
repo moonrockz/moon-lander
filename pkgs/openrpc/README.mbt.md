@@ -1,0 +1,523 @@
+# OpenRPC documents
+
+`moonrockz/openrpc` is a portable OpenRPC `1.3.2`/`1.4.x` reader, writer and
+document validator. It contains the complete typed OpenRPC and draft-07 models,
+exact JSON values, a source-preserving CST, reference resolution over explicit
+resources, versioned document validation with explicit profiles, canonical and
+pretty writing, and checked value edits. It depends only on the MoonBit core
+library. It is licensed under Apache-2.0; embedded metaschema and Unicode data
+keep their notices in `OPENRPC-LICENSE.txt` and `UNICODE-LICENSE.txt`.
+
+Reading keeps both the original JSON source and a typed document when structural
+decoding succeeds. Writing retains exact numeric tokens, extensions, absent
+fields and array order. Object keys sort by UTF-16 code units. Canonical writing
+does not insert defaults or change the document version.
+
+The examples import the root as `@openrpc`, exact JSON as `@exact`, schemas as
+`@schema`, and references as `@reference`.
+
+```mbt check
+///|
+test {
+  let source = " {\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"service-9\"},\"methods\":[],\"x-number\":9007199254740993} "
+  let result = @openrpc.read(source)
+  assert_eq(result.cst().unwrap().reproduce(), source)
+  let document = result.document().unwrap()
+  assert_eq(document.info().version(), "service-9")
+  assert_eq(
+    @openrpc.write(document).unwrap(),
+    "{\"info\":{\"title\":\"API\",\"version\":\"service-9\"},\"methods\":[],\"openrpc\":\"1.4.0\",\"x-number\":9007199254740993}",
+  )
+}
+```
+
+The public `json` package provides immutable exact JSON values and an owned CST.
+Its node spans use half-open UTF-16 offsets. Nodes retain member occurrences and
+decoded keys; the owned source retains punctuation, whitespace and raw spelling.
+Duplicate decoded keys preserve the CST but fail semantic lowering. The parser,
+lowering and writer use explicit stacks.
+
+Default JSON limits are 8,388,608 UTF-16 code units of source/output, 100,000
+nodes, 256 open containers, 4,096 code units per number and 256 lowering
+findings. `json.Limits::new`
+accepts explicit bounds. Source size is a text bound, not a UTF-8 byte bound.
+Large decimal exponents are kept exact without expanding powers of ten.
+
+`CstDocument.tokens()` partitions the original text into tokens and whitespace.
+Each token has its original text and span. `source_map()` maps decoded paths to
+all value occurrences, including duplicate members. A location separates the
+member-name span from the value span. Positions use one-based lines and UTF-16
+columns; CRLF counts as one line break. Each location's node index belongs to
+the owning CST and is not stable across parses or edits. Generated AST values
+have no source map.
+
+```mbt check
+///|
+test {
+  let cst = @exact.parse("{\"n\":9007199254740993}", source_id=Some("api.json")).unwrap()
+  let location = cst.source_map().locations(["n"])[0]
+  assert_eq(location.source_id(), Some("api.json"))
+  assert_eq(cst.slice(location.value_span()).unwrap(), "9007199254740993")
+  assert_eq(cst.slice(location.key_span().unwrap()).unwrap(), "\"n\"")
+}
+```
+
+## Writing and editing
+
+There are three ways to produce text, and they differ on purpose:
+
+- `CstDocument::reproduce` returns the original source exactly, including
+  whitespace, CRLF, member order and escape and number spelling. It works for
+  valid JSON that is not a valid OpenRPC document.
+- `write` returns canonical compact JSON: object keys sorted by UTF-16 code
+  units, minimal string escapes, no whitespace and no final newline.
+- `write(format=@exact.Pretty)` is the same text with two-space indentation.
+
+Canonical writing keeps every present field, extension and reference spelling,
+and keeps array order, so methods, parameters, examples and schema arrays are
+never reordered. It inserts no defaults: an absent `paramStructure` or
+`deprecated` stays absent. It is not RFC 8785 (JCS). JCS rewrites numbers in
+ECMAScript form; this writer keeps each number token, so `1.0` and `1` remain
+different bytes. Do not use it as a signing format. Strings with an unpaired
+UTF-16 surrogate are refused with `InvalidValue`, because they are not Unicode
+text and cannot be read back.
+
+```mbt check
+///|
+test {
+  let source = "{\"x-n\": 1.0, \"methods\": [{\"name\": \"b\", \"params\": []}, {\"name\": \"a\", \"params\": [{\"$ref\": \"#/components/contentDescriptors/P\"}]}],\r\n \"info\": {\"version\": \"1\", \"title\": \"API\"}, \"openrpc\": \"1.4.0\", \"components\": {\"contentDescriptors\": {\"P\": {\"name\": \"p\", \"schema\": true}}}}"
+  let read = @openrpc.read(source)
+  let document = read.document().unwrap()
+  assert_eq(read.cst().unwrap().reproduce(), source)
+  let compact = @openrpc.write(document).unwrap()
+  assert_eq(
+    compact,
+    "{\"components\":{\"contentDescriptors\":{\"P\":{\"name\":\"p\",\"schema\":true}}},\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"b\",\"params\":[]},{\"name\":\"a\",\"params\":[{\"$ref\":\"#/components/contentDescriptors/P\"}]}],\"openrpc\":\"1.4.0\",\"x-n\":1.0}",
+  )
+  let pretty = @openrpc.write(document, format=@exact.Pretty).unwrap()
+  assert_true(pretty.has_prefix("{\n  \"components\": {"))
+  // Both formats read back to the same document.
+  let again = @openrpc.read(pretty).document().unwrap()
+  assert_eq(@openrpc.write(again).unwrap(), compact)
+}
+```
+
+`replace_value` edits one existing value in a parsed document. Find the node
+with `CstDocument::node_at` or a source-map location's `node()`. The new value
+is written compactly into that value's span, every other code unit is kept,
+and the text is read again into a fresh CST, document and source map. Node
+handles belong to one source text; using one after an edit that changed the
+text fails with `StaleNode`. Only existing values can be replaced; insertion, deletion and
+key renaming are not supported.
+
+```mbt check
+///|
+test {
+  let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\r\n  \"methods\": [],\r\n  \"x-owner\": \"team-a\"}"
+  let cst = @openrpc.read(source).cst().unwrap()
+  let node = cst.node_at(["x-owner"]).unwrap()
+  let edited = @openrpc.replace_value(cst, node, @exact.Value::string("team-b")).unwrap()
+  let new_cst = edited.cst().unwrap()
+  assert_eq(new_cst.reproduce(), source.replace(old="team-a", new="team-b"))
+  // The old handle is stale for the edited text.
+  assert_true(new_cst.replace_value(node, @exact.Value::null()) is Err(_))
+  // Validation of the edited document locates findings in the new text.
+  let title = new_cst.node_at(["info", "title"]).unwrap()
+  let broken = @openrpc.replace_value(new_cst, title, @exact.Value::null()).unwrap()
+  assert_true(broken.document() is None)
+  let span = broken.diagnostics()[0].span().unwrap()
+  assert_eq(broken.cst().unwrap().slice(span), Some("null"))
+}
+```
+
+Exact `Value.equals` compares object members without regard to their order and
+retains numeric token distinctions. Select `numeric=true` for mathematical
+numeric equality. `Number.numeric_compare` orders exact decimals and exponents.
+Neither operation converts numbers to binary floating point. Equality returns
+`Result[Bool, Diagnostic]` and reports exhaustion through `LimitExceeded`.
+It bounds visited and queued node pairs, depth, number tokens, and aggregate
+key/string/number text on each operand. It never treats exhaustion as inequality.
+
+Core `Json` interop is explicit. `from_core_json` uses a present numeric `repr`
+after checking its syntax; without `repr`, it captures the current finite
+Double representation. It cannot recover source digits that the caller lost.
+`to_core_json` always sets exact numeric `repr`. Core arithmetic and equality
+still use Double semantics. Both conversions copy collections and enforce the
+JSON limits. `Limits.unlimited()` removes policy bounds within the maximum
+representable String/Array sizes; available host memory is still finite.
+
+```mbt check
+///|
+test {
+  let exact = @exact.parse("9007199254740993").unwrap().lower().unwrap()
+  let core = @exact.to_core_json(exact).unwrap()
+  assert_true(@exact.from_core_json(core).unwrap().equals(exact).unwrap())
+  let code = @openrpc.ErrorCode::parse("-90071992547409931234567890").unwrap()
+  assert_eq(code.number().token(), "-90071992547409931234567890")
+  let extensions = @openrpc.Extensions::from_json(
+    @exact.parse("{\"x-value\":false}").unwrap().lower().unwrap(),
+  ).unwrap()
+  assert_true(
+    extensions.get(@openrpc.ExtensionName::parse("x-value").unwrap()) is Some(_),
+  )
+}
+```
+
+`ComponentKey`, `ExtensionName`, and `ErrorCode` have checked constructors.
+Component keys follow the OpenRPC component grammar. Extension names begin with
+lowercase `x-` and retain arbitrary exact values. Error codes are mathematical
+integers with no machine-integer restriction. Each field keeps its own rules;
+these constructors do not impose a common string restriction on unrelated fields.
+
+## Validation
+
+`validate` returns a report with five facets. Each is `Passed`, `Failed` or
+`Incomplete`; there is no single success flag.
+
+| Facet | Checks |
+| --- | --- |
+| `model` | Objects reached by validation decode into the typed model |
+| `schemas` | Embedded draft-07 schema documents, including regex syntax |
+| `references` | Every reference resolves within the supplied resources |
+| `normative` | Rules from the pinned prose of the document's version |
+| `artifact` | The document's own JSON against its version's pinned metaschema |
+
+Normative rules follow the document version. Both versions require unique
+method names, unique parameter names per method, unique error codes per method
+(exact integer equality, so `1` and `1e0` collide) and links that name an
+existing method, all checked after references resolve. A referenced target of
+the wrong kind is a `references` failure. Required parameters must precede
+optional ones. OpenRPC 1.3.2 also requires server, license and link names and
+component keys matching `^[a-zA-Z0-9.\-_]+$`; the 1.4 tables state neither.
+OpenRPC 1.4 requires each example's `name` and inline `value`; its tables do
+not include the 1.3.2 `externalValue` alternative.
+Reading keeps any component key as written. While a method fails to resolve,
+link targets are left unchecked and the facet is incomplete. Members outside a version's field table are
+`UnknownField` warnings and never fail the facet.
+
+The artifact facet uses the frozen 1.3.2 meta-schema (release 1.14.9) or the
+1.4 schema at spec commit `876aa30e`. Schema positions there are checked only
+as boolean-or-object; the `schemas` facet checks their keywords. Formats are
+annotations.
+
+### Profiles
+
+`Specification`, the default, reports every normative failure as an error.
+`MetaschemaCompatibility` serves producers that pass the pinned artifact but
+differ from the prose. It downgrades exactly the discrepancies in
+`compatibility_discrepancies()`, and each such finding names its `Discrepancy`:
+
+| Discrepancy | Prose | Artifact |
+| --- | --- | --- |
+| `OptionalParameterBeforeRequired` | Optional params come last | No rule |
+| `ServerNameOmitted` | 1.3.2 requires a server name | Optional |
+| `LicenseNameOmitted` | 1.3.2 requires a license name | Optional |
+
+Every other normative failure stays an error under both profiles. Neither
+profile reorders, repairs or fills in the document.
+
+`validate_closed` returns the same report and, only when the required facets
+pass, a `ValidatedDocument` that records its profile, version and resource
+snapshot. Specification requires `model`, `schemas`, `references` and
+`normative`; an artifact failure stays in the report without blocking the
+wrapper. Compatibility requires those facets and `artifact`, with normative
+errors limited to the discrepancy list. An incomplete facet, including one
+truncated by limits, never produces a wrapper.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.3.2\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"find\",\"params\":[{\"name\":\"limit\",\"required\":false,\"schema\":true},{\"name\":\"query\",\"required\":true,\"schema\":true}]}]}",
+    )
+    .document()
+    .unwrap()
+  // The prose forbids an optional parameter before a required one.
+  let strict = @openrpc.validate_closed(document)
+  assert_eq(strict.report().normative(), @openrpc.Failed)
+  assert_true(strict.document() is None)
+  // Compatibility reports the same finding as a listed warning.
+  let compatible = @openrpc.validate_closed(
+    document,
+    profile=@openrpc.MetaschemaCompatibility,
+  )
+  let order = compatible.report().findings()[0]
+  assert_eq(order.severity(), @openrpc.Warning)
+  assert_eq(order.discrepancy(), Some(@openrpc.OptionalParameterBeforeRequired))
+  let validated = compatible.document().unwrap()
+  assert_eq(validated.profile(), @openrpc.MetaschemaCompatibility)
+  // Parameter order is unchanged.
+  assert_eq(
+    @openrpc.write(validated.document()).unwrap(),
+    @openrpc.write(document).unwrap(),
+  )
+}
+```
+
+### Findings
+
+Each finding has a typed code, severity, phase, document version and profile.
+Its location names the resource (None for the input document), a pointer, and
+for the input document a half-open UTF-16 span when the caller passes the
+`source_map` from `read`. `related()` gives other occurrences, such as the
+first of two duplicate names. `chain()` lists the OpenRPC `$ref` sites followed
+to reach the location. A missing member points at its parent and names the
+member in `expected_field()`. Documents built with constructors have no spans.
+
+```mbt check
+///|
+test {
+  let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"😀\",\"version\":\"1\"},\n\"methods\":[{\"name\":\"a\",\"params\":[]},{\"$ref\":\"#/x-copy\"}],\"x-copy\":{\"name\":\"a\",\"params\":[]}}"
+  let read = @openrpc.read(source, source_id=Some("api.json"))
+  let source_map = read.source_map().unwrap()
+  let report = @openrpc.validate(read.document().unwrap(), source_map=Some(source_map))
+  let duplicate = report.findings()[0]
+  assert_eq(duplicate.diagnostic().code(), @exact.DuplicateName)
+  assert_eq(duplicate.location().path(), ["x-copy", "name"])
+  assert_eq(duplicate.chain()[0].path(), ["methods", "1", "$ref"])
+  assert_eq(duplicate.related()[0].path(), ["methods", "0", "name"])
+  // The emoji counts as two UTF-16 units; lines and columns start at 1.
+  let span = duplicate.location().span().unwrap()
+  let position = source_map.position(span.start()).unwrap()
+  assert_eq((position.line(), position.column()), (2, 75))
+}
+```
+
+Findings are ordered by resource, pointer (array indices numerically), code,
+source position and message, so every target reports the same list. The
+`max_findings` limit (default 256) keeps the first findings in that order. Each
+phase that lost findings gets an `Information` `LimitExceeded` marker and
+becomes `Incomplete`.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]}]}",
+    )
+    .document()
+    .unwrap()
+  let limits = @exact.Limits::new(max_findings=1)
+  let report = @openrpc.validate(document, limits~)
+  assert_eq(report.normative(), @openrpc.Failed)
+  assert_true(
+    report
+    .findings()
+    .any(f => f.diagnostic().code() == @exact.LimitExceeded),
+  )
+  assert_true(@openrpc.validate_closed(document, limits~).document() is None)
+}
+```
+
+### Runtime boundary
+
+Document validation says nothing about runtime exchanges. It does not validate
+JSON-RPC envelopes, request or response IDs, batches, notifications, or
+examples and error data as instances of their schemas. An absent result and a
+result whose schema allows only `null` are both valid document shapes; neither
+is checked against any call.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"log\",\"params\":[],\"result\":{\"name\":\"done\",\"schema\":{\"type\":\"null\"}},\"examples\":[{\"name\":\"e\",\"params\":[],\"result\":{\"name\":\"r\",\"value\":42}}]}]}",
+    )
+    .document()
+    .unwrap()
+  // The example value 42 does not match the null schema, and that is not a
+  // document finding.
+  let result = @openrpc.validate_closed(document)
+  assert_true(result.document() is Some(_))
+  assert_true(result.report().findings().is_empty())
+}
+```
+
+### References
+
+References never trigger network or filesystem access. Validation resolves
+references only through an explicit `@reference.ResourceSet` and an optional
+document `base` URI. Each OpenRPC reference site (methods, parameters, results,
+errors, links, tags, example pairings and their examples) follows its
+reference-only chain. Each reference resolves against the resource that holds
+it, and the target is decoded with that kind's checked decoder. A target that
+does not decode is `WrongType` at the referencing site. A chain that revisits a
+location is `ReferenceCycle`. Schema references use draft-07 `$id` scopes and
+recursive schema graphs are valid. Server URL templates, example
+`externalValue`, error data, example values and `x-*` payloads are never
+resolved, even when they contain `$ref`.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"$ref\":\"shared.json#/methods/ping\"}]}",
+    )
+    .document()
+    .unwrap()
+  let base = @reference.UriReference::parse("https://api.example/openrpc.json").unwrap()
+  // Without the shared resource the reference is unresolved, not failed.
+  let open = @openrpc.validate(document, base=Some(base))
+  assert_eq(open.references(), @openrpc.Incomplete)
+  assert_true(
+    @openrpc.validate_closed(document, base=Some(base)).document() is None,
+  )
+  // Supplying it, under an alias, closes the check. Nothing is fetched.
+  let shared = @reference.Resource::new(
+    @reference.UriReference::parse("https://cdn.example/v1/shared.json").unwrap(),
+    @exact.parse(
+      "{\"methods\":{\"ping\":{\"name\":\"ping\",\"params\":[],\"result\":{\"name\":\"pong\",\"schema\":{\"$ref\":\"#/definitions/Pong\"}}}},\"definitions\":{\"Pong\":{\"type\":\"string\"}}}",
+    )
+    .unwrap()
+    .lower()
+    .unwrap(),
+    aliases=[
+      @reference.UriReference::parse("https://api.example/shared.json").unwrap(),
+    ],
+    schema_roots=[@reference.JsonPointer::parse("/definitions/Pong").unwrap()],
+  ).unwrap()
+  let resources = @reference.ResourceSet::new([shared]).unwrap()
+  let closed = @openrpc.validate_closed(document, resources~, base=Some(base))
+  assert_eq(closed.report().references(), @openrpc.Passed)
+  assert_true(closed.document() is Some(_))
+}
+```
+
+`Document::as_resource` registers a document with every schema position in its
+typed model declared as a schema root, so other documents can reference it.
+When `base` names a registered resource that holds exactly the validated
+document, that resource is used. Without `base`, relative external references
+report `MissingBaseUri` and leave reference coverage incomplete; a relative
+schema `$id` still scopes the fragment-only references inside it. Findings for targets in another resource carry pointers
+relative to that resource. Chains are bounded by `max_depth`, and schema graphs
+by their node, edge and finding bounds. Schema graph defaults
+are 10,000 visited nodes, 4,096 reference edges and 256 findings per check.
+
+Schema-document validation checks schema keyword forms and references. It does
+not apply schemas to payload or example instances. Error data and arbitrary
+`x-*` payloads remain instance values. JSON-RPC envelopes, notifications, batches
+and exchanges require a separate runtime validator.
+
+The [draft-07 model guide](schema/README.mbt.md) covers the complete typed keyword
+model, checked exact bounds, tuple items, dependencies and literal-data boundaries.
+`Schema.from_json` checks typed forms. Use `schema.validate_json` to report
+malformed untyped schema documents.
+
+The document API covers metadata, servers and variables, methods, descriptors,
+tags, links, errors, examples, pairings and all component tables. Each object
+offers checked `new`/`from_json` construction, typed accessors, `to_json`, shared
+`extensions`, and explicit `additional_fields`. Public arrays and maps are
+defensive copies. Generated values have no source locations.
+
+```mbt check
+///|
+test {
+  let null_schema = @schema.Schema::from_keywords([
+    @schema.Type(@schema.TypeConstraint::one(@schema.NullType)),
+  ]).unwrap()
+  let result = @openrpc.ContentDescriptor::new(
+    "result",
+    null_schema,
+    required=Some(true),
+  ).unwrap()
+  let op = @openrpc.Method::new(
+    @openrpc.MethodName::parse("ping").unwrap(),
+    [],
+    result=Some(@openrpc.Inline(result)),
+    param_structure=Some(@openrpc.ByName),
+  ).unwrap()
+  let document = @openrpc.Document::new(
+    @openrpc.DocumentVersion::parse("1.3.2").unwrap(),
+    @openrpc.Info::new("Example API", "service-v9").unwrap(),
+    [@openrpc.Inline(op)],
+  ).unwrap()
+  assert_eq(document.info().version(), "service-v9")
+  assert_true(@openrpc.write(document).unwrap().contains("\"type\":\"null\""))
+  let notification = @openrpc.Method::new(
+    @openrpc.MethodName::parse("notify").unwrap(),
+    [],
+  ).unwrap()
+  assert_true(notification.result() is None)
+}
+```
+
+An absent method result describes a notification. A present result whose schema
+permits null describes a successful null result. Optional flags and collections
+retain explicit false, empty arrays/maps and absence. Server URL templates and
+link parameters are retained data and are never executed.
+
+```mbt check
+///|
+test {
+  let schema = @schema.Schema::from_keywords([
+    @schema.Type(@schema.TypeConstraint::one(@schema.StringType)),
+  ]).unwrap()
+  let components = @openrpc.Components::new(
+    schemas=Some([(@openrpc.ComponentKey::parse("Text").unwrap(), schema)]),
+  ).unwrap()
+  let descriptor = @openrpc.ContentDescriptor::new(
+    "text",
+    @schema.Schema::from_json(
+      @exact.parse("{\"$ref\":\"#/components/schemas/Text\"}")
+      .unwrap()
+      .lower()
+      .unwrap(),
+    ).unwrap(),
+  ).unwrap()
+  assert_eq(components.schemas().unwrap()[0].0.to_string(), "Text")
+  assert_true(descriptor.schema().kind() is @schema.ReferenceSchema(_))
+  let name = @openrpc.ExtensionName::parse("x-contract").unwrap()
+  let extensions = @openrpc.Extensions::from_entries([(name, schema.to_json())]).unwrap()
+  let submitted = @schema.Schema::from_json(extensions.get(name).unwrap()).unwrap()
+  assert_true(
+    @schema.validate(submitted, root=submitted.to_json())
+    .diagnostics()
+    .is_empty(),
+  )
+}
+```
+
+Extensions keep arbitrary exact values. A caller can explicitly submit an
+extension-held schema for schema-document checks. The library does not infer
+schemas from extension names or object keys.
+
+```mbt check
+///|
+test {
+  let error = @openrpc.ErrorObject::new(
+    @openrpc.ErrorCode::parse("-90071992547409931234567890").unwrap(),
+    "Failed",
+    data=Some(
+      @exact.parse("{\"$ref\":\"literal\",\"schema\":17}")
+      .unwrap()
+      .lower()
+      .unwrap(),
+    ),
+  ).unwrap()
+  let external = @openrpc.Example::new(
+    @openrpc.ExternalExample(
+      @reference.UriReference::parse("https://example.invalid/value").unwrap(),
+    ),
+  ).unwrap()
+  let components = @openrpc.Components::new(
+    errors=Some([(@openrpc.ComponentKey::parse("E").unwrap(), error)]),
+    examples=Some([
+      (@openrpc.ComponentKey::parse("External").unwrap(), external),
+    ]),
+    example_pairings=Some([]),
+    example_pairing_objects=Some([]),
+  ).unwrap()
+  assert_true(components.to_json().get("examplePairings") is Some(_))
+  assert_true(components.to_json().get("examplePairingObjects") is Some(_))
+  assert_true(components.errors().unwrap()[0].1.data() is Some(_))
+}
+```
+
+The two pairing table spellings remain distinct; pointers are never redirected.
+Example payloads distinguish absent, literal and external values. Error data is
+an instance value. Names whose requirements differ by version or profile retain
+their presence so conformance checks can report the applicable rule.
+
+Run `mise run check:openrpc-assets` for the frozen asset checks and
+`mise run check:openrpc` for module tests, official inventories and the four-target public consumer
+comparison. No publication has occurred.

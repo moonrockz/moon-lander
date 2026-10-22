@@ -1,0 +1,14 @@
+import {
+  "moonrockz/openrpc/json" @exact,
+  "moonrockz/openrpc/domain",
+  "moonrockz/openrpc/reference",
+  "moonrockz/openrpc/schema",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/openrpc",
+  "moonrockz/openrpc/json" @exact,
+  "moonrockz/openrpc/reference",
+  "moonrockz/openrpc/schema",
+} for "test"

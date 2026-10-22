@@ -1,0 +1,126 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/notebooks/dib"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/notebooks",
+}
+
+// Values
+pub fn parse(String, registry? : KernelRegistry) -> Notebook raise FormatError
+
+pub fn walk(Node, (Node) -> @notebooks.Control, leave? : (Node) -> Unit) -> Unit
+
+pub fn walk_cursor(Node, (@notebooks.Cursor[Node]) -> @notebooks.Control, leave? : (@notebooks.Cursor[Node]) -> Unit) -> Unit
+
+// Errors
+pub(all) suberror FormatError {
+  InvalidMetadata(line~ : Int, message~ : String)
+  InvalidKernelName(String)
+  DuplicateKernelName(String)
+  UnknownKernel(String)
+  UnrepresentableSource(cell~ : Int, line~ : Int)
+} derive(Eq, @debug.Debug)
+pub fn FormatError::equal(Self, Self) -> Bool
+pub fn FormatError::not_equal(Self, Self) -> Bool
+pub fn FormatError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+type Cell derive(Eq, @debug.Debug)
+pub fn Cell::Cell(String, kernel~ : KernelName) -> Self
+pub fn Cell::directives(Self) -> ReadOnlyArray[Directive]
+pub fn Cell::equal(Self, Self) -> Bool
+pub fn Cell::kernel(Self) -> KernelName
+pub fn Cell::kind(Self) -> @notebooks.CellKind
+pub fn Cell::metadata(Self) -> @notebooks.Metadata?
+pub fn Cell::mime_capability(Self) -> &@notebooks.MimeTyped?
+pub fn Cell::not_equal(Self, Self) -> Bool
+pub fn Cell::source(Self) -> String
+pub fn Cell::to_repr(Self) -> @debug.Repr
+pub impl @notebooks.CellView for Cell
+
+type Directive derive(Eq, @debug.Debug)
+pub fn Directive::arguments(Self) -> String
+pub fn Directive::equal(Self, Self) -> Bool
+pub fn Directive::line(Self) -> Int
+pub fn Directive::name(Self) -> String
+pub fn Directive::not_equal(Self, Self) -> Bool
+pub fn Directive::text(Self) -> String
+pub fn Directive::to_repr(Self) -> @debug.Repr
+
+type KernelInfo derive(Eq, @debug.Debug)
+pub fn KernelInfo::KernelInfo(KernelName, aliases? : ReadOnlyArray[KernelName], language? : String?) -> Self
+pub fn KernelInfo::aliases(Self) -> ReadOnlyArray[KernelName]
+pub fn KernelInfo::equal(Self, Self) -> Bool
+pub fn KernelInfo::language(Self) -> String?
+pub fn KernelInfo::name(Self) -> KernelName
+pub fn KernelInfo::not_equal(Self, Self) -> Bool
+pub fn KernelInfo::to_repr(Self) -> @debug.Repr
+
+type KernelName derive(Eq, @debug.Debug)
+pub fn KernelName::KernelName(String) -> Self raise FormatError
+pub fn KernelName::equal(Self, Self) -> Bool
+pub fn KernelName::not_equal(Self, Self) -> Bool
+pub fn KernelName::to_repr(Self) -> @debug.Repr
+pub fn KernelName::to_string(Self) -> String
+
+type KernelRegistry derive(Eq, @debug.Debug)
+pub fn KernelRegistry::KernelRegistry(ReadOnlyArray[KernelInfo], default_kernel~ : KernelName) -> Self raise FormatError
+pub fn KernelRegistry::default_kernel(Self) -> KernelName
+pub fn KernelRegistry::equal(Self, Self) -> Bool
+pub fn KernelRegistry::kernels(Self) -> ReadOnlyArray[KernelInfo]
+pub fn KernelRegistry::not_equal(Self, Self) -> Bool
+pub fn KernelRegistry::resolve(Self, String) -> KernelName?
+pub fn KernelRegistry::standard() -> Self
+pub fn KernelRegistry::to_repr(Self) -> @debug.Repr
+
+pub(all) enum MetadataOutput {
+  Auto
+  Json
+  Ion
+} derive(Eq, @debug.Debug)
+pub fn MetadataOutput::equal(Self, Self) -> Bool
+pub fn MetadataOutput::not_equal(Self, Self) -> Bool
+pub fn MetadataOutput::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Node {
+  Notebook(Notebook)
+  Cell(Cell)
+  Directive(Directive)
+} derive(Eq, @debug.Debug)
+pub fn Node::at(Self, @notebooks.NodePath) -> Self?
+pub fn Node::children(Self) -> ReadOnlyArray[Self]
+pub fn Node::cursor(Self) -> @notebooks.Cursor[Self]
+pub fn Node::equal(Self, Self) -> Bool
+pub fn Node::kind(Self) -> @notebooks.NodeKind
+pub fn Node::metadata(Self) -> @notebooks.Metadata?
+pub fn Node::not_equal(Self, Self) -> Bool
+pub fn Node::source(Self) -> String?
+pub fn Node::to_repr(Self) -> @debug.Repr
+pub impl @notebooks.Node for Node
+
+type Notebook derive(Eq, @debug.Debug)
+pub fn Notebook::Notebook(ReadOnlyArray[Cell], metadata? : @notebooks.Metadata, registry? : KernelRegistry) -> Self raise FormatError
+pub fn Notebook::cell(Self, Int) -> Cell?
+pub fn Notebook::cells(Self) -> ReadOnlyArray[Cell]
+pub fn Notebook::cells_for_kernel(Self, String) -> ReadOnlyArray[Cell]
+pub fn Notebook::cursor(Self) -> @notebooks.Cursor[Node]
+pub fn Notebook::equal(Self, Self) -> Bool
+pub fn[A] Notebook::fold(Self, A, (A, @notebooks.Cursor[Node]) -> A) -> A
+pub fn Notebook::metadata(Self) -> @notebooks.Metadata
+pub fn Notebook::not_equal(Self, Self) -> Bool
+pub fn Notebook::registry(Self) -> KernelRegistry
+pub fn Notebook::root(Self) -> Node
+pub fn Notebook::to_repr(Self) -> @debug.Repr
+pub fn Notebook::to_string(Self, metadata_output? : MetadataOutput) -> String raise FormatError
+
+// Type aliases
+pub using @notebooks {type Control}
+
+pub using @notebooks {type Cursor}
+
+pub using @notebooks {type Metadata}
+
+pub using @notebooks {type NodePath}
+
+// Traits

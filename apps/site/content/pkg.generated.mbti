@@ -1,0 +1,88 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-site/content"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-site/model",
+}
+
+// Values
+pub fn analyse_html(String) -> Document
+
+pub fn check_moonbit_fences(String, String, first_line? : Int) -> Array[@model.Problem]
+
+pub fn escape(String) -> String
+
+pub fn ids_in(String) -> Array[String]
+
+pub fn inline_text(String) -> String
+
+pub fn map_urls(String, (String) -> String) -> String
+
+pub fn parse_front_matter(String, String) -> FrontMatter raise @model.Invalid
+
+pub fn plain_text(String) -> String
+
+pub fn render_callouts(String) -> String
+
+pub fn render_layers(String, String) -> LayersPass
+
+pub fn render_markdown(String, String) -> Document raise @model.Invalid
+
+pub fn render_mermaid_blocks(String, String) -> MermaidPass
+
+pub fn slug(String) -> String
+
+pub fn unescape(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Document {
+  html : String
+  title : String?
+  summary : String
+  headings : Array[Heading]
+  ids : Array[String]
+  text : String
+}
+
+pub(all) enum FieldValue {
+  Text(String)
+  List(Array[String])
+} derive(Eq, @debug.Debug)
+pub fn FieldValue::equal(Self, Self) -> Bool
+pub fn FieldValue::not_equal(Self, Self) -> Bool
+pub fn FieldValue::to_repr(Self) -> @debug.Repr
+
+pub(all) struct FrontMatter {
+  fields : Map[String, FieldValue]
+  body : String
+  body_line : Int
+}
+pub fn FrontMatter::flag(Self, String) -> Bool
+pub fn FrontMatter::list(Self, String) -> Array[String]
+pub fn FrontMatter::text(Self, String) -> String?
+
+pub(all) struct Heading {
+  level : Int
+  id : String
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn Heading::equal(Self, Self) -> Bool
+pub fn Heading::not_equal(Self, Self) -> Bool
+pub fn Heading::to_repr(Self) -> @debug.Repr
+
+pub(all) struct LayersPass {
+  html : String
+  problems : Array[@model.Problem]
+}
+
+pub(all) struct MermaidPass {
+  html : String
+  problems : Array[@model.Problem]
+}
+
+// Type aliases
+
+// Traits

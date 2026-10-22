@@ -1,0 +1,149 @@
+# Release: plan, validate, publish, verify, GitHub release. Adapted from
+# Smithy's release flow (CONTRIBUTING.md). Moon-Lander ships no binaries.
+#
+# plan      decides if this run releases: a push to main that changes moon.mod
+#           or a vX.Y.Z tag, when vX.Y.Z has no GitHub release yet and
+#           CHANGELOG.md has its section.
+# validate  runs the full checks and the shared-version check.
+# publish   packages moonrockz/openrpc, publishes the public modules (an
+#           existing version counts as done), then verifies the published
+#           OpenRPC archive from the public registry on four targets against
+#           the checksum of the archive this job built.
+# release   creates the GitHub release vX.Y.Z with the CHANGELOG.md section.
+#
+# Pull requests that change release files, and manual runs with dry_run, only
+# plan and validate. Re-running failed jobs is safe: publish and release are
+# idempotent. A future site-asset.yml (openspec add-docs-site 11.4) must be
+# called here and its asset attached to the release.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [moon.mod]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release.mbtx
+      - scripts/publish.mbtx
+      - scripts/credentials.mbtx
+      - scripts/check-openrpc-registry.mbtx
+      - scripts/versions.mbtx
+      - moon.mod
+      - CHANGELOG.md
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run every check, but do not publish or create a release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.event.number) || 'release' }}
+  cancel-in-progress: false
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      dry_run: ${{ steps.plan.outputs.dry_run }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Decide what this run does
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+        run: mise run release:plan
+
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    needs: [plan]
+    if: needs.plan.outputs.release == 'true' || needs.plan.outputs.dry_run == 'true'
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install browsers for the browser suite
+        run: mise run browsers:install -- --with-deps
+      - name: Run lint, validate, test, qualification and build
+        run: mise run check
+      - name: Check that every version is ${{ needs.plan.outputs.version }}
+        run: moonx scripts/versions.mbtx check ${{ needs.plan.outputs.version }}
+
+  publish:
+    name: Publish to mooncakes.io
+    runs-on: ubuntu-latest
+    needs: [plan, validate]
+    if: needs.plan.outputs.release == 'true'
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package moonrockz/openrpc and record its checksum
+        id: candidate
+        run: |
+          set -euo pipefail
+          moon -C pkgs/openrpc package
+          sha=$(sha256sum "_build/publish/moonrockz-openrpc-${{ needs.plan.outputs.version }}.zip" | cut -d' ' -f1)
+          echo "OpenRPC archive SHA-256 $sha"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+      - name: Write the mooncakes.io credentials
+        env:
+          MOONCAKES_USER_TOKEN: ${{ secrets.MOONCAKES_USER_TOKEN }}
+        run: mise run release:credentials
+      - name: Publish the modules
+        run: mise run release:publish
+      - name: Verify the published OpenRPC module on four targets
+        run: mise run check:openrpc-published -- --checksum ${{ steps.candidate.outputs.sha256 }}
+
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    needs: [plan, publish]
+    if: needs.plan.outputs.release == 'true'
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Write the release notes
+        run: mise run release:notes ${{ needs.plan.outputs.version }} > "$RUNNER_TEMP/notes.md"
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run release:github ${{ needs.plan.outputs.version }} "$RUNNER_TEMP/notes.md"

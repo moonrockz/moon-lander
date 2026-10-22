@@ -1,0 +1,60 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/openrpc/domain"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/openrpc/json",
+}
+
+// Values
+pub fn draft07_dialect(String) -> Bool
+
+pub fn draft07_subschemas(String, @json.Value) -> Array[(Array[String], @json.Value)]
+
+// Errors
+
+// Types and methods
+pub struct ComponentKey {
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn ComponentKey::equal(Self, Self) -> Bool
+pub fn ComponentKey::from_wire(String) -> Self
+pub fn ComponentKey::is_conforming(Self) -> Bool
+pub fn ComponentKey::not_equal(Self, Self) -> Bool
+pub fn ComponentKey::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn ComponentKey::to_repr(Self) -> @debug.Repr
+pub fn ComponentKey::to_string(Self) -> String
+
+pub struct ErrorCode {
+  number : @json.Number
+} derive(Eq, @debug.Debug)
+pub fn ErrorCode::equal(Self, Self) -> Bool
+pub fn ErrorCode::from_number(@json.Number) -> Result[Self, @json.Diagnostic]
+pub fn ErrorCode::not_equal(Self, Self) -> Bool
+pub fn ErrorCode::number(Self) -> @json.Number
+pub fn ErrorCode::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn ErrorCode::to_repr(Self) -> @debug.Repr
+
+pub struct ExtensionName {
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn ExtensionName::equal(Self, Self) -> Bool
+pub fn ExtensionName::not_equal(Self, Self) -> Bool
+pub fn ExtensionName::parse(String) -> Result[Self, @json.Diagnostic]
+pub fn ExtensionName::to_repr(Self) -> @debug.Repr
+pub fn ExtensionName::to_string(Self) -> String
+
+pub struct Extensions {
+  entries : Array[(ExtensionName, @json.Value)]
+} derive(@debug.Debug)
+pub fn Extensions::empty() -> Self
+pub fn Extensions::entries(Self) -> Array[(ExtensionName, @json.Value)]
+pub fn Extensions::from_entries(Array[(ExtensionName, @json.Value)]) -> Result[Self, @json.Diagnostic]
+pub fn Extensions::from_json(@json.Value) -> Result[Self, @json.Diagnostic]
+pub fn Extensions::get(Self, ExtensionName) -> @json.Value?
+pub fn Extensions::to_json(Self) -> @json.Value
+pub fn Extensions::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

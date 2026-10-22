@@ -1,0 +1,137 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-site/model"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn article_parts(String) -> (String, String)?
+
+pub fn article_route(String) -> String
+
+pub fn doc_route(String) -> String
+
+pub fn internal_links(String) -> Array[String]
+
+pub fn link_file(String, String) -> String?
+
+pub fn package_route(String) -> String
+
+pub fn problem(String, String, line? : Int) -> Problem
+
+pub fn route_file(String) -> String
+
+pub fn search(Array[SearchEntry], String, limit? : Int) -> Array[SearchEntry]
+
+pub fn strip_extension(String) -> String
+
+// Errors
+pub(all) suberror Invalid {
+  Invalid(Array[Problem])
+} derive(Eq, @debug.Debug)
+pub fn Invalid::equal(Self, Self) -> Bool
+pub fn Invalid::not_equal(Self, Self) -> Bool
+pub fn Invalid::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) struct ArticleSummary {
+  route : String
+  title : String
+  date : String
+  authors : Array[String]
+  summary : String
+} derive(Eq, @debug.Debug)
+pub fn ArticleSummary::equal(Self, Self) -> Bool
+pub fn ArticleSummary::not_equal(Self, Self) -> Bool
+pub fn ArticleSummary::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ChapterOrder {
+  name : String
+  chapters : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn ChapterOrder::equal(Self, Self) -> Bool
+pub fn ChapterOrder::not_equal(Self, Self) -> Bool
+pub fn ChapterOrder::to_repr(Self) -> @debug.Repr
+
+pub(all) struct NavGroup {
+  group : String
+  items : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn NavGroup::equal(Self, Self) -> Bool
+pub fn NavGroup::not_equal(Self, Self) -> Bool
+pub fn NavGroup::to_repr(Self) -> @debug.Repr
+
+pub(all) struct NavItem {
+  route : String
+  title : String
+  depth : Int
+  proposed : Bool
+} derive(Eq, @debug.Debug)
+pub fn NavItem::equal(Self, Self) -> Bool
+pub fn NavItem::not_equal(Self, Self) -> Bool
+pub fn NavItem::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Problem {
+  file : String
+  line : Int
+  message : String
+} derive(Eq, @debug.Debug)
+pub fn Problem::equal(Self, Self) -> Bool
+pub fn Problem::not_equal(Self, Self) -> Bool
+pub fn Problem::render(Self) -> String
+pub fn Problem::to_repr(Self) -> @debug.Repr
+
+pub(all) struct SearchEntry {
+  route : String
+  title : String
+  section : String
+  summary : String
+  headings : Array[String]
+  text : String
+} derive(Eq, @debug.Debug)
+pub fn SearchEntry::equal(Self, Self) -> Bool
+pub fn SearchEntry::from_json(Json) -> Self?
+pub fn SearchEntry::not_equal(Self, Self) -> Bool
+pub fn SearchEntry::to_json(Self) -> Json
+pub fn SearchEntry::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Section {
+  Home
+  Docs
+  Articles
+} derive(Eq, @debug.Debug)
+pub fn Section::equal(Self, Self) -> Bool
+pub fn Section::not_equal(Self, Self) -> Bool
+pub fn Section::to_repr(Self) -> @debug.Repr
+
+pub(all) struct SiteConfig {
+  title : String
+  description : String
+  base_path : String
+  site_url : String
+  repo_url : String
+  packages : Array[String]
+  nav : Array[NavGroup]?
+  chapters : Array[ChapterOrder]
+} derive(Eq, @debug.Debug)
+pub fn SiteConfig::absolute(Self, String) -> String
+pub fn SiteConfig::chapter_order(Self, String, String) -> Int?
+pub fn SiteConfig::equal(Self, Self) -> Bool
+pub fn SiteConfig::href(Self, String) -> String
+pub fn SiteConfig::not_equal(Self, Self) -> Bool
+pub fn SiteConfig::parse(String, String) -> Self raise Invalid
+pub fn SiteConfig::to_repr(Self) -> @debug.Repr
+
+pub(all) struct TocEntry {
+  id : String
+  text : String
+  depth : Int
+} derive(Eq, @debug.Debug)
+pub fn TocEntry::equal(Self, Self) -> Bool
+pub fn TocEntry::not_equal(Self, Self) -> Bool
+pub fn TocEntry::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

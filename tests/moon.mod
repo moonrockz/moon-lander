@@ -1,11 +1,12 @@
 name = "moonrockz/moon-lander-tests"
 
-version = "0.1.0"
+version = "0.2.0"
 
 import {
   "moonbitlang/async@0.22.5",
-  "moonrockz/notebooks@0.1.0",
-  "moonrockz/moon-lander@0.1.0",
+  "moonrockz/notebooks@0.2.0",
+  "moonrockz/moon-lander@0.2.0",
+  "moonrockz/openrpc@0.2.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/moonspec@0.11.0",
   "moonrockz/expect@0.6.1",

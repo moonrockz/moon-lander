@@ -1,0 +1,158 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/openrpc/reference"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/openrpc/json",
+}
+
+// Values
+pub fn schema_scope(UriReference, UriReference?, limits? : @json.Limits) -> UriReference?
+
+// Errors
+
+// Types and methods
+pub struct Authority {
+  raw : String
+  userinfo : String?
+  host : Host
+  port : String?
+} derive(@debug.Debug)
+pub fn Authority::host(Self) -> Host
+pub fn Authority::port(Self) -> String?
+pub fn Authority::text(Self) -> String
+pub fn Authority::to_repr(Self) -> @debug.Repr
+pub fn Authority::userinfo(Self) -> String?
+
+pub enum Host {
+  RegisteredName(String)
+  Ipv4(String)
+  Ipv6(String)
+  IpvFuture(String)
+} derive(@debug.Debug)
+pub fn Host::to_repr(Self) -> @debug.Repr
+
+pub struct JsonPointer {
+  // private fields
+} derive(@debug.Debug)
+pub fn JsonPointer::from_tokens(Array[String], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn JsonPointer::parse(String, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn JsonPointer::resolve(Self, @json.Value, limits? : @json.Limits) -> Result[@json.Value, @json.Diagnostic]
+pub fn JsonPointer::to_repr(Self) -> @debug.Repr
+pub fn JsonPointer::to_string(Self) -> String
+pub fn JsonPointer::tokens(Self) -> Array[String]
+
+pub struct Location {
+  resource : UriReference?
+  pointer : JsonPointer
+  target : @json.Value
+} derive(@debug.Debug)
+pub fn Location::identity(Self) -> String
+pub fn Location::pointer(Self) -> JsonPointer
+pub fn Location::resource(Self) -> UriReference?
+pub fn Location::target(Self) -> @json.Value
+pub fn Location::to_repr(Self) -> @debug.Repr
+
+pub struct Reference {
+  uri : UriReference
+  fragment : ReferenceFragment
+} derive(@debug.Debug)
+pub fn Reference::fragment(Self) -> ReferenceFragment
+pub fn Reference::from_uri(UriReference, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Reference::local_pointer(Self) -> JsonPointer?
+pub fn Reference::parse(String, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Reference::resolve(Self, UriReference, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Reference::text(Self) -> String
+pub fn Reference::to_repr(Self) -> @debug.Repr
+pub fn Reference::uri(Self) -> UriReference
+
+pub enum ReferenceFragment {
+  WholeResource
+  PointerFragment(JsonPointer)
+  IdentifierFragment(String)
+} derive(@debug.Debug)
+pub fn ReferenceFragment::to_repr(Self) -> @debug.Repr
+
+pub struct ReferenceStep {
+  site : Location?
+  reference : Reference
+  resolved : UriReference?
+} derive(@debug.Debug)
+pub fn ReferenceStep::reference(Self) -> Reference
+pub fn ReferenceStep::resolved(Self) -> UriReference?
+pub fn ReferenceStep::site(Self) -> Location?
+pub fn ReferenceStep::to_repr(Self) -> @debug.Repr
+
+pub struct Resolution {
+  target : Location?
+  complete : Bool
+  // private fields
+} derive(@debug.Debug)
+pub fn Resolution::chain(Self) -> Array[ReferenceStep]
+pub fn Resolution::complete(Self) -> Bool
+pub fn Resolution::diagnostics(Self) -> Array[@json.Diagnostic]
+pub fn Resolution::target(Self) -> Location?
+pub fn Resolution::to_repr(Self) -> @debug.Repr
+
+pub struct Resource {
+  uri : UriReference
+  value : @json.Value
+  // private fields
+} derive(@debug.Debug)
+pub fn Resource::aliases(Self) -> Array[UriReference]
+pub fn Resource::new(UriReference, @json.Value, aliases? : Array[UriReference], schema_roots? : Array[JsonPointer], limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn Resource::schema_roots(Self) -> Array[JsonPointer]
+pub fn Resource::to_repr(Self) -> @debug.Repr
+pub fn Resource::uri(Self) -> UriReference
+pub fn Resource::value(Self) -> @json.Value
+
+pub struct ResourceSet {
+  root_base : UriReference?
+  // private fields
+} derive(@debug.Debug)
+pub fn ResourceSet::empty() -> Self
+pub fn ResourceSet::follow(Self, Reference, (Location) -> Reference?, base? : UriReference?, limits? : @json.Limits) -> Resolution
+pub fn ResourceSet::get(Self, UriReference) -> Resource?
+pub fn ResourceSet::new(Array[Resource], root_base? : UriReference?, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn ResourceSet::resolve(Self, Reference, base? : UriReference?, limits? : @json.Limits) -> Resolution
+pub fn ResourceSet::resources(Self) -> Array[Resource]
+pub fn ResourceSet::root_base(Self) -> UriReference?
+pub fn ResourceSet::to_repr(Self) -> @debug.Repr
+
+pub struct SchemaIndex {
+  // private fields
+} derive(@debug.Debug)
+pub fn SchemaIndex::complete(Self) -> Bool
+pub fn SchemaIndex::diagnostics(Self) -> Array[@json.Diagnostic]
+pub fn SchemaIndex::indexed_scope(Self, String) -> UriReference??
+pub fn SchemaIndex::locate(Self, UriReference?, JsonPointer, limits? : @json.Limits) -> Result[Location, @json.Diagnostic]
+pub fn SchemaIndex::new(ResourceSet, input? : @json.Value?, input_base? : UriReference?, input_roots? : Array[JsonPointer], limits? : @json.Limits) -> Self
+pub fn SchemaIndex::resolve(Self, Reference, base? : UriReference?, limits? : @json.Limits) -> Resolution
+pub fn SchemaIndex::resources(Self) -> ResourceSet
+pub fn SchemaIndex::scope(Self, Location) -> UriReference?
+pub fn SchemaIndex::to_repr(Self) -> @debug.Repr
+
+pub struct UriReference {
+  raw : String
+  scheme : String?
+  authority : Authority?
+  path : String
+  query : String?
+  fragment : String?
+} derive(@debug.Debug)
+pub fn UriReference::authority(Self) -> Authority?
+pub fn UriReference::fragment(Self) -> String?
+pub fn UriReference::identity(Self) -> String
+pub fn UriReference::is_absolute(Self) -> Bool
+pub fn UriReference::parse(String, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn UriReference::path(Self) -> String
+pub fn UriReference::query(Self) -> String?
+pub fn UriReference::resolve(Self, Self, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
+pub fn UriReference::scheme(Self) -> String?
+pub fn UriReference::text(Self) -> String
+pub fn UriReference::to_repr(Self) -> @debug.Repr
+pub fn UriReference::without_fragment(Self) -> Self
+
+// Type aliases
+
+// Traits

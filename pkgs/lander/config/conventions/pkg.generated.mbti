@@ -1,0 +1,75 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander/config/conventions"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander/config",
+}
+
+// Values
+pub fn add(@config.ConfigBuilder, Conventions, options? : DiscoveryOptions) -> @config.ConfigBuilder
+
+pub fn app_dirs(String, prefix? : String, display? : String) -> Conventions
+
+pub fn app_home(Conventions) -> Conventions
+
+pub fn base(String, prefix? : String, display? : String) -> Conventions
+
+pub fn boundary(Conventions, String) -> Conventions
+
+pub fn check_environment_name(String, source~ : String) -> Unit raise @config.ConfigError
+
+pub fn environment_name(Conventions, options? : DiscoveryOptions, Map[String, String]) -> String? raise @config.ConfigError
+
+pub fn environments(Conventions, default? : String) -> Conventions
+
+pub fn layouts(Conventions) -> Conventions
+
+pub fn legacy(Conventions, String, format~ : @config.Format, decode~ : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError) -> Conventions
+
+pub fn local_overrides(Conventions) -> Conventions
+
+pub fn system_dir(Conventions) -> Conventions
+
+pub fn user_config_dir(Conventions) -> Conventions
+
+pub fn user_overrides(Conventions) -> Conventions
+
+pub fn without(Conventions, Part) -> Conventions
+
+// Errors
+
+// Types and methods
+pub struct Conventions {
+  // private fields
+}
+pub fn Conventions::display(Self) -> String
+pub fn Conventions::name(Self) -> String
+pub fn Conventions::prefix(Self) -> String
+
+pub(all) struct DiscoveryOptions {
+  environment : String?
+  config : @config.SourceSelection[String]
+  isolated : Bool
+  project : String?
+} derive(Eq, @debug.Debug)
+pub fn DiscoveryOptions::equal(Self, Self) -> Bool
+pub fn DiscoveryOptions::new(environment? : String, config? : @config.SourceSelection[String], isolated? : Bool, project? : String) -> Self
+pub fn DiscoveryOptions::not_equal(Self, Self) -> Bool
+pub fn DiscoveryOptions::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Part {
+  SystemDir
+  UserConfigDir
+  AppHome
+  Layouts
+  LocalOverrides
+  UserOverrides
+} derive(Eq, @debug.Debug)
+pub fn Part::equal(Self, Self) -> Bool
+pub fn Part::not_equal(Self, Self) -> Bool
+pub fn Part::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

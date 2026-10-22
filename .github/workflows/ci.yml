@@ -111,6 +111,18 @@ jobs:
         run: mise run check:formats
       - name: Verify the packaged candidate through a registry consumer
         run: mise run check:formats-registry
+      - name: Verify frozen OpenRPC specification assets
+        run: mise run check:openrpc-assets
+      - name: Verify the isolated OpenRPC source consumer
+        run: mise run check:openrpc
+      - name: Verify generated OpenRPC Unicode data
+        run: mise run check:openrpc-unicode
+      - name: Verify generated OpenRPC artifact metaschemas
+        run: mise run check:openrpc-artifacts
+      - name: Qualify OpenRPC against the frozen corpus
+        run: mise run qualify:openrpc
+      - name: Verify the packaged OpenRPC candidate through a registry consumer
+        run: mise run check:openrpc-registry
       - name: Test task scripts
         run: mise run test:scripts
 

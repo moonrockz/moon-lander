@@ -1,0 +1,201 @@
+///|
+/// Verify frozen OpenRPC qualification assets without network access.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+fn manifest_entries(text : String) -> Result[Array[(String, String)], String] {
+  let entries = []
+  let seen : Map[String, Bool] = Map([])
+  for line in text.split("\n") {
+    if line.is_empty() {
+      continue
+    }
+    guard line.length() > 66 && line[64:66] == "  " else {
+      return Err("Malformed SHA256SUMS entry")
+    }
+    let digest = line[:64].to_owned()
+    for c in digest {
+      guard (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') else {
+        return Err("SHA256SUMS requires lowercase SHA-256")
+      }
+    }
+    let name = line[66:].to_owned()
+    guard name != "SHA256SUMS" && name != "." && name != ".." else {
+      return Err("Invalid asset filename: \{name}")
+    }
+    for c in name {
+      guard (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9') ||
+        c == '-' ||
+        c == '_' ||
+        c == '.' else {
+        return Err("Invalid asset filename: \{name}")
+      }
+    }
+    guard !seen.contains(name) else { return Err("Duplicate asset: \{name}") }
+    seen[name] = true
+    entries.push((digest, name))
+  }
+  guard !entries.is_empty() else { return Err("Empty SHA256SUMS") }
+  Ok(entries)
+}
+
+///|
+fn digest_matches(bytes : Bytes, expected : String) -> Bool {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes)) == expected
+}
+
+///|
+let required_assets : Array[String] = [
+  "openrpc-1.3.2-spec.md", "open-rpc-meta-schema.json", "json-schema-meta.json",
+  "json-schema-meta-alias.json", "openrpc-1.4-schema.json", "openrpc-1.4-spec-template.md",
+  "draft-07-schema.json", "LICENSE-openrpc.md", "LICENSE-json-schema-tools.md", "LICENSE-draft-07.txt",
+  "DerivedCoreProperties-10.0.0.txt", "LICENSE-unicode.txt",
+]
+
+///|
+async fn verify_assets(directory : String) -> Int32 {
+  let manifest = @fs.read_file("\{directory}/SHA256SUMS").text()
+  let entries = match manifest_entries(manifest) {
+    Ok(entries) => entries
+    Err(message) => fail(message)
+  }
+  guard entries.length() == required_assets.length() &&
+    required_assets.all(name => entries.any(entry => entry.1 == name)) else {
+    fail("SHA256SUMS must list every required OpenRPC asset exactly once")
+  }
+  for (expected, name) in entries {
+    let path = "\{directory}/\{name}"
+    guard @fs.exists(path) else { fail("Missing asset: \{name}") }
+    guard digest_matches(@fs.read_file(path).binary(), expected) else {
+      fail("SHA-256 mismatch: \{name}")
+    }
+  }
+  entries.length()
+}
+
+///|
+async fn verify_failure_status(directory : String) -> Unit {
+  let script = @fs.realpath("scripts/check-openrpc-assets.mbtx")
+  let temporary = @fs.tmpdir(prefix="openrpc-assets-failure")
+  defer @fs.rmdir(temporary, recursive=true)
+  for name in required_assets + ["SHA256SUMS"] {
+    @fs.write_file(
+      "\{temporary}/\{name}",
+      @fs.read_file("\{directory}/\{name}"),
+    )
+  }
+  let asset = "\{temporary}/openrpc-1.4-schema.json"
+  let original = @fs.read_file(asset)
+  @fs.write_file(asset, "[" + original.text()[1:].to_owned())
+  let (code, out, err) = @process.collect_output("moonx", [
+    script, "--assets", temporary,
+  ])
+  guard code != 0 &&
+    (out.text() + err.text()).contains(
+      "SHA-256 mismatch: openrpc-1.4-schema.json",
+    ) else {
+    fail("Corrupted asset did not produce its expected nonzero failure")
+  }
+  @fs.write_file(asset, original)
+  @fs.remove(asset)
+  let (code, out, err) = @process.collect_output("moonx", [
+    script, "--assets", temporary,
+  ])
+  guard code != 0 &&
+    (out.text() + err.text()).contains("Missing asset: openrpc-1.4-schema.json") else {
+    fail("Missing asset did not produce its expected nonzero failure")
+  }
+  @fs.write_file(asset, original)
+  @fs.write_file("\{temporary}/SHA256SUMS", "malformed\n")
+  let (code, out, err) = @process.collect_output("moonx", [
+    script, "--assets", temporary,
+  ])
+  guard code != 0 &&
+    (out.text() + err.text()).contains("Malformed SHA256SUMS entry") else {
+    fail("Malformed manifest did not produce its expected nonzero failure")
+  }
+  println("Corrupt, missing, and malformed inputs each exit nonzero")
+}
+
+///|
+async fn run(args : Array[String]) -> Unit {
+  let mut directory = "tests/tck/openrpc"
+  let mut verify_failures = false
+  let mut i = 0
+  while i < args.length() {
+    match args[i] {
+      "--assets" => {
+        guard i + 1 < args.length() else {
+          fail("--assets requires a directory")
+        }
+        directory = args[i + 1]
+        i += 2
+      }
+      "--verify-failures" => {
+        verify_failures = true
+        i += 1
+      }
+      arg => fail("Unknown argument: \{arg}")
+    }
+  }
+  let count = verify_assets(directory)
+  if verify_failures {
+    verify_failure_status(directory)
+  }
+  println("Verified \{count} frozen OpenRPC assets")
+}
+
+///|
+async fn main {
+  run(@env.args()[1:].to_owned()) catch {
+    error => {
+      eprintln(error.to_string())
+      @sys.exit(1)
+    }
+  }
+}
+
+///|
+test "manifest records exact digest and filename" {
+  let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  assert_eq(
+    manifest_entries(digest + "  schema.json\n"),
+    Ok([(digest, "schema.json")]),
+  )
+}
+
+///|
+test "manifest rejects empty malformed duplicate and escaping entries" {
+  let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  for
+    text in [
+      "",
+      "\n",
+      "abc  schema.json\n",
+      digest + " schema.json\n",
+      digest + "  ../schema.json\n",
+      digest + "  /schema.json\n",
+      digest + "  schema.json\n" + digest + "  schema.json\n",
+      digest + "  path/schema.json\n",
+      digest + "  SHA256SUMS\n",
+      digest.to_upper() + "  schema.json\n",
+    ] {
+    assert_true(manifest_entries(text) is Err(_), msg=text)
+  }
+}
+
+///|
+test "digest check rejects a one byte corruption" {
+  let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  assert_true(digest_matches(b"abc", digest))
+  assert_false(digest_matches(b"abd", digest))
+}

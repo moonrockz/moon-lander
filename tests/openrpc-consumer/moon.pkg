@@ -1,0 +1,7 @@
+import {
+  "moonrockz/openrpc",
+  "moonrockz/openrpc/schema",
+  "moonrockz/openrpc/json" @exact,
+}
+
+pkgtype(kind: "executable")

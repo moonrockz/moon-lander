@@ -186,6 +186,66 @@ run = "moonx scripts/check-formats-registry.mbtx --published"
 description = "Run lint, validate, tests, task script tests and builds"
 run = "moonx scripts/check.mbtx"
 
+[tasks."check:openrpc-assets"]
+description = "Verify frozen OpenRPC source digests and deliberate failure status"
+run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
+
+[tasks."check:openrpc"]
+description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
+run = "moonx scripts/check-openrpc.mbtx"
+
+[tasks."release:plan"]
+description = "Decide whether a Release workflow run releases (CI)"
+run = "moonx scripts/release.mbtx plan"
+
+[tasks."release:credentials"]
+description = "Write mooncakes.io credentials from MOONCAKES_USER_TOKEN (CI only)"
+run = "moonx scripts/credentials.mbtx"
+
+[tasks."release:publish"]
+description = "Publish the public modules to mooncakes.io; already published versions count as done (CI only)"
+run = "moonx scripts/publish.mbtx"
+
+[tasks."release:notes"]
+description = "Print the CHANGELOG.md section of a version (args: X.Y.Z)"
+run = "moonx scripts/release.mbtx notes"
+
+[tasks."release:github"]
+description = "Create the GitHub release vX.Y.Z unless it exists (args: X.Y.Z NOTES_FILE; CI only)"
+run = "moonx scripts/release.mbtx github"
+
+[tasks."check:openrpc-registry"]
+description = "Verify the packaged OpenRPC candidate through an isolated loopback registry consumer"
+run = "moonx scripts/check-openrpc-registry.mbtx"
+
+[tasks."check:openrpc-published"]
+description = "Release gate: verify the published OpenRPC module outside the workspace (args: --checksum SHA-256)"
+run = "moonx scripts/check-openrpc-registry.mbtx --published"
+
+[tasks."qualify:openrpc"]
+description = "Qualify OpenRPC against the frozen corpus with independent Ajv and four targets"
+run = "moonx scripts/qualify-openrpc.mbtx"
+
+[tasks."qualify:openrpc-failures"]
+description = "Prove that wrong expectations, broken references, altered assets and missing files fail qualification"
+run = "moonx scripts/qualify-openrpc.mbtx --verify-failures"
+
+[tasks."build:openrpc-artifacts"]
+description = "Generate the pinned OpenRPC artifact metaschemas from frozen assets"
+run = "moonx scripts/generate-openrpc-artifacts.mbtx"
+
+[tasks."check:openrpc-artifacts"]
+description = "Reject stale OpenRPC artifact metaschemas and license without rewriting"
+run = "moonx scripts/generate-openrpc-artifacts.mbtx --check"
+
+[tasks."build:openrpc-unicode"]
+description = "Generate portable OpenRPC regex identifier tables from frozen Unicode data"
+run = "moonx scripts/generate-openrpc-unicode.mbtx"
+
+[tasks."check:openrpc-unicode"]
+description = "Reject stale OpenRPC Unicode tables and license without rewriting"
+run = "moonx scripts/generate-openrpc-unicode.mbtx --check"
+
 [tasks.clean]
 description = "Remove build artifacts"
 run = "moonx scripts/clean.mbtx"

@@ -1,0 +1,1 @@
+{"openrpc":"1.4.0","info":{"title":"API","version":"1"},"methods":[{"name":"a","params":[],"examples":[{"name":"p","params":[{"name":"e","externalValue":"https://x.test/a.json"}]}]}]}

@@ -70,6 +70,16 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
+| `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
+| `mise run check:openrpc` | Verify the OpenRPC library and isolated source consumer on all four targets |
+| `mise run check:openrpc-registry` | Package the OpenRPC candidate and verify it through a loopback registry consumer on all four targets |
+| `mise run check:openrpc-published` | Release gate: verify the published OpenRPC module from the public registry |
+| `mise run qualify:openrpc` | Compare the library with independent Ajv and the frozen corpus on all four targets |
+| `mise run qualify:openrpc-failures` | Prove that deliberate qualification failures exit nonzero (also run by `test:scripts`) |
+| `mise run build:openrpc-artifacts` | Generate the pinned OpenRPC artifact metaschemas from frozen assets |
+| `mise run check:openrpc-artifacts` | Reject stale artifact metaschemas and the associated OpenRPC license |
+| `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |
+| `mise run check:openrpc-unicode` | Reject stale identifier tables and the associated Unicode license |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/` |
@@ -89,7 +99,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.1.0`.
+- `moon.mod` holds the shared version, currently `0.2.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its `version()` export provides a build and test smoke check. Its
@@ -99,6 +109,11 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
   and shared traversal, with runnable usage guides for all four targets.
+- `pkgs/openrpc/` contains the [`moonrockz/openrpc`](pkgs/openrpc/README.mbt.md)
+  document library: typed OpenRPC 1.3.2/1.4.x and draft-07 models, exact JSON,
+  source-preserving reading and edits, explicit reference resolution, profiled
+  validation and canonical writing. Its release and the Smithy migration are
+  tracked in `add-standalone-openrpc`.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress
@@ -110,33 +125,28 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 The application model, command and service lifecycle, and CLI are proposed in
 `openspec/changes/` and are not implemented yet. The configuration file host
 adapters are implemented. No UI packages
-are included. CI has read-only permissions and no publishing or release workflow.
+are included. CI has read-only permissions. `.github/workflows/release.yml`
+publishes releases.
 
 ## Releases
 
-The `0.1.0` release moves `moonrockz/notebooks` here and adds MIME queries,
-runtime cell capability inspection, and Ion-backed metadata with JSON, YAML,
-TOML and Ion DIB inputs. See [the changelog](CHANGELOG.md) for API migration notes.
+The `0.2.0` release adds `moonrockz/openrpc`, a portable OpenRPC document
+library. The `0.1.0` release moved `moonrockz/notebooks` here and added MIME
+queries, runtime cell capability inspection, and Ion-backed metadata. See
+[the changelog](CHANGELOG.md) for details and API migration notes.
 
-Release versions are shared across workspace members. Only `pkgs/notebooks`
-is published to mooncakes.io; the framework name remains provisional. The
-workspace root and `tests` are not published. GitHub releases identify the
-corresponding source commit with a version tag.
+Release versions are shared across workspace members. `pkgs/notebooks` and
+`pkgs/openrpc` are published to mooncakes.io; the framework name remains
+provisional, and the workspace root, docs site and `tests` are not published.
+GitHub releases identify the source commit with a `vX.Y.Z` tag.
 
-After setting the version with `scripts/versions.mbtx`, run the full check
-and validate the package before publishing:
-
-```shell
-mise run format
-mise run check
-mise exec -- moon -C pkgs/notebooks publish --dry-run
-mise exec -- moon -C pkgs/notebooks publish
-```
-
-Publishing is manual and requires an explicit release request. No workflow
-publishes automatically. Before the first Moon-Lander GitHub release or candidate
-promotion, release gate `lander-4us.9` must be closed with successful
-`mise run check:formats-published` evidence for that candidate. See
-[the contributing guide](CONTRIBUTING.md).
+Releases run in GitHub Actions, never from a workstation. Prepare a release
+pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
+adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
+its checks on that pull request. Merging it to `main` is the owner's approval:
+the workflow then runs the full check, publishes the public modules with the
+`MOONCAKES_USER_TOKEN` organization secret, verifies the published OpenRPC
+archive from the public registry on all four targets, and creates the GitHub
+release. See [the contributing guide](CONTRIBUTING.md).
 
 License: Apache-2.0.

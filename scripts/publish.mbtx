@@ -1,0 +1,133 @@
+///|
+/// Publish the public modules to mooncakes.io (CI only), in dependency order.
+/// A version mooncakes.io already holds counts as published, so a re-run of
+/// the same release succeeds. Adapted from Smithy's release flow. Needs the
+/// credentials that `scripts/credentials.mbtx` writes.
+///
+/// Usage: `mise run release:publish`, or `moonx scripts/publish.mbtx`.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+/// Public modules, in dependency order. The framework module, the workspace
+/// root, the docs site and the test module are not published.
+let publish_list : Array[(String, String)] = [
+  ("pkgs/notebooks", "moonrockz/notebooks"),
+  ("pkgs/openrpc", "moonrockz/openrpc"),
+]
+
+///|
+let duplicated : String = "is duplicated with an existing version"
+
+///|
+priv enum Outcome {
+  Published
+  AlreadyPublished
+  Transient
+  Failed
+} derive(Eq, Debug)
+
+///|
+/// A refusal (401, 403) or conflict (409) is never retried.
+fn is_transient(exit_code : Int32, output : String) -> Bool {
+  if exit_code == 0 {
+    return false
+  }
+  let text = output.to_lower()
+  if ["401", "403", "409"].any(word => text.contains(word)) {
+    return false
+  }
+  [
+    "timed out", "timeout", "connection reset", "connection refused", "temporary failure",
+    "eof", "502", "503", "504", "rate limit",
+  ].any(word => text.contains(word))
+}
+
+///|
+fn classify(exit_code : Int32, output : String) -> Outcome {
+  if exit_code == 0 {
+    Published
+  } else if output.contains(duplicated) {
+    AlreadyPublished
+  } else if is_transient(exit_code, output) {
+    Transient
+  } else {
+    Failed
+  }
+}
+
+///|
+async fn output_in(
+  dir : String,
+  cmd : String,
+  args : Array[String],
+) -> (Int32, String) {
+  let (code, out, err) = @process.collect_output(cmd, args, cwd=dir) catch {
+    _ => return (1, "cannot start \{cmd}")
+  }
+  (code, out.text() + err.text())
+}
+
+///|
+/// Retry a transient failure after 5, 20 and 60 seconds.
+async fn with_retry(
+  label : String,
+  action : async () -> (Int32, String),
+) -> (Int32, String) {
+  let mut result = action()
+  for i, wait in [5000, 20000, 60000] {
+    if !is_transient(result.0, result.1) {
+      break
+    }
+    eprintln("↻ \{label}: attempt \{i + 2}/4")
+    @async.sleep(wait)
+    result = action()
+  }
+  result
+}
+
+///|
+async fn main {
+  let mut failed = 0
+  for entry in publish_list {
+    let (dir, name) = entry
+    let (update, update_out) = with_retry("update \{name}", () => {
+      output_in(dir, "moon", ["update"])
+    })
+    if update != 0 {
+      failed += 1
+      eprintln("❌ \{name}: moon update failed\n\{update_out}")
+      continue
+    }
+    let (code, out) = with_retry("publish \{name}", () => {
+      output_in(dir, "moon", ["publish"])
+    })
+    match classify(code, out) {
+      Published => println("✅ \{name}: published")
+      AlreadyPublished => println("✅ \{name}: already published")
+      Transient | Failed => {
+        failed += 1
+        eprintln("❌ \{name}: publish failed\n\{out}")
+      }
+    }
+  }
+  if failed > 0 {
+    eprintln("❌ \{failed} module(s) were not published")
+    @sys.exit(1)
+  }
+}
+
+///|
+test "publish outcomes distinguish duplicates, transient and refused failures" {
+  assert_eq(classify(0, ""), Published)
+  assert_eq(
+    classify(1, "version 0.2.0 is duplicated with an existing version"),
+    AlreadyPublished,
+  )
+  assert_eq(classify(1, "connection reset by peer"), Transient)
+  assert_eq(classify(1, "HTTP 403 timeout"), Failed)
+  assert_eq(classify(1, "invalid module"), Failed)
+}

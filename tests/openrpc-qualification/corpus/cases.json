@@ -1,0 +1,274 @@
+[
+  {
+    "id": "minimal-132",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "Smallest valid document"
+  },
+  {
+    "id": "full-132",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "Every object kind, reference site and extension location"
+  },
+  {
+    "id": "optional-before-required-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": true,
+    "note": "Discrepancy: prose forbids optional before required; artifact has no rule"
+  },
+  {
+    "id": "external-example-132",
+    "artifact": false,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": false,
+    "note": "Discrepancy: prose externalValue; artifact requires value"
+  },
+  {
+    "id": "reference-sibling-132",
+    "artifact": false,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": false,
+    "note": "Discrepancy: prose ignores reference siblings; artifact forbids them"
+  },
+  {
+    "id": "duplicate-methods-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Duplicate resolved method names fail both profiles"
+  },
+  {
+    "id": "duplicate-error-codes-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Exact integer equality: 1 and 1.0 collide"
+  },
+  {
+    "id": "missing-link-target-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Link names no method"
+  },
+  {
+    "id": "unresolved-reference-132",
+    "artifact": true,
+    "normative": "passed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Broken local reference fails the reference facet"
+  },
+  {
+    "id": "invalid-schema-pattern-132",
+    "artifact": true,
+    "normative": "passed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Regex syntax is a schema-document failure the artifact does not check"
+  },
+  {
+    "id": "component-key-grammar-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "1.3.2 prose key grammar; artifact [0-z]+ accepts a b"
+  },
+  {
+    "id": "unnamed-link-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "1.3.2 requires link names (no downgrade); 1.4 does not"
+  },
+  {
+    "id": "minimal-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "Smallest valid document"
+  },
+  {
+    "id": "full-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "Every object kind, reference site and extension location"
+  },
+  {
+    "id": "optional-before-required-14",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": true,
+    "note": "Discrepancy: prose forbids optional before required; artifact has no rule"
+  },
+  {
+    "id": "external-example-14",
+    "artifact": false,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "1.4 schema requires example name and value (no externalValue alternative); prose tables follow it"
+  },
+  {
+    "id": "reference-sibling-14",
+    "artifact": false,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": false,
+    "note": "Discrepancy: prose ignores reference siblings; artifact forbids them"
+  },
+  {
+    "id": "duplicate-methods-14",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Duplicate resolved method names fail both profiles"
+  },
+  {
+    "id": "duplicate-error-codes-14",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Exact integer equality: 1 and 1.0 collide"
+  },
+  {
+    "id": "missing-link-target-14",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Link names no method"
+  },
+  {
+    "id": "unresolved-reference-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Broken local reference fails the reference facet"
+  },
+  {
+    "id": "invalid-schema-pattern-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": false,
+    "compatibility": false,
+    "note": "Regex syntax is a schema-document failure the artifact does not check"
+  },
+  {
+    "id": "component-key-grammar-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.3.2 prose key grammar; artifact [0-z]+ accepts a b"
+  },
+  {
+    "id": "unnamed-link-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.3.2 requires link names (no downgrade); 1.4 does not"
+  },
+  {
+    "id": "server-name-omitted-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": true,
+    "note": "Discrepancy: 1.3.2 prose requires server name; artifact does not"
+  },
+  {
+    "id": "license-name-omitted-132",
+    "artifact": true,
+    "normative": "failed",
+    "specification": false,
+    "compatibility": true,
+    "note": "Discrepancy: 1.3.2 prose requires license name; artifact does not"
+  },
+  {
+    "id": "prose-summaries-132",
+    "artifact": false,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": false,
+    "note": "Tag and pairing summary are 1.3.2 prose fields omitted by the artifact"
+  },
+  {
+    "id": "prose-summaries-14",
+    "artifact": false,
+    "normative": "warnings",
+    "specification": true,
+    "compatibility": false,
+    "note": "1.4 tables omit tag summary: normative warning, artifact failure"
+  },
+  {
+    "id": "unnamed-server-license-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.4 requires neither name"
+  },
+  {
+    "id": "patch-version-14",
+    "artifact": true,
+    "normative": "passed",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.4.x patch line"
+  },
+  {
+    "id": "patch-leading-zero-14",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "Artifact pattern accepts 1.4.01; SemVer and the library reject it"
+  },
+  {
+    "id": "weak-link-name-14",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "1.4 artifact omits the link name type; the typed model requires a string"
+  },
+  {
+    "id": "pairing-objects-invalid-132",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "The artifact does not check the 1.3.2 examplePairingObjects spelling, so an invalid pairing passes Ajv but fails reading"
+  },
+  {
+    "id": "pairing-objects-14",
+    "artifact": true,
+    "normative": "warnings",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.4 tables use examplePairings; the 1.3.2 spelling is retained as an unknown field"
+  }
+]

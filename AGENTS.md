@@ -59,4 +59,6 @@ Do not add UI packages or a separate regolith module. One exception: the unpubli
 docs tool `apps/site` can use Rabbita. No other module can import it, and the
 published library stays UI-free. Consume `zig-cross` through
 `moonx`; do not vendor it. Ask before cutting a GitHub release or publishing to
-mooncakes.io. The initial setup intentionally has no publishing workflow.
+mooncakes.io. Releases run only through `.github/workflows/release.yml`, which
+publishes when an owner-approved version change merges to `main`; never publish
+from a workstation.

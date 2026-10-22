@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/openrpc/json",
+  "moonrockz/openrpc/domain",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonrockz/openrpc/reference",
+} for "test"

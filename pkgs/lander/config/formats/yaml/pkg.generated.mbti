@@ -1,0 +1,25 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander/config/formats/yaml"
+
+import {
+  "moonrockz/moon-lander/config",
+}
+
+// Values
+pub fn format(profile? : Profile) -> @config.Format
+
+pub fn parse(String, origin~ : String, profile? : Profile) -> @config.ConfigValue raise @config.ConfigError
+
+// Errors
+
+// Types and methods
+pub(all) enum Profile {
+  Default
+  Strict
+} derive(Eq)
+pub fn Profile::equal(Self, Self) -> Bool
+pub fn Profile::not_equal(Self, Self) -> Bool
+
+// Type aliases
+
+// Traits

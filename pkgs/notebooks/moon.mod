@@ -1,6 +1,6 @@
 name = "moonrockz/notebooks"
 
-version = "0.1.0"
+version = "0.2.0"
 
 import {
   "moonbit-community/toml@0.5.0",

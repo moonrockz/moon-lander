@@ -6,7 +6,8 @@
 /// `moonx scripts/site.mbtx test`.
 /// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
 /// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
-/// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step.
+/// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
+/// installs Chromium, and runs the browser smoke test against the built `_site/` (design D16).
 /// Run it from the workspace root.
 import {
   "moonbitlang/async@0.22.5",
@@ -79,7 +80,30 @@ enum Action {
   Run(String, Array[String])
   /// Check the gzip size of the file against the islands budget.
   GzipBudget(String)
+  /// Serve `_site/` on the port with `serve-site.mbtx --no-watch`, run the browser smoke test against
+  /// it, and stop the server.
+  BrowserTest(Int32)
 } derive(Eq, Debug)
+
+///|
+/// The port of the preview server during the browser smoke test (design D16).
+let browser_test_port : Int32 = 4174
+
+///|
+/// The browser smoke test, run by the pinned Node.
+let browser_test_script : String = "apps/site/scripts/browser-test.ts"
+
+///|
+/// The base path in the text of `site/site.json`.
+fn site_base(text : String) -> String raise Failure {
+  let json = @json.parse(text) catch {
+    error => raise Failure("site/site.json: not valid JSON: \{error}")
+  }
+  guard json is Object(fields) && fields.get("base_path") is Some(String(base)) else {
+    raise Failure("site/site.json: missing string field `base_path`")
+  }
+  base
+}
 
 ///|
 /// One step of a site task.
@@ -205,6 +229,12 @@ fn test_steps(
     run("test highlight", "node", [
       "--test", "apps/site/scripts/highlight.test.ts",
     ]),
+    // The Playwright CLI of the locked `playwright` package. It does nothing when the browser is
+    // already installed, for example from the CI cache.
+    run("install chromium", "node", [
+      "apps/site/node_modules/playwright/cli.js", "install", "chromium",
+    ]),
+    { name: "browser smoke test", action: BrowserTest(browser_test_port), },
   ]
 }
 
@@ -314,6 +344,55 @@ async fn run_step(step : Step) -> Int32 {
           eprintln("error: \{message}")
           1
         }
+      }
+    }
+    BrowserTest(port) => {
+      let base = site_base(@fs.read_file("site/site.json").text()) catch {
+        error => {
+          eprintln("❌ \{step.name}: \{error}")
+          return 1
+        }
+      }
+      let code = (@async.with_task_group() <| group => {
+        // The group stops the server when the test ends. `moonx` runs the script in its own
+        // process, so the server stops with it.
+        group.spawn_bg(no_wait=true, () => {
+          ignore(
+            @process.run(
+              "moonx",
+              [
+                "scripts/serve-site.mbtx",
+                "--no-watch",
+                "--port",
+                port.to_string(),
+              ],
+              stdout=@stdio.stdout,
+              stderr=@stdio.stderr,
+            ),
+          )
+        })
+        @process.run(
+          "node",
+          [browser_test_script],
+          extra_env={
+            "SITE_ORIGIN": "http://127.0.0.1:\{port}",
+            "SITE_BASE": base,
+          },
+          stdout=@stdio.stdout,
+          stderr=@stdio.stderr,
+        )
+      }) catch {
+        error => {
+          eprintln("❌ \{step.name}: \{error}")
+          return 1
+        }
+      }
+      if code > 0 {
+        code
+      } else if code < 0 {
+        1
+      } else {
+        0
       }
     }
   }
@@ -465,11 +544,11 @@ test "check runs the check executable on _site" {
 }
 
 ///|
-test "test runs the site package tests and the highlight test" {
+test "test runs the site package tests, the highlight test and the browser test" {
   let steps = test_steps([], ["moonrockz/moon-lander-site/model"])
   assert_eq(steps.map(step => step.name), [
     "install site dependencies", "test site packages (native)", "test site model (js)",
-    "test highlight",
+    "test highlight", "install chromium", "browser smoke test",
   ])
   assert_eq(
     steps[1].action,
@@ -477,6 +556,18 @@ test "test runs the site package tests and the highlight test" {
       "test", "--target", "native", "-p", "moonrockz/moon-lander-site/model",
     ]),
   )
+  assert_eq(steps[5].action, BrowserTest(4174))
+}
+
+///|
+test "the browser test gets the base path of site.json" {
+  assert_eq(site_base("{\"base_path\": \"/moon-lander/\"}"), "/moon-lander/")
+  let missing = try site_base("{}") catch {
+    Failure(message) => message
+  } noraise {
+    _ => "no failure"
+  }
+  assert_eq(missing, "site/site.json: missing string field `base_path`")
 }
 
 ///|

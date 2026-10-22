@@ -45,3 +45,37 @@ test "a link with a dot segment leaves the base path" {
   @expect.expect(@model.link_file("/b/", "/b/../README.md")).to_equal(None)
   @expect.expect(@model.link_file("/b/", "/b/docs/./x/")).to_equal(None)
 }
+
+///|
+test "a page title must have text" {
+  @expect.expect(@model.has_title("<head><title>A · B</title></head>")).to_equal(
+    true,
+  )
+  @expect.expect(@model.has_title("<title> \n </title>")).to_equal(false)
+  @expect.expect(@model.has_title("<title>A")).to_equal(false)
+  @expect.expect(@model.has_title("<h1>A</h1>")).to_equal(false)
+}
+
+///|
+test "a well-formed feed has balanced tags" {
+  let feed =
+    #|<?xml version="1.0" encoding="utf-8"?>
+    #|<feed xmlns="http://www.w3.org/2005/Atom"><title>T</title>
+    #|<link href="https://x.io/" rel="alternate"/><!-- note -->
+    #|<entry><title>A</title></entry></feed>
+  @expect.expect(@model.xml_problem(feed)).to_equal(None)
+}
+
+///|
+test "a feed with unbalanced tags names the first problem" {
+  @expect.expect(@model.xml_problem("<feed><entry></feed>")).to_equal(
+    Some("`</feed>` closes `<entry>`"),
+  )
+  @expect.expect(@model.xml_problem("<feed><entry></entry>")).to_equal(
+    Some("`<feed>` is not closed"),
+  )
+  @expect.expect(@model.xml_problem("</feed>")).to_equal(
+    Some("`</feed>` has no start tag"),
+  )
+  @expect.expect(@model.xml_problem("<feed")).to_equal(Some("`<` has no `>`"))
+}

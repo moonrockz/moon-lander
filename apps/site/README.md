@@ -72,6 +72,11 @@ mise run dev:site
 `dev:site` serves the site at `http://127.0.0.1:4173/moon-lander/` and builds it
 again after a source file changes.
 
+`check:site` checks the built `_site/`: internal links, page titles, the Atom feed,
+and that no file is below `docs/superpowers/`. `test:site` runs the tests of the
+site packages and then a Chromium smoke test (`apps/site/scripts/browser-test.ts`)
+against `_site/`, served on port 4174, so build the site first.
+
 The output is `_site/`. Each route is a directory with `index.html`, and each link
 starts with the `base_path` of `site/site.json`. The design is in
 `openspec/changes/add-docs-site/design.md`.

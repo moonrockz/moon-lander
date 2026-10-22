@@ -113,3 +113,53 @@ pub fn link_file(base_path : String, link : String) -> String? {
   }
   Some(if rel == "" || rel.has_suffix("/") { rel + "index.html" } else { rel })
 }
+
+///|
+/// Whether the page `html` has a `<title>` element with text that is not only white space.
+pub fn has_title(html : String) -> Bool {
+  guard html.find("<title>") is Some(start) else { return false }
+  let rest = html[start + "<title>".length():]
+  guard rest.find("</title>") is Some(end) else { return false }
+  rest[:end].trim() != ""
+}
+
+///|
+/// The first problem of the XML document `xml`, or `None` when its tags are balanced. Declarations,
+/// comments and empty-element tags do not open an element. This is the well-formed check of the
+/// Atom feed, not a full XML parser.
+pub fn xml_problem(xml : String) -> String? {
+  let stack : Array[String] = []
+  let mut rest = xml[:]
+  while rest.find("<") is Some(start) {
+    let tag = rest[start:]
+    guard tag.find(">") is Some(end) else { return Some("`<` has no `>`") }
+    let body = tag[1:end].to_owned()
+    rest = tag[end + 1:]
+    if body.has_prefix("?") || body.has_prefix("!") || body.has_suffix("/") {
+      continue
+    }
+    let name = match body.find(" ") {
+      Some(i) => body[:i].to_owned()
+      None => body
+    }
+    if name.has_prefix("/") {
+      let closing = name[1:].to_owned()
+      match stack.pop() {
+        Some(open) if open == closing => ()
+        Some(open) => return Some("`</\{closing}>` closes `<\{open}>`")
+        None => return Some("`</\{closing}>` has no start tag")
+      }
+    } else {
+      stack.push(name)
+    }
+  }
+  match stack.last() {
+    Some(open) => Some("`<\{open}>` is not closed")
+    None => None
+  }
+}
+
+///|
+/// The directory below the output directory that must stay empty: agent planning documents never go
+/// on the site (design D15).
+pub let forbidden_dir : String = "docs/superpowers/"

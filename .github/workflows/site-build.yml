@@ -32,6 +32,13 @@ jobs:
         run: mise run build:site -- --main
       - name: Check site
         run: mise run check:site
+      # test:site installs Chromium with the Playwright CLI of apps/site/bun.lock. The cache keeps the
+      # download, so the install does nothing on a hit. The runner image has the OS libraries of Chromium.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: site-playwright-${{ runner.os }}-${{ hashFiles('apps/site/bun.lock') }}
       - name: Test site
         run: mise run test:site
       - name: Upload Pages artifact

@@ -96,7 +96,7 @@ Depends on: `lander-bwk.8`, `lander-bwk.9`.
 Bead: `lander-bwk.11`
 Depends on: `lander-bwk.10`.
 
-- [ ] 10.1 Finish runnable public API docs, dependency/license audit, release notes and shared-version validation; pass deterministic `moon -C pkgs/openrpc package` and the loopback registry check without publishing, and add the GitHub Actions release workflow (credentials only in CI, so the authenticated publish runs there).
+- [x] 10.1 Finish runnable public API docs, dependency/license audit, release notes and shared-version validation; pass deterministic `moon -C pkgs/openrpc package` and the loopback registry check without publishing, and add the GitHub Actions release workflow (credentials only in CI, so the authenticated publish runs there).
 - [x] 10.2 Adapt the existing MoonBit isolated-registry consumer pattern and verify the packaged archive outside `moon.work` on all four targets, including dependency leak rejection.
 - [x] 10.3 Record candidate source SHA, exact version, archive SHA-256, graph and complete command results; prepare the concrete approval request and label loopback results as pre-publication evidence.
 

@@ -24,7 +24,7 @@ pub fn validate(Document, profile? : ValidationProfile, resources? : @reference.
 
 pub fn validate_closed(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, source_map? : @json.SourceMap?, limits? : @json.Limits) -> ClosedValidation
 
-pub fn write(Document, limits? : @json.Limits) -> Result[String, @json.Diagnostic]
+pub fn write(Document, format? : @json.Format, limits? : @json.Limits) -> Result[String, @json.Diagnostic]
 
 // Errors
 
@@ -477,5 +477,7 @@ pub using @domain {type ErrorCode}
 pub using @domain {type ExtensionName}
 
 pub using @domain {type Extensions}
+
+pub using @json {type Format}
 
 // Traits

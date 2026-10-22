@@ -12,7 +12,7 @@ pub fn parse(String, source_id? : String?, limits? : Limits) -> Result[CstDocume
 
 pub fn to_core_json(Value, limits? : Limits) -> Result[Json, Diagnostic]
 
-pub fn write(Value, limits? : Limits) -> Result[String, Diagnostic]
+pub fn write(Value, format? : Format, limits? : Limits) -> Result[String, Diagnostic]
 
 // Errors
 
@@ -77,6 +77,14 @@ pub fn Diagnostic::path(Self) -> Array[String]
 pub fn Diagnostic::related(Self) -> Array[Span]
 pub fn Diagnostic::span(Self) -> Span?
 pub fn Diagnostic::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Format {
+  Compact
+  Pretty
+} derive(Eq, @debug.Debug)
+pub fn Format::equal(Self, Self) -> Bool
+pub fn Format::not_equal(Self, Self) -> Bool
+pub fn Format::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Kind {
   Null

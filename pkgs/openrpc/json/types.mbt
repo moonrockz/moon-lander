@@ -1,4 +1,18 @@
 ///|
+/// Output layout. `Compact` is canonical; `Pretty` adds two-space indentation
+/// and changes nothing else.
+pub(all) enum Format {
+  Compact
+  Pretty
+} derive(Eq, Debug)
+
+///|
+pub extend Format with Eq::{equal, not_equal}
+
+///|
+pub extend Format with @debug.Debug::{to_repr}
+
+///|
 pub(all) enum Code {
   Syntax
   DuplicateKey

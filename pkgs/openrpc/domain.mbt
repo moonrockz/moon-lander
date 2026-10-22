@@ -5,3 +5,6 @@ pub using @domain {
   type ErrorCode,
   type Extensions,
 }
+
+///|
+pub using @exact {type Format}

@@ -73,6 +73,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
 | `mise run check:openrpc` | Verify the developing OpenRPC library and isolated source consumer on all four targets |
 | `mise run qualify:openrpc` | Compare the library with independent Ajv and the frozen corpus on all four targets |
+| `mise run qualify:openrpc-failures` | Prove that deliberate qualification failures exit nonzero (also run by `test:scripts`) |
 | `mise run build:openrpc-artifacts` | Generate the pinned OpenRPC artifact metaschemas from frozen assets |
 | `mise run check:openrpc-artifacts` | Reject stale artifact metaschemas and the associated OpenRPC license |
 | `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |

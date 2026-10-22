@@ -198,6 +198,10 @@ run = "moonx scripts/check-openrpc.mbtx"
 description = "Qualify OpenRPC against the frozen corpus with independent Ajv and four targets"
 run = "moonx scripts/qualify-openrpc.mbtx"
 
+[tasks."qualify:openrpc-failures"]
+description = "Prove that wrong expectations, broken references, altered assets and missing files fail qualification"
+run = "moonx scripts/qualify-openrpc.mbtx --verify-failures"
+
 [tasks."build:openrpc-artifacts"]
 description = "Generate the pinned OpenRPC artifact metaschemas from frozen assets"
 run = "moonx scripts/generate-openrpc-artifacts.mbtx"

@@ -332,12 +332,141 @@ async fn qualify(root : String, corpus : String, assets : String) -> Unit {
 }
 
 ///|
+/// Copy a directory's regular files.
+async fn copy_files(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if @fs.kind("\{source}/\{entry}") is Regular {
+      @fs.write_file(
+        "\{destination}/\{entry}",
+        @fs.read_file("\{source}/\{entry}"),
+      )
+    }
+  }
+}
+
+///|
+/// Rewrite one case's closed Specification expectation.
+async fn expect_closed(corpus : String, id : String) -> Unit {
+  let path = "\{corpus}/cases.json"
+  let cases = @json.parse(@fs.read_file(path).text()) catch {
+    _ => fail("Malformed cases.json")
+  }
+  guard cases is Array(items) else { fail("Malformed cases.json") }
+  let edited = items.map(item => {
+    guard item is Object(fields) &&
+      fields.get("id") is Some(String(name)) &&
+      name == id else {
+      return item
+    }
+    let copy = fields.copy()
+    copy["specification"] = Json::boolean(true)
+    Json::object(copy)
+  })
+  @fs.write_file(path, Json::array(edited).stringify())
+}
+
+///|
+/// Prove that wrong expectations, a broken reference, an altered frozen asset
+/// and a missing corpus file each make qualification exit nonzero. Only
+/// temporary copies change.
+async fn verify_failures(root : String) -> Unit {
+  let script = "\{root}/scripts/qualify-openrpc.mbtx"
+  let corpus = "\{root}/tests/openrpc-qualification/corpus"
+  let assets = "\{root}/tests/tck/openrpc"
+  let temporary = @fs.tmpdir(prefix="openrpc-qualification-failures")
+  defer @fs.rmdir(temporary, recursive=true)
+  let failures : Array[(String, String, async () -> (String, String))] = [
+    (
+      "invalid document",
+      "Case duplicate-methods-14 differs",
+      async fn() {
+        let copy = "\{temporary}/invalid-document"
+        copy_files(corpus, copy)
+        expect_closed(copy, "duplicate-methods-14")
+        (copy, assets)
+      },
+    ),
+    (
+      "invalid reference",
+      "Case unresolved-reference-14 differs",
+      async fn() {
+        let copy = "\{temporary}/invalid-reference"
+        copy_files(corpus, copy)
+        expect_closed(copy, "unresolved-reference-14")
+        (copy, assets)
+      },
+    ),
+    (
+      "digest mismatch",
+      "SHA-256 mismatch: open-rpc-meta-schema.json",
+      async fn() {
+        let copy = "\{temporary}/assets"
+        copy_files(assets, copy)
+        let schema = "\{copy}/open-rpc-meta-schema.json"
+        @fs.write_file(schema, @fs.read_file(schema).text() + " ")
+        (corpus, copy)
+      },
+    ),
+    (
+      "task failure",
+      "Missing corpus document",
+      async fn() {
+        let copy = "\{temporary}/missing-document"
+        copy_files(corpus, copy)
+        @fs.remove("\{copy}/minimal-14.json")
+        (copy, assets)
+      },
+    ),
+  ]
+  for failure in failures {
+    let (name, reason, prepare) = failure
+    let (case_corpus, case_assets) = prepare()
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, "--corpus", case_corpus, "--assets", case_assets],
+      cwd=root,
+    )
+    let text = out.text() + err.text()
+    guard code != 0 && text.contains(reason) else {
+      fail(
+        "Deliberate \{name} did not fail with \"\{reason}\" (exit \{code})\n\{text}",
+      )
+    }
+    println("\{name}: exit \{code}: \{reason}")
+  }
+  println("Deliberate qualification failures verified: \{failures.length()}")
+}
+
+///|
 async fn main {
   let root = @fs.realpath(".")
+  if @env.args().contains("--verify-failures") {
+    verify_failures(root)
+    return
+  }
   let corpus = @fs.realpath(
     option("--corpus", "tests/openrpc-qualification/corpus"),
   )
   let assets = @fs.realpath(option("--assets", "tests/tck/openrpc"))
   qualify(root, corpus, assets)
   println("OpenRPC qualification passed.")
+}
+
+///|
+async test "deliberate failures exit nonzero and leave the corpus unchanged" {
+  let root = @fs.realpath("..")
+  let manifest = "\{root}/tests/openrpc-qualification/corpus/cases.json"
+  let before = @fs.read_file(manifest).text()
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    ["\{root}/scripts/qualify-openrpc.mbtx", "--verify-failures"],
+    cwd=root,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  assert_true(
+    out.text().contains("Deliberate qualification failures verified: 4"),
+    msg=out.text(),
+  )
+  assert_eq(@fs.read_file(manifest).text(), before)
 }

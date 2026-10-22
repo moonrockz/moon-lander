@@ -220,9 +220,49 @@ pub fn api_anchors(api : ApiPackage) -> Array[String] {
 }
 
 ///|
+/// `text` with each `%XX` escape of an ASCII character decoded. CommonMark writes some characters of
+/// a link target as escapes, for example `[` as `%5B`. Other text, and an escape of a byte above 127,
+/// stays as it is.
+pub fn percent_decode(text : String) -> String {
+  let out = StringBuilder()
+  let mut i = 0
+  while i < text.length() {
+    let c = text.code_unit_at(i)
+    if c == '%' && i + 2 < text.length() {
+      match (hex_digit(text.code_unit_at(i + 1)), hex_digit(text.code_unit_at(i + 2))) {
+        (Some(high), Some(low)) if high < 8 => {
+          out.write_char(Int::unsafe_to_char(high * 16 + low))
+          i += 3
+          continue
+        }
+        _ => ()
+      }
+    }
+    out.write_char(Int::unsafe_to_char(c.to_int()))
+    i += 1
+  }
+  out.to_string()
+}
+
+///|
+fn hex_digit(c : UInt16) -> Int? {
+  let n = c.to_int()
+  if n >= '0'.to_int() && n <= '9'.to_int() {
+    Some(n - '0'.to_int())
+  } else if n >= 'a'.to_int() && n <= 'f'.to_int() {
+    Some(n - 'a'.to_int() + 10)
+  } else if n >= 'A'.to_int() && n <= 'F'.to_int() {
+    Some(n - 'A'.to_int() + 10)
+  } else {
+    None
+  }
+}
+
+///|
 /// The site link of the Markdown link target `api:<package path>[#<anchor>]`, or `Err` with the reason
 /// when the package has no API page or the page has no such anchor. `anchors` maps each package path
-/// on the site to the anchors of its page.
+/// on the site to the anchors of its page. The check uses the percent-decoded target, and the link
+/// keeps the anchor as the target writes it.
 pub fn api_prose_link(
   target : String,
   anchors~ : Map[String, Array[String]],
@@ -233,10 +273,12 @@ pub fn api_prose_link(
   } else {
     target
   }
-  let (package_path, anchor) = match rest.find("#") {
+  let (package_part, anchor_part) = match rest.find("#") {
     Some(i) => (rest[:i].to_owned(), rest[i + 1:].to_owned())
     None => (rest, "")
   }
+  let package_path = percent_decode(package_part)
+  let anchor = percent_decode(anchor_part)
   guard anchors.get(package_path) is Some(found) else {
     return Err("no API page for the package `\{package_path}`")
   }
@@ -244,7 +286,7 @@ pub fn api_prose_link(
     return Err("the API page of `\{package_path}` has no item or method `#\{anchor}`")
   }
   let page = base_path + api_route(package_path)[1:].to_owned()
-  Ok(if anchor == "" { page } else { "\{page}#\{anchor}" })
+  Ok(if anchor_part == "" { page } else { "\{page}#\{anchor_part}" })
 }
 
 ///|

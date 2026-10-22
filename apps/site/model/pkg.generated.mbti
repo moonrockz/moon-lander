@@ -48,6 +48,8 @@ pub fn package_route(String) -> String
 
 pub fn parse_signature(String) -> Result[Array[SignaturePart], String]
 
+pub fn percent_decode(String) -> String
+
 pub fn problem(String, String, line? : Int32) -> Problem
 
 pub fn result_url(String, SearchEntry) -> String

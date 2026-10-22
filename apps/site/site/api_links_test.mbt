@@ -48,6 +48,64 @@ test "Item link" {
 }
 
 ///|
+test "an api: link to a trait impl anchor with brackets resolves" {
+  let api : @site.ApiSite = {
+    ..notebooks_api,
+    modules: [
+      {
+        ..notebooks_api.modules[0],
+        packages: [
+          {
+            ..notebooks_api.modules[0].packages[0],
+            traits: [
+              {
+                entry: {
+                  name: "Validate",
+                  docstring: "",
+                  signature: "pub(open) trait Validate",
+                  loc: { path: "moonrockz/notebooks", file: "v.mbt", line: 1 },
+                },
+                methods: [],
+                impls: [
+                  {
+                    trait_name: "Validate",
+                    trait_path: "moonrockz/notebooks",
+                    self_type: "Map[String, T]",
+                    methods: [
+                      {
+                        name: "validate",
+                        docstring: "",
+                        signature: "fn validate(Self) -> Bool",
+                        loc: { path: "moonrockz/notebooks", file: "v.mbt", line: 2 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+  let prepared = @site.prepare(
+    { ..lander, api: ["pkgs/notebooks"] },
+    [
+      source(
+        "docs/a.md", "# A\n\n[x](api:moonrockz/notebooks#Validate.Map[String,T].validate)\n",
+      ),
+    ],
+    main_build=true,
+    api~,
+  )
+  assert_true(
+    page(prepared, "/docs/a/").html.contains(
+      "href=\"/moon-lander/api/moonrockz/notebooks/#Validate.Map%5BString,T%5D.validate\"",
+    ),
+  )
+}
+
+///|
 test "Unknown item" {
   let problems = try
     @site.prepare(

@@ -23,6 +23,8 @@ pub fn raw(String, class? : String) -> @html.Html
 
 pub async fn render(PageMeta, @html.Html) -> String
 
+pub let theme_script : String
+
 // Errors
 
 // Types and methods

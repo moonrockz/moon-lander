@@ -11,8 +11,6 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/gzip",
-  "moonbitlang/async@0.22.5/io",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/core/env",
@@ -238,17 +236,38 @@ fn islands_budget(file : String, size : Int32) -> Budget {
 }
 
 ///|
-/// The size of `data` after gzip compression.
-async fn gzip_size(data : Bytes) -> Int32 {
-  let (r, w) = @io.pipe()
-  @async.with_task_group() <| group => {
-    group.spawn_bg() <| () => {
-      defer w.close()
-      @gzip.Encoder(w)..write(data).end()
-    }
-    defer r.close()
-    r.read_all().binary().length()
+/// The script that prints the gzip size of a file, compressed with zlib as browsers receive it.
+/// `moonbitlang/async/gzip` writes larger output than zlib, so its size is not the size that a
+/// browser downloads.
+let gzip_size_script : String = "apps/site/scripts/gzip-size.ts"
+
+///|
+/// The size in bytes that `gzip_size_script` prints, or `None` when the text is not a size.
+fn parse_size(text : String) -> Int32? {
+  let digits = text.trim()
+  if digits == "" || digits.length() > 9 {
+    return None
   }
+  let mut size = 0
+  for c in digits {
+    guard c >= '0' && c <= '9' else { return None }
+    size = size * 10 + (c.to_int() - '0'.to_int())
+  }
+  Some(size)
+}
+
+///|
+/// The gzip size of `file`, from `gzip_size_script` below the workspace root `root`.
+async fn gzip_size(file : String, root~ : String = ".") -> Int32 {
+  let (code, out) = @process.collect_stdout("bun", [
+    "\{root}/\{gzip_size_script}",
+    file,
+  ])
+  let text = out.text()
+  guard code == 0 && parse_size(text) is Some(size) else {
+    fail("cannot measure the gzip size of \{file}")
+  }
+  size
 }
 
 ///|
@@ -276,7 +295,7 @@ async fn run_step(step : Step) -> Int32 {
       }
     }
     GzipBudget(file) => {
-      let size = gzip_size(@fs.read_file(file).binary()) catch {
+      let size = gzip_size(file) catch {
         error => {
           eprintln("❌ \{step.name}: \{error}")
           return 1
@@ -490,8 +509,21 @@ test "the islands budget warns above 25 KB and fails above 27 KB" {
 }
 
 ///|
+test "the gzip size script prints a size in bytes" {
+  assert_eq(parse_size("22573"), Some(22573))
+  assert_eq(parse_size(" 18\n"), Some(18))
+  assert_eq(parse_size(""), None)
+  assert_eq(parse_size("12 KB"), None)
+  assert_eq(parse_size("-1"), None)
+}
+
+///|
 async test "gzip size is the size of the compressed data" {
-  let size = gzip_size(Bytes::make(10000, b'a'))
+  // Script tests run in `scripts/`, one directory below the workspace root.
+  let file = "_build/site-gzip-size-test.txt"
+  @fs.write_file(file, String::make(10000, 'a'))
+  defer @fs.remove(file)
+  let size = gzip_size(file, root="..")
   assert_true(size > 18 && size < 1000, msg="size \{size}")
 }
 

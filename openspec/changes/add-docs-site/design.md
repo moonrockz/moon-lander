@@ -200,8 +200,10 @@ exit code:
 2. `moon build --target js --release islands` in `apps/site`.
 3. `bun build <islands.js> --minify --format esm --target browser --outdir _site/assets`.
    This replaces the model's `checkedBuild` helper (`scripts/build.ts:20-24`).
-4. The gzip size check of `_site/assets/islands.js` with `moonbitlang/async/gzip`
-   (D13).
+4. The gzip size check of `_site/assets/islands.js` (D13). The size comes from zlib at
+   its default level through Bun (`apps/site/scripts/gzip-size.ts`), as browsers
+   receive the file. `moonbitlang/async/gzip` writes about 50% more bytes than zlib,
+   so its size is not the download size.
 5. `moon doc` in each module directory of the `api` key of `site/site.json` (D21).
 6. `moon run --target native --release generate -- --root . --out _site [--main]`
    (`scripts/build.ts:33-36`). `generate` reads the `moon doc` output below
@@ -325,6 +327,13 @@ Call: the model budget, a 25 KB gzip target with a warning and a 27 KB failure
 (`scripts/build.ts:25-31`). The islands are the five of the model (search, theme,
 menu, copy, "On this page" marker) and the version switcher (D22). The switcher is
 small, so the model size is a fair start.
+
+Call: with Rabbita `0.16.5` (D3), a search island that uses the Rabbita command
+runtime puts the bundle at about 24.5 KB, near the target. So the search island
+draws its input and its result list with plain DOM calls, and keeps its logic
+(`search`, `result_url`, `move_selection`) in `model`, where all four targets test
+it. Its result links are plain anchors, so they navigate without a router. The theme
+control and the menu button stay Rabbita islands. The bundle is about 22.7 KB.
 
 ### D14. Links and the built-site check
 

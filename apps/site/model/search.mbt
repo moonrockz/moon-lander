@@ -115,3 +115,38 @@ pub fn search(
   scored.sort_by((a, b) => if a.0 != b.0 { b.0 - a.0 } else { a.1 - b.1 })
   scored.iter().take(limit).map(s => entries[s.1]).collect()
 }
+
+///|
+/// The entry of one row that the search island reads from `search-index.json`:
+/// `[route, title, section, summary, text, ...headings]`. A row with fewer than five fields gives
+/// `None`. The island reads the index with `JSON.parse`, not `@json`, to keep its bundle small
+/// (design D11), so it passes plain text fields.
+pub fn SearchEntry::from_fields(fields : Array[String]) -> SearchEntry? {
+  guard fields.length() >= 5 else { return None }
+  Some({
+    route: fields[0],
+    title: fields[1],
+    section: fields[2],
+    summary: fields[3],
+    text: fields[4],
+    headings: fields[5:].to_owned(),
+  })
+}
+
+///|
+/// The selected result after the key `key` in a list of `count` results, when `selected` is
+/// selected. `ArrowDown` and `ArrowUp` move the selection and stay in the list. Another key keeps it.
+pub fn move_selection(selected : Int, count : Int, key : String) -> Int {
+  match key {
+    "ArrowDown" => (selected + 1).min(count - 1).max(0)
+    "ArrowUp" => (selected - 1).max(0)
+    _ => selected
+  }
+}
+
+///|
+/// The URL of the result `entry` on a site with the base path `base`. The route starts with `/`, and
+/// can end with an anchor, for example `/api/moonrockz/notebooks/#CellKind`.
+pub fn result_url(base : String, entry : SearchEntry) -> String {
+  base + entry.route[1:].to_owned()
+}

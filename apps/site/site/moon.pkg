@@ -11,6 +11,7 @@ import {
   "moonrockz/moon-lander-site/content",
   "moonrockz/moon-lander-site/model",
   "moonbitlang/async",
+  "moonbitlang/async/fs",
   "moonbitlang/core/json",
   "moonrockz/expect",
 } for "test"

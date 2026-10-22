@@ -11,9 +11,21 @@ pub(all) struct PageMeta {
 }
 
 ///|
+/// Sets the stored theme before the first paint, so the page does not flash. It is in `<head>`
+/// before the stylesheet link.
+pub let theme_script : String = "try{var t=localStorage.getItem('site-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}"
+
+///|
 /// A block of reviewed HTML.
 pub fn raw(html : String, class~ : String = "prose") -> Html {
   @html.div(class~, attrs=@html.Attrs::build().inner_html(html), @html.nothing)
+}
+
+///|
+/// An empty mount element for a client island. `inner_html` keeps it free of the
+/// hydration comments that an empty child list would add.
+fn island(id : String) -> Html {
+  @html.div(id~, attrs=@html.Attrs::build().inner_html(""), @html.nothing)
 }
 
 ///|
@@ -37,7 +49,8 @@ fn nav_link(
 
 ///|
 /// The page frame: head, header, main content and footer. Every link starts with the base path, and
-/// the page works without JavaScript.
+/// the page works without JavaScript: the islands script only fills the empty mount elements of the
+/// search box, the theme control and the menu button.
 pub fn layout(meta : PageMeta, main : Html) -> Html {
   let config = meta.config
   let title = if meta.section == Home {
@@ -54,12 +67,21 @@ pub fn layout(meta : PageMeta, main : Html) -> Html {
         @html.meta(name="viewport", content="width=device-width, initial-scale=1"),
         @html.title(title),
         @html.meta(name="description", content=meta.description),
+        @html.script(
+          attrs=@html.Attrs::build().inner_html(theme_script),
+          @html.nothing,
+        ),
         @html.link(rel="stylesheet", href=config.href("/assets/site.css")),
         @html.link(
           rel="alternate",
           type_="application/atom+xml",
           href=config.href("/articles/atom.xml"),
           title="\{config.title} articles",
+        ),
+        @html.script(
+          src=config.href("/assets/islands.js"),
+          type_="module",
+          @html.nothing,
         ),
       ]),
       @html.body([
@@ -81,6 +103,9 @@ pub fn layout(meta : PageMeta, main : Html) -> Html {
             }) +
             [@html.a(href=config.repo_url, "GitHub")],
           ),
+          island("site-search"),
+          island("site-theme"),
+          island("site-nav"),
         ]),
         @html.main_(id="content", [main]),
         @html.footer(class="site-footer", [

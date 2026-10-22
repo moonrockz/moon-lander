@@ -41,6 +41,7 @@ bin_path = "bin"
 
 [tools."http:moonbit".platforms]
 linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-linux-aarch64.tar.gz" }
 macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-darwin-aarch64.tar.gz" }
 windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-windows-x86_64.zip", format = "zip" }
 

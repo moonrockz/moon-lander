@@ -60,3 +60,22 @@ test "pretty indentation counts toward the output limit" {
   assert_true(@json.write(value, limits~) is Ok(_))
   assert_true(@json.write(value, format=@json.Pretty, limits~) is Err(_))
 }
+
+///|
+test "raw unpaired surrogates are syntax errors, so everything read can be written" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  let low = String::from_array([(0xDC00).unsafe_to_char()])
+  for
+    source in [
+      "\"a" + lone + "\"", "{\"" + lone + "\":1}", "[\"" + low + "x\"]", "\"" + lone + "\"",
+    ] {
+    guard @json.parse(source) is Err(d) else { fail("accepted a lone surrogate") }
+    assert_eq(d.code(), @json.Syntax)
+    let span = d.span().unwrap()
+    assert_eq(span.end() - span.start(), 1)
+    let unit = source.code_unit_at(span.start()).to_int()
+    assert_true(unit >= 0xD800 && unit <= 0xDFFF)
+  }
+  let pair = "\"😀\""
+  assert_eq(@json.write(reread(pair)).unwrap(), pair)
+}

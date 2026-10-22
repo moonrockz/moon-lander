@@ -245,7 +245,24 @@ fn Parser::string_token(self : Parser) -> (String, Span) raise ReadError {
   while self.pos < self.source.length() {
     let c = self.source.code_unit_at(self.pos)
     self.pos += 1
-    if escaped {
+    if c >= 0xD800 && c <= 0xDFFF {
+      // Strings are Unicode text: a raw surrogate must be a complete pair.
+      let paired = c <= 0xDBFF &&
+        self.pos < self.source.length() &&
+        self.source.code_unit_at(self.pos) >= 0xDC00 &&
+        self.source.code_unit_at(self.pos) <= 0xDFFF
+      if !paired {
+        raise ReadError(
+          self.error(
+            Syntax,
+            "Unpaired UTF-16 surrogate in a JSON string",
+            start=Some(self.pos - 1),
+          ),
+        )
+      }
+      self.pos += 1
+      escaped = false
+    } else if escaped {
       escaped = false
     } else if c == 92 {
       escaped = true

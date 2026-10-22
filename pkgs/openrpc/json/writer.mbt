@@ -81,13 +81,18 @@ pub fn write(
       "String contains an unpaired UTF-16 surrogate and is not Unicode text",
     )
   }
+  // One shared line break per depth, built once and reused for every child.
+  let breaks : Array[WriteItem] = []
   let newline = (depth : Int) => {
-    let out = StringBuilder()
-    out.write_char('\n')
-    for _ in 0..<depth {
-      out.write_string("  ")
+    while breaks.length() <= depth {
+      let out = StringBuilder()
+      out.write_char('\n')
+      for _ in 0..<breaks.length() {
+        out.write_string("  ")
+      }
+      breaks.push(Text(out.to_string()))
     }
-    Text(out.to_string())
+    breaks[depth]
   }
   let out = StringBuilder()
   let stack = [WriteItem::Item(value, 0)]

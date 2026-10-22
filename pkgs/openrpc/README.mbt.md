@@ -106,8 +106,8 @@ test {
 with `CstDocument::node_at` or a source-map location's `node()`. The new value
 is written compactly into that value's span, every other code unit is kept,
 and the text is read again into a fresh CST, document and source map. Node
-handles belong to one source text; using one after an edit fails with
-`StaleNode`. Only existing values can be replaced; insertion, deletion and
+handles belong to one source text; using one after an edit that changed the
+text fails with `StaleNode`. Only existing values can be replaced; insertion, deletion and
 key renaming are not supported.
 
 ```mbt check

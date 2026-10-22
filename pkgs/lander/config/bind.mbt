@@ -3,11 +3,15 @@
 /// path, for example `ir` or `servers."eu.west"`. A section that no source sets
 /// decodes as `null`, so an `Option` target gives `None`. A decode failure
 /// raises `Decode` with the decode path, the decoder detail, and the sources to
-/// blame. Binding does not change the configuration.
+/// blame. A secret reference in the section raises `Decode`, and binding never
+/// resolves it. Binding does not change the configuration.
 pub fn[T : FromJson] bind(config : Config, key : String) -> T raise ConfigError {
   let path = KeyPath::parse(key)
   match config.get(path) {
-    Some(value) => decode(config, Some(path), section_json(config, Some(path), value))
+    Some(value) => {
+      config.check_no_secret(Some(path), value)
+      decode(config, Some(path), section_json(config, Some(path), value))
+    }
     None => decode(config, Some(path), Json::null())
   }
 }
@@ -21,7 +25,79 @@ pub fn[T : FromJson] Config::bind(self : Config, key : String) -> T raise Config
 ///|
 /// Decode the full configuration into a `T`. Decode paths start at the root.
 pub fn[T : FromJson] bind_root(config : Config) -> T raise ConfigError {
+  config.check_no_secret(None, config.root)
   decode(config, None, section_json(config, None, config.root))
+}
+
+///|
+/// The detail of a decode error at a secret reference.
+let secret_detail = "is a secret reference; bind it as SecretRef with bind_with"
+
+///|
+/// Raise `Decode` at the first secret reference in `value`, the section at
+/// `key`. `FromJson` reads a reference as an ordinary table, and binding can
+/// not tell which keys a type reads, so every reference in the section fails.
+/// The check never resolves the reference.
+fn Config::check_no_secret(
+  self : Config,
+  key : KeyPath?,
+  value : ConfigValue,
+) -> Unit raise ConfigError {
+  guard self.secret_syntax is Standard else { return }
+  guard secret_steps(value, self.secret_syntax) is Some(steps) else { return }
+  let path = decode_path_below(key, steps)
+  raise Decode(failure={
+    at: [{ path, blame: self.blame(path) }],
+    detail: secret_detail,
+  })
+}
+
+///|
+/// The steps from `value` to its first secret reference, in field and list
+/// order, or `None` when it holds none.
+fn secret_steps(
+  value : ConfigValue,
+  syntax : SecretSyntax,
+) -> Array[DecodeStep]? {
+  if is_secret_reference(value, syntax) {
+    return Some([])
+  }
+  match value.ion.kind() {
+    Struct(fields) =>
+      for field in fields {
+        guard field.name().text() is Some(name) else { continue }
+        if secret_steps({ ion: field.value() }, syntax) is Some(steps) {
+          return Some([Field(name), ..steps])
+        }
+      }
+    List(items) | Sexp(items) =>
+      for index, item in items {
+        if secret_steps({ ion: item }, syntax) is Some(steps) {
+          return Some([Index(index), ..steps])
+        }
+      }
+    _ => ()
+  }
+  None
+}
+
+///|
+/// The decode path of `steps` below the section at `key`: the leading field
+/// steps join the key path, and the steps from the first list index on are
+/// the suffix.
+fn decode_path_below(key : KeyPath?, steps : Array[DecodeStep]) -> DecodePath {
+  let names = match key {
+    Some(key) => key.names.copy()
+    None => []
+  }
+  let suffix : Array[DecodeStep] = []
+  for step in steps {
+    match step {
+      Field(name) if suffix.is_empty() => names.push(name)
+      _ => suffix.push(step)
+    }
+  }
+  { key: if names.is_empty() { None } else { Some({ names, }) }, suffix }
 }
 
 ///|
@@ -65,8 +141,9 @@ fn[T : FromJson] decode(
 /// rules, and the result decodes into a `T`: tables merge, a configured list
 /// or scalar replaces the default, and an absent section keeps the default.
 /// A `None` field of the default is not written, so a configured value fills
-/// it. A failure in a value that the default gave has the blame `Default`.
-/// The default does not change.
+/// it. A failure in a value that the default gave has the blame `Default`. A
+/// secret reference in the configured section raises `Decode` before the
+/// merge. The default does not change.
 pub fn[T : FromJson + ToJson] bind_or(
   config : Config,
   key : String,
@@ -77,7 +154,10 @@ pub fn[T : FromJson + ToJson] bind_or(
   // list default works too.
   let default_root = fields([("value", { ion: @ion.Ion::Ion(ToJson::to_json(default)) })])
   let merged = match config.get(path) {
-    Some(section) => merge(default_root, fields([("value", section)]))
+    Some(section) => {
+      config.check_no_secret(Some(path), section)
+      merge(default_root, fields([("value", section)]))
+    }
     None => default_root
   }
   let value = merged.field("value").unwrap_or({ ion: @ion.Ion::Ion(Json::null()) })

@@ -37,6 +37,65 @@ priv struct Target {
 } derive(FromJson)
 
 ///|
+priv struct Service {
+  url : String
+  token : String
+} derive(FromJson)
+
+///|
+priv struct ApiService {
+  api_token : String
+} derive(FromJson)
+
+///|
+priv struct PipelineRules {
+  target : String
+  validation : String
+} derive(FromJson)
+
+///|
+impl @config.Validate for PipelineRules with validate(self) {
+  let found = []
+  if self.target == "" {
+    found.push(@config.violation(["target"], "must not be empty"))
+  }
+  if !["strict", "lenient"].contains(self.validation) {
+    found.push(@config.violation(["validation"], "must be strict or lenient"))
+  }
+  found
+}
+
+///|
+/// The IR record with the rule that a split layout needs strict mode.
+priv struct IrRules {
+  layout : String
+  strict_mode : Bool
+} derive(FromJson)
+
+///|
+impl @config.Validate for IrRules with validate(self) {
+  if self.layout == "split" && !self.strict_mode {
+    [
+      @config.violation(
+        ["layout", "strict_mode"],
+        "split layout needs strict_mode = true",
+      ),
+    ]
+  } else {
+    []
+  }
+}
+
+///|
+/// A record with no validation rules.
+priv struct Telemetry {
+  endpoint : String
+} derive(FromJson)
+
+///|
+impl @config.Validate for Telemetry
+
+///|
 /// The files of one scenario, the loaded configuration, and the outcome of the
 /// last binding: a result text or an error.
 priv struct BindingWorld {
@@ -166,6 +225,36 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
     let mode = config |> @config.bind_or(key, ({ level: 1 } : Mode))
     mode.level.to_string()
   }))
+  setup.when1("the application binds {string} to the service record", (
+    key : String,
+  ) => self.run(config => {
+    let service : Service = config |> @config.bind(key)
+    "\{service.url} \{service.token}"
+  }))
+  setup.when1("the application binds {string} to the API record", (
+    key : String,
+  ) => self.run(config => {
+    let service : ApiService = config |> @config.bind(key)
+    service.api_token
+  }))
+  setup.when1("the application gets the options of {string} with pipeline rules", (
+    key : String,
+  ) => self.run(config => {
+    let options : @config.Options[PipelineRules] = @config.options(config, key)
+    options.value.target
+  }))
+  setup.when1("the application gets the options of {string} with IR rules", (
+    key : String,
+  ) => self.run(config => {
+    let options : @config.Options[IrRules] = @config.options(config, key)
+    "\{options.key} \{options.value.layout} \{options.value.strict_mode}"
+  }))
+  setup.when1("the application gets the options of {string} with no rules", (
+    key : String,
+  ) => self.run(config => {
+    let options : @config.Options[Telemetry] = @config.options(config, key)
+    options.value.endpoint
+  }))
   setup.then1("the result is {string}", (expected : String) => {
     @expect.expect(self.result).to_equal(Some(expected))
   })
@@ -184,6 +273,35 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
   })
   setup.then1("the error text is {string}", (expected : String) => {
     @expect.expect(self.message()).to_equal(expected)
+  })
+  setup.then1("binding fails with a validation error at {string}", (
+    paths : String,
+  ) => {
+    guard self.error is Some(Validation(failures~)) else {
+      fail("expected a validation error")
+    }
+    @expect.expect(
+      failures
+      .map(failure => failure.at.map(at => at.path.to_string()).join(" and "))
+      .join(", "),
+    ).to_equal(paths)
+  })
+  setup.then0("the application gets no options value", () => {
+    @expect.expect(self.result).to_equal(None)
+  })
+  setup.then1("the error text does not contain {string}", (text : String) => {
+    @expect.expect(self.message().contains(text)).to_be_false()
+  })
+  setup.then1("the system does not read {string}", (variable : String) => {
+    // The variable is in the run, so a resolved secret would reach the text.
+    guard self.vars.get(variable) is Some(secret) else {
+      fail("the scenario does not set \{variable}")
+    }
+    @expect.expect(self.result).to_equal(None)
+    @expect.expect(self.message().contains(secret)).to_be_false()
+  })
+  setup.then1("the error text is:", (expected : @moonspec.DocString) => {
+    @expect.expect(self.message()).to_equal(expected.content)
   })
   setup.then0("the error text has no backslash", () => {
     @expect.expect(self.message().contains("\\")).to_be_false()
@@ -331,6 +449,77 @@ let feature : String =
   #|  Scenario: Bad default value
   #|    When the application binds "mode" over a default that does not decode
   #|    Then the error text is "mode.level: Int::from_json: expected number (from the bind default)"
+  #|
+  #|  Scenario: Wrong type for a secret-like key
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      service.api_token = 42
+  #|      """
+  #|    When the application binds "service" to the API record
+  #|    Then binding fails with a decode error at "service.api_token"
+  #|    And the error text is "service.api_token: String::from_json: expected string (set in project /repo/morphir.toml)"
+  #|    And the error text does not contain "42"
+  #|
+  #|  Scenario: Secret reference into a text field
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      service.url = "https://example.org"
+  #|      service.token = { env = "SERVICE_TOKEN" }
+  #|      """
+  #|    And the environment variable "SERVICE_TOKEN" is "s3cret-value"
+  #|    When the application binds "service" to the service record
+  #|    Then binding fails with a decode error at "service.token"
+  #|    And the error text is "service.token: is a secret reference; bind it as SecretRef with bind_with (set in project /repo/morphir.toml)"
+  #|    And the system does not read "SERVICE_TOKEN"
+  #|
+  #|  Scenario: Two failures in one section
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      pipeline.target = ""
+  #|      pipeline.validation = "loose"
+  #|      """
+  #|    When the application gets the options of "pipeline" with pipeline rules
+  #|    Then binding fails with a validation error at "pipeline.target, pipeline.validation"
+  #|    And the error text is:
+  #|      """
+  #|      pipeline.target: must not be empty (set in project /repo/morphir.toml)
+  #|      pipeline.validation: must be strict or lenient (set in project /repo/morphir.toml)
+  #|      """
+  #|
+  #|  Scenario: Cross-field failure
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.layout = "split"
+  #|      """
+  #|    And the "user-override" file "/repo/morphir.user.toml":
+  #|      """toml
+  #|      ir.strict_mode = false
+  #|      """
+  #|    When the application gets the options of "ir" with IR rules
+  #|    Then binding fails with a validation error at "ir.layout and ir.strict_mode"
+  #|    And the error text is:
+  #|      """
+  #|      ir.layout: split layout needs strict_mode = true (set in project /repo/morphir.toml)
+  #|      ir.strict_mode: split layout needs strict_mode = true (set in user-override /repo/morphir.user.toml)
+  #|      """
+  #|    And the application gets no options value
+  #|
+  #|  Scenario: Type without rules
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      telemetry.endpoint = ""
+  #|      """
+  #|    When the application gets the options of "telemetry" with no rules
+  #|    Then the result is ""
+  #|
+  #|  Scenario: Options from a valid section
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.layout = "split"
+  #|      ir.strict_mode = true
+  #|      """
+  #|    When the application gets the options of "ir" with IR rules
+  #|    Then the result is "ir split true"
 
 ///|
 /// Run each scenario of `text` with a fresh world and fail on the first scenario

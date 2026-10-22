@@ -1,0 +1,116 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-site/site"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-site/content",
+  "moonrockz/moon-lander-site/model",
+}
+
+// Values
+pub fn atom_feed(@model.SiteConfig, Array[Page]) -> String
+
+pub async fn build(@model.SiteConfig, Array[SourceFile], main_build~ : Bool) -> Built
+
+pub fn build_grouped_nav(Array[@model.NavGroup], Array[NavEntry]) -> (Array[@model.NavItem], Array[String])
+
+pub fn build_nav(Array[NavEntry]) -> Array[@model.NavItem]
+
+pub fn classify(String, @model.SiteConfig) -> Kind
+
+pub fn glob_match(String, String) -> Bool
+
+pub fn needs_text(String, @model.SiteConfig) -> Bool
+
+pub fn normalize(String) -> String
+
+pub fn prepare(@model.SiteConfig, Array[SourceFile], main_build~ : Bool) -> Prepared raise @model.Invalid
+
+pub fn resolve(LinkContext, String, String) -> Resolution
+
+pub fn search_index(Array[Page]) -> String
+
+pub fn toc_entries(Array[@content.Heading]) -> Array[@model.TocEntry]
+
+// Errors
+
+// Types and methods
+pub(all) struct Built {
+  outputs : Array[Output]
+  warnings : Array[@model.Problem]
+}
+
+pub(all) enum Kind {
+  Doc(String)
+  Article(String)
+  Landing
+  Package(String)
+  PackagePart(String, String)
+  Forbidden
+  Other
+} derive(Eq, @debug.Debug)
+pub fn Kind::equal(Self, Self) -> Bool
+pub fn Kind::not_equal(Self, Self) -> Bool
+pub fn Kind::to_repr(Self) -> @debug.Repr
+
+pub(all) struct LinkContext {
+  config : @model.SiteConfig
+  routes : Map[String, String]
+  files : Map[String, Bool]
+  dirs : Map[String, Bool]
+  site_routes : Map[String, Bool]
+}
+pub fn LinkContext::new(@model.SiteConfig, Map[String, String], Array[String], Array[String]) -> Self
+
+pub(all) struct NavEntry {
+  route : String
+  source : String
+  title : String
+  order : Int
+  proposed : Bool
+}
+
+pub(all) enum Output {
+  Text(String, String)
+  Copy(String, String)
+}
+
+pub(all) struct Page {
+  source : String
+  route : String
+  kind : Kind
+  title : String
+  summary : String
+  date : String
+  authors : Array[String]
+  order : Int
+  full : Bool
+  html : String
+  ids : Array[String]
+  headings : Array[String]
+  toc : Array[@model.TocEntry]
+  text : String
+  proposed : Bool
+}
+
+pub(all) struct Prepared {
+  pages : Array[Page]
+  copies : Array[(String, String)]
+  warnings : Array[@model.Problem]
+}
+
+pub(all) struct Resolution {
+  url : String
+  anchor : (String, String)?
+  copy : (String, String)?
+  problem : String?
+}
+
+pub(all) struct SourceFile {
+  path : String
+  text : String?
+}
+
+// Type aliases
+
+// Traits

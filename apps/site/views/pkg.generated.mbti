@@ -1,0 +1,39 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-site/views"
+
+import {
+  "moonbit-community/rabbita/html",
+  "moonrockz/moon-lander-site/model",
+}
+
+// Values
+pub fn article_page(PageMeta, @model.ArticleSummary, String) -> @html.Html
+
+pub fn articles_index(PageMeta, Array[@model.ArticleSummary]) -> @html.Html
+
+pub fn docs_page(PageMeta, Array[@model.NavItem], String, String?, toc? : Array[@model.TocEntry], proposed? : Bool) -> @html.Html
+
+pub fn home_page(PageMeta, String, Array[@model.ArticleSummary]) -> @html.Html
+
+pub let latest_articles_marker : String
+
+pub fn layout(PageMeta, @html.Html) -> @html.Html
+
+pub fn raw(String, class? : String) -> @html.Html
+
+pub async fn render(PageMeta, @html.Html) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct PageMeta {
+  config : @model.SiteConfig
+  route : String
+  title : String
+  description : String
+  section : @model.Section
+}
+
+// Type aliases
+
+// Traits

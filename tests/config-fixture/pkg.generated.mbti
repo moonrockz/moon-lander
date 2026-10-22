@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/config-fixture"
+
+import {
+  "moonrockz/moon-lander/config",
+}
+
+// Values
+pub fn load() -> @config.Config raise @config.ConfigError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

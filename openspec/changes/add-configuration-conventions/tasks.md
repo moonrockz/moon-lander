@@ -86,11 +86,11 @@ Bead: lander-4us.3.8
 
 Bead: lander-4us.3.9
 
-- [ ] 9.1 Make discovery return `Need` with `FileRequest` values for a partial tree and `Done` for a complete one, pass `Need` out of `@config.load`, and verify the three "Pure discovery over the core load protocol" scenarios.
-- [ ] 9.2 Verify the "Native adapter reads files" scenario through the core `@config/host.load` in a temporary directory, and verify `mise run test:native-zig` passes.
-- [ ] 9.3 After the core `config/host` js story is done, verify the "js adapter reads files" scenario through the TypeScript adapter on the pinned Node.
-- [ ] 9.4 Run the tests of 9.2 and 9.3 on the windows-latest CI leg, and verify the "Windows report paths" scenario.
-- [ ] 9.5 Verify the "wasm uses injected tree" scenario on wasm and wasm-gc through `@config.load` with a complete tree.
+- [x] 9.1 Make discovery return `Need` with `FileRequest` values for a partial tree and `Done` for a complete one, pass `Need` out of `@config.load`, and verify the three "Pure discovery over the core load protocol" scenarios.
+- [x] 9.2 Verify the "Native adapter reads files" scenario through the core `@config/host.load` in a temporary directory, and verify `mise run test:native-zig` passes.
+- [x] 9.3 After the core `config/host` js story is done, verify the "js adapter reads files" scenario through the TypeScript adapter on the pinned Node.
+- [x] 9.4 Run the tests of 9.2 and 9.3 on the windows-latest CI leg, and verify the "Windows report paths" scenario.
+- [x] 9.5 Verify the "wasm uses injected tree" scenario on wasm and wasm-gc through `@config.load` with a complete tree.
 
 ## 10. Morphir preset acceptance fixture
 

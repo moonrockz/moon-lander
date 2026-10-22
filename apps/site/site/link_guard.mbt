@@ -5,7 +5,8 @@ let link_call : Array[Char] = "@html.a(".to_array()
 ///|
 /// The lines of the `@html.a(...)` calls in the MoonBit text `source` that do not pass
 /// `escape=true` as their own named argument. Text in strings and arguments of nested calls do not
-/// count.
+/// count. A link call nested in the arguments of another link call is checked too, and a call text
+/// in a string is not a call.
 ///
 /// Rabbita prevents the default action of each link click that it renders and sends the URL to the
 /// router of the app. The islands have no router, so a link without `escape=true` does nothing when a
@@ -13,9 +14,14 @@ let link_call : Array[Char] = "@html.a(".to_array()
 /// those pages.
 pub fn unescaped_links(source : String) -> Array[Int] {
   let chars = source.to_array()
+  let quoted_at = in_strings(chars)
   let lines = []
   let mut at = find_chars(chars, link_call, 0)
   while at >= 0 {
+    if quoted_at[at] {
+      at = find_chars(chars, link_call, at + 1)
+      continue
+    }
     let mut depth = 0
     let mut end = at + link_call.length() - 1
     let mut quoted = false
@@ -49,9 +55,34 @@ pub fn unescaped_links(source : String) -> Array[Int] {
     if !has_escape_true(own.to_string().to_array()) {
       lines.push(line_at(chars, at))
     }
-    at = find_chars(chars, link_call, end)
+    // Continue inside this call, so a nested link call is checked too.
+    at = find_chars(chars, link_call, at + 1)
   }
   lines
+}
+
+///|
+/// For each index of `chars`, whether it is inside a string literal, between its quotes.
+fn in_strings(chars : Array[Char]) -> Array[Bool] {
+  let inside = Array::make(chars.length(), false)
+  let mut quoted = false
+  let mut i = 0
+  while i < chars.length() {
+    let c = chars[i]
+    if quoted {
+      inside[i] = true
+      if c == '\\' && i + 1 < chars.length() {
+        inside[i + 1] = true
+        i += 1
+      } else if c == '"' {
+        quoted = false
+      }
+    } else if c == '"' {
+      quoted = true
+    }
+    i += 1
+  }
+  inside
 }
 
 ///|

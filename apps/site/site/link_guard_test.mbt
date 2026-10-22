@@ -36,6 +36,26 @@ test "only the own named argument of the link counts" {
 }
 
 ///|
+test "a link nested in an escaped link is checked too" {
+  assert_eq(
+    @site.unescaped_links(
+      "@html.a(\n  href=\"x\",\n  [@html.a(href=\"y\", \"C\")],\n  escape=true,\n)",
+    ),
+    [3],
+  )
+}
+
+///|
+test "call text in a string is not a call" {
+  assert_eq(
+    @site.unescaped_links(
+      "@html.a(href=\"x\", \"see @html.a(href)\", escape=true)",
+    ),
+    [],
+  )
+}
+
+///|
 /// The `file:line` of each link without `escape=true` in the `.mbt` files of `dir`, relative to the
 /// module directory, where `moon test` runs.
 async fn unescaped_in(dir : String) -> Array[String] {

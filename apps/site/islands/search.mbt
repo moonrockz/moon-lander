@@ -46,8 +46,9 @@ extern "js" fn open_page(url : String) -> Unit = "(url) => location.assign(url)"
 
 ///|
 /// Puts the search input and the empty result list in the mount element `id`. `on_input` gets the
-/// text after each change. `on_key` gets each key press and returns whether it used the key, which
-/// then has no default action.
+/// text after each change. `on_key` gets each key press in the input and returns whether it used the
+/// key, which then has no default action. A key press on a focused result link does not reach it, so
+/// Enter on that link opens that link.
 extern "js" fn mount_search(
   id : String,
   on_input : (String) -> Unit,
@@ -66,7 +67,7 @@ extern "js" fn mount_search(
   #|   list.className = "search-results";
   #|   list.hidden = true;
   #|   input.addEventListener("input", () => onInput(input.value));
-  #|   box.addEventListener("keydown", (e) => { if (onKey(e.key)) e.preventDefault(); });
+  #|   input.addEventListener("keydown", (e) => { if (onKey(e.key)) e.preventDefault(); });
   #|   box.append(input, list);
   #|   mount.replaceChildren(box);
   #| }

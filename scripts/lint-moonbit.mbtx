@@ -13,12 +13,17 @@
 /// `wasm`). A package that does not support that backend, such as a js-only package, gets no
 /// interface, so this check does not cover it.
 ///
-/// Usage: `mise run lint:moonbit`, or `moonx scripts/lint-moonbit.mbtx`.
+/// Both checks read the working tree. `--staged` makes lint check what a commit holds: it first fails
+/// when a MoonBit input differs from the index or is untracked, so the working tree equals the
+/// staged snapshot for every file the checks read. The pre-commit hook uses `--staged`.
+///
+/// Usage: `mise run lint:moonbit [-- --staged]`, or `moonx scripts/lint-moonbit.mbtx [--staged]`.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }
 
@@ -28,20 +33,31 @@ async fn moon(args : Array[String]) -> Int32 {
 }
 
 ///|
+/// The files that moon reads to format and check the workspace.
+let moonbit_inputs : Array[String] = [
+  "*.mbt", "*.mbt.md", "*.mbti", "*.mbtx", "*moon.pkg", "*moon.mod", "*moon.work",
+  "*moon.pkg.json", "*moon.mod.json",
+]
+
+///|
 /// The interface files that are untracked or differ from the index, in path order.
 async fn changed_interfaces() -> Array[String] {
+  changed_files(["*pkg.generated.mbti"])
+}
+
+///|
+/// The files that match `pathspecs` and are untracked or differ from the index, in path order.
+async fn changed_files(pathspecs : Array[String]) -> Array[String] {
   let paths = []
   for
     args in [
-      ["diff", "--name-only", "--", "*pkg.generated.mbti"],
-      [
-        "ls-files", "--others", "--exclude-standard", "--", "*pkg.generated.mbti",
-      ],
+      ["diff", "--name-only", "--", ..pathspecs],
+      ["ls-files", "--others", "--exclude-standard", "--", ..pathspecs],
     ] {
     let (code, out, err) = @process.collect_output("git", args)
     guard code == 0 else {
       println(err.text())
-      println("❌ git could not list the generated interfaces.")
+      println("❌ git could not list the changed files.")
       @sys.exit(if code > 0 { code } else { 1 })
     }
     for line in out.text().split("\n") {
@@ -57,6 +73,20 @@ async fn changed_interfaces() -> Array[String] {
 
 ///|
 async fn main {
+  let staged = @env.args()[1:].contains("--staged")
+  if staged {
+    println("🔍 Checking that the MoonBit inputs are staged...")
+    let unstaged = changed_files(moonbit_inputs)
+    if !unstaged.is_empty() {
+      for path in unstaged {
+        println("  \{path}")
+      }
+      println(
+        "❌ These MoonBit files are untracked or have changes that are not staged, so lint cannot check what the commit holds. Stage them, or set them aside, and commit again.",
+      )
+      @sys.exit(1)
+    }
+  }
   println("🔍 Checking MoonBit formatting...")
   let args = ["fmt", "--check", "."]
   for file in @fs.readdir("scripts", sort=true) {
@@ -163,4 +193,80 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   let (code, output) = lint()
   assert_true(code != 0, msg=output)
   assert_true(output.contains("lib/pkg.generated.mbti"), msg=output)
+}
+
+///|
+async test "staged mode fails when a MoonBit input differs from the index" {
+  let script = @fs.realpath("lint-moonbit.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-lint")
+  defer @fs.rmdir(dir, recursive=true)
+  async fn git(args : Array[String]) -> Unit {
+    let (code, out, err) = @process.collect_output(
+      "git",
+      ["-c", "user.name=lint", "-c", "user.email=lint@example.test", ..args],
+      cwd=dir,
+    )
+    assert_eq(code, 0, msg=out.text() + err.text())
+  }
+
+  async fn lint(args : Array[String]) -> (Int32, String) {
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, ..args],
+      cwd=dir,
+    )
+    (code, out.text() + err.text())
+  }
+
+  @fs.mkdir("\{dir}/scripts")
+  @fs.mkdir("\{dir}/lib")
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  @fs.write_file("\{dir}/lib/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/lib/lib.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  @fs.write_file("\{dir}/.gitignore", "_build/\n.mooncakes/\n")
+  git(["init", "-q"])
+  git(["add", "."])
+  git(["commit", "-q", "-m", "fixture"])
+  let (code, output) = lint([])
+  assert_true(code != 0, msg=output)
+  git(["add", "lib/pkg.generated.mbti"])
+  git(["commit", "-q", "-m", "interface"])
+  // Staged: one hunk. Unstaged: another hunk in the same file.
+  @fs.write_file(
+    "\{dir}/lib/lib.mbt",
+    "///|\npub fn answer() -> Int {\n  43\n}\n",
+  )
+  git(["add", "lib/lib.mbt"])
+  @fs.write_file(
+    "\{dir}/lib/lib.mbt",
+    "///|\npub fn answer() -> Int {\n  43\n}\n\n///|\npub fn other() -> Int {\n  7\n}\n",
+  )
+  let (code, output) = lint(["--staged"])
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("lib/lib.mbt"), msg=output)
+  assert_true(output.contains("not staged"), msg=output)
+  // Plain lint reads the working tree and does not reject unstaged sources.
+  let (_, output) = lint([])
+  assert_false(output.contains("not staged"), msg=output)
+  // With every MoonBit input staged, staged mode passes. Plain lint above also
+  // wrote the interface of the unstaged code, so restore it too.
+  git(["checkout", "--", "lib/lib.mbt", "lib/pkg.generated.mbti"])
+  let (code, output) = lint(["--staged"])
+  assert_eq(code, 0, msg=output)
+  // An untracked MoonBit file would be compiled but not committed.
+  @fs.write_file("\{dir}/lib/extra.mbt", "///|\nfn extra() -> Int {\n  1\n}\n")
+  let (code, output) = lint(["--staged"])
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("lib/extra.mbt"), msg=output)
+  @fs.remove("\{dir}/lib/extra.mbt")
+  // An unstaged change outside the MoonBit inputs does not block.
+  @fs.write_file("\{dir}/notes.txt", "draft\n")
+  let (code, output) = lint(["--staged"])
+  assert_eq(code, 0, msg=output)
 }

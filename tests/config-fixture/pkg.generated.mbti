@@ -6,6 +6,10 @@ import {
 }
 
 // Values
+pub fn builder() -> @config.ConfigBuilder raise @config.ConfigError
+
+pub fn files() -> Array[(String, String)]
+
 pub fn load() -> @config.Config raise @config.ConfigError
 
 // Errors

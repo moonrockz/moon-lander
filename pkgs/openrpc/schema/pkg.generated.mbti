@@ -13,11 +13,11 @@ pub fn check_pattern(String, limits? : @json.Limits) -> Result[Unit, PatternErro
 
 pub fn keyword_names() -> Array[String]
 
-pub fn validate(Schema, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+pub fn validate(Schema, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int32, max_edges? : Int32, max_findings? : Int32, max_comparison_work? : Int32, limits? : @json.Limits) -> Report
 
-pub fn validate_in(Schema, index~ : @reference.SchemaIndex, resource? : @reference.UriReference?, path? : Array[String], max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+pub fn validate_in(Schema, index~ : @reference.SchemaIndex, resource? : @reference.UriReference?, path? : Array[String], max_nodes? : Int32, max_edges? : Int32, max_findings? : Int32, max_comparison_work? : Int32, limits? : @json.Limits) -> Report
 
-pub fn validate_json(@json.Value, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int, max_edges? : Int, max_findings? : Int, max_comparison_work? : Int, limits? : @json.Limits) -> Report
+pub fn validate_json(@json.Value, root~ : @json.Value, path? : Array[String], base? : @reference.UriReference?, resources? : @reference.ResourceSet, max_nodes? : Int32, max_edges? : Int32, max_findings? : Int32, max_comparison_work? : Int32, limits? : @json.Limits) -> Report
 
 // Errors
 
@@ -99,11 +99,11 @@ pub fn NonNegativeInteger::to_repr(Self) -> @debug.Repr
 pub struct PatternError {
   code : @json.Code
   message : String
-  offset : Int
+  offset : Int32
 } derive(@debug.Debug)
 pub fn PatternError::code(Self) -> @json.Code
 pub fn PatternError::message(Self) -> String
-pub fn PatternError::offset(Self) -> Int
+pub fn PatternError::offset(Self) -> Int32
 pub fn PatternError::to_repr(Self) -> @debug.Repr
 
 pub struct PositiveNumber {

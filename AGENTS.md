@@ -50,7 +50,9 @@ Run `mise run check` after changes. It runs lint, workspace and version validati
 tests for `wasm`, `wasm-gc`, `js`, and `native`, task script tests, and builds.
 Run `mise run test:native-zig` when changing native toolchain integration.
 Install Lefthook with `mise run hooks:install`. Run `mise run format` before
-committing MoonBit changes. Use Conventional Commits without AI attribution.
+committing MoonBit changes. Commit the `pkg.generated.mbti` files that `mise run lint`
+writes; lint fails when one is new or changed and not staged. Use Conventional Commits
+without AI attribution.
 
 ## Publishing
 

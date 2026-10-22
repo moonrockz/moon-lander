@@ -66,7 +66,7 @@ pub(all) struct NavEntry {
   route : String
   source : String
   title : String
-  order : Int
+  order : Int32
   proposed : Bool
 }
 
@@ -83,7 +83,7 @@ pub(all) struct Page {
   summary : String
   date : String
   authors : Array[String]
-  order : Int
+  order : Int32
   full : Bool
   html : String
   ids : Array[String]

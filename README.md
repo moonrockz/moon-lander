@@ -63,7 +63,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run build -- js --release` | Build a selected target in release mode |
 | `mise run test -- native` | Test a selected target |
 | `mise run format` | Format the workspace |
-| `mise run lint` | Check YAML, MoonBit formatting, and compiler warnings |
+| `mise run lint` | Check YAML, MoonBit formatting, compiler warnings, and checked-in `pkg.generated.mbti` interfaces |
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |

@@ -2,6 +2,7 @@
 package "moonrockz/moon-lander/config"
 
 import {
+  "moonbitlang/core/bigint",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "moonrockz/ion/ion",
@@ -12,9 +13,11 @@ pub fn add(ConfigBuilder, ConfigSource) -> ConfigBuilder
 
 pub fn[T : @json.FromJson] bind(Config, String) -> T raise ConfigError
 
-pub fn[T : @json.FromJson + ToJson] bind_or(Config, String, T) -> T raise ConfigError
+pub fn[T : @json.FromJson + ToJson] bind_or(Config, String, T, unknown? : UnknownKeys) -> T raise ConfigError
 
 pub fn[T : @json.FromJson] bind_root(Config) -> T raise ConfigError
+
+pub fn[T : FromConfig] bind_with(Config, String) -> T raise ConfigError
 
 pub fn bool(Bool) -> ConfigValue
 
@@ -36,7 +39,7 @@ pub fn explain(Config, String) -> Array[(KeyPath, Array[Origin])] raise ConfigEr
 
 pub fn fields(Array[(String, ConfigValue)]) -> ConfigValue
 
-pub fn file(ConfigBuilder, String, role? : FileRole, name? : String, priority? : Int) -> ConfigBuilder
+pub fn file(ConfigBuilder, String, role? : FileRole, name? : String, priority? : Int32) -> ConfigBuilder
 
 pub fn float(Double) -> ConfigValue
 
@@ -46,9 +49,9 @@ pub fn get_json(Config, String) -> Json raise ConfigError
 
 pub fn get_text(Config, String) -> String raise ConfigError
 
-pub fn in_memory(ConfigValue, name? : String, priority? : Int) -> ConfigSource raise ConfigError
+pub fn in_memory(ConfigValue, name? : String, priority? : Int32) -> ConfigSource raise ConfigError
 
-pub fn in_memory_pairs(Array[(String, ConfigValue)], name? : String, priority? : Int) -> ConfigSource raise ConfigError
+pub fn in_memory_pairs(Array[(String, ConfigValue)], name? : String, priority? : Int32) -> ConfigSource raise ConfigError
 
 pub fn int(Int64) -> ConfigValue
 
@@ -57,6 +60,12 @@ pub fn list(Array[ConfigValue]) -> ConfigValue
 pub fn load(ConfigBuilder, FileTree) -> LoadStep[Config] raise ConfigError
 
 pub fn merge(ConfigValue, ConfigValue, policy? : MergePolicy, key_policies? : Array[(KeyPath, MergePolicy)], source? : String, secret_syntax? : SecretSyntax) -> ConfigValue raise ConfigError
+
+pub fn[T] named(Config, String, (Config, String) -> Options[T] raise ConfigError) -> NamedOptions[T] raise ConfigError
+
+pub fn nested(String, Array[Violation]) -> Array[Violation]
+
+pub fn[T : @json.FromJson + Validate] options(Config, String) -> Options[T] raise ConfigError
 
 pub fn overrides(ConfigBuilder, Array[(String, ConfigValue)]) -> ConfigBuilder raise ConfigError
 
@@ -78,12 +87,16 @@ pub fn show(Config, ShowFormat) -> String raise ConfigError
 
 pub fn string(String) -> ConfigValue
 
+pub fn[T : Validate] validated(T, Config, String, name? : String) -> Options[T] raise ConfigError
+
+pub fn violation(Array[String], String) -> Violation
+
 pub fn working_dir(ConfigBuilder, String) -> ConfigBuilder
 
 // Errors
 pub(all) suberror ConfigError {
-  Parse(format~ : String, origin~ : String, message~ : String, line~ : Int?, column~ : Int?)
-  UnsupportedYaml(origin~ : String, feature~ : String, line~ : Int, column~ : Int)
+  Parse(format~ : String, origin~ : String, message~ : String, line~ : Int32?, column~ : Int32?)
+  UnsupportedYaml(origin~ : String, feature~ : String, line~ : Int32, column~ : Int32)
   InvalidRoot(origin~ : String, found~ : String)
   DuplicateKey(origin~ : String, key~ : KeyPath)
   FileNotFound(path~ : String)
@@ -91,11 +104,11 @@ pub(all) suberror ConfigError {
   Ambiguous(display~ : String, location~ : String, candidates~ : Array[String])
   InvalidKeyPath(text~ : String, reason~ : String)
   InvalidEnvKey(variable~ : String)
-  MergeKey(key~ : KeyPath, index~ : Int, source~ : String)
+  MergeKey(key~ : KeyPath, index~ : Int32, source~ : String)
   InvalidSecret(key~ : KeyPath, origin~ : String, reason~ : String)
   KeyNotFound(key~ : KeyPath)
   Render(format~ : String, key~ : KeyPath, reason~ : String)
-  SourceOrder(source~ : String, priority~ : Int, previous~ : String, previous_priority~ : Int)
+  SourceOrder(source~ : String, priority~ : Int32, previous~ : String, previous_priority~ : Int32)
   OutsideBoundary(start~ : String, boundary~ : String)
   InvalidEnvironmentName(name~ : String, reason~ : String)
   UnknownProject(selector~ : String, workspace~ : String)
@@ -144,7 +157,7 @@ pub struct Config {
   // private fields
 }
 pub fn[T : @json.FromJson] Config::bind(Self, String) -> T raise ConfigError
-pub fn[T : @json.FromJson + ToJson] Config::bind_or(Self, String, T) -> T raise ConfigError
+pub fn[T : @json.FromJson + ToJson] Config::bind_or(Self, String, T, unknown? : UnknownKeys) -> T raise ConfigError
 pub fn Config::get(Self, KeyPath) -> ConfigValue?
 pub fn Config::origins(Self, KeyPath) -> Array[Origin]
 pub fn Config::provenance(Self) -> Array[(KeyPath, Array[Origin])]
@@ -161,21 +174,34 @@ pub fn ConfigBuilder::given_env_vars(Self) -> Map[String, String]?
 pub fn ConfigBuilder::given_platform(Self) -> Platform?
 pub fn ConfigBuilder::given_working_dir(Self) -> String?
 
+pub struct ConfigNode {
+  // private fields
+}
+pub fn ConfigNode::blame(Self) -> Blame
+pub fn ConfigNode::child(Self, String) -> Self
+pub fn ConfigNode::children(Self) -> Array[(String, Self)]
+pub fn[T] ConfigNode::fail(Self, String) -> T raise ConfigError
+pub fn[T : FromConfig] ConfigNode::get(Self, String) -> T raise ConfigError
+pub fn ConfigNode::items(Self) -> Array[Self]
+pub fn[T : @json.FromJson] ConfigNode::json(Self) -> T raise ConfigError
+pub fn ConfigNode::path(Self) -> DecodePath
+pub fn ConfigNode::value(Self) -> ConfigValue?
+
 pub struct ConfigSource {
   // private fields
 }
-pub fn ConfigSource::candidates(Array[String], display~ : String, role? : FileRole, name? : String, priority? : Int) -> Self
-pub fn ConfigSource::defaults(Json, name? : String, priority? : Int) -> Self raise ConfigError
-pub fn ConfigSource::defaults_value(ConfigValue, name? : String, priority? : Int) -> Self raise ConfigError
-pub fn ConfigSource::env(prefix~ : String, reserved? : Array[String], selection? : SourceSelection[Map[String, String]], name? : String, priority? : Int) -> Self
+pub fn ConfigSource::candidates(Array[String], display~ : String, role? : FileRole, name? : String, priority? : Int32) -> Self
+pub fn ConfigSource::defaults(Json, name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::defaults_value(ConfigValue, name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::env(prefix~ : String, reserved? : Array[String], selection? : SourceSelection[Map[String, String]], name? : String, priority? : Int32) -> Self
 pub fn ConfigSource::exclude(Self, Array[KeyPath], warn~ : Bool) -> Self
-pub fn ConfigSource::file(String, role? : FileRole, name? : String, priority? : Int) -> Self
+pub fn ConfigSource::file(String, role? : FileRole, name? : String, priority? : Int32) -> Self
 pub fn ConfigSource::kind(Self) -> SourceKind
 pub fn ConfigSource::name(Self) -> String
-pub fn ConfigSource::overrides(Array[(String, ConfigValue)], name? : String, priority? : Int) -> Self raise ConfigError
-pub fn ConfigSource::overrides_value(ConfigValue, name? : String, priority? : Int) -> Self raise ConfigError
-pub fn ConfigSource::parsed_file(String, ConfigValue, role? : FileRole, name? : String, priority? : Int) -> Self raise ConfigError
-pub fn ConfigSource::skipped(SourceKind, name? : String, priority? : Int) -> Self
+pub fn ConfigSource::overrides(Array[(String, ConfigValue)], name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::overrides_value(ConfigValue, name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::parsed_file(String, ConfigValue, role? : FileRole, name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::skipped(SourceKind, name? : String, priority? : Int32) -> Self
 pub fn ConfigSource::with_key_policy(Self, KeyPath, MergePolicy) -> Self
 pub fn ConfigSource::with_policy(Self, MergePolicy) -> Self
 
@@ -212,7 +238,7 @@ pub impl Show for DecodePath
 
 pub(all) enum DecodeStep {
   Field(String)
-  Index(Int)
+  Index(Int32)
 } derive(Eq, @debug.Debug)
 pub fn DecodeStep::equal(Self, Self) -> Bool
 pub fn DecodeStep::not_equal(Self, Self) -> Bool
@@ -251,7 +277,7 @@ pub(all) enum FileRequest {
   ReadFile(String)
 } derive(Eq, Hash, @debug.Debug)
 pub fn FileRequest::equal(Self, Self) -> Bool
-pub fn FileRequest::hash(Self) -> Int
+pub fn FileRequest::hash(Self) -> Int32
 pub fn FileRequest::hash_combine(Self, Hasher) -> Unit
 pub fn FileRequest::not_equal(Self, Self) -> Bool
 pub fn FileRequest::to_repr(Self) -> @debug.Repr
@@ -294,7 +320,7 @@ pub struct KeyPath {
 } derive(Eq, Hash, @debug.Debug)
 pub fn KeyPath::equal(Self, Self) -> Bool
 pub fn KeyPath::from_names(Array[String]) -> Self raise ConfigError
-pub fn KeyPath::hash(Self) -> Int
+pub fn KeyPath::hash(Self) -> Int32
 pub fn KeyPath::hash_combine(Self, Hasher) -> Unit
 pub fn KeyPath::names(Self) -> Array[String]
 pub fn KeyPath::not_equal(Self, Self) -> Bool
@@ -349,10 +375,22 @@ pub fn MergePolicy::to_repr(Self) -> @debug.Repr
 pub fn MergePolicy::to_string(Self) -> String
 pub impl Show for MergePolicy
 
+pub struct NamedOptions[T] {
+  // private fields
+}
+pub fn[T] NamedOptions::get(Self[T], String) -> Options[T]?
+pub fn[T] NamedOptions::names(Self[T]) -> Array[String]
+
+pub struct Options[T] {
+  value : T
+  key : KeyPath
+  name : String?
+}
+
 pub(all) struct Origin {
   kind : SourceKind
   source : String
-  priority : Int
+  priority : Int32
   location : String?
 } derive(Eq, @debug.Debug)
 pub fn Origin::equal(Self, Self) -> Bool
@@ -383,8 +421,10 @@ pub(all) enum SecretRef {
   Keyring(service~ : String, account~ : String)
 } derive(Eq, @debug.Debug)
 pub fn SecretRef::equal(Self, Self) -> Bool
+pub fn SecretRef::from_config(ConfigNode) -> Self raise ConfigError
 pub fn SecretRef::not_equal(Self, Self) -> Bool
 pub fn SecretRef::to_repr(Self) -> @debug.Repr
+pub impl FromConfig for SecretRef
 
 pub(all) enum SecretSyntax {
   Standard
@@ -425,7 +465,7 @@ pub(all) struct SourceProvider {
 pub(all) struct SourceReport {
   kind : SourceKind
   name : String
-  priority : Int
+  priority : Int32
   path : String?
   candidates : Array[String]
   status : SourceStatus
@@ -453,9 +493,59 @@ pub fn SourceStatus::equal(Self, Self) -> Bool
 pub fn SourceStatus::not_equal(Self, Self) -> Bool
 pub fn SourceStatus::to_repr(Self) -> @debug.Repr
 
+pub struct Sourced[T] {
+  value : T
+  blame : Blame
+} derive(Eq, @debug.Debug)
+pub fn[T : Eq] Sourced::equal(Self[T], Self[T]) -> Bool
+pub fn[T : FromConfig] Sourced::from_config(ConfigNode) -> Self[T] raise ConfigError
+pub fn[T : Eq] Sourced::not_equal(Self[T], Self[T]) -> Bool
+pub fn[T : @debug.Debug] Sourced::to_repr(Self[T]) -> @debug.Repr
+pub impl[T : FromConfig] FromConfig for Sourced[T]
+
+pub(all) enum UnknownKeys {
+  Allow
+  Reject
+  RejectExcept(Array[String])
+} derive(Eq, @debug.Debug)
+pub fn UnknownKeys::equal(Self, Self) -> Bool
+pub fn UnknownKeys::not_equal(Self, Self) -> Bool
+pub fn UnknownKeys::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Violation {
+  at : Array[Array[DecodeStep]]
+  detail : String
+} derive(Eq, @debug.Debug)
+pub fn Violation::equal(Self, Self) -> Bool
+pub fn Violation::not_equal(Self, Self) -> Bool
+pub fn Violation::to_repr(Self) -> @debug.Repr
+
 // Type aliases
 
 // Traits
+pub(open) trait FromConfig {
+  fn from_config(ConfigNode) -> Self raise ConfigError
+}
+pub impl FromConfig for Bool
+pub impl FromConfig for Int32
+pub impl FromConfig for Int64
+pub impl FromConfig for UInt64
+pub impl FromConfig for Double
+pub impl FromConfig for String
+pub impl[T : FromConfig] FromConfig for T?
+pub impl FromConfig for @bigint.BigInt
+pub impl[T : FromConfig] FromConfig for Array[T]
+pub impl[T : FromConfig] FromConfig for Map[String, T]
+pub impl FromConfig for @ion.Decimal
+pub impl FromConfig for @ion.Timestamp
+
 pub(open) trait SecretResolver {
   fn resolve(Self, SecretRef, Origin) -> Secret raise SecretError
 }
+
+pub(open) trait Validate {
+  fn validate(Self) -> Array[Violation] = _
+}
+pub impl[T : Validate] Validate for T?
+pub impl[T : Validate] Validate for Array[T]
+pub impl[T : Validate] Validate for Map[String, T]

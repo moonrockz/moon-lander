@@ -9,7 +9,7 @@ import {
 // Values
 pub fn analyse_html(String) -> Document
 
-pub fn check_moonbit_fences(String, String, first_line? : Int) -> Array[@model.Problem]
+pub fn check_moonbit_fences(String, String, first_line? : Int32) -> Array[@model.Problem]
 
 pub fn escape(String) -> String
 
@@ -58,14 +58,14 @@ pub fn FieldValue::to_repr(Self) -> @debug.Repr
 pub(all) struct FrontMatter {
   fields : Map[String, FieldValue]
   body : String
-  body_line : Int
+  body_line : Int32
 }
 pub fn FrontMatter::flag(Self, String) -> Bool
 pub fn FrontMatter::list(Self, String) -> Array[String]
 pub fn FrontMatter::text(Self, String) -> String?
 
 pub(all) struct Heading {
-  level : Int
+  level : Int32
   id : String
   text : String
 } derive(Eq, @debug.Debug)

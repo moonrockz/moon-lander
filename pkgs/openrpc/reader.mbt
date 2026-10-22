@@ -288,3 +288,18 @@ pub fn read(
     Err(d) => { cst: None, document: None, diagnostics: [d], }
   }
 }
+
+///|
+/// Replace one existing value in a parsed document and read the result again.
+/// Diagnostics use the new source map; node handles from `cst` become stale.
+pub fn replace_value(
+  cst : @exact.CstDocument,
+  node : @exact.NodeId,
+  value : @exact.Value,
+  limits? : @exact.Limits,
+) -> Result[ReadResult, @exact.Diagnostic] {
+  match cst.replace_value(node, value, limits?) {
+    Ok(edited) => Ok(lower(edited))
+    Err(d) => Err(d)
+  }
+}

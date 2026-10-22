@@ -36,6 +36,7 @@ pub(all) enum Code {
   UnknownMethod
   UnknownField
   InvalidValue
+  StaleNode
 } derive(Eq, Debug)
 
 ///|

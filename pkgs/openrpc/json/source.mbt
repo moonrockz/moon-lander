@@ -128,6 +128,7 @@ pub struct Location {
   node_index : Int32
   value_span : Span
   key_span : Span?
+  priv node : NodeId
 } derive(Debug)
 
 ///|
@@ -139,6 +140,12 @@ pub fn Location::source_id(self : Location) -> String? {
 /// Index into the owning CST only. It is not stable across parses or edits.
 pub fn Location::node_index(self : Location) -> Int32 {
   self.node_index
+}
+
+///|
+/// The node as a handle that `CstDocument::replace_value` accepts.
+pub fn Location::node(self : Location) -> NodeId {
+  self.node
 }
 
 ///|
@@ -223,6 +230,7 @@ pub fn SourceMap::locations(
       node_index: index,
       value_span: node.span,
       key_span: node.key_span,
+      node: { index, source: self.cst.source },
     }
   })
 }

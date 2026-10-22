@@ -40,6 +40,7 @@ pub(all) enum Code {
   UnknownMethod
   UnknownField
   InvalidValue
+  StaleNode
 } derive(Eq, @debug.Debug)
 pub fn Code::equal(Self, Self) -> Bool
 pub fn Code::not_equal(Self, Self) -> Bool
@@ -53,8 +54,11 @@ pub struct CstDocument {
 } derive(@debug.Debug)
 pub fn CstDocument::limits(Self) -> Limits
 pub fn CstDocument::lower(Self) -> Result[Value, Array[Diagnostic]]
+pub fn CstDocument::node_at(Self, Array[String]) -> NodeId?
+pub fn CstDocument::node_id(Self, Int) -> NodeId?
 pub fn CstDocument::nodes(Self) -> Array[Node]
 pub fn CstDocument::path(Self, Int) -> Array[String]?
+pub fn CstDocument::replace_value(Self, NodeId, Value, limits? : Limits) -> Result[Self, Diagnostic]
 pub fn CstDocument::reproduce(Self) -> String
 pub fn CstDocument::slice(Self, Span) -> String?
 pub fn CstDocument::source_id(Self) -> String?
@@ -117,8 +121,10 @@ pub struct Location {
   node_index : Int
   value_span : Span
   key_span : Span?
+  // private fields
 } derive(@debug.Debug)
 pub fn Location::key_span(Self) -> Span?
+pub fn Location::node(Self) -> NodeId
 pub fn Location::node_index(Self) -> Int
 pub fn Location::source_id(Self) -> String?
 pub fn Location::to_repr(Self) -> @debug.Repr
@@ -140,6 +146,13 @@ pub fn Node::key_span(Self) -> Span?
 pub fn Node::kind(Self) -> NodeKind
 pub fn Node::span(Self) -> Span
 pub fn Node::to_repr(Self) -> @debug.Repr
+
+pub struct NodeId {
+  // private fields
+}
+pub fn NodeId::index(Self) -> Int
+pub fn NodeId::to_repr(Self) -> @debug.Repr
+pub impl @debug.Debug for NodeId
 
 pub(all) enum NodeKind {
   Scalar

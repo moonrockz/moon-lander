@@ -20,6 +20,8 @@ pub fn object_kinds() -> Array[ObjectKind]
 
 pub fn read(String, source_id? : String?, limits? : @json.Limits) -> ReadResult
 
+pub fn replace_value(@json.CstDocument, @json.NodeId, @json.Value, limits? : @json.Limits) -> Result[ReadResult, @json.Diagnostic]
+
 pub fn validate(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, source_map? : @json.SourceMap?, limits? : @json.Limits) -> ValidationReport
 
 pub fn validate_closed(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, source_map? : @json.SourceMap?, limits? : @json.Limits) -> ClosedValidation

@@ -56,3 +56,52 @@ test "line and column positions use one based UTF16 and CRLF" {
   let cst = @json.parse("0").unwrap()
   assert_true(cst.slice(@json.Span::new(0, 2).unwrap()) is None)
 }
+
+///|
+test "replacing a value preserves every other code unit" {
+  let source = " \r\n{\"b\" :  [1, 2],\r\n \"a\": {\"x\": true} }\t"
+  let cst = @json.parse(source, source_id=Some("doc.json")).unwrap()
+  let node = cst.node_at(["b", "1"]).unwrap()
+  let value = @json.parse("{\"z\":[null]}").unwrap().lower().unwrap()
+  let edited = cst.replace_value(node, value).unwrap()
+  assert_eq(
+    edited.reproduce(),
+    " \r\n{\"b\" :  [1, {\"z\":[null]}],\r\n \"a\": {\"x\": true} }\t",
+  )
+  assert_eq(edited.source_id(), Some("doc.json"))
+  assert_eq(edited.source_map().locations(["b", "1", "z"]).length(), 1)
+  let root = edited.replace_value(edited.node_at([]).unwrap(), value).unwrap()
+  assert_eq(root.reproduce(), " \r\n{\"z\":[null]}\t")
+}
+
+///|
+test "stale and foreign node identities are rejected" {
+  let cst = @json.parse("{\"a\":1,\"b\":2}").unwrap()
+  let node = cst.node_at(["a"]).unwrap()
+  let edited = cst.replace_value(node, @json.Value::boolean(true)).unwrap()
+  guard edited.replace_value(node, @json.Value::null()) is Err(d) else {
+    fail("stale node accepted")
+  }
+  assert_eq(d.code(), @json.StaleNode)
+  let other = @json.parse("{\"a\":1,\"b\":3}").unwrap()
+  assert_true(
+    other.replace_value(cst.node_at(["b"]).unwrap(), @json.Value::null())
+    is Err(_),
+  )
+  // A separate parse of identical text is the same document.
+  let same = @json.parse("{\"a\":1,\"b\":2}").unwrap()
+  assert_true(same.replace_value(node, @json.Value::null()) is Ok(_))
+  assert_eq(node.index(), cst.source_map().locations(["a"])[0].node().index())
+}
+
+///|
+test "replacements that exceed limits leave the original unchanged" {
+  let source = "{\"a\":1}"
+  let cst = @json.parse(source, limits=@json.Limits::new(max_source=12)).unwrap()
+  let long = @json.Value::string("0123456789")
+  guard cst.replace_value(cst.node_at(["a"]).unwrap(), long) is Err(d) else {
+    fail("oversized replacement accepted")
+  }
+  assert_eq(d.code(), @json.LimitExceeded)
+  assert_eq(cst.reproduce(), source)
+}

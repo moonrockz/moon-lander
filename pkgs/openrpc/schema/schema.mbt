@@ -56,6 +56,7 @@ pub struct Report {
   complete : Bool
   references_complete : Bool
   priv resolutions : Array[@reference.Resolution]
+  priv owners : Array[@reference.UriReference?]
 } derive(Debug)
 
 ///|
@@ -81,6 +82,13 @@ pub fn Report::references_complete(self : Report) -> Bool {
 
 ///|
 /// One resolution per followed `$ref` edge, in traversal order.
+pub fn Report::diagnostic_resources(
+  self : Report,
+) -> Array[@reference.UriReference?] {
+  self.owners.copy()
+}
+
+///|
 pub fn Report::resolutions(self : Report) -> Array[@reference.Resolution] {
   self.resolutions.copy()
 }

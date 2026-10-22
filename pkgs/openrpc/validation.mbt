@@ -28,10 +28,49 @@ pub(all) enum Phase {
 } derive(Eq, Debug)
 
 ///|
+/// Where a finding applies. `resource` is None for the unnamed input document.
+/// Spans exist only for the input document, and only when its source map was
+/// supplied.
+pub struct FindingLocation {
+  priv resource : @reference.UriReference?
+  priv path : Array[String]
+  priv span : @exact.Span?
+  priv source_id : String?
+} derive(Debug)
+
+///|
+pub fn FindingLocation::resource(
+  self : FindingLocation,
+) -> @reference.UriReference? {
+  self.resource
+}
+
+///|
+pub fn FindingLocation::path(self : FindingLocation) -> Array[String] {
+  self.path.copy()
+}
+
+///|
+pub fn FindingLocation::span(self : FindingLocation) -> @exact.Span? {
+  self.span
+}
+
+///|
+pub fn FindingLocation::source_id(self : FindingLocation) -> String? {
+  self.source_id
+}
+
+///|
 pub struct Finding {
   diagnostic : @exact.Diagnostic
   severity : Severity
   phase : Phase
+  priv location : FindingLocation
+  priv related : Array[FindingLocation]
+  priv chain : Array[FindingLocation]
+  priv expected : String?
+  priv version : DocumentVersion
+  priv profile : ValidationProfile
 } derive(Debug)
 
 ///|
@@ -50,8 +89,42 @@ pub fn Finding::phase(self : Finding) -> Phase {
 }
 
 ///|
+pub fn Finding::location(self : Finding) -> FindingLocation {
+  self.location
+}
+
+///|
+/// Other occurrences involved, such as the first of two duplicates.
+pub fn Finding::related(self : Finding) -> Array[FindingLocation] {
+  self.related.copy()
+}
+
+///|
+/// OpenRPC `$ref` sites followed, in order, to reach the location.
+pub fn Finding::chain(self : Finding) -> Array[FindingLocation] {
+  self.chain.copy()
+}
+
+///|
+/// The missing member's name when the location is its parent object.
+pub fn Finding::expected_field(self : Finding) -> String? {
+  self.expected
+}
+
+///|
+pub fn Finding::version(self : Finding) -> DocumentVersion {
+  self.version
+}
+
+///|
+pub fn Finding::profile(self : Finding) -> ValidationProfile {
+  self.profile
+}
+
+///|
 pub struct ValidationReport {
   profile : ValidationProfile
+  version : DocumentVersion
   findings : Array[Finding]
   model : Coverage
   schemas : Coverage
@@ -66,6 +139,13 @@ pub fn ValidationReport::profile(self : ValidationReport) -> ValidationProfile {
 }
 
 ///|
+pub fn ValidationReport::version(self : ValidationReport) -> DocumentVersion {
+  self.version
+}
+
+///|
+/// Findings in deterministic order: resource, pointer tokens, code, source
+/// occurrence, then message.
 pub fn ValidationReport::findings(self : ValidationReport) -> Array[Finding] {
   self.findings.copy()
 }
@@ -130,18 +210,45 @@ pub fn ClosedValidation::document(
 }
 
 ///|
+/// A pointer in one resource; None is the unnamed input document.
+priv struct Site {
+  resource : @reference.UriReference?
+  path : Array[String]
+}
+
+///|
+/// A finding before source lookup, ordering and limits.
+priv struct Draft {
+  diagnostic : @exact.Diagnostic
+  severity : Severity
+  phase : Phase
+  site : Site
+  related : Array[Site]
+  chain : Array[Site]
+  expected : String?
+}
+
+///|
 fn add(
-  findings : Array[Finding],
+  findings : Array[Draft],
   code : @exact.Code,
   message : String,
   path : Array[String],
   phase : Phase,
   severity~ : Severity = Error,
+  resource~ : @reference.UriReference? = None,
+  related~ : Array[Site] = [],
+  chain~ : Array[Site] = [],
+  expected~ : String? = None,
 ) -> Unit {
   findings.push({
     diagnostic: @exact.Diagnostic::new(code, message, path~),
     phase,
     severity,
+    site: { resource, path },
+    related,
+    chain,
+    expected,
   })
 }
 
@@ -150,7 +257,8 @@ fn unsupported_fields(
   value : @exact.Value,
   allowed : Array[String],
   path : Array[String],
-  findings : Array[Finding],
+  findings : Array[Draft],
+  resource~ : @reference.UriReference? = None,
 ) -> Unit {
   guard value.kind() is @exact.Object(fields) else { return }
   for (key, _) in fields {
@@ -162,6 +270,7 @@ fn unsupported_fields(
         child(path, key),
         Model,
         severity=Information,
+        resource~,
       )
     }
   }
@@ -188,7 +297,7 @@ fn reference_severity(code : @exact.Code) -> Severity {
 /// resources are reported at their own resource-relative pointer.
 priv struct Check {
   index : @reference.SchemaIndex
-  findings : Array[Finding]
+  findings : Array[Draft]
   checked : Set[String]
   limits : @exact.Limits
 }
@@ -207,6 +316,16 @@ fn site_key(owner : @reference.UriReference?, path : Array[String]) -> String {
 }
 
 ///|
+/// A resolved OpenRPC object: its value, owning resource, pointer there, and
+/// the `$ref` sites followed to reach it.
+priv struct Resolved[T] {
+  value : T
+  owner : @reference.UriReference?
+  path : Array[String]
+  chain : Array[Site]
+}
+
+///|
 /// Follow a reference-only chain to a concrete object. Each reference resolves
 /// against the resource that holds it. Revisiting a location is a cycle.
 fn Check::follow(
@@ -214,57 +333,57 @@ fn Check::follow(
   value : @exact.Value,
   owner : @reference.UriReference?,
   path : Array[String],
-) -> (@exact.Value, @reference.UriReference?, Array[String])? {
+  chain : Array[Site],
+) -> Resolved[@exact.Value]? {
   let mut current = value
   let mut owner = owner
   let mut at = path
+  let chain = chain.copy()
   let seen : Set[String] = Set([])
   for _ in 0..<self.limits.max_depth() {
     guard current.get("$ref") is Some(raw) else {
-      return Some((current, owner, at))
+      return Some({ value: current, owner, path: at, chain })
     }
     let site = child(at, "$ref")
-    guard raw.text() is Some(text) else {
+    let fail = (code, message, severity) => {
       add(
         self.findings,
-        @exact.InvalidReference,
-        "Reference must be a string",
+        code,
+        message,
         site,
         References,
+        severity~,
+        resource=owner,
+        chain=chain.copy(),
       )
+    }
+    guard raw.text() is Some(text) else {
+      fail(@exact.InvalidReference, "Reference must be a string", Error)
       return None
     }
     let ref_ = match @reference.Reference::parse(text, limits=self.limits) {
       Ok(v) => v
       Err(d) => {
-        add(self.findings, d.code(), d.message(), site, References)
+        fail(d.code(), d.message(), Error)
         return None
       }
     }
     let resolution = self.index.resolve(ref_, base=owner, limits=self.limits)
     guard resolution.target() is Some(target) else {
       for d in resolution.diagnostics() {
-        add(
-          self.findings,
-          d.code(),
-          d.message(),
-          site,
-          References,
-          severity=reference_severity(d.code()),
-        )
+        fail(d.code(), d.message(), reference_severity(d.code()))
       }
       return None
     }
     if !seen.add_and_check(target.identity()) {
-      add(
-        self.findings,
+      fail(
         @exact.ReferenceCycle,
         "OpenRPC reference-only cycle has no concrete target",
-        site,
-        References,
+        Error,
       )
       return None
     }
+    chain.push({ resource: owner, path: site })
     current = target.target()
     owner = target.resource()
     at = target.pointer().tokens()
@@ -275,6 +394,8 @@ fn Check::follow(
     "OpenRPC reference chain limit exceeded",
     path,
     References,
+    resource=owner,
+    chain~,
   )
   None
 }
@@ -289,28 +410,45 @@ fn[T] Check::typed(
   path : Array[String],
   kind : String,
   decode : (@exact.Value, Array[String]) -> T raise DecodeError,
-) -> (T, @reference.UriReference?, Array[String])? {
+  chain~ : Array[Site] = [],
+) -> Resolved[T]? {
   let referenced = value.get("$ref") is Some(_)
-  guard self.follow(value, owner, path) is Some((target, owner, at)) else {
+  guard self.follow(value, owner, path, chain) is Some(target) else {
     return None
   }
-  let decoded = decode(target, at) catch {
+  let decoded = decode(target.value, target.path) catch {
     DecodeError(d) => {
       if referenced {
+        let last = target.chain[target.chain.length() - 1]
         add(
           self.findings,
           @exact.WrongType,
           "Reference target is not a valid " + kind + ": " + d.message(),
-          child(path, "$ref"),
+          last.path,
           References,
+          resource=last.resource,
+          chain=target.chain[:target.chain.length() - 1].to_owned(),
         )
       } else {
-        self.findings.push({ diagnostic: d, severity: Error, phase: Model, })
+        add(
+          self.findings,
+          d.code(),
+          d.message(),
+          d.path(),
+          Model,
+          resource=target.owner,
+          chain=target.chain,
+        )
       }
       return None
     }
   }
-  Some((decoded, owner, at))
+  Some({
+    value: decoded,
+    owner: target.owner,
+    path: target.path,
+    chain: target.chain,
+  })
 }
 
 ///|
@@ -332,27 +470,32 @@ fn Check::schema(
     path~,
     limits=self.limits,
   )
-  for d in report.diagnostics() {
+  let owners = report.diagnostic_resources()
+  for i, d in report.diagnostics() {
     let ref_finding = d.code() == @exact.UnresolvedReference ||
       d.code() == @exact.InvalidReference ||
       d.code() == @exact.ConflictingIdentifier ||
       unavailable(d.code()) ||
       (d.code() == @exact.UnsupportedCheck && d.path().last() == Some("$ref"))
-    self.findings.push({
-      diagnostic: @exact.Diagnostic::new(d.code(), d.message(), path=d.path()),
-      phase: if ref_finding {
+    add(
+      self.findings,
+      d.code(),
+      d.message(),
+      d.path(),
+      if ref_finding {
         References
       } else {
         SchemaDocument
       },
-      severity: if d.code() == @exact.UnsupportedCheck ||
+      severity=if d.code() == @exact.UnsupportedCheck ||
         d.code() == @exact.UnsupportedDialect ||
         unavailable(d.code()) {
         Information
       } else {
         Error
       },
-    })
+      resource=owners.get(i).unwrap_or(owner),
+    )
   }
   if !report.is_complete() && report.diagnostics().is_empty() {
     add(
@@ -362,6 +505,7 @@ fn Check::schema(
       path,
       SchemaDocument,
       severity=Information,
+      resource=owner,
     )
   }
 }
@@ -386,60 +530,79 @@ fn Check::pairing(
   value : @exact.Value,
   owner : @reference.UriReference?,
   path : Array[String],
+  chain~ : Array[Site] = [],
 ) -> Unit {
   let limits = self.limits
-  guard self.typed(value, owner, path, "example pairing", (v, p) => {
-      pairing_(v, p, limits)
-    })
-    is Some((pairing, owner, at)) else {
+  guard self.typed(
+      value,
+      owner,
+      path,
+      "example pairing",
+      (v, p) => pairing_(v, p, limits),
+      chain~,
+    )
+    is Some(pairing) else {
     return
   }
-  if !self.checked.add_and_check("pairing " + site_key(owner, at)) {
+  if !self.checked.add_and_check("pairing " + site_key(pairing.owner, pairing.path)) {
     return
   }
   let example = (v, p) => example_(v, p, limits)
-  if pairing.value.get("params") is Some(params) &&
+  let at = pairing.path
+  if pairing.value.value.get("params") is Some(params) &&
     params.kind() is @exact.Array(items) {
     for i, item in items {
       self.typed(
         item,
-        owner,
+        pairing.owner,
         child(child(at, "params"), i.to_string()),
         "example",
         example,
+        chain=pairing.chain,
       )
       |> ignore
     }
   }
-  if pairing.value.get("result") is Some(result) {
-    self.typed(result, owner, child(at, "result"), "example", example) |> ignore
+  if pairing.value.value.get("result") is Some(result) {
+    self.typed(
+      result,
+      pairing.owner,
+      child(at, "result"),
+      "example",
+      example,
+      chain=pairing.chain,
+    )
+    |> ignore
   }
 }
 
 ///|
-fn Check::items(
+fn[T] Check::items(
   self : Check,
-  method_ : Method,
-  owner : @reference.UriReference?,
-  path : Array[String],
+  method_ : Resolved[Method],
   name : String,
   kind : String,
-  decode : (@exact.Value, Array[String]) -> Unit raise DecodeError,
-) -> Unit {
-  guard method_.value.get(name) is Some(raw) &&
+  decode : (@exact.Value, Array[String]) -> T raise DecodeError,
+) -> Array[Resolved[T]] {
+  guard method_.value.value.get(name) is Some(raw) &&
     raw.kind() is @exact.Array(items) else {
-    return
+    return []
   }
+  let resolved = []
   for i, item in items {
-    self.typed(
-      item,
-      owner,
-      child(child(path, name), i.to_string()),
-      kind,
-      decode,
-    )
-    |> ignore
+    if self.typed(
+        item,
+        method_.owner,
+        child(child(method_.path, name), i.to_string()),
+        kind,
+        decode,
+        chain=method_.chain,
+      )
+      is Some(target) {
+      resolved.push(target)
+    }
   }
+  resolved
 }
 
 ///|
@@ -595,17 +758,193 @@ fn coverage(findings : Array[Finding], phase : Phase) -> Coverage {
 }
 
 ///|
+fn resource_key(resource : @reference.UriReference?) -> String {
+  match resource {
+    Some(uri) => uri.identity()
+    None => ""
+  }
+}
+
+///|
+fn array_index(token : String) -> Bool {
+  !token.is_empty() &&
+  (token == "0" || !token.has_prefix("0")) &&
+  token.code_units().iter().all(c => c >= 48 && c <= 57)
+}
+
+///|
+/// Pointer tokens in document order: array indices numerically, other tokens
+/// by UTF-16 code units, and a prefix before its extensions.
+fn compare_paths(a : Array[String], b : Array[String]) -> Int {
+  for i in 0..<(if a.length() < b.length() { a.length() } else { b.length() }) {
+    let x = a[i]
+    let y = b[i]
+    let order = if array_index(x) && array_index(y) && x.length() != y.length() {
+      x.length().compare(y.length())
+    } else {
+      x.lexical_compare(y)
+    }
+    if order != 0 {
+      return order
+    }
+  }
+  a.length().compare(b.length())
+}
+
+///|
+fn compare_findings(a : Finding, b : Finding) -> Int {
+  let order = resource_key(a.location.resource).lexical_compare(
+    resource_key(b.location.resource),
+  )
+  if order != 0 {
+    return order
+  }
+  let order = compare_paths(a.location.path, b.location.path)
+  if order != 0 {
+    return order
+  }
+  let order = a.diagnostic
+    .code()
+    .to_repr()
+    .to_string()
+    .lexical_compare(b.diagnostic.code().to_repr().to_string())
+  if order != 0 {
+    return order
+  }
+  let order = match (a.location.span, b.location.span) {
+    (Some(x), Some(y)) => x.start().compare(y.start())
+    (Some(_), None) => -1
+    (None, Some(_)) => 1
+    (None, None) => 0
+  }
+  if order != 0 {
+    return order
+  }
+  a.diagnostic.message().lexical_compare(b.diagnostic.message())
+}
+
+///|
+/// Turn drafts into findings: one per distinct problem, located in the input
+/// source when known, ordered, and bounded by the finding limit. Truncated
+/// phases get a `LimitExceeded` marker and become incomplete.
+fn finish(
+  drafts : Array[Draft],
+  document : Document,
+  owner : @reference.UriReference?,
+  source_map : @exact.SourceMap?,
+  profile : ValidationProfile,
+  index_complete : Bool,
+  limits : @exact.Limits,
+) -> ValidationReport {
+  let own = resource_key(owner)
+  let locate = (site : Site) => {
+    let mut span = None
+    let mut source_id = None
+    if resource_key(site.resource) == own && source_map is Some(map) {
+      if map.locations(site.path) is [first, ..] {
+        span = Some(first.value_span())
+        source_id = first.source_id()
+      }
+    }
+    FindingLocation::{ resource: site.resource, path: site.path, span, source_id }
+  }
+  let version = document.version
+  let unique : Array[Finding] = []
+  let seen : Set[String] = Set([])
+  for d in drafts {
+    let key = resource_key(d.site.resource) +
+      "|" +
+      d.phase.to_repr().to_string() +
+      "|" +
+      d.severity.to_repr().to_string() +
+      "|" +
+      d.diagnostic.code().to_repr().to_string() +
+      "|" +
+      site_key(None, d.site.path) +
+      "|" +
+      d.diagnostic.message()
+    if !seen.add_and_check(key) {
+      continue
+    }
+    let location = locate(d.site)
+    unique.push({
+      diagnostic: @exact.Diagnostic::new(
+        d.diagnostic.code(),
+        d.diagnostic.message(),
+        path=d.site.path,
+        span=location.span,
+      ),
+      severity: d.severity,
+      phase: d.phase,
+      location,
+      related: d.related.map(locate),
+      chain: d.chain.map(locate),
+      expected: d.expected,
+      version,
+      profile,
+    })
+  }
+  unique.sort_by(compare_findings)
+  let marker = (phase, message) => Finding::{
+    diagnostic: @exact.Diagnostic::new(@exact.LimitExceeded, message),
+    severity: Information,
+    phase,
+    location: { resource: None, path: [], span: None, source_id: None },
+    related: [],
+    chain: [],
+    expected: None,
+    version,
+    profile,
+  }
+  let max = limits.max_findings()
+  let findings = if unique.length() > max {
+    unique[:if max < 0 { 0 } else { max }].to_owned()
+  } else {
+    unique
+  }
+  let truncated : Array[Phase] = []
+  for f in unique[findings.length():] {
+    if !truncated.contains(f.phase) {
+      truncated.push(f.phase)
+    }
+  }
+  for phase in [Model, SchemaDocument, References, Normative, Artifact] {
+    if truncated.contains(phase) {
+      findings.push(
+        marker(phase, "Finding limit exceeded; later findings were omitted"),
+      )
+    }
+  }
+  if !index_complete {
+    findings.push(marker(References, "Reference index is incomplete"))
+  }
+  findings.sort_by(compare_findings)
+  {
+    profile,
+    version,
+    model: coverage(findings, Model),
+    schemas: coverage(findings, SchemaDocument),
+    references: coverage(findings, References),
+    normative: coverage(findings, Normative),
+    artifact: coverage(findings, Artifact),
+    findings,
+  }
+}
+
+///|
 /// Validate a document against explicit resources. `base` is the document's
 /// retrieval URI; relative references and schema identifiers need it. Nothing
-/// is fetched. Unsupplied resources leave reference coverage incomplete.
+/// is fetched. Unsupplied resources leave reference coverage incomplete. A
+/// `source_map` from reading the same document adds spans to its findings.
 pub fn validate(
   document : Document,
   profile~ : ValidationProfile = Specification,
   resources~ : @reference.ResourceSet = @reference.ResourceSet::empty(),
   base~ : @reference.UriReference? = None,
+  source_map~ : @exact.SourceMap? = None,
   limits~ : @exact.Limits = @exact.Limits::new(),
 ) -> ValidationReport {
-  let findings : Array[Finding] = []
+  let findings : Array[Draft] = []
   let base = match base {
     Some(uri) if !uri.is_absolute() || uri.fragment() is Some(_) => {
       add(
@@ -630,19 +969,21 @@ pub fn validate(
       severity=reference_severity(d.code()),
     )
   }
-  let check = Check::{ index, findings, checked: Set([]), limits, }
+  let check = Check::{ index, findings, checked: Set([]), limits }
   let root = document.value
   unsupported_fields(
     root,
     ["openrpc", "info", "methods", "components", "$schema"],
     [],
     findings,
+    resource=owner,
   )
   unsupported_fields(
     document.info.value,
     ["title", "version"],
     ["info"],
     findings,
+    resource=owner,
   )
   if root.get("$schema") is Some(value) && value.text() is None {
     add(
@@ -651,9 +992,10 @@ pub fn validate(
       "Root $schema must be a string",
       ["$schema"],
       Model,
+      resource=owner,
     )
   }
-  let names : Set[String] = Set([])
+  let names : Map[String, Site] = Map([])
   let raw_methods = match root.get("methods") {
     Some(raw) =>
       match raw.kind() {
@@ -662,43 +1004,58 @@ pub fn validate(
       }
     None => []
   }
+  let method_decoder = (v, p) => {
+    match method_(v, p, limits~) {
+      Inline(m) => m
+      Reference(_) =>
+        raise DecodeError(
+          @exact.Diagnostic::new(
+            @exact.WrongType,
+            "Expected an inline method",
+            path=p,
+          ),
+        )
+    }
+  }
   for i, raw_method in raw_methods {
-    let path = ["methods", i.to_string()]
-    guard check.typed(raw_method, owner, path, "method", (v, p) => {
-        match method_(v, p, limits~) {
-          Inline(m) => m
-          Reference(_) =>
-            raise DecodeError(
-              @exact.Diagnostic::new(
-                @exact.WrongType,
-                "Expected an inline method",
-                path=p,
-              ),
-            )
-        }
-      })
-      is Some((method_, method_owner, method_path)) else {
+    guard check.typed(
+        raw_method,
+        owner,
+        ["methods", i.to_string()],
+        "method",
+        method_decoder,
+      )
+      is Some(method_) else {
       continue
     }
     unsupported_fields(
-      method_.value,
+      method_.value.value,
       ["name", "params", "result", "paramStructure"],
-      method_path,
+      method_.path,
       findings,
+      resource=method_.owner,
     )
-    if names.contains(method_.name.text) {
-      add(
-        findings,
-        @exact.DuplicateKey,
-        "Method names must be unique",
-        child(path, "name"),
-        Normative,
-      )
+    let name_site = Site::{
+      resource: method_.owner,
+      path: child(method_.path, "name"),
     }
-    names.add(method_.name.text)
-    let param_names : Set[String] = Set([])
+    match names.get(method_.value.name.text) {
+      Some(first) =>
+        add(
+          findings,
+          @exact.DuplicateKey,
+          "Method names must be unique",
+          name_site.path,
+          Normative,
+          resource=name_site.resource,
+          related=[first],
+          chain=method_.chain,
+        )
+      None => names[method_.value.name.text] = name_site
+    }
+    let param_names : Map[String, Site] = Map([])
     let mut optional_seen = false
-    let raw_params = match method_.value.get("params") {
+    let raw_params = match method_.value.value.get("params") {
       Some(raw) =>
         match raw.kind() {
           @exact.Array(items) => items
@@ -707,34 +1064,44 @@ pub fn validate(
       None => []
     }
     for pi, raw_param in raw_params {
-      let param_path = child(child(method_path, "params"), pi.to_string())
+      let param_path = child(child(method_.path, "params"), pi.to_string())
       guard check.typed(
           raw_param,
-          method_owner,
+          method_.owner,
           param_path,
           "content descriptor",
           descriptor_decoder(limits),
+          chain=method_.chain,
         )
-        is Some((desc, desc_owner, desc_path)) else {
+        is Some(desc) else {
         continue
       }
       unsupported_fields(
-        desc.value,
+        desc.value.value,
         ["name", "schema", "required"],
-        desc_path,
+        desc.path,
         findings,
+        resource=desc.owner,
       )
-      if param_names.contains(desc.name) {
-        add(
-          findings,
-          @exact.DuplicateKey,
-          "Parameter names must be unique",
-          child(param_path, "name"),
-          Normative,
-        )
+      let param_site = Site::{
+        resource: desc.owner,
+        path: child(desc.path, "name"),
       }
-      param_names.add(desc.name)
-      let required = desc.required.unwrap_or(false)
+      match param_names.get(desc.value.name) {
+        Some(first) =>
+          add(
+            findings,
+            @exact.DuplicateKey,
+            "Parameter names must be unique",
+            param_site.path,
+            Normative,
+            resource=param_site.resource,
+            related=[first],
+            chain=desc.chain,
+          )
+        None => param_names[desc.value.name] = param_site
+      }
+      let required = desc.value.required.unwrap_or(false)
       if required && optional_seen {
         add(
           findings,
@@ -743,48 +1110,48 @@ pub fn validate(
           param_path,
           Normative,
           severity=if profile == Specification { Error } else { Warning },
+          resource=method_.owner,
+          chain=method_.chain,
         )
       }
       if !required {
         optional_seen = true
       }
-      check.schema(desc.schema, desc_owner, child(desc_path, "schema"))
+      check.schema(desc.value.schema, desc.owner, child(desc.path, "schema"))
     }
-    if method_.value.get("result") is Some(raw_result) {
-      let result_path = child(method_path, "result")
+    if method_.value.value.get("result") is Some(raw_result) {
       if check.typed(
           raw_result,
-          method_owner,
-          result_path,
+          method_.owner,
+          child(method_.path, "result"),
           "content descriptor",
           descriptor_decoder(limits),
+          chain=method_.chain,
         )
-        is Some((desc, desc_owner, desc_path)) {
+        is Some(desc) {
         unsupported_fields(
-          desc.value,
+          desc.value.value,
           ["name", "schema", "required"],
-          desc_path,
+          desc.path,
           findings,
+          resource=desc.owner,
         )
-        check.schema(desc.schema, desc_owner, child(desc_path, "schema"))
+        check.schema(desc.value.schema, desc.owner, child(desc.path, "schema"))
       }
     }
-    check.items(method_, method_owner, method_path, "errors", "error", (v, p) => {
-      error_object_(v, p, limits) |> ignore
-    })
-    check.items(method_, method_owner, method_path, "links", "link", (v, p) => {
-      link_(v, p, limits) |> ignore
-    })
-    check.items(method_, method_owner, method_path, "tags", "tag", (v, p) => {
-      tag_(v, p, limits) |> ignore
-    })
-    if method_.value.get("examples") is Some(raw) &&
+    check.items(method_, "errors", "error", (v, p) => error_object_(v, p, limits))
+    |> ignore
+    check.items(method_, "links", "link", (v, p) => link_(v, p, limits))
+    |> ignore
+    check.items(method_, "tags", "tag", (v, p) => tag_(v, p, limits)) |> ignore
+    if method_.value.value.get("examples") is Some(raw) &&
       raw.kind() is @exact.Array(items) {
       for ei, item in items {
         check.pairing(
           item,
-          method_owner,
-          child(child(method_path, "examples"), ei.to_string()),
+          method_.owner,
+          child(child(method_.path, "examples"), ei.to_string()),
+          chain=method_.chain,
         )
       }
     }
@@ -792,7 +1159,13 @@ pub fn validate(
   if root.get("components") is Some(components) {
     match components.kind() {
       @exact.Object(_) => {
-        unsupported_fields(components, ["schemas"], ["components"], findings)
+        unsupported_fields(
+          components,
+          ["schemas"],
+          ["components"],
+          findings,
+          resource=owner,
+        )
         if components.get("schemas") is Some(schemas) {
           match schemas.kind() {
             @exact.Object(entries) =>
@@ -805,17 +1178,20 @@ pub fn validate(
                     "Component keys must match ^[a-zA-Z0-9.\\-_]+$",
                     path,
                     Normative,
+                    resource=owner,
                   )
                 }
                 match @schema.Schema::from_json(value, limits~) {
                   Ok(schema) => check.schema(schema, owner, path)
-                  Err(d) => {
-                    let at = path.copy()
-                    for part in d.path() {
-                      at.push(part)
-                    }
-                    add(findings, d.code(), d.message(), at, SchemaDocument)
-                  }
+                  Err(d) =>
+                    add(
+                      findings,
+                      d.code(),
+                      d.message(),
+                      [..path, ..d.path()],
+                      SchemaDocument,
+                      resource=owner,
+                    )
                 }
               }
             _ =>
@@ -825,6 +1201,7 @@ pub fn validate(
                 "Schema components must be an object",
                 ["components", "schemas"],
                 Model,
+                resource=owner,
               )
           }
         }
@@ -853,6 +1230,7 @@ pub fn validate(
           "Components must be an object",
           ["components"],
           Model,
+          resource=owner,
         )
     }
   }
@@ -863,34 +1241,17 @@ pub fn validate(
     [],
     Artifact,
     severity=Information,
+    resource=owner,
   )
-  // A component reached from several sites is checked once per site; report
-  // each distinct finding once.
-  let unique : Array[Finding] = []
-  let seen : Set[String] = Set([])
-  for f in findings {
-    let key = f.phase.to_repr().to_string() +
-      "|" +
-      f.severity.to_repr().to_string() +
-      "|" +
-      f.diagnostic.code().to_repr().to_string() +
-      "|" +
-      site_key(None, f.diagnostic.path()) +
-      "|" +
-      f.diagnostic.message()
-    if seen.add_and_check(key) {
-      unique.push(f)
-    }
-  }
-  {
+  finish(
+    findings,
+    document,
+    owner,
+    source_map,
     profile,
-    model: coverage(unique, Model),
-    schemas: coverage(unique, SchemaDocument),
-    references: coverage(unique, References),
-    normative: coverage(unique, Normative),
-    artifact: coverage(unique, Artifact),
-    findings: unique,
-  }
+    index.complete(),
+    limits,
+  )
 }
 
 ///|
@@ -899,9 +1260,17 @@ pub fn validate_closed(
   profile~ : ValidationProfile = Specification,
   resources~ : @reference.ResourceSet = @reference.ResourceSet::empty(),
   base~ : @reference.UriReference? = None,
+  source_map~ : @exact.SourceMap? = None,
   limits~ : @exact.Limits = @exact.Limits::new(),
 ) -> ClosedValidation {
-  let report = validate(document, profile~, resources~, base~, limits~)
+  let report = validate(
+    document,
+    profile~,
+    resources~,
+    base~,
+    source_map~,
+    limits~,
+  )
   let passed = report.model == Passed &&
     report.schemas == Passed &&
     report.references == Passed &&
@@ -936,6 +1305,9 @@ pub extend Phase with @debug.Debug::{to_repr}
 
 ///|
 pub extend Finding with @debug.Debug::{to_repr}
+
+///|
+pub extend FindingLocation with @debug.Debug::{to_repr}
 
 ///|
 pub extend ValidationReport with @debug.Debug::{to_repr}

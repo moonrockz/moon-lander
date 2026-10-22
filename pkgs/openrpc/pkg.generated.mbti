@@ -18,9 +18,9 @@ pub fn object_kinds() -> Array[ObjectKind]
 
 pub fn read(String, source_id? : String?, limits? : @json.Limits) -> ReadResult
 
-pub fn validate(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, limits? : @json.Limits) -> ValidationReport
+pub fn validate(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, source_map? : @json.SourceMap?, limits? : @json.Limits) -> ValidationReport
 
-pub fn validate_closed(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, limits? : @json.Limits) -> ClosedValidation
+pub fn validate_closed(Document, profile? : ValidationProfile, resources? : @reference.ResourceSet, base? : @reference.UriReference?, source_map? : @json.SourceMap?, limits? : @json.Limits) -> ClosedValidation
 
 pub fn write(Document, limits? : @json.Limits) -> Result[String, @json.Diagnostic]
 
@@ -201,11 +201,27 @@ pub struct Finding {
   diagnostic : @json.Diagnostic
   severity : Severity
   phase : Phase
+  // private fields
 } derive(@debug.Debug)
+pub fn Finding::chain(Self) -> Array[FindingLocation]
 pub fn Finding::diagnostic(Self) -> @json.Diagnostic
+pub fn Finding::expected_field(Self) -> String?
+pub fn Finding::location(Self) -> FindingLocation
 pub fn Finding::phase(Self) -> Phase
+pub fn Finding::profile(Self) -> ValidationProfile
+pub fn Finding::related(Self) -> Array[FindingLocation]
 pub fn Finding::severity(Self) -> Severity
 pub fn Finding::to_repr(Self) -> @debug.Repr
+pub fn Finding::version(Self) -> DocumentVersion
+
+pub struct FindingLocation {
+  // private fields
+} derive(@debug.Debug)
+pub fn FindingLocation::path(Self) -> Array[String]
+pub fn FindingLocation::resource(Self) -> @reference.UriReference?
+pub fn FindingLocation::source_id(Self) -> String?
+pub fn FindingLocation::span(Self) -> @json.Span?
+pub fn FindingLocation::to_repr(Self) -> @debug.Repr
 
 pub struct Info {
   title : String
@@ -419,6 +435,7 @@ pub fn ValidationProfile::to_repr(Self) -> @debug.Repr
 
 pub struct ValidationReport {
   profile : ValidationProfile
+  version : DocumentVersion
   findings : Array[Finding]
   model : Coverage
   schemas : Coverage
@@ -434,6 +451,7 @@ pub fn ValidationReport::profile(Self) -> ValidationProfile
 pub fn ValidationReport::references(Self) -> Coverage
 pub fn ValidationReport::schemas(Self) -> Coverage
 pub fn ValidationReport::to_repr(Self) -> @debug.Repr
+pub fn ValidationReport::version(Self) -> DocumentVersion
 
 // Type aliases
 pub using @domain {type ComponentKey}

@@ -1,6 +1,8 @@
 ///|
 priv struct SchemaCheck {
   findings : Array[@json.Diagnostic]
+  owners : Array[@reference.UriReference?]
+  mut owner : @reference.UriReference?
   max_findings : Int32
   mut complete : Bool
   mut stopped : Bool
@@ -17,6 +19,7 @@ fn SchemaCheck::emit(self : SchemaCheck, d : @json.Diagnostic) -> Unit {
   }
   if self.findings.length() < self.max_findings {
     self.findings.push(d)
+    self.owners.push(self.owner)
   } else {
     let limit = @json.Diagnostic::new(
       @json.LimitExceeded,
@@ -24,6 +27,7 @@ fn SchemaCheck::emit(self : SchemaCheck, d : @json.Diagnostic) -> Unit {
     )
     if self.findings.is_empty() {
       self.findings.push(limit)
+      self.owners.push(self.owner)
     } else {
       self.findings[self.findings.length() - 1] = limit
     }
@@ -168,6 +172,7 @@ fn check_schema(
       complete: false,
       references_complete: false,
       resolutions: [],
+      owners: state.owners,
     }
   }
   let pointer = match @reference.JsonPointer::from_tokens(path, limits~) {
@@ -179,6 +184,7 @@ fn check_schema(
         complete: false,
         references_complete: false,
         resolutions: [],
+        owners: state.owners,
       }
     }
   }
@@ -268,6 +274,8 @@ fn new_check(
 ) -> SchemaCheck {
   {
     findings: [],
+    owners: [],
+    owner: None,
     max_findings: if max_findings < limits.max_findings() {
       max_findings
     } else {
@@ -314,12 +322,14 @@ fn walk_schema(
       (index.scope(location), Some(location.identity()))
     _ => (document, None)
   }
-  let stack = [(value, initial, scope, key, false)]
+  let stack = [(value, initial, scope, key, false, document)]
+  state.owner = document
   let mut reserved = 1
   let mut edges = 0
   let visited : Set[String] = Set([])
   while !state.stopped &&
-        stack.pop() is Some((current, path, scope, key, scoped)) {
+        stack.pop() is Some((current, path, scope, key, scoped, owner)) {
+    state.owner = owner
     if key is Some(key) && !visited.add_and_check(key) {
       continue
     }
@@ -395,7 +405,9 @@ fn walk_schema(
       }
       guard resolution.target() is Some(target) else {
         for d in resolution.diagnostics() {
-          state.emit(with_path(d, at))
+          state.emit(
+            @json.Diagnostic::new(d.code(), d.message(), path=path_tokens(at)),
+          )
         }
         continue
       }
@@ -426,6 +438,7 @@ fn walk_schema(
             target.resource(),
             Some(target.identity()),
             false,
+            target.resource(),
           ),
         )
       }
@@ -477,7 +490,7 @@ fn walk_schema(
           child_path = PathStep(child_path, token)
           child_key = pointer_key(child_key, token)
         }
-        children.push((entry.1, child_path, scope, child_key, false))
+        children.push((entry.1, child_path, scope, child_key, false, owner))
       }
     }
     for i in 0..<children.length() {
@@ -489,6 +502,7 @@ fn walk_schema(
     complete: state.complete && references_complete,
     references_complete,
     resolutions,
+    owners: state.owners,
   }
 }
 
@@ -522,6 +536,7 @@ pub fn validate_in(
         complete: false,
         references_complete: false,
         resolutions: [],
+        owners: state.owners,
       }
     }
   }

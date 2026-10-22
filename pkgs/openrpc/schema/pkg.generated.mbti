@@ -129,6 +129,7 @@ pub struct Report {
   references_complete : Bool
   // private fields
 } derive(@debug.Debug)
+pub fn Report::diagnostic_resources(Self) -> Array[@reference.UriReference?]
 pub fn Report::diagnostics(Self) -> Array[@json.Diagnostic]
 pub fn Report::is_complete(Self) -> Bool
 pub fn Report::references_complete(Self) -> Bool

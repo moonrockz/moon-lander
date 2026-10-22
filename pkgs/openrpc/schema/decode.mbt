@@ -148,6 +148,25 @@ fn simple_type(value : @json.Value) -> SimpleType raise SchemaRead {
 }
 
 ///|
+/// Decode a type union, naming the offending element on failure.
+fn simple_types(value : @json.Value) -> Array[SimpleType] raise SchemaRead {
+  let types = []
+  for i, item in array_value(value) {
+    let decoded = simple_type(item) catch {
+      SchemaRead(d) =>
+        raise SchemaRead(
+          @json.Diagnostic::new(d.code(), d.message(), path=[
+            i.to_string(),
+            ..d.path(),
+          ]),
+        )
+    }
+    types.push(decoded)
+  }
+  types
+}
+
+///|
 fn count_value(value : @json.Value) -> NonNegativeInteger raise SchemaRead {
   match NonNegativeInteger::from_number(number_value(value)) {
     Ok(n) => n
@@ -250,7 +269,7 @@ fn decode_keyword(
           match value.kind() {
             @json.String(_) => TypeConstraint::one(simple_type(value))
             _ =>
-              match TypeConstraint::many(array_value(value).map(simple_type)) {
+              match TypeConstraint::many(simple_types(value)) {
                 Ok(types) => types
                 Err(d) => raise SchemaRead(d)
               }

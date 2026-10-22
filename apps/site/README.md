@@ -97,4 +97,5 @@ canonical links and `versions.json`. Then `mise run check:site` checks each tree
 a link that leaves its tree fails, except the banner link and the canonical link.
 The version switcher in the header reads `versions.json`.
 
-The design is in `openspec/changes/add-docs-site/design.md`.
+The design is in `openspec/changes/archive/2026-10-22-add-docs-site/design.md`,
+and the requirements are in `openspec/specs/docs-site/spec.md`.

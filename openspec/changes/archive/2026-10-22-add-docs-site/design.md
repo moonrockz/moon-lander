@@ -500,6 +500,15 @@ package lands in `pkgs/lander`, with no change to the site. Until then the API
 section shows `moonrockz/notebooks`, `moonrockz/openrpc` and the root package
 `moonrockz/moon-lander`.
 
+Call: a method of a trait implementation has the anchor `#<Type>.<Trait>.<method>`
+on a type page and `#<Trait>.<Type>.<method>` on a trait page. `moon doc` lists a
+derived method under the type and under the trait, so `#<Type>.<method>` alone is
+not unique.
+
+Call: each module's `moon doc` output goes to its own folder
+`_build/site-api/<dir>/`, so a later run cannot remove the output of an earlier
+one. This replaces the staging copy that task 10.1 and risk R12 name.
+
 ### D22. Versioned docs
 
 Owner (2026-10-20): the site is versioned. A version is one minor line at

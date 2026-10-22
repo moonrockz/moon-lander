@@ -1,5 +1,5 @@
 ///|
-/// The scenarios of `openspec/changes/add-docs-site/specs/docs-site/spec.md` that `prepare` decides.
+/// The scenarios of `openspec/specs/docs-site/spec.md` that `prepare` decides.
 let lander : @model.SiteConfig = {
   title: "Moon-Lander",
   description: "An application framework for MoonBit.",

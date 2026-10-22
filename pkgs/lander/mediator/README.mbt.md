@@ -11,6 +11,29 @@ synchronous, so it has the same API and the same behavior on `wasm`, `wasm-gc`,
 `js`, and `native`. Each `mbt check` block on this page runs as a test with
 `mise run test`.
 
+## One send, start to finish
+
+A caller sends a request through a sender value. The middleware that the
+application attached runs in attach order, then the one handler runs. The reply
+goes back out through the same middleware in reverse order.
+
+```mermaid
+graph LR
+  C[Caller] -->|ctx, req| A[Middleware A]
+  A -->|next| B[Middleware B]
+  B -->|next| H[Handler]
+  H -->|reply| B
+  B -->|reply| A
+  A -->|reply| C
+```
+
+| Part | Value | Make it with |
+| --- | --- | --- |
+| Sender | `Sender[C, Req, Res]`: one handler for one request type | `@mediator.sender(handler)` |
+| Topic | `Topic[C, Ev]`: one or more handlers for one event type | `@mediator.topic(handler)`, then `add` |
+| Middleware | `Middleware[C, Req, Res]`: one wrapper step | `@mediator.middleware(wrap)`, `before`, `after`, `finally_` |
+| Error | `MediatorError`: a refusal from a handler or a middleware | `raise @mediator.Rejected(reason=...)` |
+
 ## Send a request
 
 A handler is a function that takes a context value and a request, and gives a

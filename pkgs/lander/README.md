@@ -27,6 +27,10 @@ Formats | TOML, YAML, JSON5 and Ion; linked set selected by a virtual package
 Host adapters sit beside the core. On `native` and `js` they read the files that
 a load asks for. A `wasm` host gives the files itself.
 
+The mediator also sits beside the stack. It is pure and uses no other layer: the
+parts of an application send requests and publish events through typed values,
+and middleware holds the cross-cutting steps.
+
 ## What exists today
 
 | Layer | Package | Status |
@@ -37,10 +41,11 @@ a load asks for. A `wasm` host gives the files itself.
 | Browser adapter | [`config/browser`](config/browser/README.mbt.md) | js browser URL mounts with explicit manifests, run inputs, limits, cancellation, and typed boundary errors |
 | Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery in three layouts, system and global user directories on every platform, local and user overrides, explicit project file, ambiguity, legacy fallback, stop boundary, isolated mode; workspace and environment parts come next |
 | Binding | [`config`](config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
+| Mediator | [`mediator`](mediator/README.mbt.md) | Typed senders, publish topics, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
 | Hosting | `@lander` | Planned |
 
-The [Configuration](config/README.mbt.md) chapter shows the API that exists, with
-examples that the tests compile and run. The
+The [Configuration](config/README.mbt.md) and [Mediator](mediator/README.mbt.md)
+chapters show the API that exists, with examples that the tests compile and run. The
 [design overview](../../docs/design/overview.md) shows the full design of all
 four changes. The OpenSpec changes in `openspec/changes/` hold the requirements.
 

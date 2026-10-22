@@ -68,11 +68,11 @@ Bead: lander-4us.10.4
 
 Bead: lander-4us.10.5
 
-- [ ] 5.1 Add the acceptance suite `tests/mediator-acceptance` in the unpublished `tests/` module for the spec scenarios: build a sender, two senders stay separate, handler errors, publish order, publish error stop, log middleware, short-circuit, middleware order, context read; verify `mise run test` passes on `wasm`, `wasm-gc`, `js`, and `native`
-- [ ] 5.2 Verify each target leg of the mediator acceptance suite runs more than zero tests; record the test count per target in the bead, and treat a zero count as a failure of this task
-- [ ] 5.3 Run `moon info` for the mediator package and verify the generated interface is the same for `wasm`, `wasm-gc`, `js`, and `native` (no diverging-interface report); verify the package source has no `#cfg`, no per-target file, and no import of `moonbitlang/async`
-- [ ] 5.4 Add the mediator row to the layer table in `pkgs/lander/README.md` and one framework docs page that shows send, publish, and middleware with the Ping example; verify `mise run build:site` and the README example tests pass
-- [ ] 5.5 Run `mise run check`; verify lint, workspace and version validation, all target tests, and builds pass
+- [x] 5.1 Add the acceptance suite `tests/mediator-acceptance` in the unpublished `tests/` module for the spec scenarios: build a sender, two senders stay separate, handler errors, publish order, publish error stop, log middleware, short-circuit, middleware order, context read; verify `mise run test` passes on `wasm`, `wasm-gc`, `js`, and `native`
+- [x] 5.2 Verify each target leg of the mediator acceptance suite runs more than zero tests; record the test count per target in the bead, and treat a zero count as a failure of this task
+- [x] 5.3 Run `moon info` for the mediator package and verify the generated interface is the same for `wasm`, `wasm-gc`, `js`, and `native` (no diverging-interface report); verify the package source has no `#cfg`, no per-target file, and no import of `moonbitlang/async`
+- [x] 5.4 Add the mediator row to the layer table in `pkgs/lander/README.md` and one framework docs page that shows send, publish, and middleware with the Ping example; verify `mise run build:site` and the README example tests pass
+- [x] 5.5 Run `mise run check`; verify lint, workspace and version validation, all target tests, and builds pass
 
 ## Workflow follow-up
 

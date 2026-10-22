@@ -191,7 +191,10 @@ and reports success only after the write and its close complete. A failed write
 or close aborts the stream and keeps the previous file. A failed first save
 removes the new file again, so no empty file stays. `remove(store, path)` removes
 one named file and gives `false` when the file is absent; it never removes a
-directory. Paths are relative and cannot leave the store.
+directory. Paths are relative and cannot leave the store. A write never replaces
+an entry with another exact name: if the host maps `ACME.toml` to an existing
+`acme.toml`, as a case-insensitive file system can, `write_text` raises
+`InvalidPath` and changes nothing.
 
 Failures are typed and there is no fallback to `localStorage`, IndexedDB or
 another store. Missing OPFS or `createWritable`, or an origin without usable

@@ -146,11 +146,30 @@ export async function openStore(namespace: string): Promise<StoreReply> {
 }
 
 /**
+ * Whether a directory lists a child with exactly this name. Some engines resolve
+ * a name without case on a case-insensitive host file system.
+ */
+async function present(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+  for await (const [entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+    if (entry === name) return true;
+  }
+  return false;
+}
+
+/** Require an exact child name before a removal. */
+async function exact(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
+  if (!await present(dir, name)) throw new DOMException("", "NotFoundError");
+}
+
+/**
  * Write text to a relative file inside a store. Parent directories are created
  * only inside the store. Success is reported only after close() resolves. A
  * failed write or close aborts the writable stream, so the previous content
  * remains and the file lock is released. A file that this call created is
  * removed again after a failure, so a failed first save leaves no entry.
+ * Each segment and the file name must keep its exact name. A host that maps a
+ * name to an entry with another exact name, such as WebKit on a case-insensitive
+ * file system, gives "conflict", and the existing entry is not changed.
  */
 export async function writeText(store: FileSystemDirectoryHandle, relative: string, text: string): Promise<StoreReply> {
   if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
@@ -163,11 +182,17 @@ export async function writeText(store: FileSystemDirectoryHandle, relative: stri
   let writable: FileSystemWritableFileStream | undefined;
   try {
     dir = store;
-    for (const segment of segments) dir = await dir.getDirectoryHandle(segment, { create: true });
+    for (const segment of segments) {
+      const parent: FileSystemDirectoryHandle = dir;
+      const existed = await present(parent, segment);
+      dir = await parent.getDirectoryHandle(segment, { create: true });
+      if (!existed && !await present(parent, segment)) return { kind: "conflict" };
+    }
     let file: FileSystemFileHandle;
-    try { file = await dir.getFileHandle(name, { create: false }); } catch (error) {
-      if ((error as { name?: unknown } | null)?.name !== "NotFoundError") throw error;
+    if (await present(dir, name)) file = await dir.getFileHandle(name, { create: false });
+    else {
       file = await dir.getFileHandle(name, { create: true });
+      if (!await present(dir, name)) return { kind: "conflict" };
       created = true;
     }
     if (typeof file.createWritable !== "function") throw new DOMException("", "NotSupportedError");
@@ -183,16 +208,6 @@ export async function writeText(store: FileSystemDirectoryHandle, relative: stri
   }
 }
 
-/**
- * Require an exact child name before a removal. Some engines resolve a name
- * without case on a case-insensitive host file system.
- */
-async function exact(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
-  for await (const [entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
-    if (entry === name) return;
-  }
-  throw new DOMException("", "NotFoundError");
-}
 
 /** Remove one named file inside a store. A missing file is not an error. */
 export async function removeFile(store: FileSystemDirectoryHandle, relative: string): Promise<StoreReply> {

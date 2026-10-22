@@ -1,4 +1,13 @@
-## ADDED Requirements
+# browser-configuration Specification
+
+## Purpose
+Browser configuration lets a MoonBit application on the js target load the same
+layered configuration in a web browser. It reads hosted files, selected files,
+directory handles and an explicit OPFS store through mounted virtual paths, and
+gives the same values, origins and errors as the other hosts. It never needs Node,
+never opens a picker or asks for permission, and has no UI.
+
+## Requirements
 
 ### Requirement: Browser execution without Node dependencies
 
@@ -258,6 +267,12 @@ errors; they MUST NOT cause an implicit storage fallback.
 
 - **WHEN** a storage write or close fails, including a quota failure
 - **THEN** the operation raises an error and does not report a successful save
+
+#### Scenario: A write names an entry that differs only in case
+
+- **WHEN** the store holds `acme.toml` on a host that resolves names without case, and the caller writes `ACME.toml`
+- **THEN** the write raises an invalid-path error, `acme.toml` keeps its text, and no new entry is created
+- **AND** a write never replaces or writes into an entry whose exact name differs from the requested name
 
 #### Scenario: Storage is unavailable
 

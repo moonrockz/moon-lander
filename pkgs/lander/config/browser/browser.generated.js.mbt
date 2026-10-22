@@ -119,6 +119,17 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        return storageFailure(error);
   #|      }
   #|    }
+  #|    async function present(dir, name) {
+  #|      for await (const [entry] of dir.entries()) {
+  #|        if (entry === name)
+  #|          return true;
+  #|      }
+  #|      return false;
+  #|    }
+  #|    async function exact(dir, name) {
+  #|      if (!await present(dir, name))
+  #|        throw new DOMException("", "NotFoundError");
+  #|    }
   #|    async function writeText(store, relative, text) {
   #|      if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
   #|        return { kind: "unsupported" };
@@ -130,15 +141,20 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|      let writable;
   #|      try {
   #|        dir = store;
-  #|        for (const segment of segments)
-  #|          dir = await dir.getDirectoryHandle(segment, { create: true });
+  #|        for (const segment of segments) {
+  #|          const parent = dir;
+  #|          const existed = await present(parent, segment);
+  #|          dir = await parent.getDirectoryHandle(segment, { create: true });
+  #|          if (!existed && !await present(parent, segment))
+  #|            return { kind: "conflict" };
+  #|        }
   #|        let file;
-  #|        try {
+  #|        if (await present(dir, name))
   #|          file = await dir.getFileHandle(name, { create: false });
-  #|        } catch (error) {
-  #|          if (error?.name !== "NotFoundError")
-  #|            throw error;
+  #|        else {
   #|          file = await dir.getFileHandle(name, { create: true });
+  #|          if (!await present(dir, name))
+  #|            return { kind: "conflict" };
   #|          created = true;
   #|        }
   #|        if (typeof file.createWritable !== "function")
@@ -161,13 +177,6 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        const failure = storageFailure(error);
   #|        return error?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
   #|      }
-  #|    }
-  #|    async function exact(dir, name) {
-  #|      for await (const [entry] of dir.entries()) {
-  #|        if (entry === name)
-  #|          return;
-  #|      }
-  #|      throw new DOMException("", "NotFoundError");
   #|    }
   #|    async function removeFile(store, relative) {
   #|      const segments = relative.split("/");

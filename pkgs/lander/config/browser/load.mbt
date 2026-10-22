@@ -20,6 +20,24 @@ fn Backend::capability(self : Backend) -> String {
   match self {
     Urls(_) => "urls"
     Files(_) => "files"
+    Directory(_) => "directory"
+  }
+}
+
+///|
+/// Record absence, or raise the boundary error of a failed reply.
+fn answer_missing(
+  tree : @config.FileTree,
+  path : String,
+  kind : String,
+  operation : String,
+) -> @config.FileTree raise BrowserError {
+  match kind {
+    "missing" => tree.with_missing(path)
+    "aborted" => raise Aborted(operation~, path~)
+    "unsupported" => raise Unsupported(operation~, path~)
+    "permission" => raise PermissionDenied(operation~, path~)
+    _ => raise Io(operation~, path~)
   }
 }
 
@@ -90,6 +108,7 @@ pub async fn load(
   let mut tree = @config.FileTree::new()
   let answered : Set[@config.FileRequest] = Set([])
   let mut byte_budget = limits.bytes
+  let observed : Set[String] = Set([])
   while true {
     check_abort(signal, "")
     match @config.load(builder, tree) {
@@ -116,38 +135,72 @@ pub async fn load(
         for (request, mount) in pending {
           let path = request_path(request)
           check_abort(signal, path)
-          match request {
-            ListDir(_) =>
+          let relative = if path == mount.root {
+            ""
+          } else if mount.root == "/" {
+            path[1:].to_owned()
+          } else {
+            path[mount.root.length() + 1:].to_owned()
+          }
+          match (request, mount.backend) {
+            (ListDir(_), Directory(handle)) => {
+              let reply = @js_async.run_promise(task_signal => adapter.list_directory(handle, relative, signal, task_signal))
+              check_abort(signal, path)
+              match reply.kind() {
+                "listing" => {
+                  let entries : Array[@config.DirEntry] = []
+                  for i = 0; i < reply.count(); i = i + 1 {
+                    let name = reply.name_at(i)
+                    entries.push({ name, kind: if reply.directory_at(i) { Directory } else { File } })
+                  }
+                  entries.sort_by((a, b) => a.name.lexical_compare(b.name))
+                  let seen = if path == mount.root { [] } else { [path] }
+                  for entry in entries { seen.push(join(path, entry.name)) }
+                  for entry_path in seen {
+                    if !observed.contains(entry_path) {
+                      guard entry_budget > 0 else {
+                        raise LimitExceeded(operation="list", path~, limit="entries")
+                      }
+                      observed.add(entry_path)
+                      entry_budget -= 1
+                    }
+                  }
+                  tree = tree.with_listing(path, entries)
+                }
+                kind => tree = answer_missing(tree, path, kind, "list")
+              }
+            }
+            (ListDir(_), _) =>
               match mount.listings.get(path) {
                 Some(entries) => tree = tree.with_listing(path, entries)
                 None => tree = tree.with_missing(path)
               }
-            ReadFile(_) => {
-              if mount.kinds.get(path) != Some(File) {
-                tree = tree.with_missing(path)
-              } else {
-                let offset = if mount.root == "/" { 1 } else { mount.root.length() + 1 }
-                let relative = path[offset:].to_owned()
-                let reply = @js_async.run_promise(task_signal => match mount.backend {
-                  Urls(base) => adapter.read(base, relative, byte_budget, signal, task_signal)
-                  Files(files) => adapter.read_file(files[relative], byte_budget, signal, task_signal)
-                })
-                check_abort(signal, path)
-                match reply.kind() {
-                  "file" => {
-                    byte_budget -= reply.size()
-                    tree = tree.with_file(path, reply.text())
+            (ReadFile(_), Directory(_)) if path == mount.root => tree = tree.with_missing(path)
+            (ReadFile(_), backend) if backend is Directory(_) || mount.kinds.get(path) == Some(File) => {
+              let reply = @js_async.run_promise(task_signal => match mount.backend {
+                Urls(base) => adapter.read(base, relative, byte_budget, signal, task_signal)
+                Files(files) => adapter.read_file(files[relative], byte_budget, signal, task_signal)
+                Directory(handle) => adapter.read_directory_file(handle, relative, byte_budget, signal, task_signal)
+              })
+              check_abort(signal, path)
+              match reply.kind() {
+                "file" => {
+                  if mount.backend is Directory(_) && !observed.contains(path) {
+                    guard entry_budget > 0 else {
+                      raise LimitExceeded(operation="read", path~, limit="entries")
+                    }
+                    observed.add(path)
+                    entry_budget -= 1
                   }
-                  "missing" => tree = tree.with_missing(path)
-                  "http" => raise Http(operation="read", path~, status=reply.status())
-                  "limit" => raise LimitExceeded(operation="read", path~, limit="bytes")
-                  "aborted" => raise Aborted(operation="read", path~)
-                  "unsupported" => raise Unsupported(operation="read", path~)
-                  "permission" => raise PermissionDenied(operation="read", path~)
-                  _ => raise Io(operation="read", path~)
+                  byte_budget -= reply.size()
+                  tree = tree.with_file(path, reply.text())
                 }
+                "http" => raise Http(operation="read", path~, status=reply.status())
+                "limit" => raise LimitExceeded(operation="read", path~, limit="bytes")
+                kind => tree = answer_missing(tree, path, kind, "read")
               }
             }
+            (ReadFile(_), _) => tree = tree.with_missing(path)
           }
           answered.add(request)
         }

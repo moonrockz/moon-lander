@@ -472,6 +472,33 @@ a real directory. A spy on `Blob` content methods records each read. The
 consumer example maps `File.name` and `webkitRelativePath` explicitly and merges
 hosted defaults with the selected project.
 
+## Group 4 live directory handles
+
+`from_directory(handle, root~)` takes an external `DirectoryHandle`. Its
+`Backend` has no finite namespace. `load` asks the TypeScript boundary to list
+or read a relative path below the handle. The boundary resolves each segment
+with `create: false` and lists with `entries()`. It reads with `getFile()` and
+`text()`, and keeps the File size and UTF-8 checks of group 3. `NotFoundError`
+and `TypeMismatchError` while resolving give absence. `NotAllowedError` and
+`SecurityError` give `PermissionDenied`, and other failures give `Io`. A handle
+without the required methods gives `Unsupported`. Each operation races abort
+like a File read.
+
+WebKit on a case-insensitive macOS host resolved `acme.toml` to `Acme.toml`,
+and the returned handle repeated the requested name. The boundary therefore
+checks each segment against the names that `entries()` reports before it gets
+the child handle. Listed entries count toward the entry budget when observed,
+and each unique path counts once.
+
+WebKit rejects `navigator.storage.getDirectory()` with `UnknownError` in an
+ephemeral Playwright context, as in private browsing. Chromium and Firefox
+accept it. The directory tests therefore use a new persistent profile for each
+test in all three engines. Real OPFS handles prove successful I/O. Wrapped and
+fake handles inject denied, revoked, unreadable and pending operations; these do
+not test native picker UI. Spies on handle methods, pickers and permission
+requests, and a full OPFS snapshot, prove that loads create or change nothing.
+The adapter build rejects picker and permission APIs in the library bundle.
+
 ## Risks / Trade-offs
 
 - Promise or generated-FFI integration can fail in a real browser. Group 1 proves

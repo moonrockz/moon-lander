@@ -15,3 +15,8 @@ function selected(selector: string): File[] {
 }
 export function fileCount(selector: string) { return selected(selector).length; }
 export function fileAt(selector: string, index: number) { return selected(selector)[index]; }
+
+/** A directory handle that the test created in OPFS or wrapped for error injection. */
+export function handle(name: string) { return (globalThis as any).testHandles?.[name]; }
+/** Let the test change a live backend between two loads. */
+export async function between() { await (globalThis as any).betweenLoads?.(); return true; }

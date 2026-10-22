@@ -1,30 +1,33 @@
-type Reply = { kind: string; text: string; size: number; status: number };
+type Reply = { kind: string; text: string; size: number; status: number; names?: string[]; directories?: boolean[] };
 
 const failure = (kind: string): Reply => ({ kind, text: "", size: 0, status: 0 });
 
-/** Required Web APIs for one backend: "urls" or "files". */
+/** Required Web APIs for one backend: "urls", "files" or "directory". */
 export function supported(backend = "urls"): boolean {
   if (typeof AbortController !== "function" || typeof TextEncoder !== "function") return false;
-  if (backend === "files") return typeof Blob === "function" && typeof Blob.prototype.text === "function";
+  if (backend === "files" || backend === "directory") return typeof Blob === "function" && typeof Blob.prototype.text === "function";
   return typeof fetch === "function" && typeof TextDecoder === "function";
 }
 
-/** Classify a rejected Web API call. Exception text is never returned. */
-function classify(error: unknown): string {
+/**
+ * Classify a rejected Web API call. Exception text is never returned. A missing
+ * entry or a wrong entry kind is absent only where the caller allows it.
+ */
+function classify(error: unknown, absent = false): string {
   const name = (error as { name?: unknown } | null)?.name;
-  return name === "NotAllowedError" || name === "SecurityError" ? "permission" : "io";
+  if (name === "NotAllowedError" || name === "SecurityError") return "permission";
+  if (absent && (name === "NotFoundError" || name === "TypeMismatchError")) return "missing";
+  return "io";
 }
 
 /**
- * Read one selected File. Check its known size first, then its UTF-8 size.
- * File.text() cannot be aborted, so race it against abort and ignore a late result.
+ * Run Web API work that cannot be aborted. Race it against both signals, ignore
+ * a late result and remove the listeners. A rejection becomes a classified reply.
  */
-export async function readFile(
-  file: File, budget: number, signal: AbortSignal, taskSignal: AbortSignal,
+async function guarded(
+  signal: AbortSignal, taskSignal: AbortSignal, absent: boolean, work: () => Promise<Reply>,
 ): Promise<Reply> {
-  if (!supported("files")) return failure("unsupported");
   if (signal.aborted || taskSignal.aborted) return failure("aborted");
-  if (file.size > budget) return failure("limit");
   let release = () => {};
   const aborted = new Promise<Reply>(resolve => {
     const abort = () => resolve(failure("aborted"));
@@ -36,12 +39,88 @@ export async function readFile(
     };
   });
   try {
-    const read = Promise.resolve().then(() => file.text()).then(text => {
-      const size = new TextEncoder().encode(text).length;
-      return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
-    }, error => failure(classify(error)));
-    return await Promise.race([read, aborted]);
+    const done = Promise.resolve().then(work).catch(error => failure(classify(error, absent)));
+    return await Promise.race([done, aborted]);
   } finally { release(); }
+}
+
+/** Check a known size, read the text, then check its UTF-8 size. */
+async function text(file: File, budget: number): Promise<Reply> {
+  if (file.size > budget) return failure("limit");
+  const text = await file.text();
+  const size = new TextEncoder().encode(text).length;
+  return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
+}
+
+/** Read one selected File. File.text() is called only for a requested path. */
+export async function readFile(
+  file: File, budget: number, signal: AbortSignal, taskSignal: AbortSignal,
+): Promise<Reply> {
+  if (!supported("files")) return failure("unsupported");
+  return guarded(signal, taskSignal, false, () => text(file, budget));
+}
+
+/**
+ * Require an exact child name. Some engines resolve a name without case on a
+ * case-insensitive host file system, and the returned handle repeats the
+ * requested name, so compare with the names that entries() reports.
+ */
+async function exact(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
+  for await (const [entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+    if (entry === name) return;
+  }
+  throw new DOMException("", "NotFoundError");
+}
+
+/**
+ * Resolve directory segments below a caller-supplied handle, one at a time and
+ * with create: false. This never opens a picker or requests permission.
+ */
+async function directory(handle: FileSystemDirectoryHandle, segments: string[]): Promise<FileSystemDirectoryHandle> {
+  let current = handle;
+  for (const segment of segments) {
+    await exact(current, segment);
+    current = await current.getDirectoryHandle(segment, { create: false });
+  }
+  return current;
+}
+
+function usable(handle: FileSystemDirectoryHandle): boolean {
+  return supported("directory") && typeof handle?.getDirectoryHandle === "function" &&
+    typeof handle.getFileHandle === "function" && typeof (handle as any).entries === "function";
+}
+
+/** List the direct children of a relative directory ("" is the handle itself). */
+export async function listDirectory(
+  handle: FileSystemDirectoryHandle, relative: string, signal: AbortSignal, taskSignal: AbortSignal,
+): Promise<Reply> {
+  if (!usable(handle)) return failure("unsupported");
+  return guarded(signal, taskSignal, true, async () => {
+    const dir = await directory(handle, relative === "" ? [] : relative.split("/"));
+    const names: string[] = [], directories: boolean[] = [];
+    for await (const [name, entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
+      if (signal.aborted || taskSignal.aborted) return failure("aborted");
+      names.push(name);
+      directories.push(entry.kind === "directory");
+    }
+    return { kind: "listing", text: "", size: 0, status: 0, names, directories };
+  });
+}
+
+/** Read the text of a relative file below a caller-supplied handle. */
+export async function readDirectoryFile(
+  handle: FileSystemDirectoryHandle, relative: string, budget: number, signal: AbortSignal, taskSignal: AbortSignal,
+): Promise<Reply> {
+  if (!usable(handle)) return failure("unsupported");
+  return guarded(signal, taskSignal, true, async () => {
+    const segments = relative.split("/");
+    const name = segments.pop()!;
+    const dir = await directory(handle, segments);
+    await exact(dir, name);
+    const file = await (await dir.getFileHandle(name, { create: false })).getFile();
+    // Errors after the entry is found are not absence.
+    return text(file, budget).catch(error => failure(classify(error)));
+  });
 }
 
 export function normalizeBase(base: string): string {

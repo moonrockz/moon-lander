@@ -58,4 +58,8 @@ The browser API remains UI-free. The fixture page loads the compiled
 application, exports a test function, and holds plain file and directory inputs.
 Playwright puts real files into these inputs; `selected.spec.ts` maps them to
 selected-file mounts, records each `Blob` content read, and checks workspace
-discovery. Picker and selection UI belongs to consuming applications.
+discovery. `directory.spec.ts` creates real OPFS directories and also wraps
+handles to inject denied, revoked and pending operations. It uses the
+`persistent.ts` fixture, a new persistent profile for each test, because WebKit
+has no OPFS in an ephemeral context. Picker and selection UI belongs to
+consuming applications.

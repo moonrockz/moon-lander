@@ -46,6 +46,39 @@ extern "js" fn BrowserAdapter::read_file(
   #|(adapter, file, budget, signal, taskSignal) => adapter.readFile(file, budget, signal, taskSignal)
 
 ///|
+extern "js" fn BrowserAdapter::list_directory(
+  self : BrowserAdapter,
+  handle : DirectoryHandle,
+  relative : String,
+  signal : @js_async.AbortSignal,
+  task_signal : @js_async.AbortSignal,
+) -> @js_async.Promise[Reply] =
+  #|(adapter, handle, relative, signal, taskSignal) => adapter.listDirectory(handle, relative, signal, taskSignal)
+
+///|
+extern "js" fn BrowserAdapter::read_directory_file(
+  self : BrowserAdapter,
+  handle : DirectoryHandle,
+  relative : String,
+  budget : Int,
+  signal : @js_async.AbortSignal,
+  task_signal : @js_async.AbortSignal,
+) -> @js_async.Promise[Reply] =
+  #|(adapter, handle, relative, budget, signal, taskSignal) => adapter.readDirectoryFile(handle, relative, budget, signal, taskSignal)
+
+///|
+extern "js" fn Reply::count(self : Reply) -> Int =
+  #|reply => reply.names ? reply.names.length : 0
+
+///|
+extern "js" fn Reply::name_at(self : Reply, index : Int) -> String =
+  #|(reply, index) => reply.names[index]
+
+///|
+extern "js" fn Reply::directory_at(self : Reply, index : Int) -> Bool =
+  #|(reply, index) => reply.directories[index]
+
+///|
 extern "js" fn Reply::kind(self : Reply) -> String =
   #|reply => reply.kind
 

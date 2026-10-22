@@ -16,10 +16,18 @@ pub extern "js" fn File::webkit_relative_path(self : File) -> String =
   #|file => typeof file.webkitRelativePath === "string" ? file.webkitRelativePath : ""
 
 ///|
+/// A browser `FileSystemDirectoryHandle` that the application already holds,
+/// for example from its own picker or from OPFS. The adapter never opens a
+/// picker or requests permission.
+#external
+pub type DirectoryHandle
+
+///|
 /// The backend that answers the reads of one mount.
 priv enum Backend {
   Urls(String)
   Files(Map[String, File])
+  Directory(DirectoryHandle)
 }
 
 ///|
@@ -183,4 +191,14 @@ pub fn from_files(files : Array[(String, File)], root~ : String) -> Mount raise 
   }
   let (kinds, listings) = finite_namespace(root, paths, [], operation)
   { root, backend: Files(selected), kinds, listings }
+}
+
+///|
+/// Mount a caller-supplied directory handle at a canonical absolute virtual
+/// root. This is a live, read-only mount: a load lists and reads entries below
+/// the handle one segment at a time with `create: false`, and never writes.
+/// Each load caches its answers; a later load can see changed entries.
+pub fn from_directory(handle : DirectoryHandle, root~ : String) -> Mount raise BrowserError {
+  validate_path(root, absolute=true, operation="from_directory")
+  { root, backend: Directory(handle), kinds: Map::from_array([(root, Directory)]), listings: Map([]) }
 }

@@ -649,6 +649,99 @@ test "validation names each value and its source" {
 }
 ```
 
+## Named options
+
+`named(config, key, bind_one)` binds each child of a section as one named
+instance of the same type. It calls `bind_one` with the configuration and the
+key text of each child, for example `backends.ts`, so `bind_or`, `bind` and
+`validated` all fit in it. Each options value gets the child name as its
+instance name. The `Decode` and `Validation` failures of all instances raise
+one `Validation` error. A section that no source sets gives no instances.
+
+```mbt check
+///|
+struct BackendSettings {
+  out_dir : String
+  level : Int
+} derive(FromJson, ToJson)
+
+///|
+impl @config.Validate for BackendSettings with validate(self) {
+  if self.level > 0 {
+    []
+  } else {
+    [@config.violation(["level"], "must be positive")]
+  }
+}
+
+///|
+test "bind each backend as a named instance" {
+  let config = @config.build([
+    @config.in_memory_pairs([
+      ("backends.ts.out_dir", @config.string("dist/ts")),
+      ("backends.scala.level", @config.int(2)),
+    ]),
+  ])
+  let backends : @config.NamedOptions[BackendSettings] = config
+    |> @config.named("backends", (config, key) => {
+      config
+      |> @config.bind_or(key, ({ out_dir: "out", level: 1 } : BackendSettings))
+      |> @config.validated(config, key)
+    })
+  @expect.expect(backends.names()).to_equal(["ts", "scala"])
+  guard backends.get("ts") is Some(ts) else { fail("no ts instance") }
+  @expect.expect(ts.name).to_equal(Some("ts"))
+  @expect.expect(ts.key.to_string()).to_equal("backends.ts")
+  @expect.expect(ts.value.out_dir).to_equal("dist/ts")
+}
+```
+
+## Unknown keys
+
+`FromJson` ignores keys that a type does not read, so a misspelled key has no
+effect. `bind_or` can find these keys: with `unknown=Reject`, it writes the
+bound value back with `ToJson` and compares the keys. Each configured key that
+the written value does not hold is a failure with its sources, and all of them
+raise one `Validation` error. The check also looks in list items. The default
+is `Allow`, which ignores unknown keys.
+
+`Reject` is correct only when `ToJson` writes every key that `FromJson`
+accepts, under the same name. A derived `FromJson` and `ToJson` pair with the
+same arguments does this. A hand-written decoder can accept a key that its
+encoder does not write, for example an alias. For such a type, use
+`RejectExcept(keys)`. It accepts the listed key paths, relative to the section,
+and the keys below them.
+
+```mbt check
+///|
+test "a misspelled key is an error with its source" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/app.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.toml",
+    "ir.layout = \"split\"\nir.strict_mod = true",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  let default : IrSettings = { layout: "tree", strict_mode: false }
+  let ir = config |> @config.bind_or("ir", default)
+  @expect.expect(ir.strict_mode).to_equal(false)
+  try {
+    config |> @config.bind_or("ir", default, unknown=Reject) |> ignore
+  } catch {
+    error =>
+      @expect.expect(error.message()).to_equal(
+        "ir.strict_mod: is an unknown key (set in project /srv/app.toml)",
+      )
+  } noraise {
+    _ => fail("expected a validation error")
+  }
+  let legacy = config
+    |> @config.bind_or("ir", default, unknown=RejectExcept(["strict_mod"]))
+  @expect.expect(legacy.layout).to_equal("split")
+}
+```
+
 ## Environment variables and overrides
 
 An environment source reads the variables that start with its prefix. `__`

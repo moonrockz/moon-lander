@@ -144,16 +144,24 @@ fn[T : FromJson] decode(
 /// it. A failure in a value that the default gave has the blame `Default`. A
 /// secret reference in the configured section raises `Decode` before the
 /// merge. The default does not change.
+///
+/// `unknown` turns on the unknown-key check: with `Reject`, each configured
+/// key that the `ToJson` form of the result does not hold is a failure with
+/// its sources, and all of them raise one `Validation` error. The check is
+/// correct only when `ToJson` writes every key that `FromJson` accepts, under
+/// the same name; `RejectExcept` lists the other keys that the type accepts.
 pub fn[T : FromJson + ToJson] bind_or(
   config : Config,
   key : String,
   default : T,
+  unknown? : UnknownKeys = Allow,
 ) -> T raise ConfigError {
   let path = KeyPath::parse(key)
   // Synthetic roots keep the rule that a tree root is a struct, so a scalar or
   // list default works too.
   let default_root = fields([("value", { ion: @ion.Ion::Ion(ToJson::to_json(default)) })])
-  let merged = match config.get(path) {
+  let section = config.get(path)
+  let merged = match section {
     Some(section) => {
       config.check_no_secret(Some(path), section)
       merge(default_root, fields([("value", section)]))
@@ -162,7 +170,7 @@ pub fn[T : FromJson + ToJson] bind_or(
   }
   let value = merged.field("value").unwrap_or({ ion: @ion.Ion::Ion(Json::null()) })
   let json = section_json(config, Some(path), value)
-  decode(config, Some(path), json, blame=decode_path => {
+  let result : T = decode(config, Some(path), json, blame=decode_path => {
     match config.blame(decode_path) {
       Unset | Table([]) => {
         let below = match decode_path.key {
@@ -178,6 +186,10 @@ pub fn[T : FromJson + ToJson] bind_or(
       blame => blame
     }
   })
+  if section is Some(section) && !(unknown is Allow) {
+    config.check_unknown_keys(path, section, ToJson::to_json(result), unknown)
+  }
+  result
 }
 
 ///|
@@ -186,8 +198,9 @@ pub fn[T : FromJson + ToJson] Config::bind_or(
   self : Config,
   key : String,
   default : T,
+  unknown? : UnknownKeys = Allow,
 ) -> T raise ConfigError {
-  bind_or(self, key, default)
+  bind_or(self, key, default, unknown~)
 }
 
 ///|

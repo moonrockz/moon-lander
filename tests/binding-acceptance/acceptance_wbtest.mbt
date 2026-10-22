@@ -96,6 +96,39 @@ priv struct Telemetry {
 impl @config.Validate for Telemetry
 
 ///|
+/// One named backend: each child of `backends` is an instance.
+priv struct Backend {
+  level : Int
+} derive(FromJson, ToJson)
+
+///|
+impl @config.Validate for Backend with validate(self) {
+  if self.level > 0 {
+    []
+  } else {
+    [@config.violation(["level"], "must be positive")]
+  }
+}
+
+///|
+/// A server whose decoder accepts `port` as an alias of `endpoint`, but whose
+/// encoder writes only `endpoint`.
+priv struct Endpoint {
+  endpoint : Int
+} derive(ToJson)
+
+///|
+impl FromJson for Endpoint with from_json(json, path) {
+  guard json is Object(fields) else {
+    raise @json.JsonDecodeError((path, "Expected object"))
+  }
+  match (fields.get("port"), fields.get("endpoint")) {
+    (Some(value), _) | (None, Some(value)) => { endpoint: @json.from_json(value) }
+    (None, None) => raise @json.JsonDecodeError((path, "Missing field endpoint"))
+  }
+}
+
+///|
 /// The files of one scenario, the loaded configuration, and the outcome of the
 /// last binding: a result text or an error.
 priv struct BindingWorld {
@@ -254,6 +287,47 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
   ) => self.run(config => {
     let options : @config.Options[Telemetry] = @config.options(config, key)
     options.value.endpoint
+  }))
+  setup.when1("the application binds the named backends of {string}", (
+    key : String,
+  ) => self.run(config => {
+    let backends : @config.NamedOptions[Backend] = config
+      |> @config.named(key, (config, key) => {
+        config
+        |> @config.bind_or(key, ({ level: 1 } : Backend))
+        |> @config.validated(config, key)
+      })
+    backends
+    .names()
+    .map(name => {
+      guard backends.get(name) is Some(options) else { abort("no \{name}") }
+      let instance = options.name.unwrap_or("(none)")
+      "\{instance} at \{options.key} level \{options.value.level}"
+    })
+    .join(", ")
+  }))
+  setup.when1("the application binds {string} over the IR default with unknown keys rejected", (
+    key : String,
+  ) => self.run(config => {
+    let ir = config
+      |> @config.bind_or(
+        key,
+        ({ layout: "single-file", strict_mode: false } : IrOptions),
+        unknown=Reject,
+      )
+    "\{ir.layout} \{ir.strict_mode}"
+  }))
+  setup.when2("the application binds {string} over the endpoint default and accepts {string}", (
+    key : String,
+    accepted : String,
+  ) => self.run(config => {
+    let server = config
+      |> @config.bind_or(
+        key,
+        ({ endpoint: 80 } : Endpoint),
+        unknown=RejectExcept([accepted]),
+      )
+    server.endpoint.to_string()
   }))
   setup.then1("the result is {string}", (expected : String) => {
     @expect.expect(self.result).to_equal(Some(expected))
@@ -520,6 +594,61 @@ let feature : String =
   #|      """
   #|    When the application gets the options of "ir" with IR rules
   #|    Then the result is "ir split true"
+  #|
+  #|  Scenario: Each child is a named instance
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      backends.ts.level = 2
+  #|      backends.scala.level = 3
+  #|      """
+  #|    When the application binds the named backends of "backends"
+  #|    Then the result is "ts at backends.ts level 2, scala at backends.scala level 3"
+  #|
+  #|  Scenario: Failures in two instances
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      backends.ts.level = "high"
+  #|      """
+  #|    And the "user-override" file "/repo/morphir.user.toml":
+  #|      """toml
+  #|      backends.scala.level = 0
+  #|      """
+  #|    When the application binds the named backends of "backends"
+  #|    Then binding fails with a validation error at "backends.ts.level, backends.scala.level"
+  #|    And the error text is:
+  #|      """
+  #|      backends.ts.level: Int::from_json: expected number (set in project /repo/morphir.toml)
+  #|      backends.scala.level: must be positive (set in user-override /repo/morphir.user.toml)
+  #|      """
+  #|
+  #|  Scenario: Named options of an absent section
+  #|    When the application binds the named backends of "backends"
+  #|    Then the result is ""
+  #|
+  #|  Scenario: Unknown key ignored by default
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.strict_mod = true
+  #|      """
+  #|    When the application binds "ir" over the IR default
+  #|    Then the result is "single-file false"
+  #|
+  #|  Scenario: Accepted alias listed
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      server.port = 8080
+  #|      """
+  #|    When the application binds "server" over the endpoint default and accepts "port"
+  #|    Then the result is "8080"
+  #|
+  #|  Scenario: Unknown key rejected
+  #|    Given the "project" file "/repo/morphir.toml":
+  #|      """toml
+  #|      ir.strict_mod = true
+  #|      """
+  #|    When the application binds "ir" over the IR default with unknown keys rejected
+  #|    Then binding fails with a validation error at "ir.strict_mod"
+  #|    And the error text is "ir.strict_mod: is an unknown key (set in project /repo/morphir.toml)"
 
 ///|
 /// Run each scenario of `text` with a fresh world and fail on the first scenario

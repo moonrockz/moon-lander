@@ -246,3 +246,72 @@ pub fn api_prose_link(
   let page = base_path + api_route(package_path)[1:].to_owned()
   Ok(if anchor == "" { page } else { "\{page}#\{anchor}" })
 }
+
+///|
+/// The first sentence of plain text: the text up to the first `.`, `!` or `?` that ends a word, or all
+/// of the text.
+pub fn first_sentence(text : String) -> String {
+  let flat = text.split("\n").map(l => l.trim().to_owned()).collect().join(" ").trim().to_owned()
+  for i in 0..<flat.length() {
+    let c = flat.code_unit_at(i)
+    if (c == '.' || c == '!' || c == '?') &&
+      (i + 1 == flat.length() || flat.code_unit_at(i + 1) == ' ') {
+      return flat[:i + 1].to_owned()
+    }
+  }
+  flat
+}
+
+///|
+/// The search entries of the items and methods of `api`, in page order. The route is the API page
+/// with the anchor, the title is the name (`<Type>::<method>` for a method), the section is `API`,
+/// the heading is the package path, and the summary is the first sentence of `plain(entry)`, the
+/// docstring as plain text.
+pub fn api_search_entries(
+  api : ApiPackage,
+  plain : (ApiEntry) -> String,
+) -> Array[SearchEntry] {
+  let out = []
+  let route = api_route(api.path)
+  let add = (anchor : String, title : String, entry : ApiEntry) => {
+    let summary = first_sentence(plain(entry))
+    out.push({
+      route: "\{route}#\{anchor}",
+      title,
+      section: "API",
+      summary,
+      headings: [api.path],
+      text: "\{api.path} \{summary}",
+    })
+  }
+  let add_item = (item : ApiItem, below_trait : Bool) => {
+    let name = item.entry.name
+    add(name, name, item.entry)
+    for entry in item.methods {
+      add(api_method_anchor(name, entry.name), "\{name}::\{entry.name}", entry)
+    }
+    for impl_ in item.impls {
+      let via = impl_.via(below_trait~)
+      for entry in impl_.methods {
+        add(
+          api_method_anchor(name, entry.name, via~),
+          "\{name}::\{entry.name}",
+          entry,
+        )
+      }
+    }
+  }
+  for item in api.types {
+    add_item(item, false)
+  }
+  for item in api.errors {
+    add_item(item, false)
+  }
+  for item in api.traits {
+    add_item(item, true)
+  }
+  for entry in api.aliases + api.values {
+    add(entry.name, entry.name, entry)
+  }
+  out
+}

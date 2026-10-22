@@ -32,7 +32,7 @@ pub fn prepare(@model.SiteConfig, Array[SourceFile], main_build~ : Bool, api? : 
 
 pub fn resolve(LinkContext, String, String) -> Resolution
 
-pub fn search_index(Array[Page]) -> String
+pub fn search_index(Array[Page], api? : Array[@model.SearchEntry]) -> String
 
 pub fn toc_entries(Array[@content.Heading]) -> Array[@model.TocEntry]
 
@@ -54,6 +54,7 @@ pub(all) struct ApiSite {
 }
 pub fn ApiSite::anchors(Self) -> Map[String, Array[String]]
 pub fn ApiSite::package_paths(Self) -> Array[String]
+pub fn ApiSite::search_entries(Self) -> Array[@model.SearchEntry]
 
 pub(all) struct Built {
   outputs : Array[Output]

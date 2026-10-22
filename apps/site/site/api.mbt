@@ -47,6 +47,28 @@ pub fn ApiSite::anchors(self : ApiSite) -> Map[String, Array[String]] {
 }
 
 ///|
+/// The search entries of every API item and method, with the first sentence of each docstring.
+pub fn ApiSite::search_entries(self : ApiSite) -> Array[@model.SearchEntry] {
+  let plain = (entry : @model.ApiEntry) => {
+    let source = docstring_source(entry.docstring)
+    if source.trim() == "" {
+      return ""
+    }
+    let doc = @content.render_markdown("docstring", source) catch {
+      _ => return source
+    }
+    @content.plain_text(doc.html)
+  }
+  let out = []
+  for m in self.modules {
+    for p in m.packages {
+      out.append(@model.api_search_entries(p, plain))
+    }
+  }
+  out
+}
+
+///|
 /// The sidebar of the API pages: the index, then each module with its packages.
 fn api_nav(site : ApiSite) -> Array[@model.NavItem] {
   let items : Array[@model.NavItem] = [

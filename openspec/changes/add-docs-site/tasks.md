@@ -106,7 +106,7 @@ Bead: lander-4us.7.10
 - [x] 10.5 Add source links at the built commit from `git rev-parse HEAD`, `loc.path` and `loc.file`; verify the "Source link" scenario with a unit test of the URL function.
 - [x] 10.6 Add the package index at `/api/` from `module_index.json` with README summaries, and the header "API" link; verify the "Index" scenario.
 - [x] 10.7 Add `api:` link resolution to the link pass and fail on an unknown package, item or method; document the syntax in `docs/WRITING_FOR_THE_SITE.md`; verify the "Item link" and "Unknown item" scenarios.
-- [ ] 10.8 Add API items and methods to the search index; verify the "API item result" scenario logic with a `model` search test.
+- [x] 10.8 Add API items and methods to the search index; verify the "API item result" scenario logic with a `model` search test.
 - [x] 10.9 Add the missing-docstring warnings to `check:site`; verify the "Item without a docstring" scenario with a fixture.
 - [ ] 10.10 Add the API page check of design D16 to the browser test; verify that `mise run test:site` passes and `mise run check` passes.
 

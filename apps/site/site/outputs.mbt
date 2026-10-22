@@ -135,7 +135,9 @@ pub async fn build(
     ),
   )
   outputs.push(Text("articles/atom.xml", atom_feed(config, articles)))
-  outputs.push(Text("search-index.json", search_index(pages)))
+  outputs.push(
+    Text("search-index.json", search_index(pages, api=api.search_entries())),
+  )
   outputs.append(api_outputs(config, api))
   for copy in prepared.copies {
     outputs.push(Copy(copy.0, copy.1))

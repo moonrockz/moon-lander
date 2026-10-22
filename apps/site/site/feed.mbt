@@ -64,8 +64,12 @@ fn first_chars(text : String, limit : Int32) -> String {
 }
 
 ///|
-/// The JSON search index of every page except full HTML pages and the landing page.
-pub fn search_index(pages : Array[Page]) -> String {
+/// The JSON search index of every page except full HTML pages and the landing page, then the
+/// entries of `api`.
+pub fn search_index(
+  pages : Array[Page],
+  api~ : Array[@model.SearchEntry] = [],
+) -> String {
   let entries = pages
     .filter(p => !p.full && p.route != "/")
     .map(p => {
@@ -79,5 +83,5 @@ pub fn search_index(pages : Array[Page]) -> String {
         text: first_chars(p.text, 2000),
       }.to_json()
     })
-  Json::array(entries).stringify()
+  Json::array(entries + api.map(e => e.to_json())).stringify()
 }

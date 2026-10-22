@@ -755,6 +755,23 @@ fn document_index(
     }
     return (@reference.SchemaIndex::new(set, limits~), Some(resource.uri()))
   }
+  // A different registered value at the base conflicts with the input, which
+  // stays authoritative for its own content; validate reports the conflict.
+  let resources = match registered {
+    Some(resource) => {
+      let identity = resource.uri().identity()
+      match
+        @reference.ResourceSet::new(
+          resources.resources().filter(r => r.uri().identity() != identity),
+          root_base=resources.root_base(),
+          limits=@exact.Limits::unlimited(),
+        ) {
+        Ok(set) => set
+        Err(_) => resources
+      }
+    }
+    None => resources
+  }
   (
     @reference.SchemaIndex::new(
       resources,
@@ -931,6 +948,14 @@ fn finish(
     version,
     profile,
   }
+  // A facet with a computed error stays failed even if truncation drops it.
+  let failed = [Model, SchemaDocument, References, Normative, Artifact].filter(phase => {
+    unique.any(f => {
+      f.phase == phase &&
+      f.severity == Error &&
+      f.diagnostic.code() != @exact.LimitExceeded
+    })
+  })
   let max = limits.max_findings()
   let findings = if unique.length() > max {
     unique[:if max < 0 { 0 } else { max }].to_owned()
@@ -946,7 +971,10 @@ fn finish(
   for phase in [Model, SchemaDocument, References, Normative, Artifact] {
     if truncated.contains(phase) {
       findings.push(
-        marker(phase, "Finding limit exceeded; later findings were omitted"),
+        marker(
+          phase,
+          "Finding limit max_findings=\{max} exceeded; later findings were omitted",
+        ),
       )
     }
   }
@@ -954,14 +982,19 @@ fn finish(
     findings.push(marker(References, "Reference index is incomplete"))
   }
   findings.sort_by(compare_findings)
+  let facet = phase => if failed.contains(phase) {
+    Failed
+  } else {
+    coverage(findings, phase)
+  }
   {
     profile,
     version,
-    model: coverage(findings, Model),
-    schemas: coverage(findings, SchemaDocument),
-    references: coverage(findings, References),
-    normative: coverage(findings, Normative),
-    artifact: coverage(findings, Artifact),
+    model: facet(Model),
+    schemas: facet(SchemaDocument),
+    references: facet(References),
+    normative: facet(Normative),
+    artifact: facet(Artifact),
     findings,
   }
 }
@@ -992,6 +1025,17 @@ pub fn validate(
       None
     }
     _ => base
+  }
+  if base is Some(uri) &&
+    resources.get(uri) is Some(registered) &&
+    !(registered.value().equals(document.value, limits~) is Ok(true)) {
+    add(
+      findings,
+      @exact.ConflictingIdentifier,
+      "Base URI names a registered resource with different content; the input document is used",
+      [],
+      References,
+    )
   }
   let (index, owner) = document_index(document, resources, base, limits)
   for d in index.diagnostics() {
@@ -1065,6 +1109,7 @@ pub fn validate(
   }
   let methods = []
   let errors = []
+  let mut methods_complete = true
   for i, raw_method in raw_methods {
     guard check.typed(
         raw_method,
@@ -1074,6 +1119,7 @@ pub fn validate(
         method_decoder,
       )
       is Some(method_) else {
+      methods_complete = false
       continue
     }
     methods.push(method_)
@@ -1097,7 +1143,7 @@ pub fn validate(
       child(method_.path, "servers"),
       chain~,
     )
-    let param_names : Map[String, Site] = Map([])
+    let param_names : Map[String, Array[Site]] = Map([])
     let mut optional_seen = false
     let raw_params = match method_.value.value.get("params") {
       Some(raw) =>
@@ -1138,9 +1184,9 @@ pub fn validate(
             "Parameter names must be unique",
             param_site,
             chain=desc.chain,
-            related=[first],
+            related=first,
           )
-        None => param_names[desc.value.name] = param_site
+        None => param_names[desc.value.name] = [param_site, ..desc.chain]
       }
       let required = desc.value.required.unwrap_or(false)
       if required && optional_seen {
@@ -1244,6 +1290,7 @@ pub fn validate(
           }
         }
         if document.components is Some(typed) {
+          check.component_keys(typed, owner)
           let at = (table, key : ComponentKey) => {
             ["components", table, key.to_string()]
           }
@@ -1287,7 +1334,7 @@ pub fn validate(
         )
     }
   }
-  check.uniqueness(methods, errors)
+  check.uniqueness(methods, errors, methods_complete~)
   check.artifact(document, owner)
   finish(
     findings,

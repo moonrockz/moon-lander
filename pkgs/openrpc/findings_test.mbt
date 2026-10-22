@@ -186,3 +186,49 @@ test "a truncated reference index is reported as a limit" {
     }),
   )
 }
+
+///|
+test "truncation keeps a facet that failed failed" {
+  let document = doc(
+    "\"methods\":[{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]}],\"components\":{\"schemas\":{\"S\":{\"pattern\":\"(\"}}}",
+  )
+  let report = @openrpc.validate(
+    document,
+    limits=@exact.Limits::new(max_findings=1),
+  )
+  assert_eq(report.schemas(), @openrpc.Failed)
+  assert_eq(report.normative(), @openrpc.Failed)
+  let marker = report
+    .findings()
+    .filter(f => f.diagnostic().code() == @exact.LimitExceeded)[0]
+  assert_true(marker.diagnostic().message().contains("max_findings"))
+  assert_true(marker.diagnostic().message().contains("1"))
+}
+
+///|
+test "a base naming different registered content keeps the input authoritative" {
+  let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"a\",\"params\":[{\"$ref\":\"#/components/contentDescriptors/m\"}]}],\"components\":{\"contentDescriptors\":{\"m\":{\"name\":\"m\",\"schema\":true}}}}"
+  let other = source.replace(
+    old="{\"name\":\"m\",\"schema\":true}",
+    new="{\"name\":\"m\",\"schema\":true,\"foo\":1}",
+  )
+  let base = uri("https://doc.test/api.json")
+  let registered = @reference.Resource::new(base, exact(other)).unwrap()
+  let read = @openrpc.read(source)
+  let report = @openrpc.validate(
+    read.document().unwrap(),
+    resources=@reference.ResourceSet::new([registered]).unwrap(),
+    base=Some(base),
+    source_map=read.source_map(),
+  )
+  assert_false(
+    report
+    .findings()
+    .any(f => f.diagnostic().code() == @exact.UnknownField),
+  )
+  let conflict = report
+    .findings()
+    .filter(f => f.diagnostic().code() == @exact.ConflictingIdentifier)
+  assert_eq(conflict.length(), 1)
+  assert_eq(report.references(), @openrpc.Failed)
+}

@@ -93,14 +93,7 @@ fn[T] component_entries(
   Some(
     object(raw, at).map(entry => {
       let key_path = child(at, entry.0)
-      let key = match ComponentKey::parse(entry.0) {
-        Ok(key) => key
-        Err(d) =>
-          raise DecodeError(
-            @exact.Diagnostic::new(d.code(), d.message(), path=key_path),
-          )
-      }
-      (key, decode(entry.1, key_path, limits))
+      (ComponentKey::from_wire(entry.0), decode(entry.1, key_path, limits))
     }),
   )
 }

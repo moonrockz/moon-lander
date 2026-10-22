@@ -32,6 +32,19 @@ pub fn ComponentKey::parse(
 }
 
 ///|
+/// Retain a component key exactly as read. Whether it follows a version's key
+/// grammar is a validation result, not a reading failure.
+pub fn ComponentKey::from_wire(text : String) -> ComponentKey {
+  { text, }
+}
+
+///|
+/// Whether the key matches `^[a-zA-Z0-9.\-_]+$`.
+pub fn ComponentKey::is_conforming(self : ComponentKey) -> Bool {
+  ComponentKey::parse(self.text) is Ok(_)
+}
+
+///|
 pub fn ComponentKey::to_string(self : ComponentKey) -> String {
   self.text
 }

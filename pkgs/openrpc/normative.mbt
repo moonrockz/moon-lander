@@ -235,8 +235,9 @@ fn Check::uniqueness(
   self : Check,
   methods : Array[Resolved[Method]],
   errors : Array[Array[Resolved[ErrorObject]]],
+  methods_complete~ : Bool,
 ) -> Unit {
-  let names : Map[String, Site] = Map([])
+  let names : Map[String, Array[Site]] = Map([])
   for method_ in methods {
     let site = Site::{
       resource: method_.owner,
@@ -249,37 +250,90 @@ fn Check::uniqueness(
           "Method names must be unique",
           site,
           chain=method_.chain,
-          related=[first],
+          related=first,
         )
-      None => names[method_.value.name.text] = site
+      None => names[method_.value.name.text] = [site, ..method_.chain]
     }
   }
   for method_errors in errors {
-    let seen : Array[(@domain.ErrorCode, Site)] = []
+    let seen : Map[String, Array[Site]] = Map([])
     for error in method_errors {
       let site = Site::{ resource: error.owner, path: child(error.path, "code") }
-      let code = error.value.code()
-      match seen.search_by(entry => entry.0.number().numeric_equal(code.number())) {
-        Some(i) =>
+      let key = error.value.code().number().numeric_key()
+      match seen.get(key) {
+        Some(first) =>
           self.normative(
             @exact.DuplicateErrorCode,
             "Error codes must be unique within a method",
             site,
             chain=error.chain,
-            related=[seen[i].1],
+            related=first,
           )
-        None => seen.push((code, site))
+        None => seen[key] = [site, ..error.chain]
       }
     }
   }
   for link in self.links {
-    if !names.contains(link.0) {
+    if !names.contains(link.0) && !methods_complete {
+      // An unresolved method could have this name.
+      add(
+        self.findings,
+        @exact.UnsupportedCheck,
+        "Link target not checked because a method did not resolve",
+        link.1.path,
+        Normative,
+        severity=Information,
+        resource=link.1.resource,
+        chain=link.2,
+      )
+    } else if !names.contains(link.0) {
       self.normative(
         @exact.UnknownMethod,
         "Link method must name an existing method",
         link.1,
         chain=link.2,
       )
+    }
+  }
+}
+
+///|
+/// OpenRPC 1.3.2 requires component keys to match `^[a-zA-Z0-9.\-_]+$`. The
+/// 1.4 tables state no key grammar; its artifact pattern is checked there.
+fn Check::component_keys(
+  self : Check,
+  components : Components,
+  owner : @reference.UriReference?,
+) -> Unit {
+  guard legacy(self.version) else { return }
+  let tables : Array[(String, Array[ComponentKey])] = [
+    ("schemas", components.schemas().unwrap_or([]).map(e => e.0)),
+    (
+      "contentDescriptors",
+      components.content_descriptors().unwrap_or([]).map(e => e.0),
+    ),
+    ("examples", components.examples().unwrap_or([]).map(e => e.0)),
+    ("links", components.links().unwrap_or([]).map(e => e.0)),
+    ("errors", components.errors().unwrap_or([]).map(e => e.0)),
+    ("tags", components.tags().unwrap_or([]).map(e => e.0)),
+    (
+      "examplePairings",
+      components.example_pairings().unwrap_or([]).map(e => e.0),
+    ),
+    (
+      "examplePairingObjects",
+      components.example_pairing_objects().unwrap_or([]).map(e => e.0),
+    ),
+  ]
+  for table in tables {
+    for key in table.1 {
+      if !key.is_conforming() {
+        self.normative(
+          @exact.InvalidValue,
+          "Component keys must match ^[a-zA-Z0-9.\\-_]+$",
+          { resource: owner, path: ["components", table.0, key.to_string()] },
+        )
+      }
     }
   }
 }

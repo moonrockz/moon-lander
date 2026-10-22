@@ -95,14 +95,17 @@ test "draft seven references ignore a sibling identifier scope" {
 }
 
 ///|
-test "invalid schema component keys fail typed lowering and retain source" {
+test "component keys are read as written and checked by version" {
   let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"components\":{\"schemas\":{\"bad key!\":true}}}"
-  let result = @openrpc.read(source)
-  assert_true(result.document() is None)
-  assert_eq(result.cst().unwrap().reproduce(), source)
-  assert_eq(result.diagnostics()[0].path(), [
-    "components", "schemas", "bad key!",
-  ])
+  let document = @openrpc.read(source).document().unwrap()
+  let key = document.components().unwrap().schemas().unwrap()[0].0
+  assert_eq(key.to_string(), "bad key!")
+  assert_false(key.is_conforming())
+  assert_true(@openrpc.write(document).unwrap().contains("\"bad key!\":true"))
+  let old = @openrpc.read(source.replace(old="1.4.0", new="1.3.2"))
+    .document()
+    .unwrap()
+  assert_eq(@openrpc.validate(old).normative(), @openrpc.Failed)
 }
 
 ///|

@@ -100,6 +100,14 @@ fn Number::normalized(self : Number) -> (Bool, String, @bigint.BigInt) {
 }
 
 ///|
+/// A key that is equal exactly when the numbers are numerically equal, for
+/// hashing many values without pairwise comparison.
+pub fn Number::numeric_key(self : Number) -> String {
+  let (negative, digits, exponent) = self.normalized()
+  (if negative { "-" } else { "" }) + digits + "e" + exponent.to_string()
+}
+
+///|
 pub fn Number::numeric_equal(self : Number, other : Number) -> Bool {
   let a = self.normalized()
   let b = other.normalized()

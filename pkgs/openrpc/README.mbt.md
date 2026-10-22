@@ -108,7 +108,7 @@ these constructors do not impose a common string restriction on unrelated fields
 
 | Facet | Checks |
 | --- | --- |
-| `model` | Referenced objects decode as the expected kind |
+| `model` | Objects reached by validation decode into the typed model |
 | `schemas` | Embedded draft-07 schema documents, including regex syntax |
 | `references` | Every reference resolves within the supplied resources |
 | `normative` | Rules from the pinned prose of the document's version |
@@ -117,9 +117,12 @@ these constructors do not impose a common string restriction on unrelated fields
 Normative rules follow the document version. Both versions require unique
 method names, unique parameter names per method, unique error codes per method
 (exact integer equality, so `1` and `1e0` collide) and links that name an
-existing method, all checked after references resolve. Required parameters
-must precede optional ones. OpenRPC 1.3.2 also requires server, license and
-link names; the 1.4 tables do not. Members outside a version's field table are
+existing method, all checked after references resolve. A referenced target of
+the wrong kind is a `references` failure. Required parameters must precede
+optional ones. OpenRPC 1.3.2 also requires server, license and link names and
+component keys matching `^[a-zA-Z0-9.\-_]+$`; the 1.4 tables state neither.
+Reading keeps any component key as written. While a method fails to resolve,
+link targets are left unchecked and the facet is incomplete. Members outside a version's field table are
 `UnknownField` warnings and never fail the facet.
 
 The artifact facet uses the frozen 1.3.2 meta-schema (release 1.14.9) or the

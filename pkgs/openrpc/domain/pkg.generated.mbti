@@ -18,6 +18,8 @@ pub struct ComponentKey {
   text : String
 } derive(Eq, @debug.Debug)
 pub fn ComponentKey::equal(Self, Self) -> Bool
+pub fn ComponentKey::from_wire(String) -> Self
+pub fn ComponentKey::is_conforming(Self) -> Bool
 pub fn ComponentKey::not_equal(Self, Self) -> Bool
 pub fn ComponentKey::parse(String) -> Result[Self, @json.Diagnostic]
 pub fn ComponentKey::to_repr(Self) -> @debug.Repr

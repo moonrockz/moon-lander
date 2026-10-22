@@ -226,12 +226,70 @@ test "server variables keep their versioned field table" {
 }
 
 ///|
-test "component keys outside the OpenRPC grammar do not form a document" {
-  let read = @openrpc.read(
-    "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"components\":{\"errors\":{\"a b\":{\"code\":1,\"message\":\"x\"}}}}",
+test "component keys outside the 1.3.2 grammar are normative errors" {
+  let body = "\"methods\":[],\"components\":{\"errors\":{\"a b\":{\"code\":1,\"message\":\"x\"}}}"
+  for
+    profile in [@openrpc.Specification, @openrpc.MetaschemaCompatibility] {
+    let report = @openrpc.validate(versioned("1.3.2", body), profile~)
+    assert_eq(normative(report), [
+      (@exact.InvalidValue, @openrpc.Error, ["components", "errors", "a b"]),
+    ])
+  }
+  let modern = @openrpc.validate(versioned("1.4.0", body))
+  assert_eq(normative(modern), [])
+  assert_eq(modern.artifact(), @openrpc.Passed)
+}
+
+///|
+test "unresolved methods leave link targets unchecked, not failed" {
+  let report = @openrpc.validate(
+    versioned(
+      "1.4.0",
+      "\"methods\":[{\"$ref\":\"https://x.test/m.json#/m\"},{\"name\":\"b\",\"params\":[],\"links\":[{\"name\":\"l\",\"method\":\"a\"}]}]",
+    ),
   )
-  assert_true(read.document() is None)
-  assert_eq(read.diagnostics().map(d => d.path()), [
-    ["components", "errors", "a b"],
+  assert_false(
+    report
+    .findings()
+    .any(f => f.diagnostic().code() == @exact.UnknownMethod),
+  )
+  assert_eq(report.normative(), @openrpc.Incomplete)
+}
+
+///|
+test "duplicates reached through references relate both sites" {
+  let report = @openrpc.validate(
+    versioned(
+      "1.4.0",
+      "\"methods\":[{\"$ref\":\"#/x-m\"},{\"$ref\":\"#/x-m\"}],\"x-m\":{\"name\":\"a\",\"params\":[]}",
+    ),
+  )
+  let duplicate = report
+    .findings()
+    .filter(f => f.diagnostic().code() == @exact.DuplicateName)[0]
+  assert_true(
+    duplicate.related().map(r => r.path()).contains(["methods", "0", "$ref"]),
+  )
+}
+
+///|
+test "many distinct error codes are checked in near-linear time" {
+  let errors = []
+  for i in 0..<20000 {
+    errors.push("{\"code\":\{i}e0,\"message\":\"m\"}")
+  }
+  errors.push("{\"code\":7,\"message\":\"dup\"}")
+  let document = versioned(
+    "1.4.0",
+    "\"methods\":[{\"name\":\"a\",\"params\":[],\"errors\":[" +
+    errors.join(",") +
+    "]}]",
+  )
+  let duplicates = @openrpc.validate(document)
+    .findings()
+    .filter(f => f.diagnostic().code() == @exact.DuplicateErrorCode)
+  assert_eq(duplicates.length(), 1)
+  assert_eq(duplicates[0].location().path(), [
+    "methods", "0", "errors", "20000", "code",
   ])
 }

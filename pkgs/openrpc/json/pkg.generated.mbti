@@ -150,6 +150,7 @@ pub fn Number::is_integer(Self) -> Bool
 pub fn Number::not_equal(Self, Self) -> Bool
 pub fn Number::numeric_compare(Self, Self) -> Int
 pub fn Number::numeric_equal(Self, Self) -> Bool
+pub fn Number::numeric_key(Self) -> String
 pub fn Number::parse(String) -> Result[Self, Diagnostic]
 pub fn Number::to_repr(Self) -> @debug.Repr
 pub fn Number::token(Self) -> String

@@ -112,7 +112,6 @@ test "new known fields reject wrong shapes without losing the source CST" {
       "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\",\"contact\":null},\"methods\":[]}",
       "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"servers\":[{\"url\":17}]}",
       "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"components\":{\"errors\":{\"E\":{\"code\":1.5,\"message\":\"bad\"}}}}",
-      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"components\":{\"schemas\":{\"bad key!\":true}}}",
     ] {
     let result = @openrpc.read(source)
     assert_true(result.document() is None, msg=source)

@@ -68,16 +68,47 @@ async fn selected(files : FileList, base : String) -> String {
 }
 
 ///|
+/// Load a directory handle that the application already holds, for example from
+/// its own native picker. The library never opens a picker or asks permission.
+async fn directory(handle : @browser.DirectoryHandle, base : String) -> String {
+  let defaults = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/defaults")
+  let project = @browser.from_directory(handle, root="/workspace")
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/defaults/acme.toml")
+    |> @config.working_dir("/workspace/src")
+    |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+  let config = @browser.load(builder, [defaults, project])
+  let server : Server = @config.bind(config, "server")
+  let origin = config.origins(@config.KeyPath::parse("server.host"))[0].location.unwrap_or("none")
+  "\{server.host}:\{server.port} from \{origin}"
+}
+
+///|
 extern "js" fn expose(
   load : (String) -> @js_async.Promise[String],
   load_selected : (FileList, String) -> @js_async.Promise[String],
+  load_directory : (@browser.DirectoryHandle, String) -> @js_async.Promise[String],
 ) -> Unit =
-  #|(load, loadSelected) => {
+  #|(load, loadSelected, loadDirectory) => {
   #|  globalThis.loadHostedServer = load;
   #|  globalThis.loadSelectedServer = loadSelected;
+  #|  globalThis.loadDirectoryServer = loadDirectory;
+  #|  // Capability detection belongs to the application. A native directory
+  #|  // picker, a directory input and OPFS are separate capabilities: OPFS
+  #|  // support does not imply a picker. Without a picker, use an input.
+  #|  globalThis.browserCapabilities = () => ({
+  #|    directoryPicker: typeof globalThis.showDirectoryPicker === "function",
+  #|    directoryInput: typeof HTMLInputElement === "function" && "webkitdirectory" in HTMLInputElement.prototype,
+  #|    originPrivateStorage: typeof navigator.storage?.getDirectory === "function",
+  #|  });
   #|}
 
 ///|
 fn main {
-  expose(base => @js_async.Promise::from_async(() => hosted(base)), (files, base) => @js_async.Promise::from_async(() => selected(files, base)))
+  expose(
+    base => @js_async.Promise::from_async(() => hosted(base)),
+    (files, base) => @js_async.Promise::from_async(() => selected(files, base)),
+    (handle, base) => @js_async.Promise::from_async(() => directory(handle, base)),
+  )
 }

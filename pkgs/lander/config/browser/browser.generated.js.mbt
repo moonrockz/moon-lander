@@ -11,21 +11,21 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|    function supported(backend = "urls") {
   #|      if (typeof AbortController !== "function" || typeof TextEncoder !== "function")
   #|        return false;
-  #|      if (backend === "files")
+  #|      if (backend === "files" || backend === "directory")
   #|        return typeof Blob === "function" && typeof Blob.prototype.text === "function";
   #|      return typeof fetch === "function" && typeof TextDecoder === "function";
   #|    }
-  #|    function classify(error) {
+  #|    function classify(error, absent = false) {
   #|      const name = error?.name;
-  #|      return name === "NotAllowedError" || name === "SecurityError" ? "permission" : "io";
+  #|      if (name === "NotAllowedError" || name === "SecurityError")
+  #|        return "permission";
+  #|      if (absent && (name === "NotFoundError" || name === "TypeMismatchError"))
+  #|        return "missing";
+  #|      return "io";
   #|    }
-  #|    async function readFile(file, budget, signal, taskSignal) {
-  #|      if (!supported("files"))
-  #|        return failure("unsupported");
+  #|    async function guarded(signal, taskSignal, absent, work) {
   #|      if (signal.aborted || taskSignal.aborted)
   #|        return failure("aborted");
-  #|      if (file.size > budget)
-  #|        return failure("limit");
   #|      let release = () => {};
   #|      const aborted = new Promise((resolve) => {
   #|        const abort = () => resolve(failure("aborted"));
@@ -37,14 +37,60 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        };
   #|      });
   #|      try {
-  #|        const read = Promise.resolve().then(() => file.text()).then((text) => {
-  #|          const size = new TextEncoder().encode(text).length;
-  #|          return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
-  #|        }, (error) => failure(classify(error)));
-  #|        return await Promise.race([read, aborted]);
+  #|        const done = Promise.resolve().then(work).catch((error) => failure(classify(error, absent)));
+  #|        return await Promise.race([done, aborted]);
   #|      } finally {
   #|        release();
   #|      }
+  #|    }
+  #|    async function text(file, budget) {
+  #|      if (file.size > budget)
+  #|        return failure("limit");
+  #|      const text = await file.text();
+  #|      const size = new TextEncoder().encode(text).length;
+  #|      return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
+  #|    }
+  #|    async function readFile(file, budget, signal, taskSignal) {
+  #|      if (!supported("files"))
+  #|        return failure("unsupported");
+  #|      return guarded(signal, taskSignal, false, () => text(file, budget));
+  #|    }
+  #|    async function directory(handle, segments) {
+  #|      let current = handle;
+  #|      for (const segment of segments)
+  #|        current = await current.getDirectoryHandle(segment, { create: false });
+  #|      return current;
+  #|    }
+  #|    function usable(handle) {
+  #|      return supported("directory") && typeof handle?.getDirectoryHandle === "function" && typeof handle.getFileHandle === "function" && typeof handle.entries === "function";
+  #|    }
+  #|    async function listDirectory(handle, relative, limit, signal, taskSignal) {
+  #|      if (!usable(handle))
+  #|        return failure("unsupported");
+  #|      return guarded(signal, taskSignal, true, async () => {
+  #|        const dir = await directory(handle, relative === "" ? [] : relative.split("/"));
+  #|        const names = [], directories = [];
+  #|        for await (const [name, entry] of dir.entries()) {
+  #|          if (signal.aborted || taskSignal.aborted)
+  #|            return failure("aborted");
+  #|          if (names.length >= limit)
+  #|            return failure("limit");
+  #|          names.push(name);
+  #|          directories.push(entry.kind === "directory");
+  #|        }
+  #|        return { kind: "listing", text: "", size: 0, status: 0, names, directories };
+  #|      });
+  #|    }
+  #|    async function readDirectoryFile(handle, relative, budget, signal, taskSignal) {
+  #|      if (!usable(handle))
+  #|        return failure("unsupported");
+  #|      return guarded(signal, taskSignal, true, async () => {
+  #|        const segments = relative.split("/");
+  #|        const name = segments.pop();
+  #|        const dir = await directory(handle, segments);
+  #|        const file = await (await dir.getFileHandle(name, { create: false })).getFile();
+  #|        return text(file, budget).catch((error) => failure(classify(error)));
+  #|      });
   #|    }
   #|    function normalizeBase(base) {
   #|      try {
@@ -138,7 +184,7 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|    }
   #|
   #|    // pkgs/lander/adapters/browser/entry.ts
-  #|    receiveBrowserAdapter({ read, readFile, normalizeBase, supported });
+  #|    receiveBrowserAdapter({ read, readFile, listDirectory, readDirectoryFile, normalizeBase, supported });
   #|  })();
   #|  return adapter;
   #|}

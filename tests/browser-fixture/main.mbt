@@ -26,6 +26,14 @@ extern "js" fn Adapter::file_at(self : Adapter, selector : String, index : Int) 
   #|(fixture, selector, index) => fixture.fileAt(selector, index)
 
 ///|
+extern "js" fn Adapter::handle(self : Adapter, name : String) -> @browser.DirectoryHandle =
+  #|(fixture, name) => fixture.handle(name)
+
+///|
+extern "js" fn Adapter::between(self : Adapter) -> @js_async.Promise[Bool] =
+  #|fixture => fixture.between()
+
+///|
 struct Server { host : String; port : Int } derive(FromJson)
 
 ///|
@@ -48,6 +56,9 @@ fn selected_files(mount : Json) -> Array[(String, @browser.File)] {
 ///|
 fn mounted(mount : Json) -> @browser.Mount raise {
   let root = text(field(mount, "root", "/workspace"))
+  if field(mount, "kind", "urls") == "directory" {
+    return @browser.from_directory(fixture.handle(text(field(mount, "handle", "project"))), root~)
+  }
   if field(mount, "kind", "urls") == "files" { return @browser.from_files(selected_files(mount), root~) }
   @browser.from_urls(text(field(mount, "base", "")), field(mount, "manifest", null), root~)
 }
@@ -161,6 +172,19 @@ async fn execute(input : Json) -> Json {
   if field(input, "bind", false) == true {
     let server : Server = @config.bind(config, "server")
     result["bound"] = { "host": Json(server.host), "port": Json(server.port) }
+  }
+  if field(input, "between", false) == true {
+    ignore(@js_async.run_promise(_ => fixture.between()))
+    let second = @browser.load(builder, mounts, limits~, signal=fixture.signal())
+    let first_after : Map[String, Json] = Map([])
+    let second_values : Map[String, Json] = Map([])
+    for key in items(field(input, "keys", [])) {
+      let key = text(key)
+      first_after[key] = Json(@config.get_text(config, key))
+      second_values[key] = Json(@config.get_text(second, key))
+    }
+    result["first_after"] = Json(first_after)
+    result["second"] = Json(second_values)
   }
   if mode == "fresh" {
     let second = @browser.load(builder, mounts)

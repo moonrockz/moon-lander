@@ -122,6 +122,46 @@ let builder = @config.builder()
 let config = @browser.load(builder, [defaults, project])
 ```
 
+## Directory handles
+
+`@browser.from_directory(handle, root~)` mounts a `@browser.DirectoryHandle`
+that the application already holds. The application can get it from its own
+native picker, or from OPFS. The package never opens a picker and never calls
+`requestPermission` or `queryPermission`. The adapter build rejects these APIs.
+
+A directory mount is live and read-only. For each requested path, the adapter
+resolves one segment at a time with `create: false`. It lists direct children
+with `entries()` and reads a file with `getFile()` and `text()`. Before it uses
+a name, the load lists the parent directory and checks the exact name there,
+because an engine can resolve a name without case on a case-insensitive host
+file system. These listings are cached for the load. A missing entry or a wrong
+entry kind is absent. A load never creates, writes or removes an entry.
+
+Each load caches its answers. A later load can see changed entries; a completed
+`Config` does not change. A load is not an atomic snapshot of the directory.
+Listed entries count toward the entry limit as the load observes them, and a
+listing stops as soon as a directory has more children than the remaining limit.
+`NotAllowedError` and `SecurityError` raise `PermissionDenied`, for example
+after the user revokes access. Other failures raise `Io`. The load does not try
+another mount or store after a failure.
+
+Capability detection belongs to the application. A native directory picker
+(`showDirectoryPicker`), a directory input (`webkitdirectory`) and OPFS are
+separate capabilities. OPFS support does not mean that a picker is available.
+The compiled consumer exposes `browserCapabilities()` and
+`loadDirectoryServer(handle, base)`. Without a picker, it uses
+`loadSelectedServer(files, base)` with a file or directory input instead.
+
+```moonbit
+let project = @browser.from_directory(handle, root="/workspace")
+let builder = @config.builder()
+  |> @config.format(@toml.format())
+  |> @config.file("/defaults/acme.toml")
+  |> @config.working_dir("/workspace/src")
+  |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+let config = @browser.load(builder, [defaults, project])
+```
+
 ## Authority and ordering
 
 Mounts are opaque immutable values. Their canonical absolute virtual roots must
@@ -177,5 +217,5 @@ Playwright. Repository adapter development uses `mise run build:browser-adapter`
 `check:browser-adapter` rejects stale output without rewriting it. The fixture has
 its own generated file, outside the published module.
 
-Directory handles and OPFS persistence belong to later stories. This package
-currently provides hosted URL mounts and selected-file mounts.
+OPFS persistence belongs to a later story. This package currently provides
+hosted URL mounts, selected-file mounts and directory-handle mounts.

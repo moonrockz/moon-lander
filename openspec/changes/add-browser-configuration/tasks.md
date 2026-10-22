@@ -44,10 +44,10 @@ Bead: lander-4us.8.3
 
 Bead: lander-4us.8.4
 
-- [ ] 4.1 Add a directory-handle mount using only caller-supplied handles, one-segment traversal, create:false, direct-child entries, and lazy file text reads. Verify a real directory handle with nested files in all three engines using OPFS-created test fixtures.
-- [ ] 4.2 Verify equivalence with selected-file mounts, wrong-kind and missing entries, exact names, fresh content on a second load, and unchanged prior Config values. Assert that loading never creates directories or files.
-- [ ] 4.3 Map denied and revoked operations to typed permission errors with no fallback to another mount or store. Use controlled denied-operation fixtures for error injection, alongside real-handle tests for successful I/O; do not claim the fixtures test native picker UI.
-- [ ] 4.4 Document picker capability detection and file-input fallback in a headless consumer example. Verify that no library API opens a picker or requests permission, and run the required checks and browser gate.
+- [x] 4.1 Add a directory-handle mount using only caller-supplied handles, one-segment traversal, create:false, direct-child entries, and lazy file text reads. Verify a real directory handle with nested files in all three engines using OPFS-created test fixtures.
+- [x] 4.2 Verify equivalence with selected-file mounts, wrong-kind and missing entries, exact names, fresh content on a second load, and unchanged prior Config values. Assert that loading never creates directories or files.
+- [x] 4.3 Map denied and revoked operations to typed permission errors with no fallback to another mount or store. Use controlled denied-operation fixtures for error injection, alongside real-handle tests for successful I/O; do not claim the fixtures test native picker UI.
+- [x] 4.4 Document picker capability detection and file-input fallback in a headless consumer example. Verify that no library API opens a picker or requests permission, and run the required checks and browser gate.
 
 ## 5. Scoped OPFS persistence
 

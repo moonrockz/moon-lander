@@ -29,9 +29,16 @@ extern "js" fn browser_adapter() -> Adapter =
   #|    function fileAt(selector, index) {
   #|      return selected(selector)[index];
   #|    }
+  #|    function handle(name) {
+  #|      return globalThis.testHandles?.[name];
+  #|    }
+  #|    async function between() {
+  #|      await globalThis.betweenLoads?.();
+  #|      return true;
+  #|    }
   #|
   #|    // tests/browser/adapter-entry.ts
-  #|    receiveBrowserAdapter({ register, origin, signal, fileCount, fileAt });
+  #|    receiveBrowserAdapter({ register, origin, signal, fileCount, fileAt, handle, between });
   #|  })();
   #|  return adapter;
   #|}

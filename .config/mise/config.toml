@@ -194,6 +194,14 @@ run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
 description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
 run = "moonx scripts/check-openrpc.mbtx"
 
+[tasks."build:openrpc-artifacts"]
+description = "Generate the pinned OpenRPC artifact metaschemas from frozen assets"
+run = "moonx scripts/generate-openrpc-artifacts.mbtx"
+
+[tasks."check:openrpc-artifacts"]
+description = "Reject stale OpenRPC artifact metaschemas and license without rewriting"
+run = "moonx scripts/generate-openrpc-artifacts.mbtx --check"
+
 [tasks."build:openrpc-unicode"]
 description = "Generate portable OpenRPC regex identifier tables from frozen Unicode data"
 run = "moonx scripts/generate-openrpc-unicode.mbtx"

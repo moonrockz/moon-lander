@@ -117,16 +117,14 @@ test {
   let result = @openrpc.validate_closed(document)
   assert_true(result.document() is Some(_))
   assert_eq(result.report().references(), @openrpc.Passed)
-  assert_eq(result.report().artifact(), @openrpc.Incomplete)
+  assert_eq(result.report().artifact(), @openrpc.Passed)
 }
 ```
 
-The current validator does not yet implement complete pinned-metaschema checks.
-That facet always reports `Incomplete`. Remaining document semantics and
-resource scopes also report incomplete coverage. A closed Specification result
-requires the model, schema, reference and normative facets to pass. A closed compatibility
-result additionally requires artifact compatibility, so it cannot yet
-produce that wrapper. Neither profile conceals failed or incomplete required checks.
+The artifact facet checks the document's own JSON against its version's pinned
+metaschema. A closed Specification result requires the model, schema, reference
+and normative facets to pass. A closed compatibility result also requires
+artifact compatibility. Neither profile conceals failed or incomplete required checks.
 
 References never trigger network or filesystem access. Validation resolves
 references only through an explicit `@reference.ResourceSet` and an optional

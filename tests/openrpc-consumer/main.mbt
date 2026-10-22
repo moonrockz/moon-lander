@@ -11,7 +11,7 @@ fn main raise {
     let checked = @openrpc.validate_closed(document)
     assert_true(checked.document() is Some(_))
     assert_eq(checked.report().references(), @openrpc.Passed)
-    assert_eq(checked.report().artifact(), @openrpc.Incomplete)
+    assert_eq(checked.report().artifact(), @openrpc.Passed)
     println(@openrpc.write(document).unwrap())
   }
   let null_schema = @schema.Schema::from_keywords([

@@ -1265,15 +1265,7 @@ pub fn validate(
     }
   }
   check.uniqueness(methods, errors)
-  add(
-    findings,
-    @exact.UnsupportedCheck,
-    "Pinned metaschema compatibility is not complete in the tracer",
-    [],
-    Artifact,
-    severity=Information,
-    resource=owner,
-  )
+  check.artifact(document, owner)
   finish(
     findings,
     document,

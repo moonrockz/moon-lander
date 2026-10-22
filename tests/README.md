@@ -14,7 +14,7 @@ configuration core, and the mediator.
 | `config-conventions-laws` | The same preset cases as snapshot tests | All four |
 | `config-fixture`, `config-parity` | Shared explicit builder and file tree; complete value, provenance and report observations compared by `mise run check:config` | All four |
 | `formats-default`, `formats-toml`, `formats-custom` | Default and overridden format sets, parser execution and linked output trimming | All four |
-| `mediator-acceptance` | Send, two separate senders, handler errors, publish order, publish error stop, log middleware, short-circuit, reply change, middleware order and context read | All four |
+| `mediator-acceptance` | Send, two separate senders, handler errors, publish order, publish error stop, log middleware, short-circuit, reply change, middleware order and context read; `mise run check:mediator` fails a target that runs zero of them | All four |
 | `formats-leaky` | Deliberately reachable YAML parser that `mise run check:formats` must reject | All four |
 | `nbformat-acceptance` | Jupyter cells, outputs, attachments, extensions, cursor paths and validation errors | JavaScript, native |
 | `nbformat-laws` | JSON and text round trips, traversal agreement and cursor navigation | All four |

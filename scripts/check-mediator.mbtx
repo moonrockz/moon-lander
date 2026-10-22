@@ -1,0 +1,139 @@
+///|
+/// Fail when a target leg of the mediator tests runs zero tests.
+///
+/// `moon test` exits with 0 when a package has no test entry for a target, and the workspace run
+/// skips a package that does not support a target. The mediator spec says that such a leg MUST NOT
+/// count as a pass, so this check runs each mediator path for each target and requires a test count
+/// above zero.
+///
+/// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/check-mediator.mbtx`.
+/// With no target, it checks wasm, wasm-gc, js and native.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// The mediator package and its acceptance suite, relative to the workspace root.
+let paths : Array[String] = [
+  "pkgs/lander/mediator", "tests/mediator-acceptance",
+]
+
+///|
+/// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
+/// the output has no such line.
+fn test_count(output : String) -> Int32? {
+  let mut count = None
+  for line in output.split("\n") {
+    let line = line.trim(chars=" \t\r")
+    guard line.strip_prefix("Total tests: ") is Some(rest) else { continue }
+    guard rest.split(",").next() is Some(number) else { continue }
+    count = Some(@string.parse_int(number) catch { _ => continue })
+  }
+  count
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].filter(arg => !arg.has_prefix("--"))
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  for target in targets {
+    for path in paths {
+      let (code, out, err) = @process.collect_output("moon", [
+        "test", "--deny-warn", "--target", target, path,
+      ])
+      let output = out.text() + err.text()
+      guard code == 0 else {
+        println(output)
+        println("❌ The mediator tests failed: \{path} on \{target}")
+        @sys.exit(if code > 0 { code } else { 1 })
+      }
+      match test_count(output) {
+        Some(count) if count > 0 =>
+          println("✅ \{path} on \{target}: \{count} tests")
+        Some(_) | None => {
+          println(output)
+          println("❌ \{path} on \{target} ran zero tests")
+          @sys.exit(1)
+        }
+      }
+    }
+  }
+}
+
+///|
+test "test_count reads the last total line" {
+  assert_eq(test_count("Total tests: 4, passed: 4, failed: 0.\n"), Some(4))
+  assert_eq(
+    test_count(
+      "Total tests: 2, passed: 2, failed: 0.\r\nTotal tests: 7, passed: 7, failed: 0.\r\n",
+    ),
+    Some(7),
+  )
+}
+
+///|
+test "test_count gives zero for a leg without tests and none without a total" {
+  assert_eq(
+    test_count(
+      "Warning: no test entry found.\nTotal tests: 0, passed: 0, failed: 0.\n",
+    ),
+    Some(0),
+  )
+  assert_eq(test_count("Finished. moon: no work to do\n"), None)
+}
+
+///|
+async test "a leg that runs zero tests fails the check" {
+  let script = @fs.realpath("check-mediator.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-mediator")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  for
+    path in [
+      "pkgs", "pkgs/lander", "pkgs/lander/mediator", "tests", "tests/mediator-acceptance",
+    ] {
+    @fs.mkdir("\{dir}/\{path}")
+  }
+  @fs.write_file("\{dir}/pkgs/lander/mediator/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/pkgs/lander/mediator/core_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
+  @fs.write_file("\{dir}/tests/mediator-acceptance/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/tests/mediator-acceptance/core.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(
+    output.contains("tests/mediator-acceptance on wasm ran zero tests"),
+    msg=output,
+  )
+  @fs.write_file(
+    "\{dir}/tests/mediator-acceptance/core_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+}

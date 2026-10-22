@@ -44,6 +44,8 @@ linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/mo
 linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-linux-aarch64.tar.gz" }
 macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-darwin-aarch64.tar.gz" }
 windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-windows-x86_64.zip", format = "zip" }
+# No Windows arm64 build is published; Windows on Arm runs the x64 build under emulation.
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-windows-x86_64.zip", format = "zip" }
 
 [env]
 _.path = ["./node_modules/.bin"]

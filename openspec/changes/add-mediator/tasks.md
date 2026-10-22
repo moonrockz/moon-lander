@@ -34,14 +34,14 @@ Bead: lander-4us.10.1
 
 Bead: lander-4us.10.2
 
-- [ ] 2.1 Add the middleware shape of design D3 and `Sender::use_`; verify `use_` gives a new sender value and the original sender still sends without the middleware
-- [ ] 2.2 Decide from the compiled README example whether `use_` takes a `Middleware` value or a plain function (design Open Questions); record the choice in design.md D3 and verify the example compiles with that form
-- [ ] 2.3 Add helper constructors for the before/after and finally shapes; verify a log middleware records its before entry, the handler run, and its after entry, in that order
-- [ ] 2.4 Verify a middleware that gives a reply without a call to the next step: the handler does not run and the caller gets the middleware reply
-- [ ] 2.5 Verify a middleware that changes the request before the next step and a middleware that changes the reply after it; each gets a unit test
-- [ ] 2.6 Attach middleware A and then B in one test; verify the run order is A, B, handler, B, A
-- [ ] 2.7 Verify a middleware that catches the error of the next step can give a reply instead, and a middleware that does not catch passes the same error out of `send`
-- [ ] 2.8 Document `use_` and the helper constructors with a runnable log-middleware example in the package README; verify the example runs on all four targets
+- [x] 2.1 Add the middleware shape of design D3 and `Sender::use_`; verify `use_` gives a new sender value and the original sender still sends without the middleware
+- [x] 2.2 Decide from the compiled README example whether `use_` takes a `Middleware` value or a plain function (design Open Questions); record the choice in design.md D3 and verify the example compiles with that form
+- [x] 2.3 Add helper constructors for the before/after and finally shapes; verify a log middleware records its before entry, the handler run, and its after entry, in that order
+- [x] 2.4 Verify a middleware that gives a reply without a call to the next step: the handler does not run and the caller gets the middleware reply
+- [x] 2.5 Verify a middleware that changes the request before the next step and a middleware that changes the reply after it; each gets a unit test
+- [x] 2.6 Attach middleware A and then B in one test; verify the run order is A, B, handler, B, A
+- [x] 2.7 Verify a middleware that catches the error of the next step can give a reply instead, and a middleware that does not catch passes the same error out of `send`
+- [x] 2.8 Document `use_` and the helper constructors with a runnable log-middleware example in the package README; verify the example runs on all four targets
 
 ## 3. Publish to many handlers
 

@@ -160,6 +160,17 @@ pub fn[C, Req, Res] Sender::use_(
   handle it. `Before`/`After`/`Finally` helper constructors cover the
   common Foundatio hooks on top of this one shape; the core needs only the
   wrapper shape. Helper constructors are part of task group 2.
+- `use_` takes a `Middleware` value, not a plain function (task 2.2,
+  decided from the compiled README example). The helper constructors
+  `middleware`, `before`, `after`, and `finally_` give `Middleware` values,
+  and an application can hold one in its services record under a named
+  type. The plain function form saves only the `@mediator.middleware(...)`
+  call in the example. The type is abstract, so `middleware` is the one way
+  to build a wrapper. `finally_` has a trailing underscore because
+  `moonc v0.10.17` reserves `finally` for future use (warning 0035, an
+  error under `--deny-warn`). The `finally_` hook cannot raise, so it
+  cannot hide the error of the next step. `after` runs only when the next
+  step gives a reply.
 - Middleware for a sender and middleware for a topic are the same shape
   with different `Req`/`Res`. Cross-type middleware (for example a logger
   for every message type) needs a middleware that is generic over the
@@ -277,6 +288,5 @@ removal of `pkgs/lander/mediator` and of `tests/mediator-acceptance`.
 - Exact `MediatorError` cases (D6). Task group 1 names and tests them;
   the answer cannot change the specs, because the specs require only that
   handler errors pass through and that the core raises typed errors.
-- Whether `Sender::use_` takes a `Middleware` value or a plain function.
-  Task group 2 decides from the compiled doc example; both forms keep the
-  spec contract (fixed order, short-circuit).
+- Resolved in task group 2: `Sender::use_` takes a `Middleware` value
+  (D3).

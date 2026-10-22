@@ -1,8 +1,10 @@
 schema: spec-driven
 
 context: |
-  Moon-Lander is a MoonBit application framework with no UI. Code must build and
-  test on the wasm, wasm-gc, js and native targets. Process, signal and filesystem
+  Moon-Lander is a MoonBit application framework with no UI. One exception: the
+  unpublished docs tool apps/site can use Rabbita (moonbit-community/rabbita). No
+  other module can import it, and the published library stays UI-free. Library
+  code must build and test on the wasm, wasm-gc, js and native targets. Process, signal and filesystem
   I/O stay in host adapters that use moonbitlang/async; domain logic is pure over
   explicit inputs and immutable public values.
   finos/morphir-moonbit is the first consumer and will move onto this framework.

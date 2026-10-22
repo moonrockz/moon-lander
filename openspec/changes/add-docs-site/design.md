@@ -152,8 +152,8 @@ Call: content lives at the repository root, as in the model: `docs/` for user do
   "base_path": "/moon-lander/",
   "site_url": "https://moonrockz.github.io/moon-lander/",
   "repo_url": "https://github.com/moonrockz/moon-lander",
-  "packages": ["notebooks"],
-  "api": ["pkgs/lander", "pkgs/notebooks"],
+  "packages": ["notebooks", "openrpc"],
+  "api": ["pkgs/lander", "pkgs/notebooks", "pkgs/openrpc"],
   "nav": [
     { "group": "Design", "items": ["design/"] },
     { "group": "Packages", "items": ["packages/"] },
@@ -371,8 +371,8 @@ Call: copy the model split.
   `mise run test:site` (`site-build.yml:1-67`). Only when `pages` is true, it then
   runs `site.mbtx assemble` and `check:site` on the assembled site (D22), and
   uploads it with `actions/upload-pages-artifact`.
-- `.github/workflows/site-asset.yml`: `workflow_call` for a future release
-  workflow (D22).
+- `.github/workflows/site-asset.yml`: `workflow_call`, called by the release
+  workflow `release.yml` (D22).
 - `.github/workflows/site.yml`: on push to `main` and `workflow_dispatch`;
   workflow `permissions: contents: read`; a `build` job that calls
   `site-build.yml` with `pages: true`; a `deploy` job with job-level
@@ -426,10 +426,13 @@ in each module directory of the `api` key, and `generate` reads
 files. Alternative: parse `pkg.generated.mbti`. Rejected: an `.mbti` file has no
 docstrings, so the site would need a second source for them.
 
-Call: the `api` key accepts only module directories below `pkgs/`. These are the
-published modules `moonrockz/moon-lander` (`pkgs/lander`) and
-`moonrockz/notebooks` (`pkgs/notebooks`). `apps/site`, `tests` and any other path
-fail the configuration check.
+Owner (2026-10-22): the API pages cover the library modules
+`moonrockz/moon-lander` (`pkgs/lander`), `moonrockz/notebooks` (`pkgs/notebooks`)
+and `moonrockz/openrpc` (`pkgs/openrpc`). Release 0.2.0 published
+`moonrockz/openrpc`.
+
+Call: the `api` key accepts only module directories below `pkgs/`. `apps/site`,
+`tests` and any other path fail the configuration check.
 
 Call: the reader of the JSON is a pure function in `model` that takes the JSON
 text and returns typed API items, or a `Problem` that names the file and the key.
@@ -485,7 +488,8 @@ the source can see the target.
 
 Call: the hosting packages do not exist yet. Their API pages appear when each
 package lands in `pkgs/lander`, with no change to the site. Until then the API
-section shows `moonrockz/notebooks` and the root package `moonrockz/moon-lander`.
+section shows `moonrockz/notebooks`, `moonrockz/openrpc` and the root package
+`moonrockz/moon-lander`.
 
 ### D22. Versioned docs
 
@@ -511,16 +515,21 @@ Call: `.github/workflows/site-asset.yml` is a `workflow_call` workflow with
 `permissions: contents: read`. It reads the minor line from the root `moon.mod`
 through `scripts/versions.mbtx`, runs `build:site -- --main --tree <minor>` and
 `check:site`, packs `_site/v/<minor>/` as `site-<minor>.tar.gz`, and uploads it as a
-workflow artifact. A future release workflow calls it and attaches the file to the
-release. This change does not create that workflow or a release (`AGENTS.md`).
+workflow artifact.
+
+Owner (2026-10-22): the release workflow `.github/workflows/release.yml` exists
+(#47). It calls `site-asset.yml` and attaches `site-<minor>.tar.gz` to the GitHub
+release that it creates. This change edits `release.yml` for that call only. It
+does not cut a release: the next release pull request, which the owner approves,
+is the first to carry the asset.
 
 Call: `site.mbtx assemble` runs only in the deploy. It reads every release with
 `gh api --paginate repos/{owner}/{repo}/releases`, so no page or count limit drops a
 release (a bare `gh release list` returns at most 30 by default). It skips drafts and
 prereleases. It also skips each release whose minor line is below `versions.since` in
-`site.json`, the first minor line that ships site assets. `v0.1.0` exists with no
-site asset, so `versions.since` starts at the first minor line released after this
-change (Call: `0.2`). From the remaining releases it selects, for each minor line, the
+`site.json`, the first minor line that ships site assets. Owner (2026-10-22):
+`versions.since` is `0.3`. `v0.1.0` and `v0.2.0` exist with no site asset, so the
+first minor line that can ship one is `0.3`. From the remaining releases it selects, for each minor line, the
 newest release by semantic version. It downloads `site-<minor>.tar.gz` from each with `gh release download`
 and the `GITHUB_TOKEN` with `contents: read`. A selected release without the asset,
 or an archive that does not unpack, fails the deploy with the release tag. Each
@@ -608,9 +617,9 @@ can leave a tree.
 - [R15. A wrong base path in one version tree] → The tree check of `check:site`
   fails on a link that leaves its tree. A test of the prefix change covers the
   root and `/latest/` copies.
-- [R16. There is no release workflow yet] → `site-asset.yml` is ready for it. Task
-  group 11 records the dependency. Until a release has the asset, the root shows
-  `main` with the pre-release banner.
+- [R16. Releases before `0.3` have no site asset] → `release.yml` calls
+  `site-asset.yml`, and `versions.since` is `0.3`. Until a release has the asset,
+  the root shows `main` with the pre-release banner.
 
 ## Migration Plan
 

@@ -116,6 +116,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   source-preserving reading and edits, explicit reference resolution, profiled
   validation and canonical writing. Its release and the Smithy migration are
   tracked in `add-standalone-openrpc`.
+- `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
+  builds the static site at `https://moonrockz.github.io/moon-lander/` with Rabbita.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress
@@ -126,8 +128,9 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 
 The application model, command and service lifecycle, and CLI are proposed in
 `openspec/changes/` and are not implemented yet. The configuration file host
-adapters are implemented. No UI packages
-are included. CI has read-only permissions. `.github/workflows/release.yml`
+adapters are implemented. No UI packages are included. One exception: the
+unpublished docs tool `apps/site` can use Rabbita. No other module can import it,
+and the published library stays UI-free. CI has read-only permissions. `.github/workflows/release.yml`
 publishes releases.
 
 ## Releases

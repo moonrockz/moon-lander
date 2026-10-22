@@ -147,27 +147,39 @@ export async function openStore(namespace: string): Promise<StoreReply> {
 
 /**
  * Write text to a relative file inside a store. Parent directories are created
- * only inside the store. Success is reported only after close() resolves; a
- * failed write aborts the writable stream, so the previous content remains.
+ * only inside the store. Success is reported only after close() resolves. A
+ * failed write or close aborts the writable stream, so the previous content
+ * remains and the file lock is released. A file that this call created is
+ * removed again after a failure, so a failed first save leaves no entry.
  */
 export async function writeText(store: FileSystemDirectoryHandle, relative: string, text: string): Promise<StoreReply> {
+  if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
+    return { kind: "unsupported" };
+  }
   const segments = relative.split("/");
   const name = segments.pop()!;
+  let dir: FileSystemDirectoryHandle | undefined;
+  let created = false;
   let writable: FileSystemWritableFileStream | undefined;
   try {
-    let dir = store;
+    dir = store;
     for (const segment of segments) dir = await dir.getDirectoryHandle(segment, { create: true });
-    const file = await dir.getFileHandle(name, { create: true });
-    if (typeof file.createWritable !== "function") return { kind: "unsupported" };
+    let file: FileSystemFileHandle;
+    try { file = await dir.getFileHandle(name, { create: false }); } catch (error) {
+      if ((error as { name?: unknown } | null)?.name !== "NotFoundError") throw error;
+      file = await dir.getFileHandle(name, { create: true });
+      created = true;
+    }
+    if (typeof file.createWritable !== "function") throw new DOMException("", "NotSupportedError");
     writable = await file.createWritable();
     await writable.write(text);
-    const closing = writable;
-    writable = undefined;
-    await closing.close();
+    await writable.close();
     return { kind: "written" };
   } catch (error) {
     if (writable) { try { await writable.abort(); } catch { /* Keep the original failure. */ } }
-    return storageFailure(error);
+    if (created && dir) { try { await dir.removeEntry(name); } catch { /* Keep the original failure. */ } }
+    const failure = storageFailure(error);
+    return (error as { name?: unknown } | null)?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
   }
 }
 

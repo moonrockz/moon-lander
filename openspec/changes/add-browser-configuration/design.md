@@ -511,9 +511,11 @@ the positional parameter and the accessor are `name`. The store directory is
 caller action. `Store::mount()` uses the group 4 directory backend at the
 supplied root, so a different root does not change the backing namespace.
 
-`write_text` creates parent directories inside the store, writes through
-`createWritable()`, and reports success only after `close()` resolves. A failed
-write calls `abort()`, so the previous text remains. `remove` checks exact names,
+`write_text` checks `createWritable` before it creates anything. It creates
+parent directories inside the store, writes through `createWritable()`, and
+reports success only after `close()` resolves. A failed write or close calls
+`abort()`, so the previous text remains and the file lock is released. If the
+call created the file, a failure removes it again. `remove` checks exact names,
 removes one file and returns whether it existed; a directory gives `Io`.
 A missing `getDirectory` or `createWritable` gives `Unsupported`. A failure of
 `getDirectory()` other than denial also gives `Unsupported`, because WebKit

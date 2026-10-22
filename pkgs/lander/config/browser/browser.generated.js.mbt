@@ -120,21 +120,32 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|      }
   #|    }
   #|    async function writeText(store, relative, text) {
+  #|      if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
+  #|        return { kind: "unsupported" };
+  #|      }
   #|      const segments = relative.split("/");
   #|      const name = segments.pop();
+  #|      let dir;
+  #|      let created = false;
   #|      let writable;
   #|      try {
-  #|        let dir = store;
+  #|        dir = store;
   #|        for (const segment of segments)
   #|          dir = await dir.getDirectoryHandle(segment, { create: true });
-  #|        const file = await dir.getFileHandle(name, { create: true });
+  #|        let file;
+  #|        try {
+  #|          file = await dir.getFileHandle(name, { create: false });
+  #|        } catch (error) {
+  #|          if (error?.name !== "NotFoundError")
+  #|            throw error;
+  #|          file = await dir.getFileHandle(name, { create: true });
+  #|          created = true;
+  #|        }
   #|        if (typeof file.createWritable !== "function")
-  #|          return { kind: "unsupported" };
+  #|          throw new DOMException("", "NotSupportedError");
   #|        writable = await file.createWritable();
   #|        await writable.write(text);
-  #|        const closing = writable;
-  #|        writable = undefined;
-  #|        await closing.close();
+  #|        await writable.close();
   #|        return { kind: "written" };
   #|      } catch (error) {
   #|        if (writable) {
@@ -142,7 +153,13 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|            await writable.abort();
   #|          } catch {}
   #|        }
-  #|        return storageFailure(error);
+  #|        if (created && dir) {
+  #|          try {
+  #|            await dir.removeEntry(name);
+  #|          } catch {}
+  #|        }
+  #|        const failure = storageFailure(error);
+  #|        return error?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
   #|      }
   #|    }
   #|    async function exact(dir, name) {

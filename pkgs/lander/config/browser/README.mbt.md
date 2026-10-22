@@ -188,7 +188,8 @@ Only the application opens, writes or removes a store. A load never writes,
 and URL, selected-file and directory mounts never create a namespace.
 `write_text(store, path, text)` creates parent directories only inside the store
 and reports success only after the write and its close complete. A failed write
-discards the new text and keeps the previous file. `remove(store, path)` removes
+or close aborts the stream and keeps the previous file. A failed first save
+removes the new file again, so no empty file stays. `remove(store, path)` removes
 one named file and gives `false` when the file is absent; it never removes a
 directory. Paths are relative and cannot leave the store.
 

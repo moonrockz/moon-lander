@@ -141,10 +141,8 @@ test("storage failures are typed and never fall back to other storage", async ({
     if (setup === "denied") patch(FileSystemDirectoryHandle.prototype, "getFileHandle", fail("NotAllowedError"));
     if (setup === "no-writable") patch(FileSystemFileHandle.prototype, "createWritable", undefined);
     if (setup === "quota") patch(writable, "write", fail("QuotaExceededError"));
-    if (setup === "close") {
-      const abort = writable.abort;
-      patch(writable, "close", async function (this: any) { await abort.call(this); throw new DOMException("storage-secret", "InvalidStateError"); });
-    }
+    // A close that rejects without releasing the stream; the adapter must abort it.
+    if (setup === "close") patch(writable, "close", fail("InvalidStateError"));
     try { return await (globalThis as any).landerRun({ mode: "store", ops: [op] }); }
     finally { for (const undo of restore.reverse()) undo(); }
   }, { setup, op });
@@ -163,6 +161,15 @@ test("storage failures are typed and never fall back to other storage", async ({
     // No failed save is reported as success, and the stored text is unchanged.
     const loaded = await run(page, { mounts: [store()], sources: ["acme.toml"], keys: ["server.host"] });
     expect(loaded.values["server.host"], setup).toBe("original");
+    // A failed first save leaves no new file.
+    if (op.op === "write") {
+      const fresh = await inject(setup, write("new.toml", acme(setup)));
+      expect(fresh, setup).toEqual([{ ...error, path: "/state/new.toml" }]);
+      expect(await run(page, { mounts: [store()], sources: ["new.toml"] }), setup).toEqual({ error: "FileNotFound", path: "/state/new.toml" });
+    }
   }
+  // The failed close released the file: the next save succeeds.
+  expect(await ops(page, write("acme.toml", acme("after")))).toEqual(["written"]);
+  expect((await run(page, { mounts: [store()], sources: ["acme.toml"], keys: ["server.host"] })).values["server.host"]).toBe("after");
   expect((await calls(page)).filter(call => /^(getItem|setItem|open)/.test(call))).toEqual([]);
 });

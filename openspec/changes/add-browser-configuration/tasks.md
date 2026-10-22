@@ -53,10 +53,10 @@ Bead: lander-4us.8.4
 
 Bead: lander-4us.8.5
 
-- [ ] 5.1 Add explicit open_store(namespace, root~), write_text, and named-file remove operations under a library-owned application namespace. Require and validate the virtual root before storage access, and use it for the store read mount with the directory backend. Verify the supplied root in origins, reopening the same namespace at a different root, invalid-root rejection before OPFS access, save, awaited close, page reload on the same origin, and successful configuration load in all three engines.
-- [ ] 5.2 Verify independent namespaces, relative path confinement, no writes during ordinary loads, and merging hosted defaults, a selected workspace, and stored overrides in one ordered builder.
-- [ ] 5.3 Verify unsupported or blocked APIs, permission denial, quota failure, and failed write/close as typed errors without false success or fallback to localStorage/IndexedDB. Use real OPFS for the successful persistence path and controlled failures for exceptional paths.
-- [ ] 5.4 Document explicit persistence, site-data lifetime, and recovery ownership. Do not depend on configuration rendering or add multi-file transactions, local-file editing, or automatic reload. Run all required checks and browser CI.
+- [x] 5.1 Add explicit open_store(namespace, root~), write_text, and named-file remove operations under a library-owned application namespace. Require and validate the virtual root before storage access, and use it for the store read mount with the directory backend. Verify the supplied root in origins, reopening the same namespace at a different root, invalid-root rejection before OPFS access, save, awaited close, page reload on the same origin, and successful configuration load in all three engines.
+- [x] 5.2 Verify independent namespaces, relative path confinement, no writes during ordinary loads, and merging hosted defaults, a selected workspace, and stored overrides in one ordered builder.
+- [x] 5.3 Verify unsupported or blocked APIs, permission denial, quota failure, and failed write/close as typed errors without false success or fallback to localStorage/IndexedDB. Use real OPFS for the successful persistence path and controlled failures for exceptional paths.
+- [x] 5.4 Document explicit persistence, site-data lifetime, and recovery ownership. Do not depend on configuration rendering or add multi-file transactions, local-file editing, or automatic reload. Run all required checks and browser CI.
 
 ## 6. Consumer parity and final landing audit
 

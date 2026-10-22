@@ -61,5 +61,7 @@ selected-file mounts, records each `Blob` content read, and checks workspace
 discovery. `directory.spec.ts` creates real OPFS directories and also wraps
 handles to inject denied, revoked and pending operations. It uses the
 `persistent.ts` fixture, a new persistent profile for each test, because WebKit
-has no OPFS in an ephemeral context. Picker and selection UI belongs to
-consuming applications.
+has no OPFS in an ephemeral context. `store.spec.ts` uses the same fixture to
+save, reload and load an OPFS store, and injects storage failures. Both suites
+first remove all OPFS entries of the test origin. Picker and selection UI
+belongs to consuming applications.

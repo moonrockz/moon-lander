@@ -64,6 +64,25 @@ fn mounted(mount : Json) -> @browser.Mount raise {
 }
 
 ///|
+/// Run explicit store operations in order. Each result is the outcome or the
+/// typed error of one operation, so a failure does not hide later results.
+async fn store_operations(ops : Array[Json]) -> Array[Json] {
+  let results = []
+  for op in ops {
+    let result : Json = try {
+      let store = @browser.open_store(text(field(op, "name", "app")), root=text(field(op, "root", "/state")))
+      match text(field(op, "op", "open")) {
+        "write" => { @browser.write_text(store, text(field(op, "path", "")), text(field(op, "text", ""))); "written" }
+        "remove" => Json(@browser.remove(store, text(field(op, "path", ""))))
+        _ => Json([store.name(), store.root(), store.mount().root()])
+      }
+    } catch { error => describe(error) }
+    results.push(result)
+  }
+  results
+}
+
+///|
 fn status(report : @config.SourceReport) -> String {
   match report.status { Loaded => "Loaded"; NotFound => "NotFound"; Skipped => "Skipped" }
 }
@@ -95,8 +114,18 @@ fn optional_position(value : Int?) -> Json {
 
 ///|
 async fn execute(input : Json) -> Json {
-  let mounts = items(field(input, "mounts", [])).map(mounted)
   let mode = text(field(input, "mode", "load"))
+  let mounts = []
+  for mount in items(field(input, "mounts", [])) {
+    mounts.push(
+      if field(mount, "kind", "urls") == "store" {
+        @browser.open_store(text(field(mount, "name", "app")), root=text(field(mount, "root", "/state"))).mount()
+      } else {
+        mounted(mount)
+      },
+    )
+  }
+  if mode == "store" { return Json(store_operations(items(field(input, "ops", [])))) }
   if mode == "construct" { return { "root": Json(mounts[0].root()) } }
   if mode == "parse-reference" {
     ignore(@toml.parse("[broken\n", origin="/workspace/bad.toml"))
@@ -136,6 +165,7 @@ async fn execute(input : Json) -> Json {
   for source in items(field(input, "sources", [])) {
     match source {
       String(path) => builder = builder |> @config.file(path)
+      { "file": String(path), "priority": Number(priority, ..), .. } => builder = builder |> @config.file(path, priority=priority.to_int())
       // { conventions, workspace?: mount index, boundary?, isolated? }
       _ => {
         let mut conventions = @conventions.app_dirs(text(field(source, "conventions", "acme")))
@@ -195,8 +225,8 @@ async fn execute(input : Json) -> Json {
 }
 
 ///|
-async fn run(request : String) -> String {
-  let result = try execute(@json.parse(request)) catch {
+fn describe(error : Error) -> Json {
+  match error {
     @browser.InvalidMount(operation~, path~, reason~) => { "error": "InvalidMount", "operation": Json(operation), "path": Json(path), "reason": Json(reason) }
     @browser.InvalidPath(operation~, reason~) => { "error": "InvalidPath", "operation": Json(operation), "reason": Json(reason) }
     @browser.OutsideMount(operation~, path~) => { "error": "OutsideMount", "operation": Json(operation), "path": Json(path) }
@@ -215,6 +245,11 @@ async fn run(request : String) -> String {
     @config.Decode(failure~) => { "error": "Decode", "path": Json(failure.at[0].path.to_string()), "message": Json(@config.ConfigError::Decode(failure~).message()) }
     error => { "error": "Unexpected", "message": Json(error.to_string()) }
   }
+}
+
+///|
+async fn run(request : String) -> String {
+  let result = execute(@json.parse(request)) catch { error => describe(error) }
   result.stringify()
 }
 

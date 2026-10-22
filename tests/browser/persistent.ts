@@ -1,4 +1,4 @@
-import { test as base } from "@playwright/test";
+import { test as base, type Page } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,3 +21,16 @@ export const test = base.extend({
   page: async ({ context }, use) => { await use(context.pages()[0] ?? await context.newPage()); },
 });
 export { expect } from "@playwright/test";
+
+/**
+ * Remove every OPFS entry of the current origin. WebKit can keep origin data
+ * outside the profile directory, so each test starts from an empty store.
+ */
+export async function clearStorage(page: Page) {
+  await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const names: string[] = [];
+    for await (const [name] of (root as any).entries() as AsyncIterable<[string, unknown]>) names.push(name);
+    for (const name of names) await root.removeEntry(name, { recursive: true });
+  });
+}

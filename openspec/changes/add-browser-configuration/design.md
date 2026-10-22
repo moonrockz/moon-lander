@@ -485,10 +485,13 @@ without the required methods gives `Unsupported`. Each operation races abort
 like a File read.
 
 WebKit on a case-insensitive macOS host resolved `acme.toml` to `Acme.toml`,
-and the returned handle repeated the requested name. The boundary therefore
-checks each segment against the names that `entries()` reports before it gets
-the child handle. Listed entries count toward the entry budget when observed,
-and each unique path counts once.
+and the returned handle repeated the requested name. Before a live read or
+listing, the MoonBit loader therefore lists each ancestor below the mount root
+and checks the exact name and kind in that listing. These listings are cached
+in the load snapshot and count toward the request and entry budgets. The
+boundary stops `entries()` as soon as a directory has more children than the
+remaining entry budget, so a wide directory cannot bypass the limit. Each unique
+observed path counts once.
 
 WebKit rejects `navigator.storage.getDirectory()` with `UnknownError` in an
 ephemeral Playwright context, as in private browsing. Chromium and Firefox

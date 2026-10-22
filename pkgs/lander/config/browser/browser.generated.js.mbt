@@ -55,25 +55,16 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        return failure("unsupported");
   #|      return guarded(signal, taskSignal, false, () => text(file, budget));
   #|    }
-  #|    async function exact(dir, name) {
-  #|      for await (const [entry] of dir.entries()) {
-  #|        if (entry === name)
-  #|          return;
-  #|      }
-  #|      throw new DOMException("", "NotFoundError");
-  #|    }
   #|    async function directory(handle, segments) {
   #|      let current = handle;
-  #|      for (const segment of segments) {
-  #|        await exact(current, segment);
+  #|      for (const segment of segments)
   #|        current = await current.getDirectoryHandle(segment, { create: false });
-  #|      }
   #|      return current;
   #|    }
   #|    function usable(handle) {
   #|      return supported("directory") && typeof handle?.getDirectoryHandle === "function" && typeof handle.getFileHandle === "function" && typeof handle.entries === "function";
   #|    }
-  #|    async function listDirectory(handle, relative, signal, taskSignal) {
+  #|    async function listDirectory(handle, relative, limit, signal, taskSignal) {
   #|      if (!usable(handle))
   #|        return failure("unsupported");
   #|      return guarded(signal, taskSignal, true, async () => {
@@ -82,6 +73,8 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        for await (const [name, entry] of dir.entries()) {
   #|          if (signal.aborted || taskSignal.aborted)
   #|            return failure("aborted");
+  #|          if (names.length >= limit)
+  #|            return failure("limit");
   #|          names.push(name);
   #|          directories.push(entry.kind === "directory");
   #|        }
@@ -95,7 +88,6 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        const segments = relative.split("/");
   #|        const name = segments.pop();
   #|        const dir = await directory(handle, segments);
-  #|        await exact(dir, name);
   #|        const file = await (await dir.getFileHandle(name, { create: false })).getFile();
   #|        return text(file, budget).catch((error) => failure(classify(error)));
   #|      });

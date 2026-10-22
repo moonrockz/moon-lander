@@ -50,10 +50,11 @@ extern "js" fn BrowserAdapter::list_directory(
   self : BrowserAdapter,
   handle : DirectoryHandle,
   relative : String,
+  limit : Int,
   signal : @js_async.AbortSignal,
   task_signal : @js_async.AbortSignal,
 ) -> @js_async.Promise[Reply] =
-  #|(adapter, handle, relative, signal, taskSignal) => adapter.listDirectory(handle, relative, signal, taskSignal)
+  #|(adapter, handle, relative, limit, signal, taskSignal) => adapter.listDirectory(handle, relative, limit, signal, taskSignal)
 
 ///|
 extern "js" fn BrowserAdapter::read_directory_file(

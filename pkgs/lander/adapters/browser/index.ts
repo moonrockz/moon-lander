@@ -61,27 +61,14 @@ export async function readFile(
 }
 
 /**
- * Require an exact child name. Some engines resolve a name without case on a
- * case-insensitive host file system, and the returned handle repeats the
- * requested name, so compare with the names that entries() reports.
- */
-async function exact(dir: FileSystemDirectoryHandle, name: string): Promise<void> {
-  for await (const [entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
-    if (entry === name) return;
-  }
-  throw new DOMException("", "NotFoundError");
-}
-
-/**
  * Resolve directory segments below a caller-supplied handle, one at a time and
- * with create: false. This never opens a picker or requests permission.
+ * with create: false. This never opens a picker or requests permission. The
+ * MoonBit loader first checks each name against an exact, budgeted listing,
+ * because an engine can resolve a name without case on some host file systems.
  */
 async function directory(handle: FileSystemDirectoryHandle, segments: string[]): Promise<FileSystemDirectoryHandle> {
   let current = handle;
-  for (const segment of segments) {
-    await exact(current, segment);
-    current = await current.getDirectoryHandle(segment, { create: false });
-  }
+  for (const segment of segments) current = await current.getDirectoryHandle(segment, { create: false });
   return current;
 }
 
@@ -90,9 +77,12 @@ function usable(handle: FileSystemDirectoryHandle): boolean {
     typeof handle.getFileHandle === "function" && typeof (handle as any).entries === "function";
 }
 
-/** List the direct children of a relative directory ("" is the handle itself). */
+/**
+ * List the direct children of a relative directory ("" is the handle itself).
+ * Stop the enumeration as soon as it has more than `limit` children.
+ */
 export async function listDirectory(
-  handle: FileSystemDirectoryHandle, relative: string, signal: AbortSignal, taskSignal: AbortSignal,
+  handle: FileSystemDirectoryHandle, relative: string, limit: number, signal: AbortSignal, taskSignal: AbortSignal,
 ): Promise<Reply> {
   if (!usable(handle)) return failure("unsupported");
   return guarded(signal, taskSignal, true, async () => {
@@ -100,6 +90,7 @@ export async function listDirectory(
     const names: string[] = [], directories: boolean[] = [];
     for await (const [name, entry] of (dir as any).entries() as AsyncIterable<[string, FileSystemHandle]>) {
       if (signal.aborted || taskSignal.aborted) return failure("aborted");
+      if (names.length >= limit) return failure("limit");
       names.push(name);
       directories.push(entry.kind === "directory");
     }
@@ -116,7 +107,6 @@ export async function readDirectoryFile(
     const segments = relative.split("/");
     const name = segments.pop()!;
     const dir = await directory(handle, segments);
-    await exact(dir, name);
     const file = await (await dir.getFileHandle(name, { create: false })).getFile();
     // Errors after the entry is found are not absence.
     return text(file, budget).catch(error => failure(classify(error)));

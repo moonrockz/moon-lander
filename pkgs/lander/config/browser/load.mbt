@@ -83,7 +83,15 @@ pub async fn load(
   guard !mounts.is_empty() else {
     raise InvalidMount(operation="load", path="", reason="at least one mount is required")
   }
-  let mut entry_budget = limits.entries
+  let state : LoadState = {
+    tree: @config.FileTree::new(),
+    answered: Set([]),
+    observed: Set([]),
+    entries: limits.entries,
+    bytes: limits.bytes,
+    requests: limits.requests,
+    signal: signal.unwrap_or(@js_async.AbortController::new().signal()),
+  }
   for i, mount in mounts {
     for j = 0; j < i; j = j + 1 {
       if contains(mount.root, mounts[j].root) || contains(mounts[j].root, mount.root) {
@@ -94,26 +102,21 @@ pub async fn load(
       raise Unsupported(operation="load", path=mount.root)
     }
     let entries = mount.kinds.length() - 1
-    guard entries <= entry_budget else {
+    guard entries <= state.entries else {
       raise LimitExceeded(operation="load", path=mount.root, limit="entries")
     }
-    entry_budget -= entries
+    state.entries -= entries
   }
-  let signal = signal.unwrap_or(@js_async.AbortController::new().signal())
-  check_abort(signal, "")
+  check_abort(state.signal, "")
   let cwd = builder.given_working_dir().unwrap_or(mounts[0].root)
   ignore(select(mounts, cwd))
   let mut builder = builder |> @config.working_dir(cwd)
   if builder.given_env_vars() is None { builder = builder |> @config.env_vars(Map([])) }
-  let mut tree = @config.FileTree::new()
-  let answered : Set[@config.FileRequest] = Set([])
-  let mut byte_budget = limits.bytes
-  let observed : Set[String] = Set([])
   while true {
-    check_abort(signal, "")
-    match @config.load(builder, tree) {
+    check_abort(state.signal, "")
+    match @config.load(builder, state.tree) {
       Done(config) => {
-        check_abort(signal, "")
+        check_abort(state.signal, "")
         return config
       }
       Need(requests) => {
@@ -121,7 +124,7 @@ pub async fn load(
         let batch : Set[@config.FileRequest] = Set([])
         for request in requests {
           let mount = select(mounts, request_path(request))
-          if !answered.contains(request) && !known(tree, request) && !batch.contains(request) {
+          if !state.answered.contains(request) && !known(state.tree, request) && !batch.contains(request) {
             pending.push((request, mount))
             batch.add(request)
           }
@@ -129,83 +132,170 @@ pub async fn load(
         guard !pending.is_empty() else {
           raise Protocol(operation="load", path=match requests { [first, ..] => request_path(first); [] => "" })
         }
-        guard pending.length() <= limits.requests - answered.length() else {
+        guard pending.length() <= state.requests - state.answered.length() else {
           raise LimitExceeded(operation="load", path=request_path(pending[0].0), limit="requests")
         }
         for (request, mount) in pending {
           let path = request_path(request)
-          check_abort(signal, path)
-          let relative = if path == mount.root {
-            ""
-          } else if mount.root == "/" {
-            path[1:].to_owned()
-          } else {
-            path[mount.root.length() + 1:].to_owned()
-          }
+          check_abort(state.signal, path)
           match (request, mount.backend) {
-            (ListDir(_), Directory(handle)) => {
-              let reply = @js_async.run_promise(task_signal => adapter.list_directory(handle, relative, signal, task_signal))
-              check_abort(signal, path)
-              match reply.kind() {
-                "listing" => {
-                  let entries : Array[@config.DirEntry] = []
-                  for i = 0; i < reply.count(); i = i + 1 {
-                    let name = reply.name_at(i)
-                    entries.push({ name, kind: if reply.directory_at(i) { Directory } else { File } })
-                  }
-                  entries.sort_by((a, b) => a.name.lexical_compare(b.name))
-                  let seen = if path == mount.root { [] } else { [path] }
-                  for entry in entries { seen.push(join(path, entry.name)) }
-                  for entry_path in seen {
-                    if !observed.contains(entry_path) {
-                      guard entry_budget > 0 else {
-                        raise LimitExceeded(operation="list", path~, limit="entries")
-                      }
-                      observed.add(entry_path)
-                      entry_budget -= 1
-                    }
-                  }
-                  tree = tree.with_listing(path, entries)
-                }
-                kind => tree = answer_missing(tree, path, kind, "list")
-              }
-            }
+            (ListDir(_), Directory(handle)) => ignore(state.live_listing(mount.root, handle, path))
             (ListDir(_), _) =>
               match mount.listings.get(path) {
-                Some(entries) => tree = tree.with_listing(path, entries)
-                None => tree = tree.with_missing(path)
+                Some(entries) => state.tree = state.tree.with_listing(path, entries)
+                None => state.tree = state.tree.with_missing(path)
               }
-            (ReadFile(_), Directory(_)) if path == mount.root => tree = tree.with_missing(path)
-            (ReadFile(_), backend) if backend is Directory(_) || mount.kinds.get(path) == Some(File) => {
-              let reply = @js_async.run_promise(task_signal => match mount.backend {
-                Urls(base) => adapter.read(base, relative, byte_budget, signal, task_signal)
-                Files(files) => adapter.read_file(files[relative], byte_budget, signal, task_signal)
-                Directory(handle) => adapter.read_directory_file(handle, relative, byte_budget, signal, task_signal)
-              })
-              check_abort(signal, path)
-              match reply.kind() {
-                "file" => {
-                  if mount.backend is Directory(_) && !observed.contains(path) {
-                    guard entry_budget > 0 else {
-                      raise LimitExceeded(operation="read", path~, limit="entries")
-                    }
-                    observed.add(path)
-                    entry_budget -= 1
-                  }
-                  byte_budget -= reply.size()
-                  tree = tree.with_file(path, reply.text())
-                }
-                "http" => raise Http(operation="read", path~, status=reply.status())
-                "limit" => raise LimitExceeded(operation="read", path~, limit="bytes")
-                kind => tree = answer_missing(tree, path, kind, "read")
-              }
+            (ReadFile(_), Directory(handle)) => state.live_read(mount.root, handle, path)
+            (ReadFile(_), Urls(base)) if mount.kinds.get(path) == Some(File) => {
+              let relative = relative_to(mount.root, path)
+              state.accept(path, @js_async.run_promise(task_signal => adapter.read(base, relative, state.bytes, state.signal, task_signal)))
             }
-            (ReadFile(_), _) => tree = tree.with_missing(path)
+            (ReadFile(_), Files(files)) if mount.kinds.get(path) == Some(File) => {
+              let file = files[relative_to(mount.root, path)]
+              state.accept(path, @js_async.run_promise(task_signal => adapter.read_file(file, state.bytes, state.signal, task_signal)))
+            }
+            (ReadFile(_), _) => state.tree = state.tree.with_missing(path)
           }
-          answered.add(request)
+          state.answered.add(request)
         }
       }
     }
   }
   abort("the load loop returns only a complete configuration")
+}
+
+///|
+/// The mutable answers and remaining budgets of one load.
+priv struct LoadState {
+  mut tree : @config.FileTree
+  answered : Set[@config.FileRequest]
+  observed : Set[String]
+  mut entries : Int
+  mut bytes : Int
+  requests : Int
+  signal : @js_async.AbortSignal
+}
+
+///|
+fn relative_to(root : String, path : String) -> String {
+  if path == root {
+    ""
+  } else if root == "/" {
+    path[1:].to_owned()
+  } else {
+    path[root.length() + 1:].to_owned()
+  }
+}
+
+///|
+/// Count each unique observed virtual entry once against the entry budget.
+fn LoadState::observe(self : LoadState, path : String, operation : String, at : String) -> Unit raise BrowserError {
+  if !self.observed.contains(path) {
+    guard self.entries > 0 else { raise LimitExceeded(operation~, path=at, limit="entries") }
+    self.observed.add(path)
+    self.entries -= 1
+  }
+}
+
+///|
+/// Store a file reply, or record absence, or raise its boundary error.
+fn LoadState::accept(self : LoadState, path : String, reply : Reply) -> Unit raise BrowserError {
+  check_abort(self.signal, path)
+  match reply.kind() {
+    "file" => {
+      self.bytes -= reply.size()
+      self.tree = self.tree.with_file(path, reply.text())
+    }
+    "http" => raise Http(operation="read", path~, status=reply.status())
+    "limit" => raise LimitExceeded(operation="read", path~, limit="bytes")
+    kind => self.tree = answer_missing(self.tree, path, kind, "read")
+  }
+}
+
+///|
+/// The exact listing of a live directory, or None when it is absent. Each
+/// ancestor below the mount root is listed first, so every name is checked
+/// against the names that the handle reports: an engine can resolve a name
+/// without case on a case-insensitive host file system. Every listing is cached
+/// for this load and counts toward the request and entry budgets.
+async fn LoadState::live_listing(
+  self : LoadState,
+  root : String,
+  handle : DirectoryHandle,
+  path : String,
+) -> Array[@config.DirEntry]? raise {
+  match self.tree.listing(path) {
+    Found(entries) => return Some(entries)
+    Missing => return None
+    Unknown => ()
+  }
+  if path != root {
+    let (dir, name) = parent(path)
+    let present = match self.live_listing(root, handle, dir) {
+      Some(entries) => entries.iter().any(entry => entry.name == name && entry.kind == Directory)
+      None => false
+    }
+    guard present else {
+      self.tree = self.tree.with_missing(path)
+      return None
+    }
+  }
+  let request = @config.FileRequest::ListDir(path)
+  if !self.answered.contains(request) {
+    guard self.answered.length() < self.requests else {
+      raise LimitExceeded(operation="list", path~, limit="requests")
+    }
+  }
+  check_abort(self.signal, path)
+  // Children that this load already counted do not consume the budget again.
+  let mut counted = 0
+  for seen in self.observed {
+    if seen.has_prefix(if path == "/" { "/" } else { path + "/" }) && parent(seen).0 == path { counted += 1 }
+  }
+  let reply = @js_async.run_promise(task_signal => adapter.list_directory(
+    handle, relative_to(root, path), self.entries + counted, self.signal, task_signal,
+  ))
+  check_abort(self.signal, path)
+  match reply.kind() {
+    "listing" => {
+      let entries : Array[@config.DirEntry] = []
+      for i = 0; i < reply.count(); i = i + 1 {
+        entries.push({ name: reply.name_at(i), kind: if reply.directory_at(i) { Directory } else { File } })
+      }
+      entries.sort_by((a, b) => a.name.lexical_compare(b.name))
+      if path != root { self.observe(path, "list", path) }
+      for entry in entries { self.observe(join(path, entry.name), "list", path) }
+      self.tree = self.tree.with_listing(path, entries)
+      self.answered.add(request)
+      Some(entries)
+    }
+    "limit" => raise LimitExceeded(operation="list", path~, limit="entries")
+    kind => {
+      self.tree = answer_missing(self.tree, path, kind, "list")
+      self.answered.add(request)
+      None
+    }
+  }
+}
+
+///|
+/// Read a live file only when its exact name is a file in its parent listing.
+async fn LoadState::live_read(
+  self : LoadState,
+  root : String,
+  handle : DirectoryHandle,
+  path : String,
+) -> Unit raise {
+  let exists = path != root && (match self.live_listing(root, handle, parent(path).0) {
+    Some(entries) => entries.iter().any(entry => entry.name == parent(path).1 && entry.kind == File)
+    None => false
+  })
+  guard exists else {
+    self.tree = self.tree.with_missing(path)
+    return
+  }
+  let reply = @js_async.run_promise(task_signal => adapter.read_directory_file(
+    handle, relative_to(root, path), self.bytes, self.signal, task_signal,
+  ))
+  self.accept(path, reply)
 }

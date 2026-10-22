@@ -131,14 +131,16 @@ native picker, or from OPFS. The package never opens a picker and never calls
 
 A directory mount is live and read-only. For each requested path, the adapter
 resolves one segment at a time with `create: false`. It lists direct children
-with `entries()` and reads a file with `getFile()` and `text()`. It checks each
-segment against the exact names from `entries()`, because an engine can resolve
-a name without case on a case-insensitive host file system. A missing entry or
-a wrong entry kind is absent. A load never creates, writes or removes an entry.
+with `entries()` and reads a file with `getFile()` and `text()`. Before it uses
+a name, the load lists the parent directory and checks the exact name there,
+because an engine can resolve a name without case on a case-insensitive host
+file system. These listings are cached for the load. A missing entry or a wrong
+entry kind is absent. A load never creates, writes or removes an entry.
 
 Each load caches its answers. A later load can see changed entries; a completed
 `Config` does not change. A load is not an atomic snapshot of the directory.
-Listed entries count toward the entry limit as the load observes them.
+Listed entries count toward the entry limit as the load observes them, and a
+listing stops as soon as a directory has more children than the remaining limit.
 `NotAllowedError` and `SecurityError` raise `PermissionDenied`, for example
 after the user revokes access. Other failures raise `Io`. The load does not try
 another mount or store after a failure.

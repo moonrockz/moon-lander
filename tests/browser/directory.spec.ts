@@ -208,7 +208,8 @@ test("denied and revoked handle operations raise PermissionDenied without fallba
   const before = (await paths(page)).length;
   for (const [handle, error] of [["denied", "PermissionDenied"], ["security", "PermissionDenied"], ["broken", "Io"]]) {
     const result = await run(page, { mounts: [hosted(page), directory("/workspace", handle)], sources: ["/defaults/acme.toml", "/workspace/acme.toml"] });
-    expect(result, handle).toEqual({ error, operation: "read", path: "/workspace/acme.toml" });
+    // The exact-name check lists the parent first, so the denial is on that listing.
+    expect(result, handle).toEqual({ error, operation: "list", path: "/workspace" });
     expect(JSON.stringify(result)).not.toContain("handle-secret");
   }
   // The hosted mount answered only its own file. No other mount or store replaced the denied read.
@@ -217,11 +218,10 @@ test("denied and revoked handle operations raise PermissionDenied without fallba
     .toEqual({ error: "PermissionDenied", operation: "read", path: "/workspace/acme.toml" });
   await page.evaluate(() => { (globalThis as any).revokeAfterListing = true; });
   const revoked = await run(page, { mounts: [directory("/workspace", "revoked")], cwd: "/workspace/src", sources: [{ conventions: "acme", workspace: 0 }] });
-  expect(revoked.error).toBe("PermissionDenied");
-  expect(revoked.operation).toBe("list");
-  expect(revoked.path).toMatch(/^\/workspace\/src\//);
+  // The first listing succeeds; access is revoked before the next one.
+  expect(revoked).toEqual({ error: "PermissionDenied", operation: "list", path: "/workspace/src" });
   expect(await run(page, { mounts: [directory("/workspace", "partial")], sources: ["acme.toml"] }))
-    .toEqual({ error: "Unsupported", operation: "read", path: "/workspace/acme.toml" });
+    .toEqual({ error: "Unsupported", operation: "list", path: "/workspace" });
   expect(writes(await calls(page))).toEqual([]);
 });
 
@@ -233,6 +233,27 @@ test("directory limits and abort stop handle operations", async ({ page }) => {
   expect(await run(page, { mounts: [directory()], sources: ["acme.toml"], limits: { bytes: 8 } }))
     .toEqual({ error: "LimitExceeded", operation: "read", path: "/workspace/acme.toml", limit: "bytes" });
   expect((await run(page, { mounts: [directory()], sources: ["acme.toml", "data/unrelated.toml"], limits: { entries: 1 } })).limit).toBe("entries");
+  // A wide directory stops enumeration at the budget, also for exact-name checks of reads.
+  await opfs(page, Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`wide/${i}.toml`, ""])), "wide");
+  await page.evaluate(() => {
+    const real = (globalThis as any).testHandles.wide as FileSystemDirectoryHandle;
+    (globalThis as any).yielded = 0;
+    const counted = (dir: any): any => ({
+      kind: "directory",
+      getDirectoryHandle: async (name: string, options: any) => counted(await dir.getDirectoryHandle(name, options)),
+      getFileHandle: (name: string, options: any) => dir.getFileHandle(name, options),
+      entries: async function* () { for await (const entry of dir.entries()) { (globalThis as any).yielded++; yield entry; } },
+    });
+    (globalThis as any).testHandles.counted = counted(real);
+  });
+  for (const input of [
+    { mode: "listing", path: "/workspace/wide", keys: ["listing"] }, { sources: ["wide/missing.toml"] }, { sources: ["wide/59.toml"] },
+  ]) {
+    await page.evaluate(() => { (globalThis as any).yielded = 0; });
+    const result = await run(page, { mounts: [directory("/workspace", "counted")], limits: { entries: 5 }, ...input });
+    expect(result, JSON.stringify(input)).toEqual({ error: "LimitExceeded", operation: "list", path: "/workspace/wide", limit: "entries" });
+    expect(await page.evaluate(() => (globalThis as any).yielded)).toBeLessThanOrEqual(6);
+  }
   const aborted = await page.evaluate(async input => {
     const controller = new AbortController();
     const signal = controller.signal;
@@ -252,7 +273,7 @@ test("directory limits and abort stop handle operations", async ({ page }) => {
       return { result: await pending, calls, listeners: listeners.size };
     } finally { delete (globalThis as any).testSignal; }
   }, { mounts: [directory("/workspace", "pending")], sources: ["acme.toml", "next.toml"] });
-  expect(aborted).toEqual({ result: { error: "Aborted", operation: "load", path: "/workspace/acme.toml" }, calls: 1, listeners: 0 });
+  expect(aborted).toEqual({ result: { error: "Aborted", operation: "load", path: "/workspace" }, calls: 1, listeners: 0 });
 });
 
 test("the consumer detects picker support and loads a supplied handle headlessly", async ({ page }) => {

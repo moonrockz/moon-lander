@@ -452,7 +452,7 @@ the package README as its summary.
 
 #### Scenario: Index
 - **WHEN** a user opens `/moon-lander/api/`
-- **THEN** the page lists the modules `moonrockz/moon-lander` and `moonrockz/notebooks`, and links `/moon-lander/api/moonrockz/notebooks/`
+- **THEN** the page lists the modules `moonrockz/moon-lander`, `moonrockz/notebooks` and `moonrockz/openrpc`, and links `/moon-lander/api/moonrockz/notebooks/`
 
 ### Requirement: API links in prose
 
@@ -511,11 +511,16 @@ A patch release SHALL replace the tree of its line.
 
 A reusable workflow SHALL build the site of one minor line with the base path
 `/moon-lander/v/<minor>/`, check it, and give the file `site-<minor>.tar.gz` to its
-caller. It MUST NOT create a release, and it MUST have `contents: read` only.
+caller. It MUST NOT create a release, and it MUST have `contents: read` only. The
+release workflow SHALL call it and attach the file to each release that it creates.
 
 #### Scenario: Asset build
 - **WHEN** a workflow calls the asset workflow with the root `moon.mod` version `0.1.0`
 - **THEN** the call gives `site-0.1.tar.gz`, and every internal link in it starts with `/moon-lander/v/0.1/`
+
+#### Scenario: Release with the site asset
+- **WHEN** the release workflow creates the GitHub release `v0.3.0`
+- **THEN** the release has the asset `site-0.3.tar.gz`
 
 ### Requirement: Versioned deploy
 
@@ -535,7 +540,7 @@ on a default result limit. It MUST skip draft releases, prereleases, and release
 whose minor line is below `versions.since` in `site.json`.
 
 #### Scenario: Release before site assets
-- **WHEN** `versions.since` is `0.2` and the only release is `v0.1.0`, which has no site asset
+- **WHEN** `versions.since` is `0.3` and the only releases are `v0.1.0` and `v0.2.0`, which have no site asset
 - **THEN** the deploy succeeds and the root shows the `main` docs with the pre-release banner
 
 #### Scenario: More than 30 releases

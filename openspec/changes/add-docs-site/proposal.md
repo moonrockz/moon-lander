@@ -45,8 +45,8 @@ that release.
   deploy puts the kept versions together with no rebuild. A version switcher, a
   banner on older versions and canonical links to `/latest/` help readers.
 - Add the reusable workflow `site-asset.yml` that builds the site asset of one
-  minor line. A future release workflow calls it. This change does not create a
-  release or a release workflow.
+  minor line. The release workflow `release.yml` calls it and attaches the asset
+  to each release. This change does not cut a release.
 - Add a search index, an Atom feed for articles, link and anchor checks, a check
   of the built site, and one browser smoke test.
 - Add moonx task scripts `scripts/site.mbtx` and `scripts/serve-site.mbtx` that use
@@ -78,9 +78,8 @@ None.
 Call: these items are not part of this change.
 
 - Preview deploys for pull requests. Pull requests build and test the site only.
-- A release workflow and the first release. `AGENTS.md` says to ask before a
-  release is cut. This change only adds the reusable step that a release workflow
-  calls.
+- A release. `AGENTS.md` says to ask before a release is cut. This change only
+  adds the asset step to `release.yml`.
 - A storage branch for old versions, and a rebuild of old versions from tags.
 - Translations and other languages (i18n).
 - A custom domain, analytics, cookies, comments and third-party fonts or scripts.
@@ -101,10 +100,11 @@ Call: these items are not part of this change.
   `scripts/site.mbtx`, `scripts/serve-site.mbtx`, `.github/workflows/site.yml`,
   `.github/workflows/site-build.yml`, `.github/workflows/site-asset.yml`.
 - Reads at build time: the `moon doc` output below `_build/doc/` for the modules
-  `pkgs/lander` and `pkgs/notebooks`. Its JSON format is not documented; the
+  `pkgs/lander`, `pkgs/notebooks` and `pkgs/openrpc`. Its JSON format is not documented; the
   toolchain pin and fixture tests guard it.
 - Changed: `moon.work` (new member), `.config/mise/config.toml` (four tasks),
-  `.github/workflows/ci.yml` (site job in `ci-ok`), `.gitignore` (`_site/`),
+  `.github/workflows/ci.yml` (site job in `ci-ok`),
+  `.github/workflows/release.yml` (calls `site-asset.yml`), `.gitignore` (`_site/`),
   `AGENTS.md`, `README.md`, `openspec/config.yaml`.
 - Dependencies of `apps/site` only: `moonbit-community/rabbita@0.16.5`,
   `moonbit-community/cmark@0.4.12`, `bobzhang/beautiful_mermaid@0.2.0`,
@@ -113,5 +113,6 @@ Call: these items are not part of this change.
 - Tools: Bun, pinned by `add-configuration-core` task group 1
   (bead `lander-4us.2.1`).
 - Repository setting: GitHub Pages must use "GitHub Actions" as its source.
-- Releases: each future release must carry the asset `site-<minor>.tar.gz`. The
+- Releases: each release from `0.3` on carries the asset `site-<minor>.tar.gz`
+  through `release.yml`. The
   deploy reads release assets with `contents: read` only.

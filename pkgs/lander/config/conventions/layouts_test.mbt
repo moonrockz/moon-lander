@@ -294,7 +294,7 @@ test "Isolated mode keeps the project primary and loads no override file" {
 }
 
 ///|
-test "an option that discovery does not read yet adds a note" {
+test "an option that the convention set does not use adds a note" {
   let config = discover_in(
     "/w",
     [("/w/acme.toml", "a = 1")],
@@ -311,7 +311,7 @@ test "an option that discovery does not read yet adds a note" {
       message
     }),
   ).to_equal([
-    "environments are off, so discovery ignores the environment option", "discovery does not read the project option yet",
+    "environments are off, so discovery ignores the environment option", "the convention set has no workspace part, so discovery ignores the project option",
     no_platform,
   ])
 }

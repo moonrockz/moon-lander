@@ -1,4 +1,12 @@
 ///|
+/// A system or global user source and the candidates that it checks. A
+/// skipped source has no candidates.
+priv struct MachineSource {
+  source : @config.ConfigSource
+  candidates : Array[String]
+}
+
+///|
 /// The system and global user sources, in merge order. In isolated mode, or
 /// with no platform, each source that the convention set uses reports
 /// `Skipped`; with no platform, discovery also adds a note.
@@ -8,7 +16,7 @@ fn Conventions::machine_sources(
   context : @config.LoadContext,
   extensions : Array[String],
   notes : Array[@config.ConfigWarning],
-) -> Array[@config.ConfigSource] {
+) -> Array[MachineSource] {
   let roles : Array[@config.FileRole] = []
   if self.has(SystemDir) {
     roles.push(System)
@@ -28,7 +36,10 @@ fn Conventions::machine_sources(
       )
     }
     return roles.map(role => {
-      @config.ConfigSource::skipped(File(role), name=self.display)
+      {
+        source: @config.ConfigSource::skipped(File(role), name=self.display),
+        candidates: [],
+      }
     })
   }
   let vars : DirVars = { platform, env_vars: context.env_vars, working_dir: context.working_dir }
@@ -37,12 +48,15 @@ fn Conventions::machine_sources(
       System => self.files_in(self.system_path(vars), extensions)
       _ => self.global_candidates(vars, extensions)
     }
-    @config.ConfigSource::candidates(
-      paths,
-      display=self.display,
-      role~,
-      name=self.display,
-    )
+    {
+      source: @config.ConfigSource::candidates(
+        paths,
+        display=self.display,
+        role~,
+        name=self.display,
+      ),
+      candidates: paths,
+    }
   })
 }
 

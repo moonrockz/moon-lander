@@ -32,7 +32,8 @@ pub fn DiscoveryOptions::new(
 ///|
 /// An immutable convention set: the application name, the variable prefix,
 /// the display name, the standard parts to use, the walk-up rule, the stop
-/// boundary, the legacy fallback file, and the environment opt-in.
+/// boundary, the legacy fallback file, the environment opt-in, the workspace
+/// keys, and the key filters.
 pub struct Conventions {
   priv name : String
   priv prefix : String
@@ -42,6 +43,9 @@ pub struct Conventions {
   priv boundary : String?
   priv legacy : Legacy?
   priv environments : Environments?
+  priv workspace : WorkspaceKeys?
+  priv member_scope : Array[String]
+  priv inherited : Array[String]
 }
 
 ///|
@@ -94,7 +98,17 @@ priv struct Environments {
 }
 
 ///|
-/// An empty convention set: no parts, no walk-up and no environments.
+/// The key paths of the workspace values, in the text form of a key path.
+priv struct WorkspaceKeys {
+  members : String
+  exclude : String
+  default_member : String
+  project_name : String
+}
+
+///|
+/// An empty convention set: no parts, no walk-up, no environments and no
+/// workspace.
 /// `prefix` defaults to the name in upper case with `-` changed to `_`, and
 /// `display` to the name.
 pub fn base(
@@ -111,6 +125,9 @@ pub fn base(
     boundary: None,
     legacy: None,
     environments: None,
+    workspace: None,
+    member_scope: [],
+    inherited: [],
   }
 }
 
@@ -227,6 +244,59 @@ pub fn legacy(
 }
 
 ///|
+/// Turn on workspaces. A project file whose value sets `members` or
+/// `default_member` is a workspace. Its members are the directories that the
+/// member entries select, without the entries of `exclude`. Each argument is a
+/// key path in text form. Discovery reads the members, the exclude entries
+/// and the default member from the merged value of the system file, the
+/// global user file and the workspace primary, and the project name from the
+/// same value or from the primary of a member.
+///
+/// In an entry, `*` matches any run of characters in one segment, `**`
+/// matches zero or more whole segments, and every other character matches
+/// itself. An absolute entry, an entry with a drive, a `\` or a `..`
+/// segment gives a `Note` warning, and discovery skips it. The workspace root
+/// is never its own member.
+pub fn workspace(
+  conventions : Conventions,
+  members? : String = "workspace.members",
+  exclude? : String = "workspace.exclude",
+  default_member? : String = "workspace.default_member",
+  project_name? : String = "project.name",
+) -> Conventions {
+  {
+    ..conventions,
+    workspace: Some({ members, exclude, default_member, project_name }),
+  }
+}
+
+///|
+/// Remove the key paths `paths` from each member layer: the member primary
+/// and its environment file, local override and user override. Only the
+/// workspace can set them. A removed key gives a `KeyRemoved` warning in the
+/// report of that source, and it has no origin. Each path is the text form
+/// of a key path, for example `workspace.out_dir`.
+pub fn member_scope_keys(
+  conventions : Conventions,
+  paths : Array[String],
+) -> Conventions {
+  { ..conventions, member_scope: [..conventions.member_scope, ..paths] }
+}
+
+///|
+/// Remove the keys `keys` from the layers that a selected member inherits:
+/// the system file, the global user file, the workspace primary and its
+/// environment file, local override and user override. The removal gives no
+/// warning. With no selected member, every layer stays complete. Each key is
+/// the text form of a key path, usually a top-level key such as `project`.
+pub fn inherited_filter(
+  conventions : Conventions,
+  keys : Array[String],
+) -> Conventions {
+  { ..conventions, inherited: [..conventions.inherited, ..keys] }
+}
+
+///|
 /// The application name.
 pub fn Conventions::name(self : Conventions) -> String {
   self.name
@@ -248,16 +318,18 @@ pub fn Conventions::display(self : Conventions) -> String {
 /// Add the convention set to a core builder as a source provider. During
 /// `@config.load`, discovery gives its sources at its position in merge order:
 /// the system source (priority 100), the global user source (200), the project
-/// primary with the role `Workspace`, `Legacy`, or `Explicit` (300), the
-/// environment file (375), the local override (390), and the user override
-/// (400).
+/// or workspace primary with the role `Workspace`, `Legacy`, or `Explicit`
+/// (300), the selected member primary with the role `Member` (350), the
+/// environment files (375), the local overrides (390), and the user overrides
+/// (400). Each kind of adjacent file loads for the workspace, then for the
+/// member.
 ///
-/// Discovery reads `isolated`, `config` and `environment` from `options`. In
-/// isolated mode the system, global user, and override sources report
-/// `Skipped`. `Explicit(path)` is the project primary with no walk-up, and
-/// `Skip` skips it. With environments off, a given `environment` adds a `Note`
-/// warning. Discovery does not read the `project` option yet; a given value
-/// adds a `Note` warning so that it is never ignored without a sign.
+/// Discovery reads `isolated`, `config`, `environment` and `project` from
+/// `options`. In isolated mode the system, global user, and override sources
+/// report `Skipped`. `Explicit(path)` is the project primary with no walk-up,
+/// and `Skip` skips it. `project` selects a workspace member by its path or
+/// by its project name. With environments off, a given `environment` adds a
+/// `Note` warning, and with no workspace part a given `project` does too.
 pub fn add(
   builder : @config.ConfigBuilder,
   conventions : Conventions,

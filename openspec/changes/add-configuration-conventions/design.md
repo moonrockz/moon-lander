@@ -379,6 +379,27 @@ same override names in the directory of the primary. `Explicit(path)` is a
 directory, with `\` changed to `/` on Windows, and `Skip` gives a skipped project
 source.
 
+Call (this change, groups 6 and 7): workspaces are opt-in through
+`workspace(members?, exclude?, default_member?, project_name?)`, with the
+defaults `workspace.members`, `workspace.exclude`, `workspace.default_member`
+and `project.name`. `app_dirs` does not include it. A value that sets the
+members or the default member is a workspace. A provider does not see the
+defaults source, so the workspace keys come from the system file, the global
+user file and the workspace primary, merged. The enclosing-workspace search
+parses each ancestor file alone and examines one directory per round. The
+default member must be confined, not the root and not excluded; it need not be
+listed, as in the Rust loader. A default member that is not confined gives a
+warning and no member, with no fallback to the only member. Confinement
+applies to member, exclude and default-member entries. A wildcard gives each
+directory that holds a primary or legacy candidate, also two primaries; the
+core then raises `Ambiguous` when that member is selected. A selected member
+with no primary gives a member source that reports `NotFound`. A legacy member
+primary has the role `Member` and no adjacent file. An explicit file inside a
+member of an enclosing workspace is the member primary. A selector with no
+project file raises `UnknownProject` with the start directory. A selector
+with no workspace part adds a `Note`. The inherited filter applies when a
+member source exists, also when its file is not found.
+
 Discovery with
 no working directory, or a relative one, gives a skipped project source and a
 `Note` warning: the core would join a relative candidate to the working directory

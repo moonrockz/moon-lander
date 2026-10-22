@@ -1,4 +1,5 @@
 import {
   "moonrockz/openrpc",
   "moonrockz/openrpc/json" @exact,
+  "moonrockz/openrpc/schema",
 } for "wbtest"

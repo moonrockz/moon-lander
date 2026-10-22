@@ -371,6 +371,7 @@ async fn main {
   for
     denied in [
       "smithy", "ion@", "moon-lander", "notebooks", "async@", "rabbita", "proton",
+      "wasm-devkit", "/wit@", "/wac@",
     ] {
     guard !graph.contains(denied) else {
       fail("Unexpected dependency: " + denied + "\n" + graph)

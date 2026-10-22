@@ -87,9 +87,9 @@ Depends on: `lander-bwk.5`.
 Bead: `lander-bwk.10`
 Depends on: `lander-bwk.8`, `lander-bwk.9`.
 
-- [ ] 9.1 Add full-model and S01-S18 acceptance coverage under the unpublished tests module, with independent frozen Ajv checks and separate normative/artifact discrepancy expectations.
-- [ ] 9.2 Add pinned MoonBit qualification scripts and mise/CI tasks; verify both version lines on four targets and deliberate invalid-document, invalid-ref, digest-mismatch and task-failure exits.
-- [ ] 9.3 Record complete field/keyword coverage and exact-number evidence beyond Ajv, pass full workspace checks and strict validation, and identify Smithy-only parity work still pending.
+- [x] 9.1 Add full-model and S01-S18 acceptance coverage under the unpublished tests module, with independent frozen Ajv checks and separate normative/artifact discrepancy expectations.
+- [x] 9.2 Add pinned MoonBit qualification scripts and mise/CI tasks; verify both version lines on four targets and deliberate invalid-document, invalid-ref, digest-mismatch and task-failure exits.
+- [x] 9.3 Record complete field/keyword coverage and exact-number evidence beyond Ajv, pass full workspace checks and strict validation, and identify Smithy-only parity work still pending.
 
 ## 10. Prepare the independently packaged release candidate
 

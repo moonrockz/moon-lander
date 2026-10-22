@@ -4,6 +4,7 @@ import {
   "moonrockz/moon-lander/config",
   "moonrockz/moon-lander/config/formats/toml",
   "moonrockz/moon-lander/config/browser",
+  "moonrockz/moon-lander/config/conventions",
 }
 
 supported_targets = "js"

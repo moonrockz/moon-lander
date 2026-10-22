@@ -35,10 +35,10 @@ Bead: lander-4us.8.2
 
 Bead: lander-4us.8.3
 
-- [ ] 3.1 Add a selected-file mount over explicit relative-path and browser File pairs. Infer parent listings, reject duplicates and path collisions, and read File.text only for requested contents. Verify real file-input fallback in all three engines, including a large unrelated file that is never read.
-- [ ] 3.2 Add the browser workspace convention helper that removes machine directories and bounds discovery to the mount root. Verify nested discovery, a narrower caller boundary, no outside listing, injected home variables, exact-name matching, and normal local/user overrides inside the mount.
-- [ ] 3.3 Demonstrate one load that merges hosted defaults with selected project files in builder order. Verify values, reports, provenance, parse errors, and ambiguity without uploads or writes to selected files.
-- [ ] 3.4 Add consumer examples for mapping File.name and webkitRelativePath explicitly, including directory-input fallback. Verify the selected-file and workspace discovery scenarios in required browser CI and keep all four core targets green.
+- [x] 3.1 Add a selected-file mount over explicit relative-path and browser File pairs. Infer parent listings, reject duplicates and path collisions, and read File.text only for requested contents. Verify real file-input fallback in all three engines, including a large unrelated file that is never read.
+- [x] 3.2 Add the browser workspace convention helper that removes machine directories and bounds discovery to the mount root. Verify nested discovery, a narrower caller boundary, no outside listing, injected home variables, exact-name matching, and normal local/user overrides inside the mount.
+- [x] 3.3 Demonstrate one load that merges hosted defaults with selected project files in builder order. Verify values, reports, provenance, parse errors, and ambiguity without uploads or writes to selected files.
+- [x] 3.4 Add consumer examples for mapping File.name and webkitRelativePath explicitly, including directory-input fallback. Verify the selected-file and workspace discovery scenarios in required browser CI and keep all four core targets green.
 
 ## 4. Live read-only directory handles
 

@@ -3,6 +3,7 @@ import {
   "moonbitlang/async/js_async",
   "moonrockz/moon-lander/config",
   "moonrockz/moon-lander/config/browser",
+  "moonrockz/moon-lander/config/conventions",
   "moonrockz/moon-lander/config/formats/toml",
 }
 

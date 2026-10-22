@@ -135,7 +135,7 @@ async fn answer(
     "/" => (200, "text/html", @fs.read_file("tests/browser/index.html").text())
     "/example" =>
       (
-        200, "text/html", "<!doctype html><meta charset='utf-8'><title>Hosted example</title><script type='module' src='/example.js'></script>",
+        200, "text/html", "<!doctype html><meta charset='utf-8'><title>Hosted example</title><script type='module' src='/example.js'></script><input type='file' id='files' multiple><input type='file' id='directory' webkitdirectory multiple>",
       )
     "/example.js" =>
       (

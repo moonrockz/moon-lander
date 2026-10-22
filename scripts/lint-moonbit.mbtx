@@ -9,6 +9,10 @@
 /// these files in, so lint fails when the check leaves an interface that is untracked or that differs
 /// from the staged version. Stage or commit the written files and run lint again.
 ///
+/// Moon writes an interface only from the canonical backend of a module (`preferred-backend`, else
+/// `wasm`). A package that does not support that backend, such as a js-only package, gets no
+/// interface, so this check does not cover it.
+///
 /// Usage: `mise run lint:moonbit`, or `moonx scripts/lint-moonbit.mbtx`.
 import {
   "moonbitlang/async@0.22.5",

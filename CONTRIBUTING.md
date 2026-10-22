@@ -126,4 +126,6 @@ recorded in the bead.
 - Commit the `pkg.generated.mbti` file of each package, as MoonBit convention
   recommends. `mise run lint` writes these files and fails when one is new or changed
   and not staged. Review the interface change, stage the file, and run lint again.
+  Moon writes an interface only from a module's canonical backend, so a package that
+  cannot build on that backend, such as `config/browser` (js only), has no interface.
 - CI must pass. The `ci-ok` job is the aggregate check.

@@ -1,0 +1,271 @@
+///|
+/// Release workflow steps, adapted from Smithy's release flow.
+///
+/// - `plan` decides whether this run releases and writes `release`, `dry_run`,
+///   `version` and `tag` to `$GITHUB_OUTPUT`.
+/// - `notes X.Y.Z` prints the CHANGELOG.md section of that version.
+/// - `github X.Y.Z NOTES` creates the GitHub release `vX.Y.Z` at the checked
+///   out commit, or does nothing when it exists.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+priv enum Plan {
+  Release(String)
+  DryRun(String)
+  Skip(String)
+} derive(Eq, Debug)
+
+///|
+/// A pull request run and a `dry_run` only check. Any other run must be on
+/// main; a tag must name the moon.mod version; an existing GitHub release is
+/// done; a release needs its CHANGELOG.md section.
+fn plan(
+  event~ : String,
+  ref_type~ : String,
+  ref_name~ : String,
+  on_main~ : Bool,
+  dry_run~ : Bool,
+  version~ : String,
+  released~ : Bool,
+  has_section~ : Bool,
+) -> Result[Plan, String] {
+  if event == "pull_request" || dry_run {
+    return Ok(DryRun(version))
+  }
+  let tag = "v\{version}"
+  if ref_type == "tag" && ref_name != tag {
+    return Err("tag \{ref_name} does not match moon.mod version \{version}")
+  }
+  if !on_main {
+    return Err("\{ref_name} is not on main")
+  }
+  if released {
+    return Ok(Skip("\{tag} is already released"))
+  }
+  if !has_section {
+    return Err("CHANGELOG.md has no section for \{version}")
+  }
+  Ok(Release(version))
+}
+
+///|
+fn plan_outputs(p : Plan) -> String {
+  match p {
+    Release(v) => "release=true\ndry_run=false\nversion=\{v}\ntag=v\{v}\n"
+    DryRun(v) => "release=false\ndry_run=true\nversion=\{v}\ntag=v\{v}\n"
+    Skip(_) => "release=false\ndry_run=false\n"
+  }
+}
+
+///|
+/// The body of `## X.Y.Z` up to the next `## ` heading.
+fn changelog_section(text : String, version : String) -> String? {
+  let lines = text.split("\n").map(line => line.to_owned()).collect()
+  guard lines.search_by(line => {
+      line == "## \{version}" || line.has_prefix("## \{version} ")
+    })
+    is Some(start) else {
+    return None
+  }
+  let body = []
+  for line in lines[start + 1:] {
+    if line.has_prefix("## ") {
+      break
+    }
+    body.push(line)
+  }
+  Some(body.join("\n").trim().to_owned())
+}
+
+///|
+fn module_version(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.has_prefix("version = \"") {
+      let rest = line[11:]
+      if rest.find("\"") is Some(end) {
+        return Some(rest[:end].to_owned())
+      }
+    }
+  }
+  None
+}
+
+///|
+fn fail_with(message : String) -> Unit {
+  eprintln("❌ \{message}")
+  @sys.exit(1)
+}
+
+///|
+async fn output_of(cmd : String, args : Array[String]) -> (Int32, String) {
+  let (code, out, err) = @process.collect_output(cmd, args) catch {
+    _ => return (1, "cannot start \{cmd}")
+  }
+  (code, out.text() + err.text())
+}
+
+///|
+async fn run_plan() -> Unit {
+  guard module_version(@fs.read_file("moon.mod").text()) is Some(version) else {
+    fail_with("moon.mod has no version")
+    return
+  }
+  let event = @env.get_env_var("GITHUB_EVENT_NAME").unwrap_or("")
+  let ref_type = @env.get_env_var("GITHUB_REF_TYPE").unwrap_or("")
+  let ref_name = @env.get_env_var("GITHUB_REF_NAME").unwrap_or("")
+  let dry_run = @env.get_env_var("DRY_RUN").unwrap_or("") == "true"
+  let has_section = changelog_section(
+      @fs.read_file("CHANGELOG.md").text(),
+      version,
+    )
+    is Some(_)
+  let mut on_main = false
+  let mut released = false
+  if event != "pull_request" && !dry_run {
+    let (fetched, out) = output_of("git", ["fetch", "--quiet", "origin", "main"])
+    if fetched != 0 {
+      fail_with("git fetch origin main failed: \{out}")
+    }
+    let (code, out) = output_of("git", [
+      "merge-base", "--is-ancestor", "HEAD", "origin/main",
+    ])
+    on_main = match code {
+      0 => true
+      1 => false
+      _ => {
+        fail_with("cannot tell whether HEAD is on main: \{out}")
+        false
+      }
+    }
+    let (viewed, _) = output_of("gh", ["release", "view", "v\{version}"])
+    released = viewed == 0
+  }
+  match
+    plan(
+      event~,
+      ref_type~,
+      ref_name~,
+      on_main~,
+      dry_run~,
+      version~,
+      released~,
+      has_section~,
+    ) {
+    Err(message) => fail_with(message)
+    Ok(p) => {
+      println(
+        match p {
+          Release(v) => "Release \{v}"
+          DryRun(v) => "Dry run for \{v}"
+          Skip(reason) => "Skip: \{reason}"
+        },
+      )
+      let outputs = plan_outputs(p)
+      if @env.get_env_var("GITHUB_OUTPUT") is Some(path) && path != "" {
+        let previous = if @fs.exists(path) {
+          @fs.read_file(path).text()
+        } else {
+          ""
+        }
+        @fs.write_file(path, previous + outputs)
+      } else {
+        println(outputs.trim_end())
+      }
+    }
+  }
+}
+
+///|
+async fn run_github(version : String, notes : String) -> Unit {
+  let tag = "v\{version}"
+  let (viewed, _) = output_of("gh", ["release", "view", tag])
+  if viewed == 0 {
+    println("\{tag} already has a GitHub release")
+    return
+  }
+  let target = @env.get_env_var("GITHUB_SHA").unwrap_or("HEAD")
+  let (code, out) = output_of("gh", [
+    "release", "create", tag, "--target", target, "--title", tag, "--notes-file",
+    notes,
+  ])
+  if code != 0 {
+    fail_with("gh release create failed: \{out}")
+  }
+  println("Created the GitHub release \{tag}")
+}
+
+///|
+async fn main {
+  match @env.args()[1:] {
+    ["plan"] => run_plan()
+    ["notes", version] =>
+      match changelog_section(@fs.read_file("CHANGELOG.md").text(), version) {
+        Some(section) => println(section)
+        None => fail_with("CHANGELOG.md has no section for \{version}")
+      }
+    ["github", version, notes] => run_github(version, notes)
+    _ =>
+      fail_with("Usage: release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES")
+  }
+}
+
+///|
+fn plan_case(
+  event : String,
+  ref_type : String,
+  ref_name : String,
+  on_main : Bool,
+  released : Bool,
+  has_section : Bool,
+  dry_run~ : Bool = false,
+) -> Result[Plan, String] {
+  plan(
+    event~,
+    ref_type~,
+    ref_name~,
+    on_main~,
+    dry_run~,
+    version="0.2.0",
+    released~,
+    has_section~,
+  )
+}
+
+///|
+test "plan releases only from main with a matching tag and a changelog section" {
+  assert_eq(
+    plan_case("push", "branch", "main", true, false, true),
+    Ok(Release("0.2.0")),
+  )
+  assert_eq(
+    plan_case("pull_request", "branch", "x", false, false, false),
+    Ok(DryRun("0.2.0")),
+  )
+  assert_true(plan_case("push", "tag", "v0.1.0", true, false, true) is Err(_))
+  assert_true(
+    plan_case("push", "branch", "feature", false, false, true) is Err(_),
+  )
+  assert_true(
+    plan_case("push", "branch", "main", true, true, true) is Ok(Skip(_)),
+  )
+  assert_true(plan_case("push", "branch", "main", true, false, false) is Err(_))
+  assert_eq(
+    plan_outputs(Release("0.2.0")),
+    "release=true\ndry_run=false\nversion=0.2.0\ntag=v0.2.0\n",
+  )
+}
+
+///|
+test "changelog sections end at the next version heading" {
+  let text = "# Changelog\n\n## 0.2.0 - 2026-10-22\n\nNew.\n\n### Added\n\n- x\n\n## 0.1.0 - 2026-10-19\n\nOld.\n"
+  assert_eq(changelog_section(text, "0.2.0"), Some("New.\n\n### Added\n\n- x"))
+  assert_eq(changelog_section(text, "0.1.0"), Some("Old."))
+  assert_eq(changelog_section(text, "0.3.0"), None)
+  assert_eq(changelog_section(text, "0.2"), None)
+}

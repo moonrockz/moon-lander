@@ -97,21 +97,23 @@ bd close <id>                # after its tasks are done and verified
    `openspec/changes/archive/` and merges its requirement changes into
    `openspec/specs/`.
 
-Before publishing `moonrockz/moon-lander`, run `mise run check:formats-registry`
-on the exact candidate. It checks registry resolution and virtual-package
-trimming outside `moon.work` through a loopback registry, without publishing.
-Ask the owner before publishing to mooncakes.io or cutting a GitHub release.
-After an authorized Moon-Lander candidate upload, run
-`mise run check:formats-published`. Release gate `lander-4us.9` MUST remain open
-until that public-registry consumer passes on all four targets for the exact
-candidate and its source SHA and published archive checksum are recorded in the
-bead. Do not cut the Moon-Lander GitHub release or promote the candidate while
-the gate is open, failed, or missing evidence. The pre-publish loopback check
-continues to run in ordinary CI. Future release automation must reuse
-[Smithy's release flow](https://github.com/moonrockz/smithy/blob/main/.github/workflows/release.yml)
-and its `MOONCAKES_USER_TOKEN` organization secret, with public-consumer
-verification after publish and before the GitHub release. Repository access to
-that organization secret must be verified during release setup.
+Releases run only in GitHub Actions (`.github/workflows/release.yml`, adapted
+from [Smithy's release flow](https://github.com/moonrockz/smithy/blob/main/.github/workflows/release.yml)).
+Ask the owner before opening or merging a release pull request; merging it is
+the publication approval. The pull request sets the shared version with
+`scripts/versions.mbtx set X.Y.Z` and adds the `## X.Y.Z` section to
+`CHANGELOG.md`, and the workflow dry-runs its checks on it. After the merge the
+workflow runs `mise run check`, publishes `pkgs/notebooks` and `pkgs/openrpc`
+with the `MOONCAKES_USER_TOKEN` organization secret (an existing version counts
+as published), runs `mise run check:openrpc-published -- --checksum <sha>`
+against the archive it built, and only then creates the GitHub release `vX.Y.Z`.
+Repository access to that secret must be verified before the first run.
+
+`moonrockz/moon-lander` stays unpublished. Before publishing it, run
+`mise run check:formats-registry` on the exact candidate, and keep release gate
+`lander-4us.9` open until `mise run check:formats-published` passes on all four
+targets for that candidate with its source SHA and published archive checksum
+recorded in the bead.
 
 ## Commits and pull requests
 

@@ -194,12 +194,32 @@ run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
 description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
 run = "moonx scripts/check-openrpc.mbtx"
 
+[tasks."release:plan"]
+description = "Decide whether a Release workflow run releases (CI)"
+run = "moonx scripts/release.mbtx plan"
+
+[tasks."release:credentials"]
+description = "Write mooncakes.io credentials from MOONCAKES_USER_TOKEN (CI only)"
+run = "moonx scripts/credentials.mbtx"
+
+[tasks."release:publish"]
+description = "Publish the public modules to mooncakes.io; already published versions count as done (CI only)"
+run = "moonx scripts/publish.mbtx"
+
+[tasks."release:notes"]
+description = "Print the CHANGELOG.md section of a version (args: X.Y.Z)"
+run = "moonx scripts/release.mbtx notes"
+
+[tasks."release:github"]
+description = "Create the GitHub release vX.Y.Z unless it exists (args: X.Y.Z NOTES_FILE; CI only)"
+run = "moonx scripts/release.mbtx github"
+
 [tasks."check:openrpc-registry"]
 description = "Verify the packaged OpenRPC candidate through an isolated loopback registry consumer"
 run = "moonx scripts/check-openrpc-registry.mbtx"
 
 [tasks."check:openrpc-published"]
-description = "Release gate: verify the published OpenRPC module outside the workspace"
+description = "Release gate: verify the published OpenRPC module outside the workspace (args: --checksum SHA-256)"
 run = "moonx scripts/check-openrpc-registry.mbtx --published"
 
 [tasks."qualify:openrpc"]

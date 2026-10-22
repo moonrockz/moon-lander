@@ -96,7 +96,7 @@ Depends on: `lander-bwk.8`, `lander-bwk.9`.
 Bead: `lander-bwk.11`
 Depends on: `lander-bwk.10`.
 
-- [ ] 10.1 Finish runnable public API docs, dependency/license audit, release notes and shared-version validation; pass `moon -C pkgs/openrpc publish --dry-run` without publishing.
+- [ ] 10.1 Finish runnable public API docs, dependency/license audit, release notes and shared-version validation; pass deterministic `moon -C pkgs/openrpc package` and the loopback registry check without publishing, and add the GitHub Actions release workflow (credentials only in CI, so the authenticated publish runs there).
 - [x] 10.2 Adapt the existing MoonBit isolated-registry consumer pattern and verify the packaged archive outside `moon.work` on all four targets, including dependency leak rejection.
 - [x] 10.3 Record candidate source SHA, exact version, archive SHA-256, graph and complete command results; prepare the concrete approval request and label loopback results as pre-publication evidence.
 
@@ -105,8 +105,8 @@ Depends on: `lander-bwk.10`.
 Bead: `lander-bwk.12`
 Depends on: `lander-bwk.11`.
 
-- [ ] 11.1 Obtain explicit owner approval for the concrete candidate's publication and any GitHub release; record the approved version, source SHA and archive identity before the authorized action.
-- [ ] 11.2 After publication approval, upload the unchanged verified package and run a fresh exact-version public-registry consumer outside `moon.work` on all four targets without overrides or local substitution.
+- [ ] 11.1 Obtain explicit owner approval for the concrete candidate's publication and GitHub release by the owner merging the release pull request; record the approved version, source SHA and archive identity before the workflow publishes.
+- [ ] 11.2 After the merge, let the release workflow upload the unchanged verified package and run a fresh exact-version public-registry consumer outside `moon.work` on all four targets without overrides or local substitution, against the archive checksum it built.
 - [ ] 11.3 Record public resolution, checksum and source identity; keep this gate open if approval, artifact identity or any target proof is absent or fails, and obtain separate release authority when it was not included.
 
 ## 12. Migrate Smithy in its own workspace and prove parity

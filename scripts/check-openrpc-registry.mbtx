@@ -30,12 +30,20 @@ test "archive audit requires package files and rejects foreign entries" {
 
 ///|
 test "graph leak check accepts only the candidate module" {
-  let clean = "consumer@0.1.0 (local /tmp/c) [workspace member]:\n└─ moonrockz/openrpc -> moonrockz/openrpc@0.1.0\n"
-  assert_eq(graph_leaks(clean, "consumer"), [])
+  let clean = "consumer@0.2.0 (local /tmp/c) [workspace member]:\n└─ moonrockz/openrpc -> moonrockz/openrpc@0.2.0\n"
+  assert_eq(graph_leaks(clean, "consumer", "0.2.0"), [])
   let leaky = clean + "   └─ moonrockz/ion -> moonrockz/ion@0.6.0\n"
-  assert_eq(graph_leaks(leaky, "consumer"), ["moonrockz/ion"])
-  assert_eq(graph_leaks("consumer@0.1.0:\n", "consumer"), [
-    "moonrockz/openrpc missing",
+  assert_eq(graph_leaks(leaky, "consumer", "0.2.0"), ["moonrockz/ion@0.6.0"])
+  assert_eq(graph_leaks("consumer@0.2.0:\n", "consumer", "0.2.0"), [
+    "moonrockz/openrpc@0.2.0 missing",
+  ])
+  // An alias or another version of the candidate is not the candidate.
+  assert_eq(graph_leaks(clean, "consumer", "0.1.0"), [
+    "moonrockz/openrpc@0.2.0", "moonrockz/openrpc@0.1.0 missing",
+  ])
+  let renamed = "consumer@0.2.0:\n└─ moonrockz/openrpc -> other/mod@0.2.0\n"
+  assert_eq(graph_leaks(renamed, "consumer", "0.2.0"), [
+    "other/mod@0.2.0", "moonrockz/openrpc@0.2.0 missing",
   ])
 }
 
@@ -69,25 +77,34 @@ fn archive_audit(names : Array[String]) -> Array[String] {
 }
 
 ///|
-/// Modules other than the candidate in `moon tree` output of the consumer.
-fn graph_leaks(tree : String, consumer : String) -> Array[String] {
+/// Resolved modules other than exactly `moonrockz/openrpc@version` in the
+/// consumer's `moon tree` output. The resolved name follows `->`.
+fn graph_leaks(
+  tree : String,
+  consumer : String,
+  version : String,
+) -> Array[String] {
+  let expected = "moonrockz/openrpc@\{version}"
   let leaks = []
   let mut found = false
   for line in tree.split("\n") {
-    guard line.find("─ ") is Some(at) else { continue }
-    let rest = line[at + 2:].to_owned()
-    let name = match rest.find(" ") {
-      Some(end) => rest[:end].to_owned()
-      None => rest
+    guard line.find("─ ") is Some(_) else { continue }
+    let resolved = match line.find("-> ") {
+      Some(arrow) => line[arrow + 3:].to_owned()
+      None => line[line.find("─ ").unwrap() + 2:].to_owned()
     }
-    if name == "moonrockz/openrpc" {
+    let name = match resolved.find(" ") {
+      Some(end) => resolved[:end].to_owned()
+      None => resolved
+    }
+    if name == expected {
       found = true
-    } else if name != consumer {
+    } else if !name.has_prefix(consumer + "@") {
       leaks.push(name)
     }
   }
   if !found {
-    leaks.push("moonrockz/openrpc missing")
+    leaks.push("\{expected} missing")
   }
   leaks
 }
@@ -176,6 +193,8 @@ async fn main {
       "moonrockz/openrpc \{version} differs from the workspace version \{workspace}",
     )
   }
+  let (_, head, _) = @process.collect_output("git", ["rev-parse", "HEAD"])
+  println("Source commit \{head.text().trim()}")
   let dir = @fs.tmpdir(prefix="openrpc-registry")
   defer @fs.rmdir(dir, recursive=true)
   // Reference output from source, which check:openrpc compares with the
@@ -206,7 +225,7 @@ async fn main {
   write_consumer(root, consumer, version, library=false)
   let verify = async fn() -> String {
     let graph = moon(["tree"], consumer, extra_env=consumer_env)
-    let leaks = graph_leaks(graph, "openrpc-consumer")
+    let leaks = graph_leaks(graph, "openrpc-consumer", version)
     guard leaks.is_empty() else {
       fail(
         "Unexpected modules in the consumer graph: \{leaks.join(", ")}\n\{graph}",
@@ -227,7 +246,16 @@ async fn main {
     }
     graph
   }
-  if @env.args().contains("--published") {
+  let args = @env.args()
+  let published = args.contains("--published")
+  let expected_checksum = match args.search_by(arg => arg == "--checksum") {
+    Some(i) if i + 1 < args.length() => Some(args[i + 1])
+    _ => None
+  }
+  if published && expected_checksum is None {
+    fail("--published needs --checksum <SHA-256 of the approved archive>")
+  }
+  if published {
     // Release gate: the public registry only, no candidate index entry.
     @fs.mkdir("\{isolated}", recursive=true, allow_exist=true)
     @fs.write_file(
@@ -243,11 +271,19 @@ async fn main {
       let graph = verify()
       println("Public dependency graph:\n\{graph}")
     })
-    let published = @fs.read_file(
+    let published_archive = @fs.read_file(
       "\{isolated}/registry/cache/moonrockz/openrpc/\{version}.zip",
     ).binary()
+    let public_checksum = @crypto.bytes_to_hex_string(
+      @crypto.sha256(published_archive),
+    )
+    guard Some(public_checksum) == expected_checksum else {
+      fail(
+        "Published archive SHA-256 \{public_checksum} differs from the approved \{expected_checksum.unwrap()}",
+      )
+    }
     println(
-      "Public registry consumer verified moonrockz/openrpc@\{version} on all four targets; archive SHA-256 \{@crypto.bytes_to_hex_string(@crypto.sha256(published))}",
+      "Public registry consumer verified moonrockz/openrpc@\{version} on all four targets; archive SHA-256 \{public_checksum}",
     )
     return
   }

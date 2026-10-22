@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-22
+
+Moon-Lander adds `moonrockz/openrpc` and a release workflow. The shared
+workspace version moves to `0.2.0`, so `moonrockz/notebooks` is republished
+unchanged at `0.2.0`.
 
 ### Added
 
-- `moonrockz/openrpc` 0.1.0, a portable OpenRPC 1.3.2 and 1.4.x document
+- `moonrockz/openrpc`, a portable OpenRPC 1.3.2 and 1.4.x document
   library with no framework dependency. It reads strict JSON into a
   source-preserving CST and a typed AST, keeps exact number tokens and
   extensions, and writes canonical or pretty JSON. It models and checks
@@ -14,7 +18,9 @@
   `Specification` and `MetaschemaCompatibility` profiles, with structured,
   ordered findings. Checked edits replace one value while keeping the rest of
   the source.
-
+- A GitHub Actions release workflow publishes the public modules to
+  mooncakes.io, verifies the published OpenRPC module from the public registry
+  and creates the GitHub release.
 
 ## 0.1.0 - 2026-10-19
 

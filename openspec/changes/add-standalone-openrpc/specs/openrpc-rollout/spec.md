@@ -59,6 +59,20 @@ checks MUST NOT count as public-registry proof.
   archive identity, source SHA, and passing results for all targets
 - **AND** a mismatched, unavailable, or locally substituted package fails the gate
 
+### Requirement: Pipeline-only publication
+
+Publication SHALL run only in the repository's GitHub Actions release workflow,
+never from a workstation. Merging the owner-approved release pull request SHALL be
+the approval. The workflow MUST verify the published archive against the checksum
+of the archive it built before it creates the GitHub release.
+
+#### Scenario: A merged release publishes and verifies before releasing
+
+- **WHEN** the owner merges a release pull request that changes the shared version
+- **THEN** the workflow runs the full checks, publishes the public modules, and
+  verifies the published OpenRPC archive checksum on all four targets
+- **AND** it creates the GitHub release only after that verification passes
+
 ### Requirement: Deliberate separate-workspace Smithy migration
 
 The rollout SHALL track a separate Smithy migration from the read-only baseline

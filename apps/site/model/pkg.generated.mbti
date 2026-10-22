@@ -32,6 +32,10 @@ pub fn doc_route(String) -> String
 
 pub fn first_sentence(String) -> String
 
+pub let forbidden_dir : String
+
+pub fn has_title(String) -> Bool
+
 pub fn internal_links(String) -> Array[String]
 
 pub fn link_file(String, String) -> String?
@@ -53,6 +57,8 @@ pub fn route_file(String) -> String
 pub fn search(Array[SearchEntry], String, limit? : Int32) -> Array[SearchEntry]
 
 pub fn strip_extension(String) -> String
+
+pub fn xml_problem(String) -> String?
 
 // Errors
 pub(all) suberror Invalid {

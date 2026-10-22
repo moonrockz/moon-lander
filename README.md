@@ -66,6 +66,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run lint` | Check YAML, MoonBit formatting, and compiler warnings |
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
+| `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
 | `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |

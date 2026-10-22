@@ -78,9 +78,9 @@ Depends on: `lander-bwk.5`, `lander-bwk.6`, `lander-bwk.7`.
 Bead: `lander-bwk.9`
 Depends on: `lander-bwk.5`.
 
-- [ ] 8.1 Complete canonical compact and explicit pretty writing, with UTF-16 object-key ordering, exact number tokens and unchanged array order; verify full AST laws and identical four-target output.
-- [ ] 8.2 Add checked replacement of an existing CST value span and fresh read/source-map results; verify unchanged surrounding source, stale-node rejection and invalid replacement failure.
-- [ ] 8.3 Run editor and writer documentation examples; verify default omission, extension retention, reference spelling and explicit source-reproduction/JCS distinctions.
+- [x] 8.1 Complete canonical compact and explicit pretty writing, with UTF-16 object-key ordering, exact number tokens and unchanged array order; verify full AST laws and identical four-target output.
+- [x] 8.2 Add checked replacement of an existing CST value span and fresh read/source-map results; verify unchanged surrounding source, stale-node rejection and invalid replacement failure.
+- [x] 8.3 Run editor and writer documentation examples; verify default omission, extension retention, reference spelling and explicit source-reproduction/JCS distinctions.
 
 ## 9. Qualify the full library and Smithy compatibility corpus
 

@@ -4,8 +4,8 @@
 validator. It contains the complete typed OpenRPC `1.3.2`/`1.4.x` model and
 draft-07 keyword model, exact JSON values, a source-preserving CST and
 reference resolution over explicit resources, and versioned document
-validation with explicit profiles. Pretty writing, source edits and release
-qualification remain tracked work. This development module is not a release
+validation with explicit profiles, canonical and pretty writing, and checked
+value edits. Release qualification remains tracked work. This development module is not a release
 candidate.
 
 Reading keeps both the original JSON source and a typed document when structural
@@ -59,6 +59,74 @@ test {
   assert_eq(location.source_id(), Some("api.json"))
   assert_eq(cst.slice(location.value_span()).unwrap(), "9007199254740993")
   assert_eq(cst.slice(location.key_span().unwrap()).unwrap(), "\"n\"")
+}
+```
+
+## Writing and editing
+
+There are three ways to produce text, and they differ on purpose:
+
+- `CstDocument::reproduce` returns the original source exactly, including
+  whitespace, CRLF, member order and escape and number spelling. It works for
+  valid JSON that is not a valid OpenRPC document.
+- `write` returns canonical compact JSON: object keys sorted by UTF-16 code
+  units, minimal string escapes, no whitespace and no final newline.
+- `write(format=@exact.Pretty)` is the same text with two-space indentation.
+
+Canonical writing keeps every present field, extension and reference spelling,
+and keeps array order, so methods, parameters, examples and schema arrays are
+never reordered. It inserts no defaults: an absent `paramStructure` or
+`deprecated` stays absent. It is not RFC 8785 (JCS). JCS rewrites numbers in
+ECMAScript form; this writer keeps each number token, so `1.0` and `1` remain
+different bytes. Do not use it as a signing format. Strings with an unpaired
+UTF-16 surrogate are refused with `InvalidValue`, because they are not Unicode
+text and cannot be read back.
+
+```mbt check
+///|
+test {
+  let source = "{\"x-n\": 1.0, \"methods\": [{\"name\": \"b\", \"params\": []}, {\"name\": \"a\", \"params\": [{\"$ref\": \"#/components/contentDescriptors/P\"}]}],\r\n \"info\": {\"version\": \"1\", \"title\": \"API\"}, \"openrpc\": \"1.4.0\", \"components\": {\"contentDescriptors\": {\"P\": {\"name\": \"p\", \"schema\": true}}}}"
+  let read = @openrpc.read(source)
+  let document = read.document().unwrap()
+  assert_eq(read.cst().unwrap().reproduce(), source)
+  let compact = @openrpc.write(document).unwrap()
+  assert_eq(
+    compact,
+    "{\"components\":{\"contentDescriptors\":{\"P\":{\"name\":\"p\",\"schema\":true}}},\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"b\",\"params\":[]},{\"name\":\"a\",\"params\":[{\"$ref\":\"#/components/contentDescriptors/P\"}]}],\"openrpc\":\"1.4.0\",\"x-n\":1.0}",
+  )
+  let pretty = @openrpc.write(document, format=@exact.Pretty).unwrap()
+  assert_true(pretty.has_prefix("{\n  \"components\": {"))
+  // Both formats read back to the same document.
+  let again = @openrpc.read(pretty).document().unwrap()
+  assert_eq(@openrpc.write(again).unwrap(), compact)
+}
+```
+
+`replace_value` edits one existing value in a parsed document. Find the node
+with `CstDocument::node_at` or a source-map location's `node()`. The new value
+is written compactly into that value's span, every other code unit is kept,
+and the text is read again into a fresh CST, document and source map. Node
+handles belong to one source text; using one after an edit fails with
+`StaleNode`. Only existing values can be replaced; insertion, deletion and
+key renaming are not supported.
+
+```mbt check
+///|
+test {
+  let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\r\n  \"methods\": [],\r\n  \"x-owner\": \"team-a\"}"
+  let cst = @openrpc.read(source).cst().unwrap()
+  let node = cst.node_at(["x-owner"]).unwrap()
+  let edited = @openrpc.replace_value(cst, node, @exact.Value::string("team-b")).unwrap()
+  let new_cst = edited.cst().unwrap()
+  assert_eq(new_cst.reproduce(), source.replace(old="team-a", new="team-b"))
+  // The old handle is stale for the edited text.
+  assert_true(new_cst.replace_value(node, @exact.Value::null()) is Err(_))
+  // Validation of the edited document locates findings in the new text.
+  let title = new_cst.node_at(["info", "title"]).unwrap()
+  let broken = @openrpc.replace_value(new_cst, title, @exact.Value::null()).unwrap()
+  assert_true(broken.document() is None)
+  let span = broken.diagnostics()[0].span().unwrap()
+  assert_eq(broken.cst().unwrap().slice(span), Some("null"))
 }
 ```
 

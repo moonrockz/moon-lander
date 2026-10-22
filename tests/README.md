@@ -7,6 +7,8 @@ configuration core.
 | Suite | Coverage | Targets |
 | --- | --- | --- |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
+| `browser-parity`, `browser-parity-reference` | Shared explicit cases (the core fixture, a parse error, a binding error) and their reference observation; `mise run test:browser` compares it with the browser result | All four |
+| `browser-fixture`, `browser-consumer`, `browser/` | Browser acceptance application, headless consumer guide and Playwright suites; see [the browser guide](browser/README.md) | JavaScript in Chromium, Firefox and WebKit |
 | `config-conventions-preset` | The Morphir preset of the configuration conventions, made from public parts, and its cases | All four |
 | `config-conventions-acceptance` | Morphir's `config.feature` discovery, precedence, member and ambiguity cases, and merge-rule cases, as Gherkin scenarios over the preset | JavaScript, native |
 | `config-conventions-laws` | The same preset cases as snapshot tests | All four |

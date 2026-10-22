@@ -1,6 +1,7 @@
 ///|
-/// Identical explicit inputs for every compiler target and operating system.
-pub fn load() -> @config.Config raise @config.ConfigError {
+/// The explicit builder: formats, run inputs and ordered sources. The browser
+/// parity check loads it with the same files through browser mounts.
+pub fn builder() -> @config.ConfigBuilder raise @config.ConfigError {
   let mut builder = @config.builder()
   for format in @formats.formats() {
     builder = @config.format(builder, format)
@@ -34,17 +35,33 @@ pub fn load() -> @config.Config raise @config.ConfigError {
     )
     |> @config.env(prefix="APP")
     |> @config.overrides([("server.host", @config.string("command"))])
-  let tree = @config.FileTree::new(complete=true)
-    .with_file(
+  builder
+}
+
+///|
+/// The complete file snapshot, as absolute paths and texts.
+pub fn files() -> Array[(String, String)] {
+  [
+    (
       "/workspace/app.toml", "[server]\nhost = 'file'\nport = 8080\n[registry]\ntoken = {env = 'TOKEN'}",
-    )
-    .with_file("/workspace/app.yaml", "plugins: [yaml]\ndiscard: hidden\n")
-    .with_file("/workspace/app.json", "{\"json\": 3}")
-    .with_file("/workspace/app.json5", "{json5: 5, /* allowed */}")
-    .with_file(
+    ),
+    ("/workspace/app.yaml", "plugins: [yaml]\ndiscard: hidden\n"),
+    ("/workspace/app.json", "{\"json\": 3}"),
+    ("/workspace/app.json5", "{json5: 5, /* allowed */}"),
+    (
       "/workspace/app.ion", "{exact: 123456789012345678901234567890, price: 1.20}",
-    )
-  match @config.load(builder, tree) {
+    ),
+  ]
+}
+
+///|
+/// Identical explicit inputs for every compiler target and operating system.
+pub fn load() -> @config.Config raise @config.ConfigError {
+  let mut tree = @config.FileTree::new(complete=true)
+  for file in files() {
+    tree = tree.with_file(file.0, file.1)
+  }
+  match @config.load(builder(), tree) {
     Done(config) => config
     Need(_) => abort("a complete integration tree must not request files")
   }

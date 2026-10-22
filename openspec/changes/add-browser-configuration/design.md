@@ -532,6 +532,70 @@ storage prototypes for blocked, denied, unsupported, quota and close failures.
 Spies prove that no load creates or writes entries and that no failure uses
 `localStorage` or IndexedDB.
 
+## Group 6 consumer parity and landing audit
+
+`tests/config-fixture` now exposes its explicit `builder()` and `files()`; its
+`load()` and `expected.txt` are unchanged. `tests/browser-parity` builds three
+cases from them: the complete core fixture, a TOML parse failure, and a binding
+failure after two ordered files. `revision()` is an FNV-1a digest of every case
+name, path and text. `tests/browser-parity-reference` prints the revision and
+the observation of each case from the pure loader with complete snapshots: the
+value, provenance and reports in source order, or the core error with all its
+fields. `build:browser-fixture` runs it on wasm, wasm-gc, js on Node and native,
+requires equal output, and writes the reference. The browser fixture loads the
+same builders through a file mount at `/workspace` and must give the same text,
+including the revision line.
+
+An unrelated consumer, `tests/config-parity`, builds for js with only the
+MoonBit compiler directory on `PATH`. A task-script test checks that its output
+has no browser adapter code. `build:browser-adapter` also rejects picker,
+permission and DOM UI APIs in the bundle and in the MoonBit sources of
+`config/browser`. The browser task fails when Playwright reports a skipped,
+flaky, interrupted or unrun case.
+
+### Requirement audit
+
+| Requirement | Scenarios | Evidence |
+| --- | --- | --- |
+| Browser execution without Node dependencies | Real browser load and bind; no Node runtime; feasibility | `feasibility.spec.ts`; forbidden-runtime scan in `build:browser-fixture`; group 1 evidence above |
+| Explicit mounted namespaces | Shared load; overlap; similar names; invalid paths; duplicates; outside requests | `mounts.spec.ts` (roots, paths, collisions, outside), `selected.spec.ts` (paths, duplicates, hosted and selected merge) |
+| Explicit browser run inputs | Supplied variables; no variables; supplied working directory | `mounts.spec.ts` "run inputs remain explicit" |
+| Bounded snapshot | Unrelated file not read; missing directory; new load sees an edit; repeated request | `selected.spec.ts` large file, `mounts.spec.ts` listings and faulty providers, `directory.spec.ts` second load |
+| Authoritative manifest | All nine scenarios | `mounts.spec.ts` URL bases, manifests, listings, HTTP and transport failures, encoding |
+| Selected files | File input fallback; nested discovery; case | `selected.spec.ts` real file and directory inputs, discovery, exact names |
+| Directory handles | Real handle; lost permission; no native picker | `directory.spec.ts` equivalence, denied and revoked handles, capability detection and fallback |
+| Workspace discovery | Outside parent; injected home; local overrides; ambiguity | `selected.spec.ts` discovery cases, `workspace_wbtest.mbt` |
+| Explicit persistence | Reload; namespaces; write failure; unavailable storage; no load side effects | `store.spec.ts` |
+| Store virtual roots | Supplied root; reopened root; invalid root | `store.spec.ts` save and reload case |
+| Typed failures | Parse origin; binding source | `mounts.spec.ts` core errors, `parity.spec.ts` parse and binding errors |
+| Limits and cancellation | Entry limit; unsized response; decoding; errored stream; cleanup; abort | `mounts.spec.ts` streams and limits, `selected.spec.ts` and `directory.spec.ts` limits and abort |
+| Required execution gate | Regression blocks merge; stale code; equivalent snapshots; ordinary consumer | `test:browser -- --verify-failures` in the required `browser` job of `ci-ok`; freshness tests in `build-browser-adapter.mbtx`; `parity.spec.ts`; unrelated consumer test |
+
+### Support matrix
+
+| Item | Version or value |
+| --- | --- |
+| Playwright | `1.64.1`, pinned in mise and `tests/browser/package.json` |
+| Chromium | `156.0.8078.4`, Playwright build `1248` |
+| Firefox | `157.0`, Playwright build `1555` |
+| WebKit | `27.2`, Playwright build `2370` |
+| CI host | One Linux runner for all three engines |
+| Local proof | macOS arm64 |
+
+Browser execution uses js output only. Portability of the pure core is the
+four-target coverage of wasm, wasm-gc, js and native. The OPFS suites use a
+persistent profile in each engine; WebKit has no OPFS in an ephemeral context.
+
+The last measured browser job before group 6 was CI run `39767130959` on PR #38:
+61.4 seconds to install the locked harness, engines and OS dependencies, 8.9
+seconds to build the fixture, 90.5 seconds for 123 cases in three engines, and
+3 minutes 30 seconds for the job. The persistent-profile suites make the Linux
+suite slower than the local run (41 seconds). Group 6 raises the Playwright
+global limit to 300 seconds inside a 420-second task limit, and the fixture
+build limit to 300 seconds for the four reference builds. One earlier main run
+failed when a slow Ubuntu package mirror passed the 10-minute engine install
+limit; a rerun passed. This is a sample, not a timing guarantee.
+
 ## Risks / Trade-offs
 
 - Promise or generated-FFI integration can fail in a real browser. Group 1 proves

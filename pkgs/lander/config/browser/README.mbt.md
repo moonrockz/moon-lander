@@ -256,6 +256,16 @@ Each load has a new snapshot and caches answers only for that call. A custom
 provider that requests only already answered inputs raises `Protocol`. A later
 load can see new server content; a previous `Config` remains unchanged.
 
+## Support
+
+The package runs in browsers through js output. The pure configuration core is
+portable across wasm, wasm-gc, js and native. A repository check loads the same
+explicit snapshot in Chromium, Firefox and WebKit and on the four targets, and
+requires the same values, provenance, reports and core errors. The tested
+engines are Chromium `156.0.8078.4`, Firefox `157.0` and WebKit `27.2` through
+Playwright `1.64.1`. WebKit gives OPFS only to a persistent profile, not to a
+private session.
+
 ## Building consumers
 
 Consumers compile the checked-in inline FFI with MoonBit. They do not run Bun or

@@ -20,3 +20,7 @@ export function fileAt(selector: string, index: number) { return selected(select
 export function handle(name: string) { return (globalThis as any).testHandles?.[name]; }
 /** Let the test change a live backend between two loads. */
 export async function between() { await (globalThis as any).betweenLoads?.(); return true; }
+/** A File made from fixture text, for the cross-target parity check. */
+export function makeFile(name: string, text: string) { return new File([text], name, { type: "text/plain" }); }
+/** Expose the parity observation of the shared cases. */
+export function registerParity(parity: () => Promise<string>) { Object.assign(globalThis, { landerParity: parity }); }

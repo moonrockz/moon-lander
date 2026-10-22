@@ -73,7 +73,10 @@ async fn answer(
     )
     return
   }
-  if path != "/" && path != "/fixture.js" && path != "/favicon.ico" {
+  if path != "/" &&
+    path != "/fixture.js" &&
+    path != "/favicon.ico" &&
+    path != "/parity-reference.txt" {
     state.paths.push(path)
   }
   if path.has_prefix("/stream/") {
@@ -142,6 +145,12 @@ async fn answer(
         200,
         "text/javascript",
         @fs.read_file("_build/browser/example.js").text(),
+      )
+    "/parity-reference.txt" =>
+      (
+        200,
+        "text/plain",
+        @fs.read_file("_build/browser/parity-reference.txt").text(),
       )
     "/fixture.js" =>
       (
@@ -215,7 +224,7 @@ async fn suite(
   if smoke_only {
     args.push("feasibility.spec.ts")
   }
-  let result = @async.with_timeout(180_000, () => {
+  let result = @async.with_timeout(420_000, () => {
     @async.with_task_group() <| group => {
       // Browsers normally close keep-alive connections. Those read failures
       // terminate only that connection. Failed responses still fail the tests.
@@ -305,13 +314,19 @@ async fn main {
         fail("Expected test [--verify-failures]")
       }
       check_versions()
-      @async.with_timeout(180_000, () => {
+      @async.with_timeout(300_000, () => {
         run("moonx", ["scripts/build-browser-fixture.mbtx"])
       })
       let suite_start = @async.now()
       let (code, output) = suite(Map([]))
       println(output)
       guard code == 0 else { fail("Browser suite failed with exit \{code}") }
+      // A skipped, flaky or unrun baseline case is a failure, not a pass.
+      for marker in [" skipped", " flaky", " did not run", " interrupted"] {
+        guard !output.contains(marker) else {
+          fail("Browser suite reported\{marker} cases")
+        }
+      }
       println(
         "Browser suite: \{@async.now() - suite_start} ms; total: \{@async.now() - started} ms",
       )

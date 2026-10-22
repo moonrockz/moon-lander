@@ -1,0 +1,5 @@
+import {
+  "moonrockz/moon-lander-tests/browser-parity" @parity,
+}
+
+pkgtype(kind: "executable")

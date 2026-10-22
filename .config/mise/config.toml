@@ -12,7 +12,8 @@ node = "24.14.1"
 # Bun builds and bundles the TypeScript host adapter for the js target (pkgs/lander/adapters/node/)
 bun = "1.4.3"
 
-# Browser harness CLI; must match tests/browser/package.json exactly.
+# Browser harness CLI; must match tests/browser/package.json exactly, and the Playwright image tag of
+# the browser job in .github/workflows/ci.yml.
 "npm:@playwright/test" = "1.64.1"
 
 # YAML linting, pinned so lint results do not change between machines
@@ -153,6 +154,10 @@ run = "moonx scripts/browser.mbtx install"
 [tasks."test:browser"]
 description = "Build once and test the fixture in Chromium, Firefox and WebKit"
 run = "moonx scripts/browser.mbtx test"
+
+[tasks."test:browser-zig"]
+description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures)"
+run = "moonx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/browser.mbtx test"
 
 [tasks."test:browser-failures"]
 description = "Prove browser assertion and missing-engine failures propagate"

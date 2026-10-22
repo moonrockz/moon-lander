@@ -5,6 +5,7 @@ import {
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
+  "moonbitlang/core/json",
 }
 
 ///|
@@ -24,15 +25,27 @@ async fn main {
     "--outfile", output,
   ])
   let bundle = @fs.read_file(output).text().replace_all(old="\r\n", new="\n")
-  // The library is UI-free: only the application opens a picker or asks for
-  // permission. Reject these Web APIs in the production adapter.
-  for
-    forbidden in [
-      "showDirectoryPicker", "showOpenFilePicker", "showSaveFilePicker", "requestPermission",
-      "queryPermission",
-    ] {
-    guard !bundle.contains(forbidden) else {
-      fail("The browser adapter must not call \{forbidden}.")
+  // The library is UI-free: only the application opens a picker, asks for
+  // permission or uses the DOM. Reject these Web APIs in the production adapter
+  // bundle and in the MoonBit sources of the public browser package.
+  let sources = [bundle]
+  if @fs.exists("pkgs/lander/config/browser") {
+    for name in @fs.readdir("pkgs/lander/config/browser", sort=true) {
+      if name.has_suffix(".mbt") && !name.has_suffix(".generated.js.mbt") {
+        sources.push(@fs.read_file("pkgs/lander/config/browser/\{name}").text())
+      }
+    }
+  }
+  for source in sources {
+    for
+      forbidden in [
+        "showDirectoryPicker", "showOpenFilePicker", "showSaveFilePicker", "requestPermission",
+        "queryPermission", "document.", "createElement", "HTMLElement", "HTMLInputElement",
+        "alert(", "confirm(", "prompt(",
+      ] {
+      guard !source.contains(forbidden) else {
+        fail("The browser package must not call \{forbidden}.")
+      }
     }
   }
   let source = StringBuilder()
@@ -149,4 +162,49 @@ async test "a fresh consumer build uses checked-in FFI without Bun on PATH" {
     extra_env={ "PATH": bin },
   )
   assert_eq(code, 0, msg=out.text() + err.text())
+}
+
+///|
+async test "an unrelated consumer builds without browser support" {
+  let workspace = @fs.realpath("..")
+  let (located, out, err) = @process.collect_output(
+    "mise",
+    ["where", "http:moonbit"],
+    cwd=workspace,
+  )
+  assert_eq(located, 0, msg=out.text() + err.text())
+  let bin = out.text().trim().to_owned() + "/bin"
+  let moon = if @fs.exists(bin + "/moon.exe") {
+    bin + "/moon.exe"
+  } else {
+    bin + "/moon"
+  }
+  let target = @fs.tmpdir(prefix="lander-unrelated-consumer")
+  defer @fs.rmdir(target, recursive=true)
+  // tests/config-parity loads configuration and does not import config/browser.
+  let (code, out, err) = @process.collect_output(
+    moon,
+    [
+      "run", "--build-only", "--deny-warn", "--target", "js", "--target-dir", target,
+      "tests/config-parity",
+    ],
+    cwd=workspace,
+    extra_env={ "PATH": bin },
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Expected one consumer artifact: " + out.text())
+  }
+  let linked = @fs.read_file(path).text()
+  assert_true(linked.contains("APP_SERVER__PORT"), msg="the consumer artifact")
+  for
+    browser in [
+      "receiveBrowserAdapter", "navigator.storage", "createWritable", "getDirectoryHandle",
+      "webkitRelativePath", "credentials: \"omit\"",
+    ] {
+    assert_false(
+      linked.contains(browser),
+      msg="unexpected browser support: \{browser}",
+    )
+  }
 }

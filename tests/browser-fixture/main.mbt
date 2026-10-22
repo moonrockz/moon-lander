@@ -34,6 +34,33 @@ extern "js" fn Adapter::between(self : Adapter) -> @js_async.Promise[Bool] =
   #|fixture => fixture.between()
 
 ///|
+extern "js" fn Adapter::make_file(self : Adapter, name : String, text : String) -> @browser.File =
+  #|(fixture, name, text) => fixture.makeFile(name, text)
+
+///|
+extern "js" fn Adapter::register_parity(self : Adapter, parity : () -> @js_async.Promise[String]) -> Unit =
+  #|(fixture, parity) => fixture.registerParity(parity)
+
+///|
+/// Load the shared parity cases through a browser file mount at the same
+/// virtual paths, and give the same observation text as the four targets.
+async fn parity() -> String {
+  let cases = @parity.cases() catch { error => return @parity.failure(error) }
+  let lines = [@parity.revision(cases)]
+  for case in cases {
+    let files = case.files.map(file => (file.0["/workspace/".length():].to_owned(), fixture.make_file(file.0, file.1)))
+    lines.push(
+      try {
+        @parity.observe(case, @browser.load(case.builder, [@browser.from_files(files, root="/workspace")]))
+      } catch {
+        error => "case \{case.name}\n" + @parity.failure(error)
+      },
+    )
+  }
+  lines.join("\n")
+}
+
+///|
 struct Server { host : String; port : Int } derive(FromJson)
 
 ///|
@@ -271,5 +298,6 @@ async fn probe(url : String) -> String {
 
 ///|
 fn main {
+  fixture.register_parity(() => @js_async.Promise::from_async(parity))
   fixture.register(request => @js_async.Promise::from_async(() => run(request)), url => @js_async.Promise::from_async(() => probe(url)))
 }

@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   timeout: 15_000,
-  globalTimeout: 120_000,
+  globalTimeout: 300_000,
   reporter: "list",
   use: { baseURL: process.env.LANDER_BROWSER_URL, headless: true },
   projects: ["chromium", "firefox", "webkit"].map(browserName => ({

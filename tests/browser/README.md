@@ -47,7 +47,8 @@ directory. It requires the specific failure messages and expected failed-test
 counts from the original smoke file, so an unrelated nonzero exit cannot satisfy those checks. No engine is
 skipped or retried. This command is the browser CI job's gate.
 
-The suite has a 120-second Playwright limit inside a 180-second MoonBit limit.
+The suite has a 300-second Playwright limit inside a 420-second MoonBit limit.
+The fixture build, with its four reference builds, has a 300-second limit.
 Installation has separate 5-minute dependency and 10-minute engine limits.
 Structured concurrency cancels and joins the server and runner. Process
 cancellation uses the async library's graceful termination with a 5-second hard
@@ -65,3 +66,19 @@ has no OPFS in an ephemeral context. `store.spec.ts` uses the same fixture to
 save, reload and load an OPFS store, and injects storage failures. Both suites
 first remove all OPFS entries of the test origin. Picker and selection UI
 belongs to consuming applications.
+
+`parity.spec.ts` compares the browser observation of the shared parity cases in
+`tests/browser-parity` with the reference that `build:browser-fixture` makes on
+wasm, wasm-gc, js on Node and native from the same checkout. Both sides start
+with the same fixture revision digest. The task fails when Playwright reports a
+skipped, flaky, interrupted or unrun case.
+
+| Item | Version |
+| --- | --- |
+| Playwright | `1.64.1` |
+| Chromium | `156.0.8078.4` (build `1248`) |
+| Firefox | `157.0` (build `1555`) |
+| WebKit | `27.2` (build `2370`) |
+
+Browser execution uses js output. The pure core is portable across the four
+targets, which `mise run check:config` and the parity references check.

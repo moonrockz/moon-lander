@@ -87,5 +87,24 @@ async fn main {
       }
     }
   }
+  // The browser parity test compares its observation with these references.
+  // All four targets must agree, and they come from this same checkout.
+  let mut reference : String? = None
+  for target in ["wasm", "wasm-gc", "js", "native"] {
+    let (code, out, err) = @process.collect_output("moon", [
+      "run", "--deny-warn", "--target", target, "tests/browser-parity-reference",
+    ])
+    guard code == 0 else { fail(out.text() + err.text()) }
+    let text = out.text().replace_all(old="\r\n", new="\n")
+    guard text.has_prefix("fixture ") else {
+      fail("Missing parity reference revision on \{target}")
+    }
+    if reference is Some(first) && first != text {
+      fail("Parity reference differs on \{target}:\n\{text}")
+    }
+    reference = Some(text)
+  }
+  guard reference is Some(reference) else { fail("No parity reference") }
+  @fs.write_file("_build/browser/parity-reference.txt", reference)
   println("Browser fixture build: \{@async.now() - started} ms")
 }

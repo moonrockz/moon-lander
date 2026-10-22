@@ -36,9 +36,15 @@ extern "js" fn browser_adapter() -> Adapter =
   #|      await globalThis.betweenLoads?.();
   #|      return true;
   #|    }
+  #|    function makeFile(name, text) {
+  #|      return new File([text], name, { type: "text/plain" });
+  #|    }
+  #|    function registerParity(parity) {
+  #|      Object.assign(globalThis, { landerParity: parity });
+  #|    }
   #|
   #|    // tests/browser/adapter-entry.ts
-  #|    receiveBrowserAdapter({ register, origin, signal, fileCount, fileAt, handle, between });
+  #|    receiveBrowserAdapter({ register, origin, signal, fileCount, fileAt, handle, between, makeFile, registerParity });
   #|  })();
   #|  return adapter;
   #|}

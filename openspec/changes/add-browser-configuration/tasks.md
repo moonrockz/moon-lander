@@ -62,11 +62,11 @@ Bead: lander-4us.8.5
 
 Bead: lander-4us.8.6
 
-- [ ] 6.1 Compare one shared explicit snapshot and run context in browser js with the same inputs on wasm, wasm-gc, js on Node, and native. Assert values, provenance, reports, parse/binding errors, and source order; verify reference results come from the same fixture revision.
-- [ ] 6.2 Build an unrelated consumer without config/browser and verify that no browser API, generated browser bundle, or browser build tool becomes its runtime or consumer-build dependency. Verify the public browser package remains UI-free and the existing Node/Bun adapter tests still pass.
-- [ ] 6.3 Audit every requirement and named scenario against actual tests and current-head CI. Verify browser task failure propagation, required ci-ok dependencies, engine availability, generated freshness, setup documentation, and no unexpected skipped baseline cases.
-- [ ] 6.4 Record the support matrix using exact Playwright and browser build versions and actual job timings. State that browser execution is js output and pure-core portability is four-target coverage. Verify the consumer guides against the final API.
-- [ ] 6.5 Run mise run format, mise run check, mise run test:node-adapter, and mise exec -- openspec validate --all --strict. Record current-head evidence and confirm that all preceding implementation PRs are merged. Do not publish or cut a release.
+- [x] 6.1 Compare one shared explicit snapshot and run context in browser js with the same inputs on wasm, wasm-gc, js on Node, and native. Assert values, provenance, reports, parse/binding errors, and source order; verify reference results come from the same fixture revision.
+- [x] 6.2 Build an unrelated consumer without config/browser and verify that no browser API, generated browser bundle, or browser build tool becomes its runtime or consumer-build dependency. Verify the public browser package remains UI-free and the existing Node/Bun adapter tests still pass.
+- [x] 6.3 Audit every requirement and named scenario against actual tests and current-head CI. Verify browser task failure propagation, required ci-ok dependencies, engine availability, generated freshness, setup documentation, and no unexpected skipped baseline cases.
+- [x] 6.4 Record the support matrix using exact Playwright and browser build versions and actual job timings. State that browser execution is js output and pure-core portability is four-target coverage. Verify the consumer guides against the final API.
+- [x] 6.5 Run mise run format, mise run check, mise run test:node-adapter, and mise exec -- openspec validate --all --strict. Record current-head evidence and confirm that all preceding implementation PRs are merged. Do not publish or cut a release.
 
 After group 6 merges, its PR maintainer owns a separate archive-only documentation
 PR. Run `mise exec -- openspec archive add-browser-configuration` and strict

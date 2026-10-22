@@ -71,7 +71,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
-| `mise run check:openrpc` | Verify the developing OpenRPC library and isolated source consumer on all four targets |
+| `mise run check:openrpc` | Verify the OpenRPC library and isolated source consumer on all four targets |
 | `mise run check:openrpc-registry` | Package the OpenRPC candidate and verify it through a loopback registry consumer on all four targets |
 | `mise run check:openrpc-published` | Release gate: verify the published OpenRPC module from the public registry |
 | `mise run qualify:openrpc` | Compare the library with independent Ajv and the frozen corpus on all four targets |
@@ -109,10 +109,11 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
   and shared traversal, with runnable usage guides for all four targets.
-- `pkgs/openrpc/` contains the developing [`moonrockz/openrpc`](pkgs/openrpc/README.mbt.md)
-  document library. It provides complete typed OpenRPC and draft-07 models, exact
-  JSON and source text retention. Validation and release work remain tracked in
-  `add-standalone-openrpc`.
+- `pkgs/openrpc/` contains the [`moonrockz/openrpc`](pkgs/openrpc/README.mbt.md)
+  document library: typed OpenRPC 1.3.2/1.4.x and draft-07 models, exact JSON,
+  source-preserving reading and edits, explicit reference resolution, profiled
+  validation and canonical writing. Its release and the Smithy migration are
+  tracked in `add-standalone-openrpc`.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress

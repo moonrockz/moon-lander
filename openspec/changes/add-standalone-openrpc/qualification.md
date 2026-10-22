@@ -8,8 +8,8 @@ Commands run from the workspace root with the pinned toolchain
 
 | Command | Evidence |
 | --- | --- |
-| `mise run qualify:openrpc` | Frozen asset digests verified; pinned Ajv 8.17.1 agrees with all 30 corpus artifact expectations offline; the library agrees with all 30 expectations (artifact, normative, closed Specification, closed MetaschemaCompatibility) on native, wasm, js and wasm-gc, with byte-identical output across targets |
-| `mise run qualify:openrpc-failures` | A wrong closed expectation, a broken-reference expectation, an altered frozen asset and a missing corpus file each exit nonzero with their specific reason; the corpus is unchanged (also run by `test:scripts`) |
+| `mise run qualify:openrpc` | Frozen asset digests verified; pinned Ajv 8.17.1 agrees with all 34 corpus artifact expectations offline; the library agrees with all 34 expectations (artifact, normative or unreadable, closed Specification, closed MetaschemaCompatibility) on native, wasm, js and wasm-gc, with byte-identical output across targets |
+| `mise run qualify:openrpc-failures` | Deliberately wrong expectations (a duplicate-name case and a broken-reference case marked as closing), an altered frozen asset and a missing corpus file each exit nonzero with their specific reason; the corpus is unchanged (also run by `test:scripts`) |
 | `mise run check:openrpc` | Focused suites and the isolated source consumer agree on all four targets; the 81-case ECMAScript 2018 pattern corpus agrees with pinned regexpp 4.12.2; the 61-case schema-shape corpus agrees with Ajv and the frozen draft-07 metaschema; the dependency graph excludes Smithy, Ion, Moon-Lander, notebooks, async, Rabbita, Proton, wasm-devkit, WIT and WAC |
 | `mise run check:openrpc-assets`, `check:openrpc-artifacts`, `check:openrpc-unicode` | Frozen inputs, generated artifact metaschemas and Unicode tables are current |
 | `mise run check` | Full workspace gate, including the above |
@@ -28,6 +28,10 @@ external documentation, server variables, link parameters and servers, tags,
 examples, pairings, recursive and boolean schemas, and extensions at each
 extensible site. Failure cases cover duplicate methods, exact duplicate error
 codes, missing link targets, unresolved references and invalid regex syntax.
+Some rows need an outcome where the pinned artifact accepts a document the
+reader rejects: the 1.4 patch spelling `1.4.01`, a non-string 1.4 link name,
+and an invalid pairing under the 1.3.2 `examplePairingObjects` spelling, which
+the artifact does not check. These cases expect `unreadable`.
 
 ## Field inventory
 

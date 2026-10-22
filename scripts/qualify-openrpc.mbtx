@@ -12,6 +12,16 @@ import {
 test "case manifests require complete, known and unique expectations" {
   let good = "[{\"id\":\"a\",\"artifact\":true,\"normative\":\"passed\",\"specification\":true,\"compatibility\":false,\"note\":\"n\"}]"
   assert_eq(parse_cases(good).map(cases => cases.length()), Ok(1))
+  let unreadable = parse_cases(
+    "[{\"id\":\"u\",\"artifact\":true,\"normative\":\"unreadable\",\"specification\":false,\"compatibility\":false,\"note\":\"n\"}]",
+  ).unwrap()
+  assert_eq(compare(unreadable, ["u unreadable"]), Ok(()))
+  assert_true(
+    parse_cases(
+      "[{\"id\":\"u\",\"artifact\":true,\"normative\":\"unreadable\",\"specification\":true,\"compatibility\":false,\"note\":\"n\"}]",
+    )
+    is Err(_),
+  )
   for
     bad in [
       "{}",
@@ -66,6 +76,9 @@ priv struct Case {
 
 ///|
 fn expected_line(case : Case) -> String {
+  if case.normative == "unreadable" {
+    return "\{case.id} unreadable"
+  }
   "\{case.id} artifact=\{case.artifact} normative=\{case.normative} specification=\{case.specification} compatibility=\{case.compatibility}"
 }
 
@@ -91,8 +104,13 @@ fn parse_cases(text : String) -> Result[Array[Case], String] {
         "Each case needs id, artifact, normative, specification, compatibility and note",
       )
     }
-    guard ["passed", "warnings", "failed"].contains(normative) else {
+    guard ["passed", "warnings", "failed", "unreadable"].contains(normative) else {
       return Err("Unknown normative expectation \{normative} for \{id}")
+    }
+    // A document the reader rejects can have no closed validation.
+    guard normative != "unreadable" ||
+      (specification is False && compatibility is False) else {
+      return Err("Unreadable case \{id} cannot expect a validated document")
     }
     guard !id.is_empty() &&
       id

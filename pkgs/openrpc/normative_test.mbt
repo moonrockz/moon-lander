@@ -293,3 +293,31 @@ test "many distinct error codes are checked in near-linear time" {
     "methods", "0", "errors", "20000", "code",
   ])
 }
+
+///|
+test "1.4 examples require a name and an inline value" {
+  let body = "\"methods\":[{\"name\":\"a\",\"params\":[],\"examples\":[{\"name\":\"p\",\"params\":[{\"externalValue\":\"https://x.test/a.json\"}]}]}],\"components\":{\"examples\":{\"E\":{\"name\":\"e\",\"externalValue\":\"https://x.test/b.json\"}}}"
+  let modern = @openrpc.validate(versioned("1.4.0", body))
+  let missing = modern
+    .findings()
+    .filter(f => {
+      f.phase() == @openrpc.Normative &&
+      f.diagnostic().code() == @exact.MissingField
+    })
+    .map(f => (f.location().path(), f.expected_field()))
+  assert_eq(missing, [
+    (["components", "examples", "E"], Some("value")),
+    (["methods", "0", "examples", "0", "params", "0"], Some("name")),
+    (["methods", "0", "examples", "0", "params", "0"], Some("value")),
+  ])
+  assert_eq(modern.normative(), @openrpc.Failed)
+  let old = @openrpc.validate(versioned("1.3.2", body))
+  assert_false(
+    old
+    .findings()
+    .any(f => {
+      f.phase() == @openrpc.Normative &&
+      f.diagnostic().code() == @exact.MissingField
+    }),
+  )
+}

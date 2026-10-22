@@ -69,6 +69,14 @@ test "S04 optional interior parameters keep required false with profile results"
   let d = document(
     "\"methods\":[{\"name\":\"m\",\"params\":[{\"name\":\"o\",\"required\":false,\"schema\":true},{\"name\":\"r\",\"required\":true,\"schema\":true}]}]",
   )
+  let order = (profile : @openrpc.ValidationProfile) => {
+    @openrpc.validate(d, profile~)
+    .findings()
+    .filter(f => f.diagnostic().code() == @exact.ParameterOrder)
+    .map(f => f.severity())
+  }
+  assert_eq(order(@openrpc.Specification), [@openrpc.Error])
+  assert_eq(order(@openrpc.MetaschemaCompatibility), [@openrpc.Warning])
   assert_true(@openrpc.validate_closed(d).document() is None)
   let compatible = @openrpc.validate_closed(
     d,
@@ -190,7 +198,22 @@ test "S12 pairings keep results and add no standard error field in 1.3.2" {
     text.contains("\"result\":{\"name\":\"r\",\"value\":2}"),
     msg=text,
   )
-  assert_false(text.contains("\"examples\":[{\"error\""))
+  // The standard pairing has exactly its own fields; error examples stay in
+  // the extension.
+  let pairing = @exact.parse(text)
+    .unwrap()
+    .lower()
+    .unwrap()
+    .get("methods")
+    .unwrap()
+    .array_item(0)
+    .unwrap()
+    .get("examples")
+    .unwrap()
+    .array_item(0)
+    .unwrap()
+  guard pairing.kind() is Object(fields) else { fail("pairing is not an object") }
+  assert_eq(fields.map(f => f.0), ["name", "params", "result"])
   assert_true(text.contains("\"x-smithy-error-examples\""))
 }
 

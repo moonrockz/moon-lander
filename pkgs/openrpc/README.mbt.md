@@ -1,12 +1,12 @@
 # OpenRPC documents
 
-`moonrockz/openrpc` is a developing portable reader, writer and document
-validator. It contains the complete typed OpenRPC `1.3.2`/`1.4.x` model and
-draft-07 keyword model, exact JSON values, a source-preserving CST and
-reference resolution over explicit resources, and versioned document
-validation with explicit profiles, canonical and pretty writing, and checked
-value edits. Release qualification remains tracked work. This development module is not a release
-candidate.
+`moonrockz/openrpc` is a portable OpenRPC `1.3.2`/`1.4.x` reader, writer and
+document validator. It contains the complete typed OpenRPC and draft-07 models,
+exact JSON values, a source-preserving CST, reference resolution over explicit
+resources, versioned document validation with explicit profiles, canonical and
+pretty writing, and checked value edits. It depends only on the MoonBit core
+library. It is licensed under Apache-2.0; embedded metaschema and Unicode data
+keep their notices in `OPENRPC-LICENSE.txt` and `UNICODE-LICENSE.txt`.
 
 Reading keeps both the original JSON source and a typed document when structural
 decoding succeeds. Writing retains exact numeric tokens, extensions, absent
@@ -189,6 +189,8 @@ existing method, all checked after references resolve. A referenced target of
 the wrong kind is a `references` failure. Required parameters must precede
 optional ones. OpenRPC 1.3.2 also requires server, license and link names and
 component keys matching `^[a-zA-Z0-9.\-_]+$`; the 1.4 tables state neither.
+OpenRPC 1.4 requires each example's `name` and inline `value`; its tables do
+not include the 1.3.2 `externalValue` alternative.
 Reading keeps any component key as written. While a method fails to resolve,
 link targets are left unchecked and the facet is incomplete. Members outside a version's field table are
 `UnknownField` warnings and never fail the facet.

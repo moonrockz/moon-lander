@@ -337,3 +337,32 @@ fn Check::component_keys(
     }
   }
 }
+
+///|
+/// The pinned 1.4 schema requires an example's `name` and inline `value`; its
+/// generated tables drop the 1.3.2 `externalValue` alternative. The 1.3.2
+/// prose requires neither.
+fn Check::example(
+  self : Check,
+  value : @exact.Value,
+  owner : @reference.UriReference?,
+  path : Array[String],
+  chain~ : Array[Site] = [],
+) -> Unit {
+  if self.checked.contains("fields " + site_key(owner, path)) {
+    return
+  }
+  self.fields(ExampleObject, value, owner, path, chain~)
+  guard !legacy(self.version) else { return }
+  for field in ["name", "value"] {
+    if value.get(field) is None {
+      self.normative(
+        @exact.MissingField,
+        "Example " + field + " is required by OpenRPC 1.4",
+        { resource: owner, path },
+        chain~,
+        expected=Some(field),
+      )
+    }
+  }
+}

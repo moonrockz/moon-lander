@@ -598,8 +598,7 @@ fn Check::pairing(
   }
   for resolved in examples {
     if resolved is Some(target) {
-      self.fields(
-        ExampleObject,
+      self.example(
         target.value.value,
         target.owner,
         target.path,
@@ -1300,7 +1299,7 @@ pub fn validate(
             check.schema(entry.1.schema(), owner, child(path, "schema"))
           }
           for entry in typed.examples().unwrap_or([]) {
-            check.fields(ExampleObject, entry.1.value, owner, at("examples", entry.0))
+            check.example(entry.1.value, owner, at("examples", entry.0))
           }
           for entry in typed.links().unwrap_or([]) {
             check.link(entry.1, owner, at("links", entry.0))

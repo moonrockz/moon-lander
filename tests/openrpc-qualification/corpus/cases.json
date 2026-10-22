@@ -53,7 +53,7 @@
     "normative": "failed",
     "specification": false,
     "compatibility": false,
-    "note": "Exact integer equality: 1 and 1.0e0 collide"
+    "note": "Exact integer equality: 1 and 1.0 collide"
   },
   {
     "id": "missing-link-target-132",
@@ -122,10 +122,10 @@
   {
     "id": "external-example-14",
     "artifact": false,
-    "normative": "warnings",
-    "specification": true,
+    "normative": "failed",
+    "specification": false,
     "compatibility": false,
-    "note": "Discrepancy: prose externalValue; artifact requires value"
+    "note": "1.4 schema requires example name and value (no externalValue alternative); prose tables follow it"
   },
   {
     "id": "reference-sibling-14",
@@ -149,7 +149,7 @@
     "normative": "failed",
     "specification": false,
     "compatibility": false,
-    "note": "Exact integer equality: 1 and 1.0e0 collide"
+    "note": "Exact integer equality: 1 and 1.0 collide"
   },
   {
     "id": "missing-link-target-14",
@@ -238,5 +238,37 @@
     "specification": true,
     "compatibility": true,
     "note": "1.4.x patch line"
+  },
+  {
+    "id": "patch-leading-zero-14",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "Artifact pattern accepts 1.4.01; SemVer and the library reject it"
+  },
+  {
+    "id": "weak-link-name-14",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "1.4 artifact omits the link name type; the typed model requires a string"
+  },
+  {
+    "id": "pairing-objects-invalid-132",
+    "artifact": true,
+    "normative": "unreadable",
+    "specification": false,
+    "compatibility": false,
+    "note": "The artifact does not check the 1.3.2 examplePairingObjects spelling, so an invalid pairing passes Ajv but fails reading"
+  },
+  {
+    "id": "pairing-objects-14",
+    "artifact": true,
+    "normative": "warnings",
+    "specification": true,
+    "compatibility": true,
+    "note": "1.4 tables use examplePairings; the 1.3.2 spelling is retained as an unknown field"
   }
 ]

@@ -82,7 +82,7 @@ description = "Check the built docs site in _site/"
 run = "moonx scripts/site.mbtx check"
 
 [tasks."test:site"]
-description = "Test the docs site packages and the highlight step"
+description = "Test the docs site packages and the highlight step, and run the browser smoke test on _site/"
 run = "moonx scripts/site.mbtx test"
 
 [tasks."dev:site"]

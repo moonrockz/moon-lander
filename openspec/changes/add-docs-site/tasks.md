@@ -75,9 +75,9 @@ Bead: lander-4us.7.6
 
 Bead: lander-4us.7.7
 
-- [ ] 7.1 Complete the `check` package and executable: internal links, titles, feed XML and the `docs/superpowers/` path; verify the "Broken internal link" scenario with a fixture output directory.
-- [ ] 7.2 Add `apps/site/scripts/browser-test.ts` with the checks of design D16 except the API page check (task 10.10), run by the pinned Node against `serve-site.mbtx --no-watch --port 4174`; verify the "Smoke test passes" scenario with `mise run test:site`.
-- [ ] 7.3 Make `site-build.yml` run `build:site -- --main`, `check:site` and `test:site`, and cache the Playwright browsers; verify the "Pull request" scenario on a pull request that changes `docs/`.
+- [x] 7.1 Complete the `check` package and executable: internal links, titles, feed XML and the `docs/superpowers/` path; verify the "Broken internal link" scenario with a fixture output directory.
+- [x] 7.2 Add `apps/site/scripts/browser-test.ts` with the checks of design D16 except the API page check (task 10.10), run by the pinned Node against `serve-site.mbtx --no-watch --port 4174`; verify the "Smoke test passes" scenario with `mise run test:site`.
+- [x] 7.3 Make `site-build.yml` run `build:site -- --main`, `check:site` and `test:site`, and cache the Playwright browsers; verify the "Pull request" scenario on a pull request that changes `docs/`.
 - [ ] 7.4 Verify after the merge that `main` deploys the site (task 11.10 completes the "Push to main" scenario), and that `ci.yml` and `site-build.yml` keep `contents: read` while only the deploy job has `pages: write` and `id-token: write`.
 
 ## 8. Rabbita exception in project rules

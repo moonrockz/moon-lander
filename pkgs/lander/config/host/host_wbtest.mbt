@@ -11,6 +11,21 @@ fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
 }
 
 ///|
+/// The process variables without those that tests set. Async tests in this
+/// package run at the same time and set and unset variables, so a test that
+/// compares the full variable map leaves them out. A test that sets a variable
+/// must give it a `LANDER_HOST_` or `APP_` prefix.
+fn without_test_vars(vars : Map[String, String]) -> Map[String, String] {
+  let kept : Map[String, String] = Map([])
+  for name, value in vars {
+    if !name.has_prefix("LANDER_HOST_") && !name.has_prefix("APP_") {
+      kept[name] = value
+    }
+  }
+  kept
+}
+
+///|
 async test "Host adapter fills the inputs" {
   @env.set_env_var("LANDER_HOST_INPUT_A", "1")
   defer @env.unset_env_var("LANDER_HOST_INPUT_A")
@@ -27,7 +42,10 @@ async test "Host adapter fills the inputs" {
   @expect.expect(@config.get_text(config, "project.name")).to_equal("disk")
   @expect.expect(@config.get_text(config, "a")).to_equal("1")
   guard seen.val is Some(context) else { fail("the provider did not run") }
-  @expect.expect(context.env_vars).to_equal(@env.get_env_vars())
+  @expect.expect(context.env_vars.get("LANDER_HOST_INPUT_A")).to_equal(Some("1"))
+  @expect.expect(without_test_vars(context.env_vars)).to_equal(
+    without_test_vars(@env.get_env_vars()),
+  )
   @expect.expect(context.working_dir).to_equal(
     @env.current_dir().map(dir => to_slash(dir, running_platform())),
   )

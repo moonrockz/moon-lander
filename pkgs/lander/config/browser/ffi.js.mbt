@@ -13,8 +13,8 @@ priv type Reply
 let adapter : BrowserAdapter = browser_adapter()
 
 ///|
-extern "js" fn BrowserAdapter::supported(self : BrowserAdapter) -> Bool =
-  #|adapter => adapter.supported()
+extern "js" fn BrowserAdapter::supported(self : BrowserAdapter, backend : String) -> Bool =
+  #|(adapter, backend) => adapter.supported(backend)
 
 ///|
 extern "js" fn BrowserAdapter::normalize_base(self : BrowserAdapter, base : String) -> String =
@@ -34,6 +34,16 @@ extern "js" fn BrowserAdapter::read(
   task_signal : @js_async.AbortSignal,
 ) -> @js_async.Promise[Reply] =
   #|(adapter, base, relative, budget, signal, taskSignal) => adapter.read(base, relative, budget, signal, taskSignal)
+
+///|
+extern "js" fn BrowserAdapter::read_file(
+  self : BrowserAdapter,
+  file : File,
+  budget : Int,
+  signal : @js_async.AbortSignal,
+  task_signal : @js_async.AbortSignal,
+) -> @js_async.Promise[Reply] =
+  #|(adapter, file, budget, signal, taskSignal) => adapter.readFile(file, budget, signal, taskSignal)
 
 ///|
 extern "js" fn Reply::kind(self : Reply) -> String =

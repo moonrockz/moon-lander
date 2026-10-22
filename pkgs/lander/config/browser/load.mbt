@@ -15,6 +15,15 @@ pub fn limits(entries? : Int = 4096, bytes? : Int = 8388608, requests? : Int = 8
 }
 
 ///|
+/// The adapter capability that a backend needs.
+fn Backend::capability(self : Backend) -> String {
+  match self {
+    Urls(_) => "urls"
+    Files(_) => "files"
+  }
+}
+
+///|
 fn check_abort(signal : @js_async.AbortSignal, path : String) -> Unit raise BrowserError {
   if signal_aborted(signal) { raise Aborted(operation="load", path~) }
 }
@@ -53,7 +62,6 @@ pub async fn load(
   signal? : @js_async.AbortSignal,
 ) -> @config.Config raise {
   let mounts = mounts.copy()
-  guard adapter.supported() else { raise Unsupported(operation="load", path="") }
   guard !mounts.is_empty() else {
     raise InvalidMount(operation="load", path="", reason="at least one mount is required")
   }
@@ -63,6 +71,9 @@ pub async fn load(
       if contains(mount.root, mounts[j].root) || contains(mounts[j].root, mount.root) {
         raise InvalidMount(operation="load", path=mount.root, reason="overlapping roots")
       }
+    }
+    guard adapter.supported(mount.backend.capability()) else {
+      raise Unsupported(operation="load", path=mount.root)
     }
     let entries = mount.kinds.length() - 1
     guard entries <= entry_budget else {
@@ -117,7 +128,10 @@ pub async fn load(
               } else {
                 let offset = if mount.root == "/" { 1 } else { mount.root.length() + 1 }
                 let relative = path[offset:].to_owned()
-                let reply = @js_async.run_promise(task_signal => adapter.read(mount.base, relative, byte_budget, signal, task_signal))
+                let reply = @js_async.run_promise(task_signal => match mount.backend {
+                  Urls(base) => adapter.read(base, relative, byte_budget, signal, task_signal)
+                  Files(files) => adapter.read_file(files[relative], byte_budget, signal, task_signal)
+                })
                 check_abort(signal, path)
                 match reply.kind() {
                   "file" => {
@@ -129,6 +143,7 @@ pub async fn load(
                   "limit" => raise LimitExceeded(operation="read", path~, limit="bytes")
                   "aborted" => raise Aborted(operation="read", path~)
                   "unsupported" => raise Unsupported(operation="read", path~)
+                  "permission" => raise PermissionDenied(operation="read", path~)
                   _ => raise Io(operation="read", path~)
                 }
               }

@@ -54,6 +54,8 @@ cancellation uses the async library's graceful termination with a 5-second hard
 kill fallback. After each suite the task checks that both listeners no longer
 accept connections. Output and test artifacts live under `_build/browser/`.
 
-The browser API remains UI-free. The fixture page only loads the compiled
-application and exports a test function. File selection UI belongs to later
-unpublished fixtures or to consuming applications.
+The browser API remains UI-free. The fixture page loads the compiled
+application, exports a test function, and holds plain file and directory inputs.
+Playwright puts real files into these inputs; `selected.spec.ts` maps them to
+selected-file mounts, records each `Blob` content read, and checks workspace
+discovery. Picker and selection UI belongs to consuming applications.

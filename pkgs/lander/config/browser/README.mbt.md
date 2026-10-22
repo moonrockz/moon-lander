@@ -46,13 +46,89 @@ engines first with `mise run browsers:install`, adding `-- --with-deps` on Linux
 The loopback fixture serves `acme.toml`; the example returns
 `browser.example:9000`. The package guides compile under the ordinary js tests.
 
+## Selected project files
+
+`@browser.from_files(files, root~)` mounts explicit relative-path and
+`@browser.File` pairs. The application gets each `File` from its own picker or
+HTML input. The package opens no picker and has no UI. Map `File.name` or
+`webkitRelativePath` to a relative path yourself; the adapter does not remove a
+directory prefix by guessing. `File::name()` and `File::webkit_relative_path()`
+read these names without reading the contents.
+
+```moonbit
+// A plain file input gives a name. A directory input gives the selected
+// directory as the first segment, and this application removes it.
+let relative = match file.webkit_relative_path() {
+  "" => file.name()
+  path =>
+    match path.find("/") {
+      Some(index) => path[index + 1:].to_owned()
+      None => path
+    }
+}
+let project = @browser.from_files([(relative, file)], root="/workspace")
+```
+
+Parent listings come from the paths. Duplicates, file/directory collisions and
+invalid paths fail before any read. A load reads a file with `File.text()` only
+when the core requests it, so a large unrelated file is never read. A file that
+is larger than the remaining byte limit fails before its read. The adapter never
+uploads or writes a selected file. `File.text()` decodes UTF-8 with replacement
+characters and removes a leading byte order mark; this is the browser behavior,
+and it differs from the fatal decoding of hosted files. A rejected read raises
+`Io`, or `PermissionDenied` for `NotAllowedError` and `SecurityError`. Abort
+stops the load while a read is pending, and the adapter ignores its late result.
+
+## Workspace discovery
+
+`@browser.workspace(conventions, mount)` confines convention discovery to one
+mount. It removes the system directory, the global user directory and the
+application home, and sets the walk-up boundary to the mount root. It does not
+set isolated mode. Project files, environment files, and local and user
+overrides inside the mount keep the core order, ambiguity, reports and
+provenance. Variables such as `HOME` or `ACME_HOME` give no file access.
+
+```mbt check
+test "confine discovery to a mounted workspace" {
+  let mount = @browser.from_urls(
+    "https://example.org/project/",
+    { "version": 1, "files": ["acme.toml", "src/main.mbt"] },
+    root="/workspace",
+  )
+  let conventions = @browser.workspace(@conventions.app_dirs("acme"), mount)
+  let builder = @config.builder() |> @conventions.add(conventions)
+  assert_eq(conventions.name(), "acme")
+  ignore(builder)
+}
+```
+
+A caller can set a narrower boundary with `@conventions.boundary` after this
+call. A wider boundary, or conventions without this helper, can still request a
+path outside every mount; `load` then raises `OutsideMount` before any I/O.
+
+The compiled consumer in
+[`tests/browser-consumer`](../../../../tests/browser-consumer/main.mbt) merges
+hosted defaults with selected files. Its `loadSelectedServer(files, base)` maps a
+plain file input or a directory input, then loads in builder order:
+
+```moonbit
+let defaults = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/defaults")
+let project = @browser.from_files(project_files(files), root="/workspace")
+let builder = @config.builder()
+  |> @config.format(@toml.format())
+  |> @config.file("/defaults/acme.toml")
+  |> @config.working_dir("/workspace/src")
+  |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+let config = @browser.load(builder, [defaults, project])
+```
+
 ## Authority and ordering
 
 Mounts are opaque immutable values. Their canonical absolute virtual roots must
 be distinct and cannot overlap. `/workspace` and `/workspace2` are separate;
 `/workspace` and `/workspace/vendor` overlap. A load requires at least one mount.
-An empty manifest is valid. Parent directories are inferred; declared empty
-directories are retained. Listings contain exact direct-child names in lexical
+An empty manifest or file list is valid. Parent directories are inferred;
+declared empty directories are retained. Listings contain exact direct-child names in lexical
 code-unit order. Unlisted paths are missing without a fetch.
 
 Use multiple mounts for hosted defaults and project configuration, then add their
@@ -62,8 +138,8 @@ directory and OS platform are preserved. Omitted variables are an empty map and
 no platform is inferred. Page parameters, storage, user-agent and process state
 never supply configuration.
 
-Roots and working directories must be canonical absolute paths; manifest paths
-must be relative. Empty segments, `.`, `..`, backslashes, NUL and drive prefixes
+Roots and working directories must be canonical absolute paths; manifest and
+selected-file paths must be relative. Empty segments, `.`, `..`, backslashes, NUL and drive prefixes
 are invalid. Duplicate declarations, file/directory collisions, and file ancestors
 are rejected before I/O. A requested path must be inside a mount. Filenames are
 not URL-decoded or lowercased, and each segment is URL-encoded before fetching.
@@ -71,8 +147,8 @@ not URL-decoded or lowercased, and each segment is URL-encoded before fetching.
 ## Limits, cancellation and failures
 
 `@browser.limits(entries?, bytes?, requests?)` accepts positive limits, defaulting
-to 4096 unique manifest entries including inferred directories but excluding
-mount roots, 8 MiB of loaded UTF-8, and 8192 distinct requests. Entry and request
+to 4096 unique manifest or selected-file entries including inferred directories
+but excluding mount roots, 8 MiB of loaded UTF-8, and 8192 distinct requests. Entry and request
 bounds are checked before backend access. Byte bounds apply across files and
 while reading streams, even if size headers are absent or incorrect.
 
@@ -101,5 +177,5 @@ Playwright. Repository adapter development uses `mise run build:browser-adapter`
 `check:browser-adapter` rejects stale output without rewriting it. The fixture has
 its own generated file, outside the published module.
 
-Selected files, workspace helpers, directory handles and OPFS persistence belong
-to later stories. This package currently provides hosted URL mounts only.
+Directory handles and OPFS persistence belong to later stories. This package
+currently provides hosted URL mounts and selected-file mounts.

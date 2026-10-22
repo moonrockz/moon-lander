@@ -439,9 +439,38 @@ original-error preservation. A compressed HTTP response verifies that wire size
 cannot bypass the decoded-byte budget. Available parse positions and binding
 blame are checked before the fixture's JavaScript presentation conversion.
 
-Selected files, browser workspace conventions, directory handles, OPFS operations
-and cross-target consumer parity remain groups 3-6. Group 2 does not implement
-those APIs or claim their scenarios have passed.
+Group 2 did not implement selected files, browser workspace conventions,
+directory handles, OPFS operations or cross-target consumer parity. Groups 3-6
+add them.
+
+## Group 3 selected files and workspace discovery
+
+`from_files(files, root~)` takes an array of relative-path and external `File`
+pairs. `File` is an external wrapper with `name()` and `webkit_relative_path()`
+accessors that do not read contents. The mount reuses the manifest namespace
+rules, so duplicates, collisions, file ancestors and the entry budget fail before
+any read. A private `Backend` selects the HTTP or File read for each mount, and
+`load` checks the Web APIs of each backend. A selected-file load does not need
+`fetch`.
+
+The TypeScript boundary checks `File.size` against the remaining byte budget,
+then calls `File.text()` and checks the UTF-8 size. It races that read against
+both abort signals, ignores a late result and removes its listeners. A rejected
+read gives `Io`, or `PermissionDenied` for `NotAllowedError` and `SecurityError`.
+`File.text()` uses the browser UTF-8 decoding: it replaces malformed bytes and
+removes a leading byte order mark. Hosted files keep fatal decoding.
+
+`workspace(conventions, mount)` uses only the public conventions API:
+`without(SystemDir)`, `without(UserConfigDir)`, `without(AppHome)` and
+`boundary(mount.root())`. The core still rejects an explicit file source after
+discovery because of source priority. The tests show builder order with two
+explicit files, and with hosted defaults before workspace discovery.
+
+The acceptance fixture page has plain file and directory inputs. Playwright puts
+real files into them in all three engines, including a 9 MiB unrelated file and
+a real directory. A spy on `Blob` content methods records each read. The
+consumer example maps `File.name` and `webkitRelativePath` explicitly and merges
+hosted defaults with the selected project.
 
 ## Risks / Trade-offs
 

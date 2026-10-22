@@ -19,9 +19,19 @@ extern "js" fn browser_adapter() -> Adapter =
   #|    function signal() {
   #|      return globalThis.testSignal ?? new AbortController().signal;
   #|    }
+  #|    function selected(selector) {
+  #|      const input = document.querySelector(selector);
+  #|      return input instanceof HTMLInputElement && input.files ? Array.from(input.files) : [];
+  #|    }
+  #|    function fileCount(selector) {
+  #|      return selected(selector).length;
+  #|    }
+  #|    function fileAt(selector, index) {
+  #|      return selected(selector)[index];
+  #|    }
   #|
   #|    // tests/browser/adapter-entry.ts
-  #|    receiveBrowserAdapter({ register, origin, signal });
+  #|    receiveBrowserAdapter({ register, origin, signal, fileCount, fileAt });
   #|  })();
   #|  return adapter;
   #|}

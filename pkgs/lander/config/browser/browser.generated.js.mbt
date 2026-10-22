@@ -7,8 +7,44 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|  const receiveBrowserAdapter = value => { adapter = value; };
   #|  (() => {
   #|    // pkgs/lander/adapters/browser/index.ts
-  #|    function supported() {
-  #|      return typeof fetch === "function" && typeof AbortController === "function" && typeof TextDecoder === "function" && typeof TextEncoder === "function";
+  #|    var failure = (kind) => ({ kind, text: "", size: 0, status: 0 });
+  #|    function supported(backend = "urls") {
+  #|      if (typeof AbortController !== "function" || typeof TextEncoder !== "function")
+  #|        return false;
+  #|      if (backend === "files")
+  #|        return typeof Blob === "function" && typeof Blob.prototype.text === "function";
+  #|      return typeof fetch === "function" && typeof TextDecoder === "function";
+  #|    }
+  #|    function classify(error) {
+  #|      const name = error?.name;
+  #|      return name === "NotAllowedError" || name === "SecurityError" ? "permission" : "io";
+  #|    }
+  #|    async function readFile(file, budget, signal, taskSignal) {
+  #|      if (!supported("files"))
+  #|        return failure("unsupported");
+  #|      if (signal.aborted || taskSignal.aborted)
+  #|        return failure("aborted");
+  #|      if (file.size > budget)
+  #|        return failure("limit");
+  #|      let release = () => {};
+  #|      const aborted = new Promise((resolve) => {
+  #|        const abort = () => resolve(failure("aborted"));
+  #|        signal.addEventListener("abort", abort, { once: true });
+  #|        taskSignal.addEventListener("abort", abort, { once: true });
+  #|        release = () => {
+  #|          signal.removeEventListener("abort", abort);
+  #|          taskSignal.removeEventListener("abort", abort);
+  #|        };
+  #|      });
+  #|      try {
+  #|        const read = Promise.resolve().then(() => file.text()).then((text) => {
+  #|          const size = new TextEncoder().encode(text).length;
+  #|          return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
+  #|        }, (error) => failure(classify(error)));
+  #|        return await Promise.race([read, aborted]);
+  #|      } finally {
+  #|        release();
+  #|      }
   #|    }
   #|    function normalizeBase(base) {
   #|      try {
@@ -19,8 +55,8 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|      }
   #|    }
   #|    async function read(base, relative, budget, signal, taskSignal) {
-  #|      if (!supported())
-  #|        return { kind: "unsupported", text: "", size: 0, status: 0 };
+  #|      if (!supported("urls"))
+  #|        return failure("unsupported");
   #|      const controller = new AbortController;
   #|      const abort = () => controller.abort();
   #|      let response;
@@ -102,7 +138,7 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|    }
   #|
   #|    // pkgs/lander/adapters/browser/entry.ts
-  #|    receiveBrowserAdapter({ read, normalizeBase, supported });
+  #|    receiveBrowserAdapter({ read, readFile, normalizeBase, supported });
   #|  })();
   #|  return adapter;
   #|}

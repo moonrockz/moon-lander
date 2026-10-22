@@ -1,8 +1,47 @@
 type Reply = { kind: string; text: string; size: number; status: number };
 
-export function supported(): boolean {
-  return typeof fetch === "function" && typeof AbortController === "function" &&
-    typeof TextDecoder === "function" && typeof TextEncoder === "function";
+const failure = (kind: string): Reply => ({ kind, text: "", size: 0, status: 0 });
+
+/** Required Web APIs for one backend: "urls" or "files". */
+export function supported(backend = "urls"): boolean {
+  if (typeof AbortController !== "function" || typeof TextEncoder !== "function") return false;
+  if (backend === "files") return typeof Blob === "function" && typeof Blob.prototype.text === "function";
+  return typeof fetch === "function" && typeof TextDecoder === "function";
+}
+
+/** Classify a rejected Web API call. Exception text is never returned. */
+function classify(error: unknown): string {
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === "NotAllowedError" || name === "SecurityError" ? "permission" : "io";
+}
+
+/**
+ * Read one selected File. Check its known size first, then its UTF-8 size.
+ * File.text() cannot be aborted, so race it against abort and ignore a late result.
+ */
+export async function readFile(
+  file: File, budget: number, signal: AbortSignal, taskSignal: AbortSignal,
+): Promise<Reply> {
+  if (!supported("files")) return failure("unsupported");
+  if (signal.aborted || taskSignal.aborted) return failure("aborted");
+  if (file.size > budget) return failure("limit");
+  let release = () => {};
+  const aborted = new Promise<Reply>(resolve => {
+    const abort = () => resolve(failure("aborted"));
+    signal.addEventListener("abort", abort, { once: true });
+    taskSignal.addEventListener("abort", abort, { once: true });
+    release = () => {
+      signal.removeEventListener("abort", abort);
+      taskSignal.removeEventListener("abort", abort);
+    };
+  });
+  try {
+    const read = Promise.resolve().then(() => file.text()).then(text => {
+      const size = new TextEncoder().encode(text).length;
+      return size > budget ? failure("limit") : { kind: "file", text, size, status: 0 };
+    }, error => failure(classify(error)));
+    return await Promise.race([read, aborted]);
+  } finally { release(); }
 }
 
 export function normalizeBase(base: string): string {
@@ -18,7 +57,7 @@ export async function read(
   base: string, relative: string, budget: number,
   signal: AbortSignal, taskSignal: AbortSignal,
 ): Promise<Reply> {
-  if (!supported()) return { kind: "unsupported", text: "", size: 0, status: 0 };
+  if (!supported("urls")) return failure("unsupported");
   const controller = new AbortController();
   const abort = () => controller.abort();
   let response: Response | undefined;

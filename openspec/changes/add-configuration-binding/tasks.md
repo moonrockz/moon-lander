@@ -35,19 +35,19 @@ Bead: lander-4us.4.2
 
 Bead: lander-4us.4.3
 
-- [ ] 3.1 Detect a secret reference leaf on the decode path of `bind` and `bind_or` and raise `Decode` with the secret-reference detail; verify a test with an environment resolver stub that fails if the system calls it
-- [ ] 3.2 Add a test that the text of each binding error does not contain the configured value; verify it with a value such as `42` at `service.api_token`
-- [ ] 3.3 Add acceptance scenarios for "Error text does not show configured values" and the first scenario of "Secret references are not resolved by binding"; verify they pass
+- [x] 3.1 Detect a secret reference leaf on the decode path of `bind` and `bind_or` and raise `Decode` with the secret-reference detail; verify a test with an environment resolver stub that fails if the system calls it
+- [x] 3.2 Add a test that the text of each binding error does not contain the configured value; verify it with a value such as `42` at `service.api_token`
+- [x] 3.3 Add acceptance scenarios for "Error text does not show configured values" and the first scenario of "Secret references are not resolved by binding"; verify they pass
 
 ## 4. Validation and options values
 
 Bead: lander-4us.4.4
 
-- [ ] 4.1 Add `Violation` (relative `DecodeStep` paths), `violation`, `nested`, and the `Validate` trait with an empty default; add impls for `Map[String, T]` (adds `Field`), `Array[T]` (adds `Index`) and `T?`; verify unit tests for path prefixes
-- [ ] 4.2 Add `validated`, which turns each violation into a core `BindFailure` with full decode paths and blames and raises the core `ConfigError::Validation`; verify a test with two failures, a cross-field failure and a failure inside a list
-- [ ] 4.3 Add `Options[T]` and `options`; verify that no options value exists after a validation failure
-- [ ] 4.4 Add acceptance scenarios for "Validation reports all failures with sources" and "Options value"; verify they pass on all four targets
-- [ ] 4.5 Document `Validate`, `validated` and `options` with a pipeline example in the package README; verify the example runs
+- [x] 4.1 Add `Violation` (relative `DecodeStep` paths), `violation`, `nested`, and the `Validate` trait with an empty default; add impls for `Map[String, T]` (adds `Field`), `Array[T]` (adds `Index`) and `T?`; verify unit tests for path prefixes
+- [x] 4.2 Add `validated`, which turns each violation into a core `BindFailure` with full decode paths and blames and raises the core `ConfigError::Validation`; verify a test with two failures, a cross-field failure and a failure inside a list
+- [x] 4.3 Add `Options[T]` and `options`; verify that no options value exists after a validation failure
+- [x] 4.4 Add acceptance scenarios for "Validation reports all failures with sources" and "Options value"; verify they pass on all four targets
+- [x] 4.5 Document `Validate`, `validated` and `options` with a pipeline example in the package README; verify the example runs
 
 ## 5. Named options
 

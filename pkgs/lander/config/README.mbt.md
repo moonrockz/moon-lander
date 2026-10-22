@@ -541,6 +541,114 @@ Binding decodes through `FromJson`, so its rules apply:
 The configuration never holds a null field, so a `null` in a source does not
 reach an `Option` field: the field is absent and decodes as `None`.
 
+## Secret references in a bound section
+
+Binding never resolves a secret reference such as `{ env = "API_TOKEN" }`.
+`FromJson` would read a reference as an ordinary table, and binding can not
+tell which keys a type reads. So `bind`, `bind_root` and `bind_or` fail with
+`Decode` at the first reference in the bound section, with the detail
+`is a secret reference; bind it as SecretRef with bind_with`. Bind a narrower
+section that holds no reference, and read the secret with `Config::secret`.
+
+```mbt check
+///|
+struct ApiClient {
+  url : String
+} derive(FromJson)
+
+///|
+test "a secret reference stops binding" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/app.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.toml",
+    "api.url = \"https://example.org\"\napi.token = { env = \"API_TOKEN\" }",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  try {
+    let client : ApiClient = config |> @config.bind("api")
+    ignore(client.url)
+  } catch {
+    error =>
+      @expect.expect(error.message()).to_equal(
+        "api.token: is a secret reference; bind it as SecretRef with bind_with (set in project /srv/app.toml)",
+      )
+  } noraise {
+    _ => fail("expected a decode error")
+  }
+  let url : String = config |> @config.bind("api.url")
+  @expect.expect(url).to_equal("https://example.org")
+}
+```
+
+## Validate bound values
+
+A type declares its rules with the `Validate` trait. `validate` is pure: it
+returns every broken rule as a `Violation` and never raises. `violation(fields,
+detail)` names fields of the section; a rule over two fields names both, so the
+error shows the source of each value. `nested(field, found)` moves the
+violations of a nested value below its field. `Map`, `Array` and `Option` values
+check each value, below its key or list index. A type with no rules writes
+`impl Validate for T` and uses the default, which finds nothing.
+
+`validated(value, config, key)` checks a bound value and gives an
+`Options[T]`: the value, the key path of its section, and an optional instance
+name. All violations raise one `Validation` error, with one line for each path:
+`<path>: <detail> (<blame text>)`. No options value exists after a failure.
+`options(config, key)` is the short form of `bind`, then `validated`.
+
+```mbt check
+///|
+struct IrSettings {
+  layout : String
+  strict_mode : Bool
+} derive(FromJson, ToJson)
+
+///|
+impl @config.Validate for IrSettings with validate(self) {
+  if self.layout == "split" && !self.strict_mode {
+    [
+      @config.violation(
+        ["layout", "strict_mode"],
+        "split layout needs strict_mode = true",
+      ),
+    ]
+  } else {
+    []
+  }
+}
+
+///|
+test "validation names each value and its source" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/app.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.toml",
+    "ir.layout = \"split\"",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  let default : IrSettings = { layout: "tree", strict_mode: false }
+  try {
+    let ir = config
+      |> @config.bind_or("ir", default)
+      |> @config.validated(config, "ir")
+    ignore(ir.value)
+  } catch {
+    error =>
+      @expect.expect(error.message()).to_equal(
+        (
+          #|ir.layout: split layout needs strict_mode = true (set in project /srv/app.toml)
+          #|ir.strict_mode: split layout needs strict_mode = true (not set by any source)
+        ),
+      )
+  } noraise {
+    _ => fail("expected a validation error")
+  }
+}
+```
+
 ## Environment variables and overrides
 
 An environment source reads the variables that start with its prefix. `__`

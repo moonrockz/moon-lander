@@ -410,7 +410,7 @@ test "a configured value over a default keeps the source blame" {
   ])
   let (failure, message) = decode_failure(() => {
     config
-    |> @config.bind_or("ir", { layout: "tree", strict_mode: false })
+    |> @config.bind_or("ir", ({ layout: "tree", strict_mode: false } : IrOptions))
     |> ignore
   })
   @expect.expect(failure.at[0].path.to_string()).to_equal("ir.strict_mode")

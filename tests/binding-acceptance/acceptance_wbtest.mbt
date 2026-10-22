@@ -129,6 +129,78 @@ impl FromJson for Endpoint with from_json(json, path) {
 }
 
 ///|
+/// A billing record that decodes exactly from the value tree.
+priv struct Billing {
+  rate : @ion.Decimal
+}
+
+///|
+impl @config.FromConfig for Billing with from_config(node) {
+  { rate: node.get("rate") }
+}
+
+///|
+priv struct Release {
+  at : @ion.Timestamp
+}
+
+///|
+impl @config.FromConfig for Release with from_config(node) {
+  { at: node.get("at") }
+}
+
+///|
+priv struct Limits {
+  max : Int64
+}
+
+///|
+impl @config.FromConfig for Limits with from_config(node) {
+  { max: node.get("max") }
+}
+
+///|
+priv struct ExactServer {
+  port : Int
+}
+
+///|
+impl @config.FromConfig for ExactServer with from_config(node) {
+  { port: node.get("port") }
+}
+
+///|
+priv struct Metadata {
+  lock : @config.Sourced[String]
+}
+
+///|
+impl @config.FromConfig for Metadata with from_config(node) {
+  { lock: node.get("lock") }
+}
+
+///|
+priv struct SecretService {
+  url : String
+  token : @config.SecretRef
+}
+
+///|
+impl @config.FromConfig for SecretService with from_config(node) {
+  { url: node.get("url"), token: node.get("token") }
+}
+
+///|
+/// The text of a blame for a result: the location of each origin.
+fn locations(blame : @config.Blame) -> String {
+  match blame {
+    Set(origins) =>
+      origins.map(origin => origin.location.unwrap_or("(none)")).join(", ")
+    _ => "(no origin)"
+  }
+}
+
+///|
 /// The files of one scenario, the loaded configuration, and the outcome of the
 /// last binding: a result text or an error.
 priv struct BindingWorld {
@@ -155,7 +227,9 @@ fn role(name : String) -> @config.FileRole {
 
 ///|
 fn BindingWorld::config(self : BindingWorld) -> @config.Config raise {
-  let mut builder = @config.builder() |> @config.format(@toml.format())
+  let mut builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.format(@ion_format.format())
   let mut tree = @config.FileTree::new(complete=true)
   for file in self.files {
     builder = builder |> @config.file(file.0, role=file.1)
@@ -329,6 +403,62 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
       )
     server.endpoint.to_string()
   }))
+  setup.when1("the application binds {string} to the exact billing record", (
+    key : String,
+  ) => self.run(config => {
+    let billing : Billing = config |> @config.bind_with(key)
+    "coefficient \{billing.rate.coefficient()} exponent \{billing.rate.exponent()}"
+  }))
+  setup.when1("the application binds {string} to the exact release record", (
+    key : String,
+  ) => self.run(config => {
+    let release : Release = config |> @config.bind_with(key)
+    let digits = match release.at.fraction() {
+      Some(fraction) => (-fraction.exponent()).to_string()
+      None => "0"
+    }
+    let offset = match release.at.offset() {
+      Some(Known(minutes)) => "\{minutes} minutes"
+      _ => "unknown"
+    }
+    "fraction digits \{digits} offset \{offset}"
+  }))
+  setup.when1("the application binds {string} to the exact limits record", (
+    key : String,
+  ) => self.run(config => {
+    let limits : Limits = config |> @config.bind_with(key)
+    limits.max.to_string()
+  }))
+  setup.when1("the application binds {string} to the exact server record", (
+    key : String,
+  ) => self.run(config => {
+    let server : ExactServer = config |> @config.bind_with(key)
+    server.port.to_string()
+  }))
+  setup.when1("the application binds {string} to the metadata record with origins", (
+    key : String,
+  ) => self.run(config => {
+    let metadata : Metadata = config |> @config.bind_with(key)
+    "\{metadata.lock.value} from \{locations(metadata.lock.blame)}"
+  }))
+  setup.when1("the application binds {string} to the exact service record", (
+    key : String,
+  ) => self.run(config => {
+    let service : SecretService = config |> @config.bind_with(key)
+    match service.token {
+      Env(name) => "\{service.url} env \{name}"
+      _ => "\{service.url} other"
+    }
+  }))
+  setup.then1("the result does not contain the value of {string}", (
+    variable : String,
+  ) => {
+    guard self.vars.get(variable) is Some(secret) else {
+      fail("the scenario does not set \{variable}")
+    }
+    guard self.result is Some(result) else { fail("binding failed") }
+    @expect.expect(result.contains(secret)).to_be_false()
+  })
   setup.then1("the result is {string}", (expected : String) => {
     @expect.expect(self.result).to_equal(Some(expected))
   })
@@ -649,6 +779,57 @@ let feature : String =
   #|    When the application binds "ir" over the IR default with unknown keys rejected
   #|    Then binding fails with a validation error at "ir.strict_mod"
   #|    And the error text is "ir.strict_mod: is an unknown key (set in project /repo/morphir.toml)"
+  #|
+  #|  Scenario: Decimal keeps its scale
+  #|    Given the "project" file "/repo/morphir.ion":
+  #|      """ion
+  #|      { billing: { rate: 1.50d0 } }
+  #|      """
+  #|    When the application binds "billing" to the exact billing record
+  #|    Then the result is "coefficient 150 exponent -2"
+  #|
+  #|  Scenario: Timestamp keeps precision and offset
+  #|    Given the "project" file "/repo/morphir.ion":
+  #|      """ion
+  #|      { release: { at: 2026-10-19T08:30:00.125+02:00 } }
+  #|      """
+  #|    When the application binds "release" to the exact release record
+  #|    Then the result is "fraction digits 3 offset 120 minutes"
+  #|
+  #|  Scenario: Large integer into Int64
+  #|    Given the "project" file "/repo/morphir.ion":
+  #|      """ion
+  #|      { limits: { max: 9007199254740993 } }
+  #|      """
+  #|    When the application binds "limits" to the exact limits record
+  #|    Then the result is "9007199254740993"
+  #|
+  #|  Scenario: Fraction into Int fails
+  #|    Given the "project" file "/repo/morphir.ion":
+  #|      """ion
+  #|      { server: { port: 80.5 } }
+  #|      """
+  #|    When the application binds "server" to the exact server record
+  #|    Then binding fails with a decode error at "server.port"
+  #|    And the error text is "server.port: expected int, found decimal (set in project /repo/morphir.ion)"
+  #|
+  #|  Scenario: Relative path with its file
+  #|    Given the "workspace-member" file "/repo/sub/morphir.toml":
+  #|      """toml
+  #|      metadata.lock = "deps.lock"
+  #|      """
+  #|    When the application binds "metadata" to the metadata record with origins
+  #|    Then the result is "deps.lock from /repo/sub/morphir.toml"
+  #|
+  #|  Scenario: Secret reference into the reference type
+  #|    Given the "project" file "/repo/morphir.ion":
+  #|      """ion
+  #|      { service: { url: "https://example.org", token: { env: "SERVICE_TOKEN" } } }
+  #|      """
+  #|    And the environment variable "SERVICE_TOKEN" is "s3cret-value"
+  #|    When the application binds "service" to the exact service record
+  #|    Then the result is "https://example.org env SERVICE_TOKEN"
+  #|    And the result does not contain the value of "SERVICE_TOKEN"
 
 ///|
 /// Run each scenario of `text` with a fresh world and fail on the first scenario

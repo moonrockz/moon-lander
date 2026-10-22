@@ -533,8 +533,8 @@ Binding decodes through `FromJson`, so its rules apply:
 
 | Case | Result |
 | --- | --- |
-| `Int` from `1.5` | `1`: the fraction is lost without an error |
-| `Int64` from a number | An error: `Int64` decodes only from text such as `"42"` |
+| `Int` from `1.5` | `1`: the fraction is lost without an error; `bind_with` rejects it |
+| `Int64` from a number | An error: `Int64` decodes only from text such as `"42"`; `bind_with` reads the number |
 | An `Option` field that is absent | `None` |
 | An unknown field | Ignored |
 
@@ -547,8 +547,10 @@ Binding never resolves a secret reference such as `{ env = "API_TOKEN" }`.
 `FromJson` would read a reference as an ordinary table, and binding can not
 tell which keys a type reads. So `bind`, `bind_root` and `bind_or` fail with
 `Decode` at the first reference in the bound section, with the detail
-`is a secret reference; bind it as SecretRef with bind_with`. Bind a narrower
-section that holds no reference, and read the secret with `Config::secret`.
+`is a secret reference; bind it as SecretRef with bind_with`. Decode the
+section with `FromConfig` and `bind_with`, and give the field the type
+`SecretRef` (see "Exact decoding with FromConfig"). Or bind a narrower section
+that holds no reference. Read the secret value with `Config::secret`.
 
 ```mbt check
 ///|
@@ -739,6 +741,85 @@ test "a misspelled key is an error with its source" {
   let legacy = config
     |> @config.bind_or("ir", default, unknown=RejectExcept(["strict_mod"]))
   @expect.expect(legacy.layout).to_equal("split")
+}
+```
+
+## Exact decoding with FromConfig
+
+`FromJson` reads numbers as `Double`, so it loses the scale of a decimal, the
+digits of a large integer, and the fraction of an `Int`. A type that implements
+`FromConfig` decodes straight from the configuration tree instead, and
+`bind_with(config, key)` binds it. Each decoder gets a `ConfigNode`: its decode
+path, its value, and the sources to blame.
+
+| `ConfigNode` operation | Result |
+| --- | --- |
+| `get(name)` | Decode the field `name` with `FromConfig` |
+| `child(name)` | The node of the field `name`; it has no value when no source sets it |
+| `children()` | The fields of a table, with their nodes |
+| `items()` | The items of a list; each item has the index in its path |
+| `json()` | Decode the node with `FromJson`, with the same error text as `bind` |
+| `fail(detail)` | Raise `Decode` at the node with its sources |
+| `path()`, `value()`, `blame()` | The decode path, the value, and the sources to blame |
+
+The package supplies `FromConfig` for `String`, `Bool`, `Int`, `Int64`,
+`UInt64`, `Double`, `@bigint.BigInt`, `@ion.Decimal`, `@ion.Timestamp`,
+`SecretRef`, `T?`, `Array[T]`, `Map[String, T]` and `Sourced[T]`. The integer
+types accept only an integer value in their range, so `80.5` fails for `Int`.
+`@ion.Decimal` accepts a decimal or an integer. `Double` accepts a float, an
+integer or a decimal. A node with no value gives `None` for `T?` and fails with
+`no value` for the other types.
+
+`Sourced[T]` holds a value and the sources to blame for it, so the application
+can resolve a relative path against the file that set it. `SecretRef` accepts a
+secret reference and gives it unresolved; every other type fails at a
+reference.
+
+```mbt check
+///|
+struct Invoice {
+  rate : @ion.Decimal
+  max_items : Int64
+  lock : @config.Sourced[String]
+  server : ServerOptions
+}
+
+///|
+impl @config.FromConfig for Invoice with from_config(node) {
+  {
+    rate: node.get("rate"),
+    max_items: node.get("max_items"),
+    lock: node.get("lock"),
+    server: node.child("server").json(),
+  }
+}
+
+///|
+test "exact decoding keeps the decimal scale and the file" {
+  let builder = @config.builder()
+    |> @config.format(@ion_format.format())
+    |> @config.file("/srv/app.ion")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.ion",
+    (
+      #|{
+      #|  billing: {
+      #|    rate: 1.50,
+      #|    max_items: 9007199254740993,
+      #|    lock: "deps.lock",
+      #|    server: { host: "localhost", port: 8080 },
+      #|  },
+      #|}
+    ),
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  let billing : Invoice = config |> @config.bind_with("billing")
+  @expect.expect(billing.rate.coefficient().to_string()).to_equal("150")
+  @expect.expect(billing.rate.exponent()).to_equal(-2)
+  @expect.expect(billing.max_items).to_equal(9007199254740993L)
+  guard billing.lock.blame is Set([origin]) else { fail("one origin") }
+  @expect.expect(origin.location).to_equal(Some("/srv/app.ion"))
+  @expect.expect(billing.server).to_equal({ host: "localhost", port: 8080 })
 }
 ```
 

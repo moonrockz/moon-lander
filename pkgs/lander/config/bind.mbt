@@ -9,10 +9,11 @@ pub fn[T : FromJson] bind(config : Config, key : String) -> T raise ConfigError 
   let path = KeyPath::parse(key)
   match config.get(path) {
     Some(value) => {
-      config.check_no_secret(Some(path), value)
-      decode(config, Some(path), section_json(config, Some(path), value))
+      let at = section_path(Some(path))
+      config.check_no_secret(at, value)
+      decode(config, at, section_json(config, at, value))
     }
-    None => decode(config, Some(path), Json::null())
+    None => decode(config, section_path(Some(path)), Json::null())
   }
 }
 
@@ -25,8 +26,9 @@ pub fn[T : FromJson] Config::bind(self : Config, key : String) -> T raise Config
 ///|
 /// Decode the full configuration into a `T`. Decode paths start at the root.
 pub fn[T : FromJson] bind_root(config : Config) -> T raise ConfigError {
-  config.check_no_secret(None, config.root)
-  decode(config, None, section_json(config, None, config.root))
+  let at = section_path(None)
+  config.check_no_secret(at, config.root)
+  decode(config, at, section_json(config, at, config.root))
 }
 
 ///|
@@ -34,18 +36,18 @@ pub fn[T : FromJson] bind_root(config : Config) -> T raise ConfigError {
 let secret_detail = "is a secret reference; bind it as SecretRef with bind_with"
 
 ///|
-/// Raise `Decode` at the first secret reference in `value`, the section at
-/// `key`. `FromJson` reads a reference as an ordinary table, and binding can
+/// Raise `Decode` at the first secret reference in `value`, the value at the
+/// decode path `at`. `FromJson` reads a reference as an ordinary table, and binding can
 /// not tell which keys a type reads, so every reference in the section fails.
 /// The check never resolves the reference.
 fn Config::check_no_secret(
   self : Config,
-  key : KeyPath?,
+  at : DecodePath,
   value : ConfigValue,
 ) -> Unit raise ConfigError {
   guard self.secret_syntax is Standard else { return }
   guard secret_steps(value, self.secret_syntax) is Some(steps) else { return }
-  let path = decode_path_below(key, steps)
+  let path = at.below(steps)
   raise Decode(failure={
     at: [{ path, blame: self.blame(path) }],
     detail: secret_detail,
@@ -82,15 +84,27 @@ fn secret_steps(
 }
 
 ///|
-/// The decode path of `steps` below the section at `key`: the leading field
-/// steps join the key path, and the steps from the first list index on are
-/// the suffix.
+/// The decode path of the section at `key`, or of the root for `None`.
+fn section_path(key : KeyPath?) -> DecodePath {
+  { key, suffix: [] }
+}
+
+///|
+/// The decode path of `steps` below the section at `key`.
 fn decode_path_below(key : KeyPath?, steps : Array[DecodeStep]) -> DecodePath {
-  let names = match key {
+  section_path(key).below(steps)
+}
+
+///|
+/// The decode path of `steps` below this path. Before the first list index,
+/// field steps join the key path; the steps from the first list index on go
+/// to the suffix.
+fn DecodePath::below(self : DecodePath, steps : Array[DecodeStep]) -> DecodePath {
+  let names = match self.key {
     Some(key) => key.names.copy()
     None => []
   }
-  let suffix : Array[DecodeStep] = []
+  let suffix = self.suffix.copy()
   for step in steps {
     match step {
       Field(name) if suffix.is_empty() => names.push(name)
@@ -101,35 +115,35 @@ fn decode_path_below(key : KeyPath?, steps : Array[DecodeStep]) -> DecodePath {
 }
 
 ///|
-/// The JSON form of a section. A value with no JSON form fails as a decode
-/// error at the section.
+/// The JSON form of the value at the decode path `at`. A value with no JSON
+/// form fails as a decode error at `at`.
 fn section_json(
   config : Config,
-  key : KeyPath?,
+  at : DecodePath,
   value : ConfigValue,
 ) -> Json raise ConfigError {
   @ion_json.to_json(value.ion) catch {
-    error => {
-      let path : DecodePath = { key, suffix: [] }
+    error =>
       raise Decode(failure={
-        at: [{ path, blame: config.blame(path) }],
+        at: [{ path: at, blame: config.blame(at) }],
         detail: "the value has no JSON form: \{error.message()}",
       })
-    }
   }
 }
 
 ///|
+/// Decode `json`, the value at the decode path `at`, with `FromJson`. A
+/// failure raises `Decode` at the full decode path below `at`.
 fn[T : FromJson] decode(
   config : Config,
-  key : KeyPath?,
+  at : DecodePath,
   json : Json,
   blame? : (DecodePath) -> Blame,
 ) -> T raise ConfigError {
   let blame = blame.unwrap_or(path => config.blame(path))
   @json.from_json(json) catch {
     JsonDecodeError((pointer, detail)) => {
-      let path = decode_path(key, pointer.to_string(), json)
+      let path = decode_path(at, pointer.to_string(), json)
       raise Decode(failure={ at: [{ path, blame: blame(path) }], detail })
     }
   }
@@ -163,14 +177,14 @@ pub fn[T : FromJson + ToJson] bind_or(
   let section = config.get(path)
   let merged = match section {
     Some(section) => {
-      config.check_no_secret(Some(path), section)
+      config.check_no_secret(section_path(Some(path)), section)
       merge(default_root, fields([("value", section)]))
     }
     None => default_root
   }
   let value = merged.field("value").unwrap_or({ ion: @ion.Ion::Ion(Json::null()) })
-  let json = section_json(config, Some(path), value)
-  let result : T = decode(config, Some(path), json, blame=decode_path => {
+  let json = section_json(config, section_path(Some(path)), value)
+  let result : T = decode(config, section_path(Some(path)), json, blame=decode_path => {
     match config.blame(decode_path) {
       Unset | Table([]) => {
         let below = match decode_path.key {
@@ -204,16 +218,12 @@ pub fn[T : FromJson + ToJson] Config::bind_or(
 }
 
 ///|
-/// The decode path of a JSON Pointer (RFC 6901) below the section at `key`.
+/// The decode path of a JSON Pointer (RFC 6901) below the decode path `at`.
 /// A segment is a list index when the JSON value there is an array. The key
 /// path takes the names up to the first list index; the suffix takes the
 /// steps from that index on.
-fn decode_path(key : KeyPath?, pointer : String, json : Json) -> DecodePath {
-  let names = match key {
-    Some(key) => key.names.copy()
-    None => []
-  }
-  let suffix : Array[DecodeStep] = []
+fn decode_path(at : DecodePath, pointer : String, json : Json) -> DecodePath {
+  let steps : Array[DecodeStep] = []
   let mut node : Json? = Some(json)
   for segment in pointer_segments(pointer) {
     let step : DecodeStep = match (node, list_index(segment)) {
@@ -230,12 +240,9 @@ fn decode_path(key : KeyPath?, pointer : String, json : Json) -> DecodePath {
         Field(segment)
       }
     }
-    match step {
-      Field(name) if suffix.is_empty() => names.push(name)
-      _ => suffix.push(step)
-    }
+    steps.push(step)
   }
-  { key: if names.is_empty() { None } else { Some({ names, }) }, suffix }
+  at.below(steps)
 }
 
 ///|

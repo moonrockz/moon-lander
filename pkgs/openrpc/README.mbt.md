@@ -3,9 +3,10 @@
 `moonrockz/openrpc` is a developing portable reader, writer and document
 validator. It contains the complete typed OpenRPC `1.3.2`/`1.4.x` model and
 draft-07 keyword model, exact JSON values, a source-preserving CST and
-reference resolution over explicit resources. Full document validation, source
-editing and release qualification remain tracked work. This development module
-is not a release candidate.
+reference resolution over explicit resources, and versioned document
+validation with explicit profiles. Pretty writing, source edits and release
+qualification remain tracked work. This development module is not a release
+candidate.
 
 Reading keeps both the original JSON source and a typed document when structural
 decoding succeeds. Writing retains exact numeric tokens, extensions, absent
@@ -100,31 +101,166 @@ lowercase `x-` and retain arbitrary exact values. Error codes are mathematical
 integers with no machine-integer restriction. Each field keeps its own rules;
 these constructors do not impose a common string restriction on unrelated fields.
 
-Validation returns separate model, schema-document, reference, normative and
-pinned-artifact coverage results. `Specification` is the default profile.
-`MetaschemaCompatibility` reports the documented optional-before-required
-parameter-order discrepancy as a warning. It does not reorder descriptors.
-Duplicate names remain errors in both profiles.
+## Validation
+
+`validate` returns a report with five facets. Each is `Passed`, `Failed` or
+`Incomplete`; there is no single success flag.
+
+| Facet | Checks |
+| --- | --- |
+| `model` | Referenced objects decode as the expected kind |
+| `schemas` | Embedded draft-07 schema documents, including regex syntax |
+| `references` | Every reference resolves within the supplied resources |
+| `normative` | Rules from the pinned prose of the document's version |
+| `artifact` | The document's own JSON against its version's pinned metaschema |
+
+Normative rules follow the document version. Both versions require unique
+method names, unique parameter names per method, unique error codes per method
+(exact integer equality, so `1` and `1e0` collide) and links that name an
+existing method, all checked after references resolve. Required parameters
+must precede optional ones. OpenRPC 1.3.2 also requires server, license and
+link names; the 1.4 tables do not. Members outside a version's field table are
+`UnknownField` warnings and never fail the facet.
+
+The artifact facet uses the frozen 1.3.2 meta-schema (release 1.14.9) or the
+1.4 schema at spec commit `876aa30e`. Schema positions there are checked only
+as boolean-or-object; the `schemas` facet checks their keywords. Formats are
+annotations.
+
+### Profiles
+
+`Specification`, the default, reports every normative failure as an error.
+`MetaschemaCompatibility` serves producers that pass the pinned artifact but
+differ from the prose. It downgrades exactly the discrepancies in
+`compatibility_discrepancies()`, and each such finding names its `Discrepancy`:
+
+| Discrepancy | Prose | Artifact |
+| --- | --- | --- |
+| `OptionalParameterBeforeRequired` | Optional params come last | No rule |
+| `ServerNameOmitted` | 1.3.2 requires a server name | Optional |
+| `LicenseNameOmitted` | 1.3.2 requires a license name | Optional |
+
+Every other normative failure stays an error under both profiles. Neither
+profile reorders, repairs or fills in the document.
+
+`validate_closed` returns the same report and, only when the required facets
+pass, a `ValidatedDocument` that records its profile, version and resource
+snapshot. Specification requires `model`, `schemas`, `references` and
+`normative`; an artifact failure stays in the report without blocking the
+wrapper. Compatibility requires those facets and `artifact`, with normative
+errors limited to the discrepancy list. An incomplete facet, including one
+truncated by limits, never produces a wrapper.
 
 ```mbt check
 ///|
 test {
   let document = @openrpc.read(
-      "{\"openrpc\":\"1.3.2\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[]}",
+      "{\"openrpc\":\"1.3.2\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"find\",\"params\":[{\"name\":\"limit\",\"required\":false,\"schema\":true},{\"name\":\"query\",\"required\":true,\"schema\":true}]}]}",
     )
     .document()
     .unwrap()
-  let result = @openrpc.validate_closed(document)
-  assert_true(result.document() is Some(_))
-  assert_eq(result.report().references(), @openrpc.Passed)
-  assert_eq(result.report().artifact(), @openrpc.Passed)
+  // The prose forbids an optional parameter before a required one.
+  let strict = @openrpc.validate_closed(document)
+  assert_eq(strict.report().normative(), @openrpc.Failed)
+  assert_true(strict.document() is None)
+  // Compatibility reports the same finding as a listed warning.
+  let compatible = @openrpc.validate_closed(
+    document,
+    profile=@openrpc.MetaschemaCompatibility,
+  )
+  let order = compatible.report().findings()[0]
+  assert_eq(order.severity(), @openrpc.Warning)
+  assert_eq(order.discrepancy(), Some(@openrpc.OptionalParameterBeforeRequired))
+  let validated = compatible.document().unwrap()
+  assert_eq(validated.profile(), @openrpc.MetaschemaCompatibility)
+  // Parameter order is unchanged.
+  assert_eq(
+    @openrpc.write(validated.document()).unwrap(),
+    @openrpc.write(document).unwrap(),
+  )
 }
 ```
 
-The artifact facet checks the document's own JSON against its version's pinned
-metaschema. A closed Specification result requires the model, schema, reference
-and normative facets to pass. A closed compatibility result also requires
-artifact compatibility. Neither profile conceals failed or incomplete required checks.
+### Findings
+
+Each finding has a typed code, severity, phase, document version and profile.
+Its location names the resource (None for the input document), a pointer, and
+for the input document a half-open UTF-16 span when the caller passes the
+`source_map` from `read`. `related()` gives other occurrences, such as the
+first of two duplicate names. `chain()` lists the OpenRPC `$ref` sites followed
+to reach the location. A missing member points at its parent and names the
+member in `expected_field()`. Documents built with constructors have no spans.
+
+```mbt check
+///|
+test {
+  let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"😀\",\"version\":\"1\"},\n\"methods\":[{\"name\":\"a\",\"params\":[]},{\"$ref\":\"#/x-copy\"}],\"x-copy\":{\"name\":\"a\",\"params\":[]}}"
+  let read = @openrpc.read(source, source_id=Some("api.json"))
+  let source_map = read.source_map().unwrap()
+  let report = @openrpc.validate(read.document().unwrap(), source_map=Some(source_map))
+  let duplicate = report.findings()[0]
+  assert_eq(duplicate.diagnostic().code(), @exact.DuplicateName)
+  assert_eq(duplicate.location().path(), ["x-copy", "name"])
+  assert_eq(duplicate.chain()[0].path(), ["methods", "1", "$ref"])
+  assert_eq(duplicate.related()[0].path(), ["methods", "0", "name"])
+  // The emoji counts as two UTF-16 units; lines and columns start at 1.
+  let span = duplicate.location().span().unwrap()
+  let position = source_map.position(span.start()).unwrap()
+  assert_eq((position.line(), position.column()), (2, 75))
+}
+```
+
+Findings are ordered by resource, pointer (array indices numerically), code,
+source position and message, so every target reports the same list. The
+`max_findings` limit (default 256) keeps the first findings in that order. Each
+phase that lost findings gets an `Information` `LimitExceeded` marker and
+becomes `Incomplete`.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]}]}",
+    )
+    .document()
+    .unwrap()
+  let limits = @exact.Limits::new(max_findings=1)
+  let report = @openrpc.validate(document, limits~)
+  assert_eq(report.normative(), @openrpc.Failed)
+  assert_true(
+    report
+    .findings()
+    .any(f => f.diagnostic().code() == @exact.LimitExceeded),
+  )
+  assert_true(@openrpc.validate_closed(document, limits~).document() is None)
+}
+```
+
+### Runtime boundary
+
+Document validation says nothing about runtime exchanges. It does not validate
+JSON-RPC envelopes, request or response IDs, batches, notifications, or
+examples and error data as instances of their schemas. An absent result and a
+result whose schema allows only `null` are both valid document shapes; neither
+is checked against any call.
+
+```mbt check
+///|
+test {
+  let document = @openrpc.read(
+      "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"log\",\"params\":[],\"result\":{\"name\":\"done\",\"schema\":{\"type\":\"null\"}},\"examples\":[{\"name\":\"e\",\"params\":[],\"result\":{\"name\":\"r\",\"value\":42}}]}]}",
+    )
+    .document()
+    .unwrap()
+  // The example value 42 does not match the null schema, and that is not a
+  // document finding.
+  let result = @openrpc.validate_closed(document)
+  assert_true(result.document() is Some(_))
+  assert_true(result.report().findings().is_empty())
+}
+```
+
+### References
 
 References never trigger network or filesystem access. Validation resolves
 references only through an explicit `@reference.ResourceSet` and an optional
@@ -191,9 +327,8 @@ and exchanges require a separate runtime validator.
 
 The [draft-07 model guide](schema/README.mbt.md) covers the complete typed keyword
 model, checked exact bounds, tuple items, dependencies and literal-data boundaries.
-`Schema.from_json` now checks typed forms. Use `schema.validate_json` to report
-malformed untyped schema documents. Complete conformance and reference-resource
-checks remain tracked work.
+`Schema.from_json` checks typed forms. Use `schema.validate_json` to report
+malformed untyped schema documents.
 
 The document API covers metadata, servers and variables, methods, descriptors,
 tags, links, errors, examples, pairings and all component tables. Each object

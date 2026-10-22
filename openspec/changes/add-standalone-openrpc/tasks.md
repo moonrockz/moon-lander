@@ -69,9 +69,9 @@ Depends on: `lander-bwk.4`, `lander-bwk.5`.
 Bead: `lander-bwk.8`
 Depends on: `lander-bwk.5`, `lander-bwk.6`, `lander-bwk.7`.
 
-- [ ] 7.1 Implement versioned normative and pinned-artifact rules with structured, ordered diagnostics; verify required fields, key grammar, duplicates, server variables, links and parameter order after resolution.
-- [ ] 7.2 Implement Specification and bounded MetaschemaCompatibility profiles; verify all discrepancy outcomes, report-only `validate`, gated `validate_closed`, and no wrapper for failed/incomplete required checks.
-- [ ] 7.3 Document profile and protocol boundaries with runnable examples; verify generated-AST pointers, source-related locations, reference chains, exhaustion and cross-target diagnostic equality.
+- [x] 7.1 Implement versioned normative and pinned-artifact rules with structured, ordered diagnostics; verify required fields, key grammar, duplicates, server variables, links and parameter order after resolution.
+- [x] 7.2 Implement Specification and bounded MetaschemaCompatibility profiles; verify all discrepancy outcomes, report-only `validate`, gated `validate_closed`, and no wrapper for failed/incomplete required checks.
+- [x] 7.3 Document profile and protocol boundaries with runnable examples; verify generated-AST pointers, source-related locations, reference chains, exhaustion and cross-target diagnostic equality.
 
 ## 8. Complete writing and source-preserving value edits
 

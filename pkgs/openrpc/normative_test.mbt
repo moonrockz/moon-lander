@@ -208,3 +208,30 @@ test "reference failures cause no semantic findings" {
   assert_eq(normative(report), [])
   assert_eq(report.references(), @openrpc.Failed)
 }
+
+///|
+test "server variables keep their versioned field table" {
+  let report = @openrpc.validate(
+    versioned(
+      "1.4.0",
+      "\"servers\":[{\"url\":\"https://{host}\",\"variables\":{\"host\":{\"default\":\"a.test\",\"enum\":[\"a.test\"],\"foo\":1}}}],\"methods\":[]",
+    ),
+  )
+  assert_eq(normative(report), [
+    (@exact.UnknownField, @openrpc.Warning, [
+      "servers", "0", "variables", "host", "foo",
+    ]),
+  ])
+  assert_eq(artifact(report), [])
+}
+
+///|
+test "component keys outside the OpenRPC grammar do not form a document" {
+  let read = @openrpc.read(
+    "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[],\"components\":{\"errors\":{\"a b\":{\"code\":1,\"message\":\"x\"}}}}",
+  )
+  assert_true(read.document() is None)
+  assert_eq(read.diagnostics().map(d => d.path()), [
+    ["components", "errors", "a b"],
+  ])
+}

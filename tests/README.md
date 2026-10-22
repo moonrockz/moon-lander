@@ -7,6 +7,9 @@ configuration core.
 | Suite | Coverage | Targets |
 | --- | --- | --- |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
+| `config-conventions-preset` | The Morphir preset of the configuration conventions, made from public parts, and its cases | All four |
+| `config-conventions-acceptance` | Morphir's `config.feature` discovery, precedence, member and ambiguity cases, and merge-rule cases, as Gherkin scenarios over the preset | JavaScript, native |
+| `config-conventions-laws` | The same preset cases as snapshot tests | All four |
 | `config-fixture`, `config-parity` | Shared explicit builder and file tree; complete value, provenance and report observations compared by `mise run check:config` | All four |
 | `formats-default`, `formats-toml`, `formats-custom` | Default and overridden format sets, parser execution and linked output trimming | All four |
 | `formats-leaky` | Deliberately reachable YAML parser that `mise run check:formats` must reject | All four |
@@ -31,6 +34,22 @@ Run the notebook suites on one target:
 
 ```shell
 mise exec -- moon test tests/nbformat-acceptance tests/nbformat-laws tests/notebooks-acceptance tests/notebooks-laws --target js
+```
+
+Run the Morphir preset suites. The acceptance suite runs on js and native, and
+the laws run on all four targets:
+
+```shell
+mise exec -- moon test tests/config-conventions-acceptance --target js
+mise exec -- moon test tests/config-conventions-acceptance --target native
+mise exec -- moon test tests/config-conventions-laws --target all
+```
+
+After an intended change to discovery, rewrite the preset snapshots and review
+the diff:
+
+```shell
+mise exec -- moon test tests/config-conventions-laws --target native --update
 ```
 
 `mise run test:node-adapter` runs the shared host tests and the

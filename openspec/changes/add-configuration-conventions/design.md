@@ -488,6 +488,14 @@ so wasm and wasm-gc are covered (Call (this change)). A small subset runs over a
 temporary directory on native and js, also on Windows, to check discovery through the
 core adapter.
 
+Call (this change, group 10): the preset and its cases are in the package
+`tests/config-conventions-preset`, which both suites import. The cases are
+values, and the laws compare a text observation of each case (reports,
+candidates, warnings, the effective value as JSON, or the error message) with an
+inline snapshot. The preset gives Morphir's defaults `workspace.out_dir` and
+`ir.format_version` as the defaults source. The legacy decoder keeps the parsed
+value. The disk subset is the host adapter tests of group 9.
+
 ### D17. Local overrides (Owner (2026-10-20); Call: part of `app_dirs`)
 
 - A local override is for one checkout, and git ignores it. A user override is the

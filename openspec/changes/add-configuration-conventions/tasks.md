@@ -96,15 +96,15 @@ Bead: lander-4us.3.9
 
 Bead: lander-4us.3.10
 
-- [ ] 10.1 Build the Morphir preset in `tests/` from public parts only (design D16), with YAML limited to `.yaml`, the JSON5 format only on the legacy part, and no local override part, and verify the "Six primary candidates" and "Preset has no local layer" scenarios.
-- [ ] 10.2 Port the discovery, precedence, member and ambiguity cases of Morphir's `config.feature` to `tests/config-conventions-acceptance/features/morphir.feature`, and verify they pass with moonspec on js and native.
-- [ ] 10.3 Add the merge-rules cases (global ambiguity, `MORPHIR_HOME`, `MORPHIR_LOG_DIR`, relative XDG, macOS and Windows directories, `C:/ProgramData`, legacy `morphir.json`), and verify the "Morphir preset reproduces Morphir" scenarios.
-- [ ] 10.4 Run the same cases as snapshot tests in `tests/config-conventions-laws` on all four targets, and verify `mise run test` passes.
-- [ ] 10.5 Add a case that shows the inherited-filter difference from the Rust loader (design D9), and verify it passes.
-- [ ] 10.6 Update `tests/README.md` with the focused commands for the new suites, and verify each command runs.
+- [x] 10.1 Build the Morphir preset in `tests/` from public parts only (design D16), with YAML limited to `.yaml`, the JSON5 format only on the legacy part, and no local override part, and verify the "Six primary candidates" and "Preset has no local layer" scenarios.
+- [x] 10.2 Port the discovery, precedence, member and ambiguity cases of Morphir's `config.feature` to `tests/config-conventions-acceptance/features/morphir.feature`, and verify they pass with moonspec on js and native.
+- [x] 10.3 Add the merge-rules cases (global ambiguity, `MORPHIR_HOME`, `MORPHIR_LOG_DIR`, relative XDG, macOS and Windows directories, `C:/ProgramData`, legacy `morphir.json`), and verify the "Morphir preset reproduces Morphir" scenarios.
+- [x] 10.4 Run the same cases as snapshot tests in `tests/config-conventions-laws` on all four targets, and verify `mise run test` passes.
+- [x] 10.5 Add a case that shows the inherited-filter difference from the Rust loader (design D9), and verify it passes.
+- [x] 10.6 Update `tests/README.md` with the focused commands for the new suites, and verify each command runs.
 
 ## 11. Integration check
 
 Bead: lander-4us.3.11
 
-- [ ] 11.1 Run `mise run check` on the complete change and verify that lint, validation, tests on wasm, wasm-gc, js and native, script tests and builds pass.
+- [x] 11.1 Run `mise run check` on the complete change and verify that lint, validation, tests on wasm, wasm-gc, js and native, script tests and builds pass.

@@ -532,6 +532,13 @@ release that it creates. This change edits `release.yml` for that call only. It
 does not cut a release: the next release pull request, which the owner approves,
 is the first to carry the asset.
 
+Call: after it creates the release, the release job starts the Site workflow with
+`gh workflow run site.yml --ref main` (job permission `actions: write`). The Site
+deploy of the version-bump push can run before the release exists, and a release
+event from `GITHUB_TOKEN` starts no workflow. `gh release create` publishes the
+release only after it uploads the asset, and the deploy skips drafts, so the early
+deploy does not fail; the started deploy adds the new line.
+
 Call: `site.mbtx assemble` runs only in the deploy. It reads every release with
 `gh api --paginate repos/{owner}/{repo}/releases`, so no page or count limit drops a
 release (a bare `gh release list` returns at most 30 by default). It skips drafts and

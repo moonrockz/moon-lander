@@ -13,8 +13,8 @@
 #           site-asset.yml and gives site-<minor>.tar.gz to the release job
 #           (openspec add-docs-site, design D22).
 # release   creates the GitHub release vX.Y.Z with the CHANGELOG.md section and
-#           attaches site-<minor>.tar.gz. The Site workflow serves each minor
-#           line from that asset.
+#           attaches site-<minor>.tar.gz, then starts the Site workflow, which
+#           serves each minor line from that asset.
 #
 # Pull requests that change release files, and manual runs with dry_run, only
 # plan, validate and build the site asset. Re-running failed jobs is safe:
@@ -144,8 +144,11 @@ jobs:
     needs: [plan, publish, site]
     if: needs.plan.outputs.release == 'true'
     timeout-minutes: 15
+    # actions: write lets this job start the Site workflow. A release event from GITHUB_TOKEN starts
+    # no workflow, but a workflow_dispatch does.
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -166,3 +169,10 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           ASSET: ${{ runner.temp }}/site-asset/${{ needs.site.outputs.asset }}
         run: mise run release:github "$VERSION" "$RUNNER_TEMP/notes.md" "$ASSET"
+      # The Site deploy of the version-bump push can run before this release exists. gh publishes the
+      # release only after it uploads the asset, and the deploy skips drafts, so that deploy does not
+      # fail; it only misses the new line. This run deploys the site again with the new release.
+      - name: Deploy the docs site with the new release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run site.yml --ref main

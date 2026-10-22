@@ -50,7 +50,7 @@ fn nav_link(
 ///|
 /// The page frame: head, header, main content and footer. Every link starts with the base path, and
 /// the page works without JavaScript: the islands script only fills the empty mount elements of the
-/// search box, the theme control and the menu button.
+/// search box, the version switcher, the theme control and the menu button.
 pub fn layout(meta : PageMeta, main : Html) -> Html {
   let config = meta.config
   let title = if meta.section == Home {
@@ -60,7 +60,9 @@ pub fn layout(meta : PageMeta, main : Html) -> Html {
   }
   @html.html(
     lang="en",
-    attrs=@html.Attrs::build().data_set("base", config.base_path),
+    attrs=@html.Attrs::build()
+      .data_set("base", config.base_path)
+      .data_set("site-root", @model.site_root(config.base_path)),
     [
       @html.head([
         @html.meta(charset="utf-8"),
@@ -104,9 +106,17 @@ pub fn layout(meta : PageMeta, main : Html) -> Html {
             [@html.a(href=config.repo_url, "GitHub")],
           ),
           island("site-search"),
+          island("site-version"),
           island("site-theme"),
           island("site-nav"),
         ]),
+        // The deploy fills the banner of an older or unreleased version tree (design D22), so it
+        // shows without JavaScript. A build writes it empty.
+        @html.div(
+          class="version-banner",
+          attrs=@html.Attrs::build().inner_html(""),
+          @html.nothing,
+        ),
         @html.main_(id="content", [main]),
         @html.footer(class="site-footer", [
           @html.p(

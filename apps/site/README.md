@@ -10,7 +10,8 @@ docs tool and is not published.
 | `views` | Rabbita components for each page kind | `native` |
 | `site` | Sources to outputs: pages, links, sidebar, articles, feed, search index and API pages | `native` |
 | `generate` | Executable that reads the repository and writes `_site/` | `native` |
-| `check` | Executable that checks the links of a built `_site/` and warns about API items without a docstring | `native` |
+| `check` | Executable that checks the links of a built `_site/`, tree by tree when it is assembled, and warns about API items without a docstring | `native` |
+| `assemble` | Executable that adds the release trees to a `next` build and writes the versioned site: root, `/latest/`, banners, canonical links and `versions.json` | `native` |
 | `islands` | Client islands, bundled with Bun into `_site/assets/islands.js` | `js` |
 
 `scripts/highlight.ts` highlights code blocks with Shiki after `generate`. It is the
@@ -78,5 +79,22 @@ site packages and then a Chromium smoke test (`apps/site/scripts/browser-test.ts
 against `_site/`, served on port 4174, so build the site first.
 
 The output is `_site/`. Each route is a directory with `index.html`, and each link
-starts with the `base_path` of `site/site.json`. The design is in
-`openspec/changes/add-docs-site/design.md`.
+starts with the `base_path` of `site/site.json`.
+
+## Versions
+
+The deployed site is versioned. CI builds `main` as the `next` tree with
+`mise run build:site -- --main --tree next`, so its pages are in `_site/next/` and
+each link starts with `/moon-lander/next/`. A release builds the tree of its minor
+line with `--tree <minor>`, in `_site/v/<minor>/`, and attaches it as
+`site-<minor>.tar.gz`. `--tree` fails for a minor line that is not the line of the
+root `moon.mod`. A source page cannot have a route below `v`, `next` or `latest`.
+
+On `main`, `mise run assemble:site` reads the releases with `gh`, downloads the
+asset of the newest release of each minor line from `versions.since` in
+`site/site.json` on, and writes the root, `/latest/`, the version banners, the
+canonical links and `versions.json`. Then `mise run check:site` checks each tree:
+a link that leaves its tree fails, except the banner link and the canonical link.
+The version switcher in the header reads `versions.json`.
+
+The design is in `openspec/changes/add-docs-site/design.md`.

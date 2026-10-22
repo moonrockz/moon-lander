@@ -280,6 +280,17 @@ pub fn prepare(
       refused.push(dir + "/README.mbt.md")
     }
   }
+  // A route below a version tree segment would collide with a tree of the deploy (design D22).
+  for page in pages {
+    if @model.reserved_route(page.route) {
+      problems.push(
+        @model.problem(
+          page.source,
+          "route `\{page.route}` starts with a reserved version segment (`v`, `next` or `latest`)",
+        ),
+      )
+    }
+  }
   // Duplicate routes.
   let owners : Map[String, String] = Map([])
   let unique : Array[Page] = []

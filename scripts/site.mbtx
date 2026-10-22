@@ -1,13 +1,16 @@
 ///|
 /// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
 ///
-/// Usage: `mise run build:site [-- --main]`, `mise run check:site` and `mise run test:site`, or
-/// `moonx scripts/site.mbtx build [--main]`, `moonx scripts/site.mbtx check` and
-/// `moonx scripts/site.mbtx test`.
+/// Usage: `mise run build:site [-- --main] [--tree <tree>]`, `mise run check:site [-- --tree <tree>]`,
+/// `mise run test:site [-- --tree <tree>]` and `mise run assemble:site`, or the same commands of
+/// `moonx scripts/site.mbtx`.
 /// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
 /// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
 /// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
 /// installs Chromium, and runs the browser smoke test against the built `_site/` (design D16).
+/// `--tree next` builds, checks or tests the `main` tree in `_site/next/`, and `--tree <minor>` the
+/// tree of the minor line of the root `moon.mod` in `_site/v/<minor>/` (design D22). `assemble` adds
+/// the release trees to a `next` build in `_site/` and writes the deployed site.
 /// Run it from the workspace root.
 import {
   "moonbitlang/async@0.22.5",
@@ -20,7 +23,96 @@ import {
 }
 
 ///|
-let usage : String = "Usage: site.mbtx build [--main] | check | test"
+let usage : String = "Usage: site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
+
+///|
+/// The arguments without `--tree <tree>`, and the tree, or `None` without `--tree`.
+fn split_tree(args : Array[String]) -> (Array[String], String?) raise Failure {
+  let rest = []
+  let mut tree = None
+  let mut i = 0
+  while i < args.length() {
+    if args[i] == "--tree" {
+      guard i + 1 < args.length() else {
+        raise Failure("`--tree` needs a tree: `next` or a minor line. \{usage}")
+      }
+      tree = Some(args[i + 1])
+      i += 2
+    } else {
+      rest.push(args[i])
+      i += 1
+    }
+  }
+  (rest, tree)
+}
+
+///|
+/// Whether `text` is a minor line `X.Y` with digits only.
+fn is_minor_line(text : String) -> Bool {
+  let parts = text.split(".").collect()
+  parts.length() == 2 &&
+  parts
+  .iter()
+  .all(part => part != "" && part.iter().all(c => c >= '0' && c <= '9'))
+}
+
+///|
+/// The path of the tree `tree` below `_site/`, with a final `/` (design D22): `next/` for `next`, and
+/// `v/<minor>/` for the minor line `line` of the root `moon.mod`. Another minor line fails, and so do
+/// the reserved names `latest` and `v`, which only the deploy writes.
+fn tree_path(tree : String, line~ : String) -> String raise Failure {
+  if tree == "next" {
+    "next/"
+  } else if is_minor_line(tree) {
+    if tree != line {
+      raise Failure(
+        "moon.mod has the minor line \{line}, but the build asks for the tree \{tree}",
+      )
+    }
+    "v/\{tree}/"
+  } else {
+    raise Failure(
+      "`\{tree}` is not a tree to build: use `next` or the minor line of moon.mod",
+    )
+  }
+}
+
+///|
+/// The minor line of the root `moon.mod`, from `scripts/versions.mbtx minor`.
+async fn root_line() -> String raise Failure {
+  let (code, out) = @process.collect_stdout("moonx", [
+    "scripts/versions.mbtx", "minor",
+  ]) catch {
+    error => raise Failure("scripts/versions.mbtx does not run: \{error}")
+  }
+  let line = (out.text() catch { _ => "" }).trim().to_owned()
+  guard code == 0 && is_minor_line(line) else {
+    raise Failure("scripts/versions.mbtx minor gives no minor line")
+  }
+  line
+}
+
+///|
+/// The tree path of the arguments of a command, or `""` without `--tree`. Only a minor line needs the
+/// version of the root `moon.mod`.
+async fn tree_of(tree : String?) -> String raise Failure {
+  match tree {
+    None => ""
+    Some("next") => "next/"
+    Some(name) =>
+      tree_path(name, line=if is_minor_line(name) { root_line() } else { "" })
+  }
+}
+
+///|
+/// The output directory of the tree at `path` below `_site/`.
+fn tree_dir(path : String) -> String {
+  if path == "" {
+    out_dir
+  } else {
+    "\{out_dir}/\{path[:path.length() - 1]}"
+  }
+}
 
 ///|
 /// The output directory, relative to the workspace root.
@@ -62,8 +154,10 @@ fn api_dirs(site_json : String) -> Array[String] {
 }
 
 ///|
-/// The bundled islands in the output directory.
-let islands_bundle : String = "\{out_dir}/assets/islands.js"
+/// The bundled islands in the output directory `out`.
+fn islands_bundle(out : String) -> String {
+  "\{out}/assets/islands.js"
+}
 
 ///|
 /// The gzip size of the islands bundle that gives a warning (design D13).
@@ -81,8 +175,8 @@ enum Action {
   /// Check the gzip size of the file against the islands budget.
   GzipBudget(String)
   /// Serve `_site/` on the port with `serve-site.mbtx --no-watch`, run the browser smoke test against
-  /// it, and stop the server.
-  BrowserTest(Int32)
+  /// the tree at the path below the base path (`""` for the whole site), and stop the server.
+  BrowserTest(Int32, String)
 } derive(Eq, Debug)
 
 ///|
@@ -125,20 +219,27 @@ let install_step : Step = run("install site dependencies", "bun", [
 
 ///|
 /// The steps of `build`. `--main` marks a build for the deployed site. `api` holds the module
-/// directories of the API pages; `moon doc` runs in each before `generate`.
+/// directories of the API pages; `moon doc` runs in each before `generate`. `tree` is the path of the
+/// version tree below `_site/`, such as `next/`, or `""` for a build at the site root.
 fn build_steps(
   args : Array[String],
   api~ : Array[String] = [],
+  tree~ : String = "",
 ) -> Array[Step] raise Failure {
   for arg in args {
     if arg != "--main" {
       raise Failure("unknown option `\{arg}`. \{usage}")
     }
   }
+  let out = tree_dir(tree)
   let generate_args = [
     "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
-    ".", "--out", out_dir,
+    ".", "--out", out,
   ]
+  if tree != "" {
+    generate_args.push("--tree-path")
+    generate_args.push(tree)
+  }
   if args.contains("--main") {
     generate_args.push("--main")
   }
@@ -156,25 +257,58 @@ fn build_steps(
       "--target",
       "browser",
       "--outdir",
-      "\{out_dir}/assets",
+      "\{out}/assets",
     ]),
-    { name: "check islands size", action: GzipBudget(islands_bundle), },
+    { name: "check islands size", action: GzipBudget(islands_bundle(out)), },
     ..api.map(api_doc_step),
     run("generate", "moon", generate_args),
-    run("highlight", "bun", ["apps/site/scripts/highlight.ts", out_dir]),
+    run("highlight", "bun", ["apps/site/scripts/highlight.ts", out]),
   ]
 }
 
 ///|
-/// The steps of `check`.
-fn check_steps(args : Array[String]) -> Array[Step] raise Failure {
+/// The steps of `check`. `tree` is the path of the version tree below `_site/`, and `base` the base
+/// path of the site in `_site/`. Without a tree, a `_site/` that the deploy assembled is checked tree
+/// by tree.
+fn check_steps(
+  args : Array[String],
+  tree~ : String = "",
+  base~ : String = "/",
+) -> Array[Step] raise Failure {
+  if args is [arg, ..] {
+    raise Failure("unknown option `\{arg}`. \{usage}")
+  }
+  let check_args = [
+    "run",
+    "--target",
+    "native",
+    "--release",
+    "apps/site/check",
+    "--",
+    "--root",
+    ".",
+    "--dir",
+    tree_dir(tree),
+  ]
+  if tree != "" {
+    check_args.push("--base")
+    check_args.push(base + tree)
+  }
+  [run("check", "moon", check_args)]
+}
+
+///|
+/// The steps of `assemble` (design D22): the `assemble` executable reads the releases with `gh`,
+/// unpacks their site assets below `_site/v/`, and writes the root, `/latest/`, the banners, the
+/// canonical links and `versions.json`.
+fn assemble_steps(args : Array[String]) -> Array[Step] raise Failure {
   if args is [arg, ..] {
     raise Failure("unknown option `\{arg}`. \{usage}")
   }
   [
-    run("check", "moon", [
-      "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
-      ".", "--dir", out_dir,
+    run("assemble", "moon", [
+      "run", "--target", "native", "--release", "apps/site/assemble", "--", "--root",
+      ".", "--site", out_dir,
     ]),
   ]
 }
@@ -208,10 +342,11 @@ async fn site_packages() -> Array[(String, String)] {
 
 ///|
 /// The steps of `test` for the native site packages `packages`. The browser test of task 7.2 comes
-/// after the highlight test.
+/// after the highlight test, and tests the version tree at `tree` below the base path.
 fn test_steps(
   args : Array[String],
   packages : Array[String],
+  tree~ : String = "",
 ) -> Array[Step] raise Failure {
   if args is [arg, ..] {
     raise Failure("unknown option `\{arg}`. \{usage}")
@@ -234,7 +369,10 @@ fn test_steps(
     run("install chromium", "node", [
       "apps/site/node_modules/playwright/cli.js", "install", "chromium",
     ]),
-    { name: "browser smoke test", action: BrowserTest(browser_test_port), },
+    {
+      name: "browser smoke test",
+      action: BrowserTest(browser_test_port, tree),
+    },
   ]
 }
 
@@ -346,13 +484,14 @@ async fn run_step(step : Step) -> Int32 {
         }
       }
     }
-    BrowserTest(port) => {
-      let base = site_base(@fs.read_file("site/site.json").text()) catch {
+    BrowserTest(port, tree) => {
+      let site = site_base(@fs.read_file("site/site.json").text()) catch {
         error => {
           eprintln("❌ \{step.name}: \{error}")
           return 1
         }
       }
+      let base = site + tree
       let code = (@async.with_task_group() <| group => {
         // The group stops the server when the test ends. `moonx` runs the script in its own
         // process, so the server stops with it.
@@ -421,23 +560,39 @@ async fn main {
     @sys.exit(2)
     return
   }
-  let rest = rest.to_owned()
   let (steps, done) = try {
+    let (rest, tree_name) = split_tree(rest.to_owned())
+    let tree = tree_of(tree_name)
     match command {
       "build" =>
         (
           build_steps(
             rest,
             api=api_dirs(@fs.read_file("site/site.json").text()),
+            tree~,
           ),
-          "✅ Built \{out_dir}/",
+          "✅ Built \{tree_dir(tree)}/",
         )
-      "check" => (check_steps(rest), "✅ Checked \{out_dir}/")
+      "check" =>
+        (
+          check_steps(
+            rest,
+            tree~,
+            base=site_base(@fs.read_file("site/site.json").text()),
+          ),
+          "✅ Checked \{tree_dir(tree)}/",
+        )
       "test" =>
         (
-          test_steps(rest, native_packages(site_packages())),
+          test_steps(rest, native_packages(site_packages()), tree~),
           "✅ Site tests passed",
         )
+      "assemble" =>
+        if tree_name is Some(_) {
+          raise Failure("`assemble` takes no tree. \{usage}")
+        } else {
+          (assemble_steps(rest), "✅ Assembled \{out_dir}/")
+        }
       _ => raise Failure("unknown command `\{command}`. \{usage}")
     }
   } catch {
@@ -556,7 +711,93 @@ test "test runs the site package tests, the highlight test and the browser test"
       "test", "--target", "native", "-p", "moonrockz/moon-lander-site/model",
     ]),
   )
-  assert_eq(steps[5].action, BrowserTest(4174))
+  assert_eq(steps[5].action, BrowserTest(4174, ""))
+  let next = test_steps([], [], tree="next/")
+  assert_eq(next[5].action, BrowserTest(4174, "next/"))
+}
+
+///|
+test "Minor line tree: a tree build writes below its tree" {
+  let steps = build_steps(["--main"], tree="next/")
+  assert_eq(
+    steps[2].action,
+    Run("bun", [
+      "build", islands_build, "--minify", "--format", "esm", "--target", "browser",
+      "--outdir", "_site/next/assets",
+    ]),
+  )
+  assert_eq(steps[3].action, GzipBudget("_site/next/assets/islands.js"))
+  assert_eq(
+    steps[4].action,
+    Run("moon", [
+      "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
+      ".", "--out", "_site/next", "--tree-path", "next/", "--main",
+    ]),
+  )
+  assert_eq(
+    steps[5].action,
+    Run("bun", ["apps/site/scripts/highlight.ts", "_site/next"]),
+  )
+  assert_eq(tree_path("next", line="0.2"), "next/")
+  assert_eq(tree_path("0.2", line="0.2"), "v/0.2/")
+  assert_eq(tree_dir("v/0.2/"), "_site/v/0.2")
+}
+
+///|
+test "Wrong line" {
+  let message = try tree_path("0.1", line="0.2") catch {
+    Failure(message) => message
+  } noraise {
+    _ => ""
+  }
+  assert_eq(
+    message, "moon.mod has the minor line 0.2, but the build asks for the tree 0.1",
+  )
+  let reserved = try tree_path("latest", line="0.2") catch {
+    Failure(message) => message
+  } noraise {
+    _ => ""
+  }
+  assert_eq(
+    reserved, "`latest` is not a tree to build: use `next` or the minor line of moon.mod",
+  )
+}
+
+///|
+test "--tree is split from the other arguments" {
+  assert_eq(
+    split_tree(["--main", "--tree", "next"]),
+    (["--main"], Some("next")),
+  )
+  assert_eq(split_tree(["--main"]), (["--main"], None))
+  let message = try split_tree(["--tree"]) catch {
+    Failure(message) => message
+  } noraise {
+    _ => ""
+  }
+  assert_eq(message, "`--tree` needs a tree: `next` or a minor line. \{usage}")
+}
+
+///|
+test "check and assemble run their executables on _site" {
+  assert_eq(check_steps([], tree="next/", base="/moon-lander/"), [
+    {
+      name: "check",
+      action: Run("moon", [
+        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
+        ".", "--dir", "_site/next", "--base", "/moon-lander/next/",
+      ]),
+    },
+  ])
+  assert_eq(assemble_steps([]), [
+    {
+      name: "assemble",
+      action: Run("moon", [
+        "run", "--target", "native", "--release", "apps/site/assemble", "--", "--root",
+        ".", "--site", "_site",
+      ]),
+    },
+  ])
 }
 
 ///|

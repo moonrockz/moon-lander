@@ -28,6 +28,14 @@ pub fn article_parts(String) -> (String, String)?
 
 pub fn article_route(String) -> String
 
+pub let banner_start : String
+
+pub fn choice_base(String, String) -> String
+
+pub fn choice_label(String, String?) -> String
+
+pub fn current_choice(String, String, String?) -> String
+
 pub fn doc_route(String) -> String
 
 pub fn first_sentence(String) -> String
@@ -37,6 +45,8 @@ pub let forbidden_dir : String
 pub fn has_title(String) -> Bool
 
 pub fn internal_links(String) -> Array[String]
+
+pub fn is_minor_line(String) -> Bool
 
 pub fn link_file(String, String) -> String?
 
@@ -52,13 +62,29 @@ pub fn percent_decode(String) -> String
 
 pub fn problem(String, String, line? : Int32) -> Problem
 
+pub fn reserved_route(String) -> Bool
+
+pub let reserved_segments : Array[String]
+
 pub fn result_url(String, SearchEntry) -> String
 
 pub fn route_file(String) -> String
 
 pub fn search(Array[SearchEntry], String, limit? : Int32) -> Array[SearchEntry]
 
+pub fn search_index_url(String) -> String
+
+pub fn site_root(String) -> String
+
 pub fn strip_extension(String) -> String
+
+pub fn switch_probe(String, String, String) -> String
+
+pub fn switch_url(String, String, String, Bool) -> String
+
+pub fn tree_path(String) -> String
+
+pub fn without_banner(String) -> String
 
 pub fn xml_problem(String) -> String?
 
@@ -230,6 +256,19 @@ pub(all) struct TocEntry {
 pub fn TocEntry::equal(Self, Self) -> Bool
 pub fn TocEntry::not_equal(Self, Self) -> Bool
 pub fn TocEntry::to_repr(Self) -> @debug.Repr
+
+pub(all) struct VersionsFile {
+  latest : String?
+  next : Bool
+  versions : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn VersionsFile::choices(Self) -> Array[String]
+pub fn VersionsFile::equal(Self, Self) -> Bool
+pub fn VersionsFile::not_equal(Self, Self) -> Bool
+pub fn VersionsFile::parse(String, String) -> Self raise Invalid
+pub fn VersionsFile::to_repr(Self) -> @debug.Repr
+pub fn VersionsFile::to_text(Self) -> String
+pub fn VersionsFile::trees(Self, String) -> Array[(String, String)]
 
 // Type aliases
 

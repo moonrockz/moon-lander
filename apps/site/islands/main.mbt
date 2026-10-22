@@ -35,6 +35,9 @@ fn main {
     search_box("site-search", base)
     focus_search_on_slash()
   }
+  if element_exists("site-version") {
+    version_switcher("site-version", base)
+  }
   if element_exists("site-theme") {
     @rabbita.new(theme_toggle).mount("site-theme")
   }

@@ -10,8 +10,12 @@
 ///
 /// The script reads `moon.mod` and `moon.work` with line matching. This is enough and adds no dependency.
 ///
-/// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`
-/// or `moonx scripts/versions.mbtx set X.Y.Z`. The script exits with a non-zero code on failure.
+/// `minor` prints the minor line of the root version, for example `0.2` for `0.2.1`. The docs site
+/// builds and packs the tree of this line (openspec add-docs-site, design D22).
+///
+/// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`,
+/// `moonx scripts/versions.mbtx set X.Y.Z` or `moonx scripts/versions.mbtx minor`. The script exits
+/// with a non-zero code on failure.
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -23,7 +27,7 @@ import {
 }
 
 ///|
-let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z"
+let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z | minor"
 
 ///|
 /// The source files that hold a version string, with the text that comes right before the version.
@@ -343,6 +347,25 @@ async fn set(version : String) -> Unit {
 }
 
 ///|
+/// The minor line `X.Y` of the version `X.Y.Z`, or `None` when `version` is not of that form.
+fn minor_line(version : String) -> String? {
+  guard is_semver(version) else { return None }
+  let parts = version.split(".").collect()
+  Some("\{parts[0]}.\{parts[1]}")
+}
+
+///|
+/// Print the minor line of the root `moon.mod` version.
+async fn minor() -> Unit {
+  let text = read_text("moon.mod")
+  guard mod_version(text) is Some(version) && minor_line(version) is Some(line) else {
+    fail_with("moon.mod has no version of the form X.Y.Z.")
+    return
+  }
+  println(line)
+}
+
+///|
 async fn main {
   match @env.args()[1:] {
     ["check"] => check(None)
@@ -358,8 +381,16 @@ async fn main {
       } else {
         fail_with("\{v} is not a version of the form X.Y.Z.")
       }
+    ["minor"] => minor()
     _ => fail_with(usage)
   }
+}
+
+///|
+test "minor line of a version" {
+  assert_eq(minor_line("0.2.0"), Some("0.2"))
+  assert_eq(minor_line("1.12.3"), Some("1.12"))
+  assert_eq(minor_line("0.2"), None)
 }
 
 ///|

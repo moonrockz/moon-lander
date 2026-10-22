@@ -35,6 +35,36 @@ async test "generate the fixture site" {
 }
 
 ///|
+/// The `next` tree of the fixture: every link, the site root of the islands and the feed URL are below
+/// the tree base path (design D22, "Minor line tree").
+async test "generate the next tree of the fixture site" {
+  let out = "_build/fixture-site-next"
+  if @fs.exists(out) {
+    @fs.rmdir(out, recursive=true)
+  }
+  let warnings = generate(
+    "fixtures/content",
+    out,
+    "assets",
+    true,
+    tree_path="next/",
+  )
+  assert_eq(warnings, [])
+  let home = @fs.read_file("\{out}/index.html").text()
+  assert_true(
+    home.has_prefix(
+      "<!DOCTYPE html><html data-base=\"/fixture/next/\" data-site-root=\"/fixture/\"",
+    ),
+  )
+  assert_true(home.contains("href=\"/fixture/next/docs/\""))
+  assert_false(home.contains("href=\"/fixture/docs/\""))
+  let feed = @fs.read_file("\{out}/articles/atom.xml").text()
+  assert_true(
+    feed.contains("<id>https://example.org/fixture/next/articles/first/</id>"),
+  )
+}
+
+///|
 async test "a bad configuration fails the build" {
   let root = "_build/bad-config"
   if @fs.exists(root) {

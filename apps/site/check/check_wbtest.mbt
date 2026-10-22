@@ -111,3 +111,61 @@ async test "a file below docs/superpowers fails" {
     "docs/superpowers/plan/index.html: is below `docs/superpowers/`, which never goes on the site",
   ])
 }
+
+///|
+async test "a tree build checks against the tree base path" {
+  let dir = site_dir("next-tree", [
+    ("index.html", page("<a href=\"/fixture/next/docs/\">d</a>")),
+    ("docs/index.html", page("<a href=\"/fixture/docs/\">old</a>")),
+    feed,
+  ])
+  assert_eq(
+    check_site("fixtures/content", dir, base="/fixture/next/").map(p => p.render()),
+    [
+      "docs/index.html: link `/fixture/docs/` leaves the base path `/fixture/next/`",
+    ],
+  )
+}
+
+///|
+/// One tree of an assembled site below `path`: its home page with `body`, and its feed.
+fn tree(path : String, body : String) -> Array[(String, String)] {
+  [("\{path}index.html", page(body)), ("\{path}articles/atom.xml", feed.1)]
+}
+
+///|
+/// An assembled site: the root, `latest/`, `next/` and two version trees. The `0.1` page has a banner
+/// link that leaves its tree, and `extra` after it.
+fn assembled(extra : String) -> Array[(String, String)] {
+  [
+    (
+      "versions.json",
+      "{ \"latest\": \"0.2\", \"next\": true, \"versions\": [\"0.2\", \"0.1\"] }",
+    ),
+  ] +
+  tree("", "<a href=\"/fixture/\">r</a>") +
+  tree("latest/", "<a href=\"/fixture/latest/\">l</a>") +
+  tree("next/", "<a href=\"/fixture/next/\">n</a>") +
+  tree("v/0.2/", "<a href=\"/fixture/v/0.2/\">2</a>") +
+  tree(
+    "v/0.1/",
+    "<div class=\"version-banner\"><p><a href=\"/fixture/latest/\">latest</a></p></div><a href=\"/fixture/v/0.1/\">1</a>\{extra}",
+  )
+}
+
+///|
+async test "an assembled site checks each tree" {
+  let dir = site_dir("assembled", assembled(""))
+  assert_eq(check_site("fixtures/content", dir), [])
+}
+
+///|
+async test "Link leaves its tree" {
+  let dir = site_dir(
+    "leaves-tree",
+    assembled("<a href=\"/fixture/v/0.2/docs/\">newer</a>"),
+  )
+  assert_eq(check_site("fixtures/content", dir).map(p => p.render()), [
+    "v/0.1/index.html: link `/fixture/v/0.2/docs/` leaves its tree `/fixture/v/0.1/`",
+  ])
+}

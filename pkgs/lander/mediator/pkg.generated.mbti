@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander/mediator"
+
+// Values
+pub fn[C, Req, Res] after((C, Req, Res) -> Unit raise) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] before((C, Req) -> Unit raise) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] finally_((C, Req) -> Unit) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] middleware(((C, Req) -> Res raise, C, Req) -> Res raise) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] sender((C, Req) -> Res raise) -> Sender[C, Req, Res]
+
+pub fn[C, Ev] topic((C, Ev) -> Unit raise) -> Topic[C, Ev]
+
+// Errors
+pub(all) suberror MediatorError {
+  Rejected(reason~ : String)
+}
+pub fn MediatorError::message(Self) -> String
+
+// Types and methods
+type Middleware[C, Req, Res]
+
+type Sender[C, Req, Res]
+pub fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res raise
+pub fn[C, Req, Res] Sender::use_(Self[C, Req, Res], Middleware[C, Req, Res]) -> Self[C, Req, Res]
+
+type Topic[C, Ev]
+pub fn[C, Ev] Topic::add(Self[C, Ev], (C, Ev) -> Unit raise) -> Self[C, Ev]
+pub fn[C, Ev] Topic::publish(Self[C, Ev], C, Ev) -> Unit raise
+pub fn[C, Ev] Topic::use_(Self[C, Ev], Middleware[C, Ev, Unit]) -> Self[C, Ev]
+
+// Type aliases
+
+// Traits

@@ -120,6 +120,12 @@ recorded in the bead.
 - Use [Conventional Commits](https://www.conventionalcommits.org/), for example
   `feat(config): add the TOML source` or `docs(openspec): propose add-host-lifecycle`.
 - Do not add AI attribution lines to commits, pull requests or issues.
-- Install the hooks with `mise run hooks:install`. Pre-commit checks formatting and
-  compiler warnings. Pre-push runs lint, workspace validation and tests.
+- Install the hooks with `mise run hooks:install`. Pre-commit checks formatting,
+  compiler warnings and generated interfaces. Pre-push runs lint, workspace validation
+  and tests.
+- Commit the `pkg.generated.mbti` file of each package, as MoonBit convention
+  recommends. `mise run lint` writes these files and fails when one is new or changed
+  and not staged. Review the interface change, stage the file, and run lint again.
+  Moon writes an interface only from a module's canonical backend, so a package that
+  cannot build on that backend, such as `config/browser` (js only), has no interface.
 - CI must pass. The `ci-ok` job is the aggregate check.

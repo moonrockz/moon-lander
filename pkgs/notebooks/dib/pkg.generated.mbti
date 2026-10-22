@@ -15,11 +15,11 @@ pub fn walk_cursor(Node, (@notebooks.Cursor[Node]) -> @notebooks.Control, leave?
 
 // Errors
 pub(all) suberror FormatError {
-  InvalidMetadata(line~ : Int, message~ : String)
+  InvalidMetadata(line~ : Int32, message~ : String)
   InvalidKernelName(String)
   DuplicateKernelName(String)
   UnknownKernel(String)
-  UnrepresentableSource(cell~ : Int, line~ : Int)
+  UnrepresentableSource(cell~ : Int32, line~ : Int32)
 } derive(Eq, @debug.Debug)
 pub fn FormatError::equal(Self, Self) -> Bool
 pub fn FormatError::not_equal(Self, Self) -> Bool
@@ -42,7 +42,7 @@ pub impl @notebooks.CellView for Cell
 type Directive derive(Eq, @debug.Debug)
 pub fn Directive::arguments(Self) -> String
 pub fn Directive::equal(Self, Self) -> Bool
-pub fn Directive::line(Self) -> Int
+pub fn Directive::line(Self) -> Int32
 pub fn Directive::name(Self) -> String
 pub fn Directive::not_equal(Self, Self) -> Bool
 pub fn Directive::text(Self) -> String
@@ -101,7 +101,7 @@ pub impl @notebooks.Node for Node
 
 type Notebook derive(Eq, @debug.Debug)
 pub fn Notebook::Notebook(ReadOnlyArray[Cell], metadata? : @notebooks.Metadata, registry? : KernelRegistry) -> Self raise FormatError
-pub fn Notebook::cell(Self, Int) -> Cell?
+pub fn Notebook::cell(Self, Int32) -> Cell?
 pub fn Notebook::cells(Self) -> ReadOnlyArray[Cell]
 pub fn Notebook::cells_for_kernel(Self, String) -> ReadOnlyArray[Cell]
 pub fn Notebook::cursor(Self) -> @notebooks.Cursor[Node]

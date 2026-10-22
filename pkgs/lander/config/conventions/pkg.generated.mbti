@@ -23,11 +23,15 @@ pub fn environment_name(Conventions, options? : DiscoveryOptions, Map[String, St
 
 pub fn environments(Conventions, default? : String) -> Conventions
 
+pub fn inherited_filter(Conventions, Array[String]) -> Conventions
+
 pub fn layouts(Conventions) -> Conventions
 
 pub fn legacy(Conventions, String, format~ : @config.Format, decode~ : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError) -> Conventions
 
 pub fn local_overrides(Conventions) -> Conventions
+
+pub fn member_scope_keys(Conventions, Array[String]) -> Conventions
 
 pub fn system_dir(Conventions) -> Conventions
 
@@ -36,6 +40,8 @@ pub fn user_config_dir(Conventions) -> Conventions
 pub fn user_overrides(Conventions) -> Conventions
 
 pub fn without(Conventions, Part) -> Conventions
+
+pub fn workspace(Conventions, members? : String, exclude? : String, default_member? : String, project_name? : String) -> Conventions
 
 // Errors
 

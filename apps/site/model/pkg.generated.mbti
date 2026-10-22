@@ -18,11 +18,11 @@ pub fn link_file(String, String) -> String?
 
 pub fn package_route(String) -> String
 
-pub fn problem(String, String, line? : Int) -> Problem
+pub fn problem(String, String, line? : Int32) -> Problem
 
 pub fn route_file(String) -> String
 
-pub fn search(Array[SearchEntry], String, limit? : Int) -> Array[SearchEntry]
+pub fn search(Array[SearchEntry], String, limit? : Int32) -> Array[SearchEntry]
 
 pub fn strip_extension(String) -> String
 
@@ -65,7 +65,7 @@ pub fn NavGroup::to_repr(Self) -> @debug.Repr
 pub(all) struct NavItem {
   route : String
   title : String
-  depth : Int
+  depth : Int32
   proposed : Bool
 } derive(Eq, @debug.Debug)
 pub fn NavItem::equal(Self, Self) -> Bool
@@ -74,7 +74,7 @@ pub fn NavItem::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Problem {
   file : String
-  line : Int
+  line : Int32
   message : String
 } derive(Eq, @debug.Debug)
 pub fn Problem::equal(Self, Self) -> Bool
@@ -116,7 +116,7 @@ pub(all) struct SiteConfig {
   chapters : Array[ChapterOrder]
 } derive(Eq, @debug.Debug)
 pub fn SiteConfig::absolute(Self, String) -> String
-pub fn SiteConfig::chapter_order(Self, String, String) -> Int?
+pub fn SiteConfig::chapter_order(Self, String, String) -> Int32?
 pub fn SiteConfig::equal(Self, Self) -> Bool
 pub fn SiteConfig::href(Self, String) -> String
 pub fn SiteConfig::not_equal(Self, Self) -> Bool
@@ -126,7 +126,7 @@ pub fn SiteConfig::to_repr(Self) -> @debug.Repr
 pub(all) struct TocEntry {
   id : String
   text : String
-  depth : Int
+  depth : Int32
 } derive(Eq, @debug.Debug)
 pub fn TocEntry::equal(Self, Self) -> Bool
 pub fn TocEntry::not_equal(Self, Self) -> Bool

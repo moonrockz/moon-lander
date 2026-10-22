@@ -55,9 +55,9 @@ pub struct CstDocument {
 pub fn CstDocument::limits(Self) -> Limits
 pub fn CstDocument::lower(Self) -> Result[Value, Array[Diagnostic]]
 pub fn CstDocument::node_at(Self, Array[String]) -> NodeId?
-pub fn CstDocument::node_id(Self, Int) -> NodeId?
+pub fn CstDocument::node_id(Self, Int32) -> NodeId?
 pub fn CstDocument::nodes(Self) -> Array[Node]
-pub fn CstDocument::path(Self, Int) -> Array[String]?
+pub fn CstDocument::path(Self, Int32) -> Array[String]?
 pub fn CstDocument::replace_value(Self, NodeId, Value, limits? : Limits) -> Result[Self, Diagnostic]
 pub fn CstDocument::reproduce(Self) -> String
 pub fn CstDocument::slice(Self, Span) -> String?
@@ -101,31 +101,31 @@ pub(all) enum Kind {
 pub fn Kind::to_repr(Self) -> @debug.Repr
 
 pub struct Limits {
-  max_depth : Int
-  max_nodes : Int
-  max_source : Int
-  max_number : Int
-  max_findings : Int
+  max_depth : Int32
+  max_nodes : Int32
+  max_source : Int32
+  max_number : Int32
+  max_findings : Int32
 } derive(@debug.Debug)
-pub fn Limits::max_depth(Self) -> Int
-pub fn Limits::max_findings(Self) -> Int
-pub fn Limits::max_nodes(Self) -> Int
-pub fn Limits::max_number(Self) -> Int
-pub fn Limits::max_source(Self) -> Int
-pub fn Limits::new(max_depth? : Int, max_nodes? : Int, max_source? : Int, max_number? : Int, max_findings? : Int) -> Self
+pub fn Limits::max_depth(Self) -> Int32
+pub fn Limits::max_findings(Self) -> Int32
+pub fn Limits::max_nodes(Self) -> Int32
+pub fn Limits::max_number(Self) -> Int32
+pub fn Limits::max_source(Self) -> Int32
+pub fn Limits::new(max_depth? : Int32, max_nodes? : Int32, max_source? : Int32, max_number? : Int32, max_findings? : Int32) -> Self
 pub fn Limits::to_repr(Self) -> @debug.Repr
 pub fn Limits::unlimited() -> Self
 
 pub struct Location {
   source_id : String?
-  node_index : Int
+  node_index : Int32
   value_span : Span
   key_span : Span?
   // private fields
 } derive(@debug.Debug)
 pub fn Location::key_span(Self) -> Span?
 pub fn Location::node(Self) -> NodeId
-pub fn Location::node_index(Self) -> Int
+pub fn Location::node_index(Self) -> Int32
 pub fn Location::source_id(Self) -> String?
 pub fn Location::to_repr(Self) -> @debug.Repr
 pub fn Location::value_span(Self) -> Span
@@ -135,12 +135,12 @@ pub struct Node {
   span : Span
   key : String?
   key_span : Span?
-  children : Array[Int]
+  children : Array[Int32]
   scalar : Value?
-  parent : Int?
-  ordinal : Int
+  parent : Int32?
+  ordinal : Int32
 } derive(@debug.Debug)
-pub fn Node::children(Self) -> Array[Int]
+pub fn Node::children(Self) -> Array[Int32]
 pub fn Node::key(Self) -> String?
 pub fn Node::key_span(Self) -> Span?
 pub fn Node::kind(Self) -> NodeKind
@@ -150,7 +150,7 @@ pub fn Node::to_repr(Self) -> @debug.Repr
 pub struct NodeId {
   // private fields
 }
-pub fn NodeId::index(Self) -> Int
+pub fn NodeId::index(Self) -> Int32
 pub fn NodeId::to_repr(Self) -> @debug.Repr
 pub impl @debug.Debug for NodeId
 
@@ -169,7 +169,7 @@ pub struct Number {
 pub fn Number::equal(Self, Self) -> Bool
 pub fn Number::is_integer(Self) -> Bool
 pub fn Number::not_equal(Self, Self) -> Bool
-pub fn Number::numeric_compare(Self, Self) -> Int
+pub fn Number::numeric_compare(Self, Self) -> Int32
 pub fn Number::numeric_equal(Self, Self) -> Bool
 pub fn Number::numeric_key(Self) -> String
 pub fn Number::parse(String) -> Result[Self, Diagnostic]
@@ -177,32 +177,32 @@ pub fn Number::to_repr(Self) -> @debug.Repr
 pub fn Number::token(Self) -> String
 
 pub struct Position {
-  line : Int
-  column : Int
+  line : Int32
+  column : Int32
 } derive(Eq, @debug.Debug)
-pub fn Position::column(Self) -> Int
+pub fn Position::column(Self) -> Int32
 pub fn Position::equal(Self, Self) -> Bool
-pub fn Position::line(Self) -> Int
+pub fn Position::line(Self) -> Int32
 pub fn Position::not_equal(Self, Self) -> Bool
 pub fn Position::to_repr(Self) -> @debug.Repr
 
 pub struct SourceMap {
   cst : CstDocument
-  line_starts : Array[Int]
+  line_starts : Array[Int32]
 } derive(@debug.Debug)
 pub fn SourceMap::locations(Self, Array[String]) -> Array[Location]
-pub fn SourceMap::position(Self, Int) -> Position?
+pub fn SourceMap::position(Self, Int32) -> Position?
 pub fn SourceMap::to_repr(Self) -> @debug.Repr
 
 pub struct Span {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 } derive(Eq, @debug.Debug)
-pub fn Span::end(Self) -> Int
+pub fn Span::end(Self) -> Int32
 pub fn Span::equal(Self, Self) -> Bool
-pub fn Span::new(Int, Int) -> Self?
+pub fn Span::new(Int32, Int32) -> Self?
 pub fn Span::not_equal(Self, Self) -> Bool
-pub fn Span::start(Self) -> Int
+pub fn Span::start(Self) -> Int32
 pub fn Span::to_repr(Self) -> @debug.Repr
 
 pub struct Token {
@@ -237,8 +237,8 @@ pub struct Value {
   // private fields
 } derive(@debug.Debug)
 pub fn Value::array(Array[Self]) -> Self
-pub fn Value::array_item(Self, Int) -> Self?
-pub fn Value::array_length(Self) -> Int?
+pub fn Value::array_item(Self, Int32) -> Self?
+pub fn Value::array_length(Self) -> Int32?
 pub fn Value::boolean(Bool) -> Self
 pub fn Value::equals(Self, Self, numeric? : Bool, limits? : Limits) -> Result[Bool, Diagnostic]
 pub fn Value::get(Self, String) -> Self?

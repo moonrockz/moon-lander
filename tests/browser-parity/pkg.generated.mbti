@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/browser-parity"
+
+import {
+  "moonrockz/moon-lander/config",
+}
+
+// Values
+pub fn cases() -> Array[Case] raise @config.ConfigError
+
+pub fn failure(Error) -> String
+
+pub fn observe(Case, @config.Config) -> String
+
+pub fn reference() -> String raise @config.ConfigError
+
+pub fn revision(Array[Case]) -> String
+
+// Errors
+
+// Types and methods
+pub struct Case {
+  name : String
+  builder : @config.ConfigBuilder
+  files : Array[(String, String)]
+  bind : Bool
+}
+
+// Type aliases
+
+// Traits

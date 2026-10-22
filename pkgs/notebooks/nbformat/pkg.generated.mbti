@@ -17,7 +17,7 @@ pub fn walk_cursor(Node, (@notebooks.Cursor[Node]) -> @notebooks.Control, leave?
 pub(all) suberror FormatError {
   InvalidJson(String)
   InvalidField(path~ : String, expected~ : String)
-  UnsupportedVersion(major~ : Int, minor~ : Int)
+  UnsupportedVersion(major~ : Int32, minor~ : Int32)
   DuplicateCellId(String)
   DuplicateCellName(String)
 } derive(Eq, @debug.Debug)
@@ -72,7 +72,7 @@ pub fn CellId::to_repr(Self) -> @debug.Repr
 pub fn CellId::to_string(Self) -> String
 
 type ExecutionCount derive(Eq, @debug.Debug)
-pub fn ExecutionCount::ExecutionCount(Int) -> Self raise FormatError
+pub fn ExecutionCount::ExecutionCount(Int32) -> Self raise FormatError
 pub fn ExecutionCount::equal(Self, Self) -> Bool
 pub fn ExecutionCount::from_json(Json) -> Self raise FormatError
 pub fn ExecutionCount::not_equal(Self, Self) -> Bool
@@ -115,8 +115,8 @@ pub fn Node::to_repr(Self) -> @debug.Repr
 pub impl @notebooks.Node for Node
 
 type Notebook derive(Eq, @debug.Debug)
-pub fn Notebook::Notebook(ReadOnlyArray[Cell], minor? : Int, metadata? : @notebooks.Metadata) -> Self raise FormatError
-pub fn Notebook::cell(Self, Int) -> Cell?
+pub fn Notebook::Notebook(ReadOnlyArray[Cell], minor? : Int32, metadata? : @notebooks.Metadata) -> Self raise FormatError
+pub fn Notebook::cell(Self, Int32) -> Cell?
 pub fn Notebook::cell_by_id(Self, CellId) -> Cell?
 pub fn Notebook::cells(Self) -> ReadOnlyArray[Cell]
 pub fn Notebook::cells_by_mime_type(Self, String) -> ReadOnlyArray[Cell]
@@ -126,8 +126,8 @@ pub fn Notebook::extensions(Self) -> JsonObject
 pub fn[A] Notebook::fold(Self, A, (A, @notebooks.Cursor[Node]) -> A) -> A
 pub fn Notebook::from_json(Json) -> Self raise FormatError
 pub fn Notebook::metadata(Self) -> @notebooks.Metadata
-pub fn Notebook::nbformat(Self) -> Int
-pub fn Notebook::nbformat_minor(Self) -> Int
+pub fn Notebook::nbformat(Self) -> Int32
+pub fn Notebook::nbformat_minor(Self) -> Int32
 pub fn Notebook::not_equal(Self, Self) -> Bool
 pub fn Notebook::root(Self) -> Node
 pub fn Notebook::to_json(Self) -> Json raise FormatError

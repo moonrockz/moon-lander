@@ -515,7 +515,13 @@ supplied root, so a different root does not change the backing namespace.
 parent directories inside the store, writes through `createWritable()`, and
 reports success only after `close()` resolves. A failed write or close calls
 `abort()`, so the previous text remains and the file lock is released. If the
-call created the file, a failure removes it again. `remove` checks exact names,
+call created the file, a failure removes it again. `write_text` also checks
+exact names: it lists each parent before it resolves a segment or the file
+name. If the name was not in the listing and is still not there after the
+`create: true` call, the host resolved it to an entry with another exact name.
+The write then raises `InvalidPath` and does not change that entry. A new
+`BrowserError` case is not necessary, and the check does not depend on a
+case-folding rule of the host. `remove` checks exact names,
 removes one file and returns whether it existed; a directory gives `Io`.
 A missing `getDirectory` or `createWritable` gives `Unsupported`. A failure of
 `getDirectory()` other than denial also gives `Unsupported`, because WebKit
@@ -565,7 +571,7 @@ flaky, interrupted or unrun case.
 | Selected files | File input fallback; nested discovery; case | `selected.spec.ts` real file and directory inputs, discovery, exact names |
 | Directory handles | Real handle; lost permission; no native picker | `directory.spec.ts` equivalence, denied and revoked handles, capability detection and fallback |
 | Workspace discovery | Outside parent; injected home; local overrides; ambiguity | `selected.spec.ts` discovery cases, `workspace_wbtest.mbt` |
-| Explicit persistence | Reload; namespaces; write failure; unavailable storage; no load side effects | `store.spec.ts` |
+| Explicit persistence | Reload; namespaces; write failure; case variant; unavailable storage; no load side effects | `store.spec.ts` |
 | Store virtual roots | Supplied root; reopened root; invalid root | `store.spec.ts` save and reload case |
 | Typed failures | Parse origin; binding source | `mounts.spec.ts` core errors, `parity.spec.ts` parse and binding errors |
 | Limits and cancellation | Entry limit; unsized response; decoding; errored stream; cleanup; abort | `mounts.spec.ts` streams and limits, `selected.spec.ts` and `directory.spec.ts` limits and abort |

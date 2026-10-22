@@ -119,6 +119,17 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|        return storageFailure(error);
   #|      }
   #|    }
+  #|    async function present(dir, name) {
+  #|      for await (const [entry] of dir.entries()) {
+  #|        if (entry === name)
+  #|          return true;
+  #|      }
+  #|      return false;
+  #|    }
+  #|    async function exact(dir, name) {
+  #|      if (!await present(dir, name))
+  #|        throw new DOMException("", "NotFoundError");
+  #|    }
   #|    async function writeText(store, relative, text) {
   #|      if (typeof FileSystemFileHandle !== "function" || typeof FileSystemFileHandle.prototype.createWritable !== "function") {
   #|        return { kind: "unsupported" };
@@ -126,20 +137,25 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|      const segments = relative.split("/");
   #|      const name = segments.pop();
   #|      let dir;
-  #|      let created = false;
+  #|      let fresh = false;
   #|      let writable;
   #|      try {
   #|        dir = store;
-  #|        for (const segment of segments)
-  #|          dir = await dir.getDirectoryHandle(segment, { create: true });
+  #|        for (const segment of segments) {
+  #|          const parent = dir;
+  #|          const existed = await present(parent, segment);
+  #|          dir = await parent.getDirectoryHandle(segment, { create: true });
+  #|          if (!existed && !await present(parent, segment))
+  #|            return { kind: "conflict" };
+  #|        }
   #|        let file;
-  #|        try {
+  #|        if (await present(dir, name))
   #|          file = await dir.getFileHandle(name, { create: false });
-  #|        } catch (error) {
-  #|          if (error?.name !== "NotFoundError")
-  #|            throw error;
+  #|        else {
+  #|          fresh = true;
   #|          file = await dir.getFileHandle(name, { create: true });
-  #|          created = true;
+  #|          if (!await present(dir, name))
+  #|            return { kind: "conflict" };
   #|        }
   #|        if (typeof file.createWritable !== "function")
   #|          throw new DOMException("", "NotSupportedError");
@@ -153,21 +169,15 @@ extern "js" fn browser_adapter() -> BrowserAdapter =
   #|            await writable.abort();
   #|          } catch {}
   #|        }
-  #|        if (created && dir) {
+  #|        if (fresh && dir) {
   #|          try {
-  #|            await dir.removeEntry(name);
+  #|            if (await present(dir, name))
+  #|              await dir.removeEntry(name);
   #|          } catch {}
   #|        }
   #|        const failure = storageFailure(error);
   #|        return error?.name === "NotSupportedError" ? { kind: "unsupported" } : failure;
   #|      }
-  #|    }
-  #|    async function exact(dir, name) {
-  #|      for await (const [entry] of dir.entries()) {
-  #|        if (entry === name)
-  #|          return;
-  #|      }
-  #|      throw new DOMException("", "NotFoundError");
   #|    }
   #|    async function removeFile(store, relative) {
   #|      const segments = relative.split("/");

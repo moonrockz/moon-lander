@@ -84,6 +84,11 @@ fn storage_failure(
     "unsupported" => Unsupported(operation~, path~)
     "permission" => PermissionDenied(operation~, path~)
     "quota" => LimitExceeded(operation~, path~, limit="quota")
+    "conflict" =>
+      InvalidPath(
+        operation~,
+        reason="the host maps the name to an entry with another exact name",
+      )
     _ => Io(operation~, path~)
   }
 }
@@ -117,6 +122,9 @@ pub async fn open_store(
 /// created only inside the store. Success means that the write and its close
 /// completed. A failed write or close raises; quota failure raises
 /// `LimitExceeded` with the `quota` limit. This is one file, not a transaction.
+/// A write never replaces an entry with another exact name: when the host maps
+/// a segment or the file name to such an entry, as a case-insensitive file
+/// system can, the write raises `InvalidPath` and changes nothing.
 pub async fn write_text(
   store : Store,
   path : String,

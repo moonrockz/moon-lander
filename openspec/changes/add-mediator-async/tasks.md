@@ -14,11 +14,11 @@ sync API of `@mediator` other than the new case `TimedOut`. Run each test on
 
 Bead: lander-4us.19.1
 
-- [ ] 1.1 Create `pkgs/lander/mediator/async` (`moon.pkg` with `supported_targets = "wasm+js+native"`, imports `moonrockz/moon-lander/mediator` and `moonbitlang/async`); verify `mise run build` passes and the package builds on `wasm`, `js` and `native`
-- [ ] 1.2 Add the abstract `Sender[C, Req, Res]`, `sender` and `Sender::send` of design D2 with the handler type `async (C, Req) -> Res`; verify an async test sends `Ping("Hello")` through a handler that waits, gets `"Pong: Hello"`, and the handler runs one time
-- [ ] 1.3 Verify an async handler error passes out of `send` unchanged, and record in a test comment the compile error for a request of the wrong type
-- [ ] 1.4 Give `scripts/check-mediator.mbtx` a target list per path (core paths: four targets; async paths: `wasm`, `js`, `native`) and add the async package; verify its script test still fails on a zero-test leg and `mise run check:mediator` passes
-- [ ] 1.5 Add the Ping example to the package `README.mbt.md`, with the note that a `wasm` host must supply the `moonbitlang/async` imports; verify the example runs in `mise run test` on `wasm`, `js` and `native`
+- [x] 1.1 Create `pkgs/lander/mediator/async` (`moon.pkg` with `supported_targets = "wasm+js+native"`, imports `moonrockz/moon-lander/mediator` and `moonbitlang/async`); verify `mise run build` passes and the package builds on `wasm`, `js` and `native`
+- [x] 1.2 Add the abstract `Sender[C, Req, Res]`, `sender` and `Sender::send` of design D2 with the handler type `async (C, Req) -> Res`; verify an async test sends `Ping("Hello")` through a handler that waits, gets `"Pong: Hello"`, and the handler runs one time
+- [x] 1.3 Verify an async handler error passes out of `send` unchanged, and record in a test comment the compile error for a request of the wrong type
+- [x] 1.4 Give `scripts/check-mediator.mbtx` a target list per path (core paths: four targets; async paths: `wasm`, `js`, `native`) and add the async package; verify its script test still fails on a zero-test leg and `mise run check:mediator` passes
+- [x] 1.5 Add the Ping example to the package `README.mbt.md`, with the note that a `wasm` host must supply the `moonbitlang/async` imports; verify the example runs in `mise run test` on `wasm`, `js` and `native`
 
 ## 2. Async middleware pipeline
 

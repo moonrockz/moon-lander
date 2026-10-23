@@ -44,12 +44,12 @@ Bead: lander-4us.19.3
 
 Bead: lander-4us.19.4
 
-- [ ] 4.1 Verify caller cancellation of `send` (with `with_timeout_opt` around the call): the handler stops, no reply and no mediator error, and the call ends as cancelled
-- [ ] 4.2 Verify caller cancellation of a sequential publish during the second of three handlers: the second stops, the third does not start, no `PublishFailed`; and of a concurrent publish: both waiting handlers stop
-- [ ] 4.3 Verify a handler that raises a timeout error from its own `with_timeout` is an ordinary failure: send passes it out, and a publish lists it and runs the other handlers
-- [ ] 4.4 Add the case `MediatorError::TimedOut(after_ms~)` to `@mediator` with the `message` "Request timed out after N ms", and the `timeout(after_ms)` middleware of design D7; verify a 50 ms timeout stops a 1000 ms handler and raises `TimedOut` with 50, a 1000 ms timeout gives the reply of a 10 ms handler, and the core tests and `pkgs/lander/mediator/pkg.generated.mbti` show only the new case
-- [ ] 4.5 Verify `finally_` runs one time when the caller cancels a send
-- [ ] 4.6 Document cancellation (including that failures before a cancellation are not reported) and the timeout middleware in the README with a runnable example; verify it runs on `wasm`, `js` and `native`
+- [x] 4.1 Verify caller cancellation of `send` (with `with_timeout_opt` around the call): the handler stops, no reply and no mediator error, and the call ends as cancelled
+- [x] 4.2 Verify caller cancellation of a sequential publish during the second of three handlers: the second stops, the third does not start, no `PublishFailed`; and of a concurrent publish: both waiting handlers stop
+- [x] 4.3 Verify a handler that raises a timeout error from its own `with_timeout` is an ordinary failure: send passes it out, and a publish lists it and runs the other handlers
+- [x] 4.4 Add the case `MediatorError::TimedOut(after_ms~)` to `@mediator` with the `message` "Request timed out after N ms", and the `timeout(after_ms)` middleware of design D7; verify a 50 ms timeout stops a 1000 ms handler and raises `TimedOut` with 50, a 1000 ms timeout gives the reply of a 10 ms handler, and the core tests and `pkgs/lander/mediator/pkg.generated.mbti` show only the new case
+- [x] 4.5 Verify `finally_` runs one time when the caller cancels a send
+- [x] 4.6 Document cancellation (including that failures before a cancellation are not reported) and the timeout middleware in the README with a runnable example; verify it runs on `wasm`, `js` and `native`
 
 ## 5. Interop with the core and the context value
 

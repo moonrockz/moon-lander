@@ -131,3 +131,9 @@ test "the publish message holds no event value and no handler error text" {
     _ => fail("publish did not raise")
   }
 }
+
+///|
+test "the timeout message gives the limit and nothing else" {
+  let error = @mediator.TimedOut(after_ms=50)
+  assert_eq(error.message(), "Request timed out after 50 ms")
+}

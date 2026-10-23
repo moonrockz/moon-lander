@@ -21,12 +21,15 @@ pub(all) suberror MediatorError {
   /// `handlers` is the number of handlers in the publish, and `failures` holds
   /// each failure in add order.
   PublishFailed(handlers~ : Int32, failures~ : Array[PublishFailure])
+  /// A step did not end within its time limit. Only the timeout middleware of
+  /// the async mediator raises it. `after_ms` is the limit in milliseconds.
+  TimedOut(after_ms~ : Int32)
 }
 
 ///|
 /// Text for people that describes the failure. The text holds only the
-/// reason, or the counts and the handler positions; the core never formats a
-/// request, an event or the text of a wrapped error.
+/// reason, the counts and the handler positions, or the time limit; the core
+/// never formats a request, an event or the text of a wrapped error.
 pub fn MediatorError::message(self : MediatorError) -> String {
   match self {
     Rejected(reason~) => "Request rejected: \{reason}"
@@ -35,5 +38,6 @@ pub fn MediatorError::message(self : MediatorError) -> String {
       let label = if positions.length() == 1 { "position" } else { "positions" }
       "Publish failed: \{failures.length()} of \{handlers} handlers raised an error (\{label} \{positions.join(", ")})"
     }
+    TimedOut(after_ms~) => "Request timed out after \{after_ms} ms"
   }
 }

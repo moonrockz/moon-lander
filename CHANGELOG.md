@@ -11,8 +11,8 @@
   the first handler that raised and passed that error out. A caller that
   caught the raw handler error catches `PublishFailed` instead and reads each
   error from `failures`. `Sender::send` does not change.
-- `MediatorError` has the new case `PublishFailed`. A `match` on
-  `MediatorError` with no wildcard must add it.
+- `MediatorError` has the new cases `PublishFailed` and `TimedOut`. A
+  `match` on `MediatorError` with no wildcard must add them.
 
 ### Added
 
@@ -20,6 +20,17 @@
   of the handler and the `error` that it raised. `MediatorError::message`
   gives only the failure count, the handler count and the positions, not
   event values or the text of the wrapped errors.
+- `moonrockz/moon-lander/mediator/async` (`@mediator_async`), the async
+  mediator for `wasm`, `js` and `native`. It has typed async senders and
+  topics, `publish` (one handler at a time) and `publish_concurrent` (all
+  handlers in one task group), both with one `PublishFailed` in add order,
+  and no fire-and-forget publish. A caller cancellation stops the running
+  handlers and passes out; it is never a failure. Async middleware has the
+  core helper names, with async `before` and `after` and a sync `finally_`
+  that also runs during a cancellation. `timeout(after_ms)` cancels a slow
+  step and raises the new core case `MediatorError::TimedOut(after_ms~)`,
+  whose message is "Request timed out after N ms". `Sender::from_sync` and
+  `Topic::from_sync` wrap core values with their middleware.
 
 ## 0.2.0 - 2026-10-22
 

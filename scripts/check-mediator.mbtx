@@ -35,6 +35,7 @@ let paths : Array[(String, Array[String])] = [
   ("pkgs/lander/mediator", all_targets),
   ("tests/mediator-acceptance", all_targets),
   ("pkgs/lander/mediator/async", async_targets),
+  ("tests/mediator-async-acceptance", async_targets),
 ]
 
 ///|
@@ -102,7 +103,9 @@ test "legs give the core paths on four targets and the async paths on three" {
   assert_true(all.contains(("pkgs/lander/mediator/async", "wasm")))
   assert_true(all.contains(("pkgs/lander/mediator/async", "js")))
   assert_true(all.contains(("pkgs/lander/mediator/async", "native")))
+  assert_true(all.contains(("tests/mediator-async-acceptance", "native")))
   assert_false(all.contains(("pkgs/lander/mediator/async", "wasm-gc")))
+  assert_false(all.contains(("tests/mediator-async-acceptance", "wasm-gc")))
   assert_eq(legs(["wasm-gc"]), [
     ("pkgs/lander/mediator", "wasm-gc"),
     ("tests/mediator-acceptance", "wasm-gc"),
@@ -143,7 +146,7 @@ async test "a leg that runs zero tests fails the check" {
   for
     path in [
       "pkgs", "pkgs/lander", "pkgs/lander/mediator", "pkgs/lander/mediator/async",
-      "tests", "tests/mediator-acceptance",
+      "tests", "tests/mediator-acceptance", "tests/mediator-async-acceptance",
     ] {
     @fs.mkdir("\{dir}/\{path}")
   }
@@ -158,6 +161,14 @@ async test "a leg that runs zero tests fails the check" {
   )
   @fs.write_file(
     "\{dir}/pkgs/lander/mediator/async/async_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
+  @fs.write_file(
+    "\{dir}/tests/mediator-async-acceptance/moon.pkg",
+    "supported_targets = \"wasm+js+native\"\n",
+  )
+  @fs.write_file(
+    "\{dir}/tests/mediator-async-acceptance/async_test.mbt",
     "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
   )
   @fs.write_file("\{dir}/tests/mediator-acceptance/moon.pkg", "")

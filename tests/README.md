@@ -2,7 +2,7 @@
 
 This unpublished workspace module contains acceptance tests and domain laws.
 Its suites exercise the public notebook APIs migrated from Moonbase, the
-configuration core, and the mediator.
+configuration core, and the sync and async mediators.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
@@ -14,7 +14,8 @@ configuration core, and the mediator.
 | `config-conventions-laws` | The same preset cases as snapshot tests | All four |
 | `config-fixture`, `config-parity` | Shared explicit builder and file tree; complete value, provenance and report observations compared by `mise run check:config` | All four |
 | `formats-default`, `formats-toml`, `formats-custom` | Default and overridden format sets, parser execution and linked output trimming | All four |
-| `mediator-acceptance` | Send, two separate senders, handler errors, publish order, publish error stop, log middleware, short-circuit, reply change, middleware order and context read; `mise run check:mediator` fails a target that runs zero of them | All four |
+| `mediator-acceptance` | Send, two separate senders, handler errors, publish order, one and two publish failures in one `PublishFailed`, log middleware, short-circuit, reply change, middleware order and context read; `mise run check:mediator` fails a target that runs zero of them | All four |
+| `mediator-async-acceptance` | One `async test` per `mediator-async` scenario: async send and errors, sequential and concurrent publish, caller cancellation, handler timeouts, the `timeout` middleware, middleware order, `finally_` on cancellation, context read and a wrapped core sender; `mise run check:mediator` fails a target that runs zero of them | wasm, JavaScript, native |
 | `formats-leaky` | Deliberately reachable YAML parser that `mise run check:formats` must reject | All four |
 | `nbformat-acceptance` | Jupyter cells, outputs, attachments, extensions, cursor paths and validation errors | JavaScript, native |
 | `nbformat-laws` | JSON and text round trips, traversal agreement and cursor navigation | All four |

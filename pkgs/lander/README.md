@@ -29,7 +29,8 @@ a load asks for. A `wasm` host gives the files itself.
 
 The mediator also sits beside the stack. It is pure and uses no other layer: the
 parts of an application send requests and publish events through typed values,
-and middleware holds the cross-cutting steps.
+and middleware holds the cross-cutting steps. The async mediator adds handlers
+that wait, on `wasm`, `js` and `native`.
 
 ## What exists today
 
@@ -41,11 +42,12 @@ and middleware holds the cross-cutting steps.
 | Browser adapter | [`config/browser`](config/browser/README.mbt.md) | js browser URL mounts with explicit manifests, run inputs, limits, cancellation, and typed boundary errors |
 | Conventions | [`config/conventions`](config/conventions/README.mbt.md) | Walk-up discovery in three layouts, system and global user directories on every platform, local and user overrides, explicit project file, ambiguity, legacy fallback, stop boundary, isolated mode; workspace and environment parts come next |
 | Binding | [`config`](config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
-| Mediator | [`mediator`](mediator/README.mbt.md) | Typed senders, publish topics, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
+| Mediator | [`mediator`](mediator/README.mbt.md) | Typed senders, publish topics that run every handler and report every failure in one `PublishFailed`, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
+| Async mediator | [`mediator/async`](mediator/async/README.mbt.md) | Async senders and topics with sequential and concurrent publish, caller cancellation, the `timeout` middleware, async middleware with a sync `finally_`, and `from_sync` for core values; `wasm`, `js` and `native` |
 | Hosting | `@lander` | Planned |
 
-The [Configuration](config/README.mbt.md) and [Mediator](mediator/README.mbt.md)
-chapters show the API that exists, with examples that the tests compile and run. The
+The [Configuration](config/README.mbt.md), [Mediator](mediator/README.mbt.md) and
+[Async mediator](mediator/async/README.mbt.md) chapters show the API that exists, with examples that the tests compile and run. The
 [design overview](../../docs/design/overview.md) shows the full design of all
 four changes. The OpenSpec changes in `openspec/changes/` hold the requirements.
 

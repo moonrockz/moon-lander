@@ -15,13 +15,13 @@ and the bun pin come from `add-configuration-core`.
 
 Bead: lander-4us.5.1
 
-- [ ] 1.1 Write one C source in `hosting/console`, listed in `native-stub` in `moon.pkg`, that exports C-ABI functions (install handlers, read the stop flag, read the signal identity); call them through `extern "c"`; verify `moon test --target native` calls an exported function
-- [ ] 1.2 Install SIGINT, SIGTERM and SIGQUIT handlers on Linux and macOS, and a `SetConsoleCtrlHandler` handler for `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and `CTRL_CLOSE_EVENT` on Windows (`#ifdef _WIN32`); verify a test that sends each signal or event and reads the flag and the identity, and record in the bead any Windows event that a CI runner cannot send
-- [ ] 1.3 Verify a second signal ends the process from inside the handler with the mapped code (130, 143, 131) while the main thread runs a loop with no suspension point; run the loop in a helper executable started as a child process through `moonbitlang/async/process`
-- [ ] 1.4 Verify the `moonbitlang/async` runtime does not also handle the same signals when the stub is active, with `@signal.set_global_cancellation_signals([])`, on each platform
-- [ ] 1.5 Run 1.1 to 1.4 on Linux, macOS and Windows CI legs, and with `mise run test:native-zig`; verify all pass
-- [ ] 1.6 Verify a consumer module outside the workspace that depends on `moonrockz/moon-lander` by path builds the stub with its own C compiler and passes 1.1 to 1.4 on Linux and macOS
-- [ ] 1.7 After 1.1 to 1.6 pass, add a narrow exception to AGENTS.md: native signal handlers in `hosting/console` use a C stub; all other process and filesystem work stays with `moonbitlang/async`
+- [x] 1.1 Write one C source in `hosting/console`, listed in `native-stub` in `moon.pkg`, that exports C-ABI functions (install handlers, read the stop flag, read the signal identity); call them through `extern "c"`; verify `moon test --target native` calls an exported function
+- [x] 1.2 Install SIGINT, SIGTERM and SIGQUIT handlers on Linux and macOS, and a `SetConsoleCtrlHandler` handler for `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and `CTRL_CLOSE_EVENT` on Windows (`#ifdef _WIN32`); verify a test that sends each signal or event and reads the flag and the identity, and record in the bead any Windows event that a CI runner cannot send
+- [x] 1.3 Verify a second signal ends the process from inside the handler with the mapped code (130, 143, 131) while the main thread runs a loop with no suspension point; run the loop in a helper executable started as a child process through `moonbitlang/async/process`
+- [x] 1.4 Verify the `moonbitlang/async` runtime does not also handle the same signals when the stub is active, with `@signal.set_global_cancellation_signals([])`, on each platform
+- [x] 1.5 Run 1.1 to 1.4 on Linux, macOS and Windows CI legs, and with `mise run test:native-zig`; verify all pass
+- [x] 1.6 Verify a consumer module outside the workspace that depends on `moonrockz/moon-lander` by path builds the stub with its own C compiler and passes 1.1 to 1.4 on Linux and macOS
+- [x] 1.7 After 1.1 to 1.6 pass, add a narrow exception to AGENTS.md: native signal handlers in `hosting/console` use a C stub; all other process and filesystem work stays with `moonbitlang/async`
 
 ## 2. Tracer bullet: one service, one command, one exit code
 

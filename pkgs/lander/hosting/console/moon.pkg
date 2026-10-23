@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/async/signal",
+  "moonbitlang/core/debug",
+}
+
+supported_targets = "native"
+
+options("native-stub": [ "signal_stub.c" ])

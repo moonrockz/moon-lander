@@ -31,6 +31,7 @@ Bead: lander-4us.5.2
 - [x] 2.2 Add `HostBuilder[S]`, `@hosting.builder`, `service` (with `start` and `stop` only), `build` and `Host[S]` with no configuration (an empty in-memory source); verify a test that builds a `Host[Unit]` on all four targets
 - [x] 2.3 Add a first `@hosting.run` (native, js) that builds `S`, runs `start`, the command and `stop`, and returns a `RunOutcome` with exit code 0 or 1; verify tests for a clean run and a failing command, also on the Windows leg
 - [x] 2.4 Add the `@lander.cli(name, args)` shortcut. Rename `pkgs/lander/README.md` to `README.mbt.md` and set `readme` in `pkgs/lander/moon.mod` to it. Add an example that builds a host (`cli`, `service`, `build`); verify that the example compiles as a doc test on all four targets, and that a native and js test runs the same host with `@hosting.run`
+- [x] 2.5 Add `AppName`, `ServiceName` and `ExitCode` with smart constructors, and `HostError` (design D17); make `@hosting.builder`, `@lander.cli` and `service` take the types, and make `service` reject a second service with the same name; verify each rule on both sides of its limit and the scenarios of "Parsed names and exit codes", "Name and exit code rules" and "Unique service names" on all four targets
 
 ## 3. Pure phase engine and full hook order
 
@@ -82,6 +83,8 @@ Bead: lander-4us.5.7
 - [ ] 7.4 Add `@hosting.app_dirs()`, which gives the application name and the prefix to `@conventions.app_dirs`; verify `$<PREFIX>_HOME` and the variable source use one prefix
 - [ ] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli` and `@hosting.builder`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
 - [ ] 7.6 Add the trait `IntoEnvVars` with implementations for `Map[String, String]` and `Json` and the JSON rules of design D14; verify the "Map literal", "JSON fixture", "Mixed values", "Null value" and "Root that is not an object" scenarios on all four targets
+- [ ] 7.7 Add `EnvPrefix::parse` and the default prefix from an `AppName`, which cannot fail (design D17); make `@hosting.env_prefix` take an `EnvPrefix`; verify each rule on both sides of its limit on all four targets
+- [ ] 7.8 Use a path type for the working directory of the run in place of `String` (design D17); verify that an empty or relative path does not parse, on all four targets
 
 ## 8. Host environment
 
@@ -91,6 +94,7 @@ Bead: lander-4us.5.8
 - [ ] 8.2 Resolve the name from `--environment`, `<PREFIX>_ENVIRONMENT` and `default_environment`, and check it with the conventions name rules; verify the resolution-order tests and that an invalid name gives code 2 with no hook run
 - [ ] 8.3 Make `@hosting.default_environment` also enable environment files; verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`
 - [ ] 8.4 Set the content root (builder value, else the working directory of the run) with `/` separators; verify one test per target group and one Windows test
+- [ ] 8.5 Use a parsed environment-name type in `HostEnvironment`, `default_environment` and the starting setting `environment?` in place of `String` (design D17); verify that a name that breaks the conventions name rules cannot make a value
 
 ## 9. Configuration load and services factory
 
@@ -107,6 +111,7 @@ Bead: lander-4us.5.10
 
 - [ ] 10.1 Add `@hosting.shutdown_timeout(ms)` (default 30 000) and the bounded stop phase inside `protect_from_cancel`; verify on native and js that a slow `stop` is cancelled, later hooks are skipped, the stopped event occurs and the code is 1
 - [ ] 10.2 Verify that a stop phase after an outside cancel still runs all hooks and keeps its timeout
+- [ ] 10.3 Use a duration type for the shutdown timeout in place of `ms : Int` (design D17); verify that a negative duration does not parse
 
 ## 11. Console driver on native with the C stub
 

@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn cli(String, Array[String]) -> @hosting.HostBuilder[Unit]
+pub fn cli(@hosting.AppName, Array[String]) -> @hosting.HostBuilder[Unit]
 
 pub fn version() -> String
 

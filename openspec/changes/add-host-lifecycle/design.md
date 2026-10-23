@@ -148,7 +148,7 @@ each part itself and reproduces Morphir exactly. The batteries path is in D15.
 
 ```moonbit
 async fn main {
-  @hosting.builder("morphir", @env.args())
+  @hosting.builder(@hosting.AppName::parse("morphir"), @env.args())
   |> @hosting_argparse.command(fn(name) {
     @argparse.Command(name,
       options=[
@@ -174,7 +174,7 @@ async fn main {
   })
   |> @hosting.app_dirs()   // = @conventions.add(@conventions.app_dirs(name, prefix~)) with host values
   |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
-  |> @hosting.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @hosting.service(@hosting.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @hosting.shutdown_timeout(5_000)
   |> @hosting.build(fn(b) {
     App::{ logs: TelemetrySession::local(b.environment.content_root, ...), ... }
@@ -189,7 +189,7 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
     process(item)
   }
   if has_errors(ctx) {
-    ctx.lifetime.set_exit_code(@hosting.ExitCode(2))
+    ctx.lifetime.set_exit_code(@hosting.ExitCode::from_int(2))
   }
 }
 ```
@@ -254,8 +254,8 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
 A service is a value with a name and six optional hooks, not a trait.
 
 ```moonbit
-pub(all) struct HostedService[S] {
-  name : String
+priv struct HostedService[S] {   // only `service` makes one (D17)
+  name : ServiceName
   starting : Hook[S]?
   start : Hook[S]?
   started : Hook[S]?
@@ -266,10 +266,10 @@ pub(all) struct HostedService[S] {
 pub type Hook[S] = async (Context[S]) -> Unit raise
 
 pub fn[S] service(
-  self : HostBuilder[S], name : String,
+  self : HostBuilder[S], name : ServiceName,
   starting? : Hook[S], start? : Hook[S], started? : Hook[S],
   stopping? : Hook[S], stop? : Hook[S], stopped? : Hook[S],
-) -> HostBuilder[S]
+) -> HostBuilder[S] raise HostError
 ```
 
 - Owner: start in registration order, stop in reverse. .NET 8 order: all `starting`,
@@ -281,6 +281,9 @@ pub fn[S] service(
 - Call (this change): a stop hook failure does not skip the next hooks. The host
   collects all failures.
 - Stop hooks read the reason with `ctx.lifetime.stop_reason()`.
+- Owner (2026-10-23, D17): each service of a host has its own `ServiceName`. A
+  second service with the same name raises `HostError::DuplicateService`, so a
+  builder never holds two services with one name.
 
 ### D5. Lifetime, stop requests and cancellation checks (Owner: .NET `IHostApplicationLifetime`; O1)
 
@@ -420,8 +423,16 @@ TypeScript adapter that the `config/host` js story adds. That adapter uses only
 ### D8. Exit codes (Owner: 130, 143; Call: 1 and 2 match morphir-moonbit; Call (O3): 131 and explicit codes)
 
 ```moonbit
-pub(all) struct ExitCode(Int) derive(Eq, Show)
+pub struct ExitCode { priv code : Int } derive(Eq, Debug)
+pub fn ExitCode::from_int(code : Int) -> ExitCode raise HostError  // 0 to 255
+pub fn ExitCode::success() -> ExitCode                         // 0
+pub fn ExitCode::failure() -> ExitCode                         // 1
+pub fn ExitCode::to_int(self : ExitCode) -> Int
 ```
+
+Owner (2026-10-23, D17): an exit code is in the range 0 to 255, which every
+platform keeps. `ExitCode::from_int` raises `HostError::InvalidExitCode` for any other
+number, so no `ExitCode` value is out of range.
 
 | Code | Cause |
 | --- | --- |
@@ -569,7 +580,7 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 ```moonbit
 // @lander: the batteries-included entry (D15)
 pub fn cli(
-  name : String,
+  name : @hosting.AppName,
   args : Array[String],
   env_vars? : &@hosting.IntoEnvVars,
   working_dir? : String,
@@ -578,7 +589,7 @@ pub fn cli(
 
 // @hosting: the bare entry, with the same starting settings
 pub fn[S] builder(
-  name : String,
+  name : AppName,
   args : Array[String],
   env_vars? : &IntoEnvVars,
   working_dir? : String,
@@ -636,10 +647,11 @@ The parameter type is `&IntoEnvVars`. Probe results:
 - An empty `{}` is ambiguous. Use `Map([])`.
 
 ```moonbit
-@lander.cli("acme", ["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
-@lander.cli("acme", [], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
-@lander.cli("acme", [], env_vars=fixture)   // fixture : Json from @json.parse
-@lander.cli("acme", [], env_vars=Map([]))
+let acme = @lander.AppName::parse("acme")
+@lander.cli(acme, ["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
+@lander.cli(acme, [], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
+@lander.cli(acme, [], env_vars=fixture)   // fixture : Json from @json.parse
+@lander.cli(acme, [], env_vars=Map([]))
 ```
 
 JSON rules (Call):
@@ -678,8 +690,8 @@ Owner: "lean on minimal config and sane defaults". There are two entry layers:
 The smallest program:
 
 ```moonbit
-fn main {
-  @lander.cli("acme", @env.args())
+fn main raise {
+  @lander.cli(@lander.AppName::parse("acme"), @env.args())
   |> @lander.run(fn(ctx) { ... })
 }
 ```
@@ -687,11 +699,11 @@ fn main {
 A larger program in the one batteries style. It uses only `@lander` steps:
 
 ```moonbit
-fn main {
-  @lander.cli("acme", @env.args())
+fn main raise {
+  @lander.cli(@lander.AppName::parse("acme"), @env.args())
   |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
   |> @lander.build(fn(b) { App::new(b.config) })
-  |> @lander.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @lander.service(@lander.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @lander.shutdown_timeout(5_000)
   |> @lander.run(fn(ctx) { acme_command(ctx) })
 }
@@ -704,8 +716,9 @@ fn main {
   step is an alias: a `pub using` re-export, so one function has one document. The
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
-  `error_report` and `shutdown_timeout` from `@hosting`, and `command` and `map` from
-  `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
+  `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
+  `ServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
+  `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.
   So a batteries application writes only `@lander` steps. Probe (`moonc v0.10.15`,
   scratchpad, 2026-10-20): `pub using @hosting {shutdown_timeout}` re-exported a
@@ -773,10 +786,10 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 }
 
 // lambda form
-@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })
+@lander.cli(@lander.AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })
 
 // object form
-@lander.cli("morphir", @env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
+@lander.cli(@lander.AppName::parse("morphir"), @env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
 ```
 
 - `run_app(factory)` is `build(factory)` followed by
@@ -788,6 +801,49 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
   one handler object for each subcommand in `S`.
 - Limit: a command object that is separate from `S` cannot be typed against
   `Context[S]`. Revisit if MoonBit adds generic traits.
+
+### D17. Domain types (Owner (2026-10-23): no primitive obsession; parse, do not validate)
+
+Owner: a value with rules is a type with private fields and one smart
+constructor, so a value that breaks its rules cannot exist. `AGENTS.md` (Domain
+types) holds the repository rule. The caller parses each value one time, where it
+is written. After the parse, the host takes the type, not the raw value, and does
+not check the rules again.
+
+| Value | Type | Rule | Group |
+| --- | --- | --- | --- |
+| Application name | `AppName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
+| Service name | `ServiceName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `.`, `-` and `_`. Unique in one host. | 2 |
+| Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
+| Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
+| Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
+| Working directory and content root | A path type with `/` separators (D9, D13) | Not empty; absolute | 7, 8 |
+| Shutdown timeout | A duration type in place of `ms : Int` (D6) | Not negative | 10 |
+
+- Owner: the caller parses, so `@lander.cli` and `@hosting.builder` take an
+  `AppName`, and `service` takes a `ServiceName`. A program parses its name in
+  `fn main raise`, or in an `async fn main`. A bad name in a synchronous `main`
+  stops the program at start with the error and a stack trace (probe, `moonc
+  v0.10.17`: abort, exit code 134). In an `async fn main` the `moonbitlang/async`
+  entry prints the error and gives exit code 1.
+- Call (this change): one public `suberror HostError` holds the faults of a host
+  set-up: `InvalidAppName(text~, reason~)`, `InvalidServiceName(text~, reason~)`,
+  `DuplicateService(name~)` and `InvalidExitCode(code~)`. `HostError::message` gives
+  text for people. A fault in the program is not a `ConfigError` or a
+  `UsageError`, because no user input caused it.
+- Call (this change): `AppName` allows no `.`, so `<app>.<env>.<ext>` stays
+  unambiguous, and no path separator or whitespace, so it is safe in file and
+  directory names. It starts with a letter, so the default prefix is a valid
+  variable name.
+- Call (this change): a service name uses ASCII only. A report shows it as it is,
+  and an ASCII rule excludes every Unicode whitespace, control and direction
+  character, which `moonbitlang/core` has no category data to test. It allows `.`
+  for names such as `db.primary`.
+- Call (this change): a smart constructor that reads text is `parse`; one that
+  takes a number is `from_<type>`, for example `ExitCode::from_int`.
+- Call (this change): the signatures in D3, D6, D9, D12 and D13 that still show
+  `String` or `Int` for a value in the table change in the group that the table
+  names. The planned types follow this decision.
 
 ### Mapping from .NET and starbase
 

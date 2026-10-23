@@ -4,8 +4,9 @@
 ///
 /// The run loads the configuration, builds the services record one time, runs
 /// the `start` hooks in registration order, runs the command, and then runs the
-/// `stop` hooks in reverse order. Only a service whose `start` hook succeeded
-/// gets its `stop` hook. A failure in a `start` hook skips the other `start`
+/// `stop` hooks in reverse order. Only a service that started gets its `stop`
+/// hook: its `start` hook succeeded, or it has no `start` hook and no earlier
+/// `start` hook failed. A failure in a `start` hook skips the other `start`
 /// hooks and the command. A failure in a `stop` hook does not skip the other
 /// `stop` hooks. The exit code is 1 when a failure occurred, else 0.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
@@ -53,5 +54,10 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
 ///|
 /// The outcome with the exit code that `failures` gives.
 fn outcome(failures : Array[Error]) -> RunOutcome {
-  { exit_code: ExitCode(if failures.is_empty() { 0 } else { 1 }), failures }
+  let exit_code = if failures.is_empty() {
+    ExitCode::success()
+  } else {
+    ExitCode::failure()
+  }
+  { exit_code, failures }
 }

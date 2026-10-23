@@ -58,6 +58,10 @@ supply layered configuration. This change connects that configuration to a lifec
     2 (configuration or usage error), 130 (SIGINT, Ctrl-C), 143 (SIGTERM, console
     close), 131 (SIGQUIT, Ctrl-Break), or a code that the application sets.
   - `UsageError` for CLI misuse.
+  - Parsed domain types with smart constructors, so invalid values cannot exist:
+    `AppName`, `ServiceName` and `ExitCode` (0 to 255), and `HostError` for a fault
+    in the set-up of a host. Later groups add types for the variable prefix, the
+    environment name, paths and the shutdown timeout.
   - A pure, synchronous phase engine. Drivers run its steps.
   - A configurable shutdown timeout (default 30 seconds).
 - Add the package `moonrockz/moon-lander/hosting/console` (native and js):
@@ -94,7 +98,7 @@ supply layered configuration. This change connects that configuration to a lifec
     `|> @lander.shutdown_timeout(ms)` change or turn off a default.
   - `|> @lander.run(command)` selects the console driver on native and js and the
     embedded driver on wasm and wasm-gc. The smallest program is
-    `@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })`.
+    `@lander.cli(AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })`.
   - `@hosting.builder` is bare: it turns on none of these defaults. The Morphir preset
     builds on it.
   - The users of an application need no configuration file. A run with no file uses

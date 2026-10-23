@@ -71,18 +71,33 @@ of the pipeline gives a new builder:
 
 | Step | What it does |
 | --- | --- |
-| `@lander.cli("acme", args)` | Starts the builder with the application name and the arguments |
-| `@hosting.service(name, start=.., stop=..)` | Adds a hosted service. Both hooks are optional and can wait |
+| `@lander.cli(name, args)` | Starts the builder with an `AppName` and the arguments |
+| `@hosting.service(name, start=.., stop=..)` | Adds a hosted service with a `ServiceName`. Both hooks are optional and can wait. A second service with the same name raises `DuplicateService` |
 | `@hosting.build(factory)` | Gives the `Host`. It does no I/O, so a host can run more than one time |
+
+Names and exit codes are types, not raw strings and numbers. Each type has one
+smart constructor, which is the only way to make a value, so a value that breaks
+its rule cannot exist:
+
+| Type | Parse | Rule |
+| --- | --- | --- |
+| `AppName` | `AppName::parse("acme")` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` |
+| `ServiceName` | `ServiceName::parse("db")` | Starts with an ASCII letter; then only ASCII letters, digits, `.`, `-` and `_` |
+| `ExitCode` | `ExitCode::from_int(3)`, or `ExitCode::success()` and `ExitCode::failure()` | 0 to 255 |
+
+A parse that fails raises `HostError` with the text and the broken rule. A
+program parses its names one time, where they are written. A program whose
+`main` can raise, `fn main raise { ... }`, lets a bad name stop the program at
+start.
 
 ```mbt check
 ///|
 /// The host of the application `acme`. Its one service writes each hook call
 /// into `log`.
-fn acme_host(log : Array[String]) -> @hosting.Host[Unit] {
-  @lander.cli("acme", ["greet"])
+fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
+  @lander.cli(@hosting.AppName::parse("acme"), ["greet"])
   |> @hosting.service(
-    "greeter",
+    @hosting.ServiceName::parse("greeter"),
     start=_ => log.push("greeter started"),
     stop=_ => log.push("greeter stopped"),
   )

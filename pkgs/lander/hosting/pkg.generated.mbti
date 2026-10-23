@@ -9,13 +9,34 @@ import {
 // Values
 pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
-pub fn[S] builder(String, Array[String]) -> HostBuilder[S]
+pub fn[S] builder(AppName, Array[String]) -> HostBuilder[S]
 
-pub fn[S] service(HostBuilder[S], String, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S]
+pub fn[S] service(HostBuilder[S], ServiceName, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 // Errors
+pub(all) suberror HostError {
+  InvalidAppName(text~ : String, reason~ : String)
+  InvalidServiceName(text~ : String, reason~ : String)
+  DuplicateService(name~ : ServiceName)
+  InvalidExitCode(code~ : Int32)
+} derive(@debug.Debug)
+pub fn HostError::message(Self) -> String
+pub fn HostError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct AppName {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn AppName::equal(Self, Self) -> Bool
+pub fn AppName::hash(Self) -> Int32
+pub fn AppName::hash_combine(Self, Hasher) -> Unit
+pub fn AppName::not_equal(Self, Self) -> Bool
+pub fn AppName::output(Self, &Logger) -> Unit
+pub fn AppName::parse(String) -> Self raise HostError
+pub fn AppName::to_repr(Self) -> @debug.Repr
+pub fn AppName::to_string(Self) -> String
+pub impl Show for AppName
+
 pub struct BuildContext {
   config : @config.Config
 }
@@ -25,9 +46,15 @@ pub struct Context[S] {
   config : @config.Config
 }
 
-pub(all) struct ExitCode(Int32) derive(Eq, @debug.Debug)
+pub struct ExitCode {
+  // private fields
+} derive(Eq, @debug.Debug)
 pub fn ExitCode::equal(Self, Self) -> Bool
+pub fn ExitCode::failure() -> Self
+pub fn ExitCode::from_int(Int32) -> Self raise HostError
 pub fn ExitCode::not_equal(Self, Self) -> Bool
+pub fn ExitCode::success() -> Self
+pub fn ExitCode::to_int(Self) -> Int32
 pub fn ExitCode::to_repr(Self) -> @debug.Repr
 
 pub struct Host[S] {
@@ -39,9 +66,23 @@ pub struct HostBuilder[S] {
 }
 
 pub struct RunOutcome {
-  exit_code : ExitCode
-  failures : Array[Error]
+  // private fields
 }
+pub fn RunOutcome::exit_code(Self) -> ExitCode
+pub fn RunOutcome::failures(Self) -> Array[Error]
+
+pub struct ServiceName {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn ServiceName::equal(Self, Self) -> Bool
+pub fn ServiceName::hash(Self) -> Int32
+pub fn ServiceName::hash_combine(Self, Hasher) -> Unit
+pub fn ServiceName::not_equal(Self, Self) -> Bool
+pub fn ServiceName::output(Self, &Logger) -> Unit
+pub fn ServiceName::parse(String) -> Self raise HostError
+pub fn ServiceName::to_repr(Self) -> @debug.Repr
+pub fn ServiceName::to_string(Self) -> String
+pub impl Show for ServiceName
 
 // Type aliases
 pub type Hook[S] = async (Context[S]) -> Unit

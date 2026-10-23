@@ -201,6 +201,10 @@ cancellation, so a middleware that catches every error does not stop it. The
 failures that a sequential publish held before the cancellation are not
 reported. A caller that needs them publishes without a cancellation scope
 around the publish. The `finally_` hook runs also during a cancellation.
+A handler that reacts to its own cancellation with a protected cleanup, and
+raises an ordinary error from it, gives that error from `send`, as a direct
+call of the handler does. A publish does not start the next handler after a
+cancellation and does not raise `PublishFailed` for it.
 
 A time limit that a handler sets for itself, for example with
 `with_timeout`, raises an ordinary error. `send` passes it out, and a publish

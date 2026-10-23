@@ -10,7 +10,7 @@ suberror GreetError {
 /// A sender whose handler waits, records `handler` and gives `Hi <name>`.
 fn greeter(log : Array[String]) -> @mediator_async.Sender[Unit, Greet, String] {
   @mediator_async.sender((_, req) => {
-    @async.sleep(1)
+    @aio.sleep(1)
     log.push("handler")
     let Greet(name) = req
     "Hi " + name
@@ -21,7 +21,7 @@ fn greeter(log : Array[String]) -> @mediator_async.Sender[Unit, Greet, String] {
 /// A sender whose handler waits, records `handler` and raises `Refused`.
 fn refuser(log : Array[String]) -> @mediator_async.Sender[Unit, Greet, String] {
   @mediator_async.sender((_, _) => {
-    @async.sleep(1)
+    @aio.sleep(1)
     log.push("handler")
     raise Refused("closed")
   })
@@ -35,7 +35,7 @@ fn traced(
   name : String,
 ) -> @mediator_async.Middleware[Unit, Greet, String] {
   @mediator_async.middleware((next, ctx, req) => {
-    @async.sleep(1)
+    @aio.sleep(1)
     log.push(name + " in")
     let reply = next(ctx, req)
     log.push(name + " out")
@@ -74,14 +74,14 @@ async test "before and after hooks wait and record around the handler" {
   let logged = greeter(log)
     .use_(
       @mediator_async.before((_, req) => {
-        @async.sleep(1)
+        @aio.sleep(1)
         let Greet(name) = req
         log.push("before " + name)
       }),
     )
     .use_(
       @mediator_async.after((_, _, reply) => {
-        @async.sleep(1)
+        @aio.sleep(1)
         log.push("after " + reply)
       }),
     )
@@ -126,7 +126,7 @@ async test "a middleware that replies without the next step skips the handler" {
   let log = []
   let cached = greeter(log).use_(
     @mediator_async.middleware((_, _, _) => {
-      @async.sleep(1)
+      @aio.sleep(1)
       "cached"
     }),
   )

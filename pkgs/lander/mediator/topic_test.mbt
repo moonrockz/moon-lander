@@ -28,7 +28,28 @@ test "publish runs each handler one time in add order" {
 }
 
 ///|
-test "publish stops at the first handler that raises" {
+/// Check that `error` is one `PublishFailed` for `handlers` handlers whose
+/// failures are `Full` errors with the given positions and names.
+fn expect_publish_failed(
+  error : Error,
+  handlers~ : Int32,
+  failures~ : Array[(Int32, String)],
+) -> Unit raise {
+  guard error is @mediator.PublishFailed(handlers=count, failures=got) else {
+    fail("publish raised another error: \{error}")
+  }
+  assert_eq(count, handlers)
+  let seen = got.map(failure => {
+    guard failure.error is Full(name) else {
+      fail("a failure holds another error: \{failure.error}")
+    }
+    (failure.position, name)
+  })
+  assert_eq(seen, failures)
+}
+
+///|
+test "publish runs every handler after the second of three raises" {
   let log = []
   let entered : @mediator.Topic[Unit, Entered] = @mediator.topic((_, _) => {
     log.push("one")
@@ -41,12 +62,78 @@ test "publish stops at the first handler that raises" {
     })
     .add((_, _) => log.push("three"))
   try all.publish((), Entered("Ann")) catch {
-    Full(name) => assert_eq(name, "Ann")
-    other => fail("publish raised another error: \{other}")
+    error => expect_publish_failed(error, handlers=3, failures=[(2, "Ann")])
   } noraise {
     _ => fail("publish did not raise")
   }
+  assert_eq(log, ["one", "two", "three"])
+}
+
+///|
+test "publish lists two failures in add order with their own errors" {
+  let log = []
+  let entered : @mediator.Topic[Unit, Entered] = @mediator.topic((_, _) => {
+    log.push("one")
+  })
+  let all = entered
+    .add((_, _) => {
+      log.push("two")
+      raise Full("second")
+    })
+    .add((_, _) => {
+      log.push("three")
+      raise Full("third")
+    })
+  try all.publish((), Entered("Ann")) catch {
+    error =>
+      expect_publish_failed(error, handlers=3, failures=[
+        (2, "second"),
+        (3, "third"),
+      ])
+  } noraise {
+    _ => fail("publish did not raise")
+  }
+  assert_eq(log, ["one", "two", "three"])
+}
+
+///|
+test "publish with no failing handler finishes with no error" {
+  let log = []
+  let entered : @mediator.Topic[Unit, Entered] = @mediator.topic((_, _) => {
+    log.push("one")
+  })
+  let all = entered.add((_, _) => log.push("two"))
+  all.publish((), Entered("Ann")) catch {
+    error => fail("publish raised an error: \{error}")
+  }
   assert_eq(log, ["one", "two"])
+}
+
+///|
+test "a topic middleware gets the combined error and can catch it" {
+  let log = []
+  let caught = []
+  let entered : @mediator.Topic[Unit, Entered] = @mediator.topic((_, _) => {
+    log.push("one")
+  })
+  let guarded = entered
+    .add((_, _) => {
+      log.push("two")
+      raise Full("second")
+    })
+    .use_(
+      @mediator.middleware((next, ctx, ev) => {
+        next(ctx, ev) catch {
+          error => caught.push(error)
+        }
+      }),
+    )
+  guarded.publish((), Entered("Ann")) catch {
+    error => fail("publish raised an error: \{error}")
+  }
+  assert_eq(log, ["one", "two"])
+  assert_eq(caught.length(), 1)
+  expect_publish_failed(caught[0], handlers=2, failures=[(2, "second")])
 }
 
 ///|

@@ -31,6 +31,8 @@ struct MediatorWorld {
   mut topic : @mediator.Topic[AcceptanceContext, Joined]?
   mut reply : String?
   mut error : String?
+  mut publish_handlers : Int32?
+  publish_failures : Array[String]
 }
 
 ///|
@@ -43,6 +45,8 @@ fn MediatorWorld::MediatorWorld() -> MediatorWorld {
     topic: None,
     reply: None,
     error: None,
+    publish_handlers: None,
+    publish_failures: [],
   }
 }
 
@@ -154,7 +158,15 @@ impl @moonspec.World for MediatorWorld with fn configure(self, setup) {
   setup.when1("the caller publishes {string}", (name : String) => {
     guard self.topic is Some(topic) else { fail("build the topic first") }
     topic.publish(self.ctx, Joined(name)) catch {
-      Closed(text) => self.error = Some(text)
+      @mediator.PublishFailed(handlers~, failures~) => {
+        self.publish_handlers = Some(handlers)
+        for failure in failures {
+          guard failure.error is Closed(text) else {
+            fail("a publish failure holds another error: \{failure.error}")
+          }
+          self.publish_failures.push("\{failure.position} \{text}")
+        }
+      }
       other => fail("publish raised another error: \{other}")
     }
   })
@@ -169,6 +181,13 @@ impl @moonspec.World for MediatorWorld with fn configure(self, setup) {
   })
   setup.then0("no error is raised", () => {
     @expect.expect(self.error).to_equal(None)
+    @expect.expect(self.publish_handlers).to_equal(None)
+  })
+  setup.then1("the publish fails for {int} handlers", (handlers : Int32) => {
+    @expect.expect(self.publish_handlers).to_equal(Some(handlers))
+  })
+  setup.then1("the publish failures are {string}", (expected : String) => {
+    @expect.expect(self.publish_failures.join(", ")).to_equal(expected)
   })
   setup.then1("the log is {string}", (expected : String) => {
     @expect.expect(self.log.join(", ")).to_equal(expected)
@@ -217,8 +236,18 @@ let publish_feature : String =
   #|    And the failing handler "two" is added
   #|    And the handler "three" is added
   #|    When the caller publishes "Ann"
-  #|    Then the log is "one Ann, two Ann"
-  #|    And the application error "two" is raised
+  #|    Then the log is "one Ann, two Ann, three Ann"
+  #|    And the publish fails for 3 handlers
+  #|    And the publish failures are "2 two"
+  #|
+  #|  Scenario: Two handlers raise
+  #|    Given a topic that starts with the handler "one"
+  #|    And the failing handler "two" is added
+  #|    And the failing handler "three" is added
+  #|    When the caller publishes "Ann"
+  #|    Then the log is "one Ann, two Ann, three Ann"
+  #|    And the publish fails for 3 handlers
+  #|    And the publish failures are "2 two, 3 three"
 
 ///|
 let middleware_feature : String =

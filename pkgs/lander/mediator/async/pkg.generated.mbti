@@ -1,0 +1,15 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander/mediator/async"
+
+// Values
+pub fn[C, Req, Res] sender(async (C, Req) -> Res) -> Sender[C, Req, Res]
+
+// Errors
+
+// Types and methods
+type Sender[C, Req, Res]
+pub async fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res
+
+// Type aliases
+
+// Traits

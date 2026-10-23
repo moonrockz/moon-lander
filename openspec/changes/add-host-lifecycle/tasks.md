@@ -114,7 +114,7 @@ Bead: lander-4us.5.11
 
 - [ ] 11.1 Create `moonrockz/moon-lander/hosting/console` `run` for native over the spike stub: install handlers, register the flag as a stop probe, run a 50 ms watcher task that calls `stop_application` with `Signal(kind)`, and end the process with libc `exit(code)`
 - [ ] 11.2 Add a test program in `tests/` and native acceptance tests that send SIGINT, SIGTERM and SIGQUIT on Linux and macOS; verify codes 130, 143 and 131, the exact `SignalKind`, no core dump, and all stop hooks
-- [ ] 11.3 Add Windows acceptance tests that send `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and `CTRL_CLOSE_EVENT`; verify codes 130, 131 and 143 and the stop hooks
+- [ ] 11.3 Add Windows acceptance tests that send each console event that task 1.2 found a CI runner can send to one child process (`CTRL_BREAK_EVENT` at least); verify its code (131 for `CTRL_BREAK_EVENT`) and the stop hooks. For each event that task 1.2 recorded as not sendable from a program (`CTRL_CLOSE_EVENT`, and `CTRL_C_EVENT` to one process group), verify the mapping and the code through a unit test of the handler logic, and record the manual check in the package README
 - [ ] 11.4 Verify that a second SIGINT during a slow stop hook ends the process at once with 130 and skips the remaining hooks
 - [ ] 11.5 Verify that a synchronous loop that polls `ctx.cancelled()` sees the first signal, and that a loop with no check ends at the second signal
 - [ ] 11.6 Document the Windows console-close time limit in the package README

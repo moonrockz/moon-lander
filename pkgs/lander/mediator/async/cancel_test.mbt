@@ -207,3 +207,32 @@ async test "handler errors during a cancellation give no concurrent PublishFaile
   assert_eq(outcome, None)
   assert_eq(log.filter(line => line == "cleanup stopped").length(), 2)
 }
+
+///|
+/// A sync send has no loop and no `catch`, so it adds nothing to the outcome
+/// of its handler: a handler that turns its own cancellation into an ordinary
+/// error, through a protected cleanup, gives that error from `send`, the same
+/// as a direct call of the handler.
+async test "send gives the cleanup error of a cancelled handler, as a direct call does" {
+  let log = []
+  let cleanup = failing_cleanup(log)
+  let direct = try {
+    @aio.with_timeout_opt(50, () => cleanup((), Job("a"))) |> ignore
+    "no error"
+  } catch {
+    Broken(text) => text
+    other => "other \{other}"
+  }
+  let cleanup_sender : @mediator_async.Sender[Unit, Job, Unit] = @mediator_async.sender(
+    cleanup,
+  )
+  let sent = try {
+    @aio.with_timeout_opt(50, () => cleanup_sender.send((), Job("a"))) |> ignore
+    "no error"
+  } catch {
+    Broken(text) => text
+    other => "other \{other}"
+  }
+  assert_eq(direct, "cleanup")
+  assert_eq(sent, direct)
+}

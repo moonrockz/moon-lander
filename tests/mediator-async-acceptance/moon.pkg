@@ -1,0 +1,7 @@
+import {
+  "moonrockz/moon-lander/mediator",
+  "moonrockz/moon-lander/mediator/async" @mediator_async,
+  "moonbitlang/async",
+} for "wbtest"
+
+supported_targets = "wasm+js+native"

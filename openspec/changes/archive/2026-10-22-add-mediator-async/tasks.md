@@ -63,12 +63,12 @@ Bead: lander-4us.19.5
 
 Bead: lander-4us.19.6
 
-- [ ] 6.1 Add `tests/mediator-async-acceptance` (`supported_targets = "wasm+js+native"`) with one `async test` per spec scenario of `mediator-async`; verify `mise run test` passes on `wasm`, `js` and `native`
-- [ ] 6.2 Add the acceptance suite to `check:mediator`; verify each async leg runs more than zero tests and record the counts per target in the bead
-- [ ] 6.3 Verify the `moon info --target` reports for the async package are the same for `wasm`, `js` and `native`, the core interface is still the same on all four targets, and the package source has no `#cfg` and no per-target file
-- [ ] 6.4 Add the async mediator row to the layer table in `pkgs/lander/README.md` and a row to `tests/README.md`; verify `mise run build:site` and `mise run check:site` pass
-- [ ] 6.5 Add the async package and the new `TimedOut` case to the `## Unreleased` section of `CHANGELOG.md`; verify `mise run test:scripts` passes
-- [ ] 6.6 Run `mise run check`; verify lint, validation, all target tests, `check:mediator` and builds pass
+- [x] 6.1 Add `tests/mediator-async-acceptance` (`supported_targets = "wasm+js+native"`) with one `async test` per spec scenario of `mediator-async`; verify `mise run test` passes on `wasm`, `js` and `native`
+- [x] 6.2 Add the acceptance suite to `check:mediator`; verify each async leg runs more than zero tests and record the counts per target in the bead
+- [x] 6.3 Verify the `moon info --target` reports for the async package are the same for `wasm`, `js` and `native`, the core interface is still the same on all four targets, and the package source has no `#cfg` and no per-target file
+- [x] 6.4 Add the async mediator row to the layer table in `pkgs/lander/README.md` and a row to `tests/README.md`; verify `mise run build:site` and `mise run check:site` pass
+- [x] 6.5 Add the async package and the new `TimedOut` case to the `## Unreleased` section of `CHANGELOG.md`; verify `mise run test:scripts` passes
+- [x] 6.6 Run `mise run check`; verify lint, validation, all target tests, `check:mediator` and builds pass
 
 ## Workflow follow-up
 

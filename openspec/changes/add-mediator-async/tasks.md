@@ -24,11 +24,11 @@ Bead: lander-4us.19.1
 
 Bead: lander-4us.19.2
 
-- [ ] 2.1 Add the abstract async `Middleware[C, Req, Res]`, `middleware` and `Sender::use_` of design D2; verify `use_` gives a new sender and the original sender still sends without the middleware
-- [ ] 2.2 Add `before` and `after` with async hooks, and `finally_` with a sync hook in a `defer` (design D8); verify a log records before, handler and after in order, and that `after` does not run when the next step raises
-- [ ] 2.3 Verify the order rule (A then B gives A, B, handler, B, A), a middleware that replies without the next step (the handler does not run), and middleware that change the request and the reply
-- [ ] 2.4 Verify a middleware that catches the error of the next step can give a reply, and one that does not catch passes the same error out
-- [ ] 2.5 Document the async middleware with a runnable log example in the README; verify it runs on `wasm`, `js` and `native`
+- [x] 2.1 Add the abstract async `Middleware[C, Req, Res]`, `middleware` and `Sender::use_` of design D2; verify `use_` gives a new sender and the original sender still sends without the middleware
+- [x] 2.2 Add `before` and `after` with async hooks, and `finally_` with a sync hook in a `defer` (design D8); verify a log records before, handler and after in order, and that `after` does not run when the next step raises
+- [x] 2.3 Verify the order rule (A then B gives A, B, handler, B, A), a middleware that replies without the next step (the handler does not run), and middleware that change the request and the reply
+- [x] 2.4 Verify a middleware that catches the error of the next step can give a reply, and one that does not catch passes the same error out
+- [x] 2.5 Document the async middleware with a runnable log example in the README; verify it runs on `wasm`, `js` and `native`
 
 ## 3. Async topics: sequential and concurrent publish
 

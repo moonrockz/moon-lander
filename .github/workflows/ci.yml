@@ -117,6 +117,8 @@ jobs:
         run: mise run check:openrpc-assets
       - name: Verify the isolated OpenRPC source consumer
         run: mise run check:openrpc
+      - name: Test the native console signal stub and a consumer outside the workspace
+        run: mise run check:console
       - name: Verify generated OpenRPC Unicode data
         run: mise run check:openrpc-unicode
       - name: Verify generated OpenRPC artifact metaschemas
@@ -212,6 +214,8 @@ jobs:
         run: mise run check:config
       - name: Verify format trimming and failure propagation
         run: mise run check:formats
+      - name: Test the native console signal stub and a consumer outside the workspace
+        run: mise run check:console
 
   # The docs site. It runs on each pull request with no path filter, because a path-filtered
   # required check stays pending on other pull requests. It builds the site and does not deploy it.

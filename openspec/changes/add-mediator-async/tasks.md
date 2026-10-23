@@ -34,11 +34,11 @@ Bead: lander-4us.19.2
 
 Bead: lander-4us.19.3
 
-- [ ] 3.1 Add the abstract `Topic[C, Ev]`, `topic`, `Topic::add` and `Topic::use_`; verify `add` gives a new topic and the original keeps its handler count
-- [ ] 3.2 Add `Topic::publish` as in design D3; verify three handlers run one at a time in add order (each starts after the previous one ends), that a failing second handler gives one `PublishFailed` at position 2 of 3 after all three run, and that no failure gives no error
-- [ ] 3.3 Add `Topic::publish_concurrent` as in design D4; verify two waiting handlers overlap (the second starts before the first ends), that publish returns after both end, and that failures appear in add order when the third handler fails before the first
-- [ ] 3.4 Verify a topic middleware gets the one combined error from both publish operations and can catch it
-- [ ] 3.5 Document both publish operations, the Foundatio model and the absence of fire-and-forget in the README with a runnable example; verify it runs on `wasm`, `js` and `native`
+- [x] 3.1 Add the abstract `Topic[C, Ev]`, `topic`, `Topic::add` and `Topic::use_`; verify `add` gives a new topic and the original keeps its handler count
+- [x] 3.2 Add `Topic::publish` as in design D3; verify three handlers run one at a time in add order (each starts after the previous one ends), that a failing second handler gives one `PublishFailed` at position 2 of 3 after all three run, and that no failure gives no error
+- [x] 3.3 Add `Topic::publish_concurrent` as in design D4; verify two waiting handlers overlap (the second starts before the first ends), that publish returns after both end, and that failures appear in add order when the third handler fails before the first
+- [x] 3.4 Verify a topic middleware gets the one combined error from both publish operations and can catch it
+- [x] 3.5 Document both publish operations, the Foundatio model and the absence of fire-and-forget in the README with a runnable example; verify it runs on `wasm`, `js` and `native`
 
 ## 4. Cancellation and timeouts
 

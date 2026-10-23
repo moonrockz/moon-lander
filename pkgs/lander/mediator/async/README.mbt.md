@@ -12,9 +12,14 @@ Import the package with an explicit alias, because its last path segment is
 ```text
 import {
   "moonrockz/moon-lander/mediator/async" @mediator_async,
-  "moonbitlang/async" @async,
+  "moonbitlang/async",
 }
 ```
+
+In your package, `moonbitlang/async` keeps its default alias `@async`. The
+examples on this page run as tests of the package itself, where `async` is the
+name of the package, so they import `moonbitlang/async` as `@aio`. Write
+`@async.sleep` where an example has `@aio.sleep`.
 
 | Target | Supported | Note |
 | --- | --- | --- |
@@ -47,7 +52,7 @@ async test "send a ping to a handler that waits" {
     _,
     req,
   ) => {
-    @async.sleep(10)
+    @aio.sleep(10)
     let Ping(text) = req
     "Pong: " + text
   })
@@ -87,7 +92,7 @@ async test "log middleware around an async send" {
     _,
     req,
   ) => {
-    @async.sleep(10)
+    @aio.sleep(10)
     log.push("handler")
     let Ping(text) = req
     "Pong: " + text
@@ -107,5 +112,74 @@ async test "log middleware around an async send" {
   assert_eq(log, [
     "log in", "handler", "finally", "reply Pong: Hello", "log out",
   ])
+}
+```
+
+## Publish an event
+
+`@mediator_async.topic` takes the first async event handler and gives a
+`Topic[C, Ev]` value. `Topic::add` gives a new topic with one more handler at
+the end, and `Topic::use_` gives a new topic with one more middleware around
+the whole publish. A topic has two publish operations. Both follow the
+Foundatio.Mediator contract of the core: every handler runs, and a failing
+handler does not stop the others.
+
+| Operation | Handlers run | Foundatio model |
+| --- | --- | --- |
+| `publish` | One at a time, in add order. Each handler starts after the previous one ends | `ForeachAwait` |
+| `publish_concurrent` | All at the same time, in one task group. The publish waits for all of them | `TaskWhenAll` |
+
+When one or more handlers raise, both operations raise one
+`@mediator.PublishFailed(handlers~, failures~)` after the last handler ends.
+The failures are in add order, also when the handlers of a concurrent publish
+end in another order. A topic middleware gets that one error from its `next`
+and can catch it.
+
+No publish returns before its handlers end. There is no fire-and-forget
+publish, because a handler error must not be lost and `moonbitlang/async`
+lets no task outlive its task group. An application that wants background
+work starts its own task group.
+
+```mbt check
+///|
+struct Joined(String)
+
+///|
+suberror AuditError {
+  AuditClosed(String)
+}
+
+///|
+async test "a concurrent publish runs every handler and lists the failure" {
+  let log = []
+  let joined : @mediator_async.Topic[Unit, Joined] = @mediator_async.topic((
+    _,
+    ev,
+  ) => {
+    @aio.sleep(50)
+    let Joined(name) = ev
+    log.push("welcome " + name)
+  })
+  let all = joined.add((_, ev) => {
+    @aio.sleep(10)
+    let Joined(name) = ev
+    raise AuditClosed(name)
+  })
+  try all.publish_concurrent((), Joined("Ann")) catch {
+    @mediator.PublishFailed(handlers~, failures~) as error => {
+      assert_eq(handlers, 2)
+      assert_eq(failures.length(), 1)
+      assert_eq(failures[0].position, 2)
+      assert_true(failures[0].error is AuditClosed("Ann"))
+      assert_eq(
+        error.message(),
+        "Publish failed: 1 of 2 handlers raised an error (position 2)",
+      )
+    }
+    other => fail("publish raised another error: \{other}")
+  } noraise {
+    _ => fail("publish did not raise")
+  }
+  assert_eq(log, ["welcome Ann"])
 }
 ```

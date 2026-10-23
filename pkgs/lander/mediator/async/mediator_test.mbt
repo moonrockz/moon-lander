@@ -13,7 +13,7 @@ async test "send an echo through a handler that waits" {
     _,
     req,
   ) => {
-    @async.sleep(10)
+    @aio.sleep(10)
     calls.val += 1
     let Echo(text) = req
     "Echo: " + text
@@ -35,7 +35,7 @@ async test "a handler error passes out of send unchanged" {
     _,
     req,
   ) => {
-    @async.sleep(10)
+    @aio.sleep(10)
     let Echo(text) = req
     raise Closed(text)
   })

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- `moonrockz/moon-lander/mediator`: `Topic::publish` calls every handler of
+  the topic, in add order, also after a handler raises an error. After the
+  last handler it raises one `MediatorError::PublishFailed(handlers~,
+  failures~)`, also when only one handler fails. Before, publish stopped at
+  the first handler that raised and passed that error out. A caller that
+  caught the raw handler error catches `PublishFailed` instead and reads each
+  error from `failures`. `Sender::send` does not change.
+- `MediatorError` has the new case `PublishFailed`. A `match` on
+  `MediatorError` with no wildcard must add it.
+
+### Added
+
+- `PublishFailure`, one handler failure of a publish: the 1-based `position`
+  of the handler and the `error` that it raised. `MediatorError::message`
+  gives only the failure count, the handler count and the positions, not
+  event values or the text of the wrapped errors.
+
 ## 0.2.0 - 2026-10-22
 
 Moon-Lander adds `moonrockz/openrpc` and a release workflow. The shared
@@ -21,6 +42,12 @@ unchanged at `0.2.0`.
 - A GitHub Actions release workflow publishes the public modules to
   mooncakes.io, verifies the published OpenRPC module from the public registry
   and creates the GitHub release.
+- `moonrockz/moon-lander/mediator`, a synchronous mediator in the framework
+  module: typed senders and topics, middleware with `before`, `after` and
+  `finally_`, a context value, and `MediatorError::Rejected`. The compiler is
+  the registry, so there is no text key and no runtime lookup. In `0.2.0`,
+  `Topic::publish` stops at the first handler that raises. The framework
+  module is not published.
 
 ## 0.1.0 - 2026-10-19
 

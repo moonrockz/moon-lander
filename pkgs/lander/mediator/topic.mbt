@@ -45,8 +45,10 @@ pub fn[C, Ev] Topic::use_(
 
 ///|
 /// Publish an event with a context value. The middleware runs in attach order
-/// around the handlers, and the handlers run one time each in add order. The
-/// publish stops at the first handler that raises, and raises that error.
+/// around the handlers. Every handler runs one time, in add order, also after
+/// a handler raises. When one or more handlers raise, the publish raises one
+/// `MediatorError::PublishFailed` after the last handler, so a topic
+/// middleware gets that one combined error from its next step.
 pub fn[C, Ev] Topic::publish(
   self : Topic[C, Ev],
   ctx : C,
@@ -57,8 +59,14 @@ pub fn[C, Ev] Topic::publish(
     self.middleware,
     0,
     (c, e) => {
-      for handle in handlers {
-        handle(c, e)
+      let failures = []
+      for index, handle in handlers {
+        handle(c, e) catch {
+          error => failures.push({ position: index + 1, error, })
+        }
+      }
+      if !failures.is_empty() {
+        raise PublishFailed(handlers=handlers.length(), failures~)
       }
     },
     ctx,

@@ -32,7 +32,7 @@ graph LR
 | Sender | `Sender[C, Req, Res]`: one handler for one request type | `@mediator.sender(handler)` |
 | Topic | `Topic[C, Ev]`: one or more handlers for one event type | `@mediator.topic(handler)`, then `add` |
 | Middleware | `Middleware[C, Req, Res]`: one wrapper step | `@mediator.middleware(wrap)`, `before`, `after`, `finally_` |
-| Error | `MediatorError`: a refusal from a handler or a middleware | `raise @mediator.Rejected(reason=...)` |
+| Error | `MediatorError`: a refusal, or the failures of a publish | `raise @mediator.Rejected(reason=...)`; `publish` raises `PublishFailed` |
 
 ## Send a request
 
@@ -92,9 +92,63 @@ test "publish to two handlers" {
 }
 ```
 
-Publish stops at the first handler that raises, and raises that error. The
-handlers after it do not run for that publish. A topic that must run all
-handlers catches the error inside the handler.
+The handlers of a topic are independent reactions to one event, so a failing
+handler does not stop the others. This is the Foundatio.Mediator contract.
+Publish calls every handler, also after a handler raises. After the last
+handler, publish raises one `MediatorError::PublishFailed` that holds the
+number of handlers and each failure, in add order. A failure is a
+`PublishFailure` record with the 1-based `position` of its handler and the
+`error` that the handler raised, unchanged. Publish raises `PublishFailed` also
+when only one handler fails, so a caller has one error shape to handle.
+
+| Handlers that raise | Handlers that run | Publish gives |
+| --- | --- | --- |
+| None | All, in add order | `()` |
+| One or more | All, in add order | `PublishFailed(handlers~, failures~)` after the last handler |
+
+```mbt check
+///|
+suberror CountError {
+  CountFull(String)
+}
+
+///|
+test "one handler fails and the others still run" {
+  let log = []
+  let joined : @mediator.Topic[Unit, Joined] = @mediator.topic((_, ev) => {
+    let Joined(name) = ev
+    log.push("welcome " + name)
+  })
+  let all = joined
+    .add((_, ev) => {
+      let Joined(name) = ev
+      raise CountFull(name)
+    })
+    .add((_, ev) => {
+      let Joined(name) = ev
+      log.push("audit " + name)
+    })
+  try all.publish((), Joined("Ann")) catch {
+    @mediator.PublishFailed(handlers~, failures~) as error => {
+      assert_eq(handlers, 3)
+      assert_eq(failures.length(), 1)
+      assert_eq(failures[0].position, 2)
+      assert_true(failures[0].error is CountFull("Ann"))
+      assert_eq(
+        error.message(),
+        "Publish failed: 1 of 3 handlers raised an error (position 2)",
+      )
+    }
+    other => fail("publish raised another error: \{other}")
+  } noraise {
+    _ => fail("publish did not raise")
+  }
+  assert_eq(log, ["welcome Ann", "audit Ann"])
+}
+```
+
+A topic whose later steps must not run after a failure uses one handler that
+calls the steps in order.
 
 ## Middleware
 
@@ -181,16 +235,25 @@ test "a handler reads the services from the context" {
 
 ## Errors
 
-The mediator raises no error of its own. A missing handler is a compile error,
-and there is no lookup and no I/O. A handler or a middleware can raise an
-error. `send` and `publish` raise the same error and give no reply, unless a
-middleware catches it. The mediator does not turn an error into a reply.
+A missing handler is a compile error, and there is no lookup and no I/O, so a
+send raises no error of its own. A handler or a middleware can raise an error.
+`send` raises the same error and gives no reply, unless a middleware catches
+it. `publish` collects the errors of its handlers into one `PublishFailed`. The
+mediator does not turn an error into a reply.
 
-`MediatorError` holds the failures that belong to the mediator pattern. Its one
-case, `Rejected(reason~)`, is for a handler or a middleware that refuses a
-request, for example after validation. `MediatorError::message` gives the text
-for people. It holds only the reason, because a request can hold secrets. An
-application error passes through as itself.
+`MediatorError` holds the failures that belong to the mediator pattern:
+
+| Case | Raised by | `message` gives |
+| --- | --- | --- |
+| `Rejected(reason~)` | A handler or a middleware that refuses a request, for example after validation | `Request rejected: <reason>` |
+| `PublishFailed(handlers~, failures~)` | `publish`, when one or more handlers raise | `Publish failed: 2 of 3 handlers raised an error (positions 2, 3)` |
+
+`MediatorError::message` gives the text for people. It holds only the reason,
+or the counts and the handler positions. It never holds a request, an event, or
+the text of a wrapped error, because each one can hold secrets. Read each
+wrapped error from `failures`. An application error from a send passes through
+as itself. A topic middleware wraps the whole publish, so it gets the one
+`PublishFailed` from its `next` and can catch it.
 
 ```mbt check
 ///|

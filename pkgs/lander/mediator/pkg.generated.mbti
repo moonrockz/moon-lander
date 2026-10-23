@@ -17,11 +17,17 @@ pub fn[C, Ev] topic((C, Ev) -> Unit raise) -> Topic[C, Ev]
 // Errors
 pub(all) suberror MediatorError {
   Rejected(reason~ : String)
+  PublishFailed(handlers~ : Int32, failures~ : Array[PublishFailure])
 }
 pub fn MediatorError::message(Self) -> String
 
 // Types and methods
 type Middleware[C, Req, Res]
+
+pub(all) struct PublishFailure {
+  position : Int32
+  error : Error
+}
 
 type Sender[C, Req, Res]
 pub fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res raise

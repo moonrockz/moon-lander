@@ -61,7 +61,7 @@ supply layered configuration. This change connects that configuration to a lifec
   - A pure, synchronous phase engine. Drivers run its steps.
   - A configurable shutdown timeout (default 30 seconds).
 - Add the package `moonrockz/moon-lander/hosting/console` (native and js):
-  - Native: a Zig signal stub. On Linux and macOS it handles SIGINT, SIGTERM and
+  - Native: a C signal stub (`native-stub`). On Linux and macOS it handles SIGINT, SIGTERM and
     SIGQUIT. On Windows it handles `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and
     `CTRL_CLOSE_EVENT`. It records which signal arrived, sets an atomic stop flag, and
     ends the process at once on a second signal, also during synchronous code.
@@ -69,9 +69,11 @@ supply layered configuration. This change connects that configuration to a lifec
     `config/host` js story adds.
   - After a graceful signal stop, the process exits explicitly with 130, 143 or 131 on
     every platform.
-- Add a first spike task group. It proves that a Zig C-ABI library, built by a moonx
-  task script, links into a MoonBit native build on Linux, macOS and Windows. If the
-  spike fails, the work stops and goes back to the owner.
+- Add a first spike task group. It proves that a C `native-stub` in `hosting/console`
+  installs the handlers, ends the process on a second signal, and owns the signals
+  without the `moonbitlang/async` runtime on Linux, macOS and Windows, also for a
+  consumer module outside the workspace. If the spike fails, the work stops and goes
+  back to the owner.
 - Add an embedded driver for wasm and wasm-gc. The lifetime stops through
   `stop_application` or through a stop probe that the embedder supplies.
 - Add the package `moonrockz/moon-lander/hosting/argparse`. It gives the standard
@@ -97,7 +99,7 @@ supply layered configuration. This change connects that configuration to a lifec
     builds on it.
   - The users of an application need no configuration file. A run with no file uses
     the defaults. An empty file is valid. A file sets only the keys that it holds.
-- Add a narrow AGENTS.md exception for the Zig signal stub.
+- Add a narrow AGENTS.md exception for the C signal stub.
 
 ## Capabilities
 
@@ -123,9 +125,10 @@ None. This change depends on `configuration-core`, `configuration-conventions` a
   `@lander` imports the `formats` virtual package of `add-configuration-core`.
 - New dependencies: `moonbitlang/async` (task groups, cancellation, timeouts),
   `moonbitlang/core/argparse` and `moonbitlang/core/env`. The native build of
-  `hosting/console` needs the pinned Zig 0.17.0. The js driver uses the TypeScript
-  adapter from the `config/host` js story.
-- AGENTS.md: a narrow exception lets `hosting/console` use a Zig stub for native
+  `hosting/console` compiles a C stub with the consumer's C compiler, which native
+  MoonBit builds already need. The js driver uses the TypeScript adapter from the
+  `config/host` js story.
+- AGENTS.md: a narrow exception lets `hosting/console` use a C stub for native
   signal handlers. All other process work stays with `moonbitlang/async`.
 - Windows is a target. Tests for the native stub and the js driver run on the
   windows-latest CI leg that `add-configuration-core` adds.

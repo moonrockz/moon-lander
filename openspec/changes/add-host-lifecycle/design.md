@@ -64,7 +64,8 @@ The async runtime is cooperative and single-threaded. On native, the runtime rea
 its own signal pipe only at a suspension point. On js, a Node.js listener runs only
 when the JavaScript stack is empty. Because `moonbitlang/async` gives no SIGQUIT, no
 signal identity and no handler that runs during synchronous code, the owner allows a
-native signal stub in Zig (O1, D7).
+native signal stub (O1, D7). Owner (2026-10-23): the stub is written in C. Zig was
+only a means to this end.
 
 ### Platform limits that remain
 
@@ -75,11 +76,17 @@ native signal stub in Zig (O1, D7).
 3. **Synchronous code that does not yield on js.** A Node.js listener does not run
    while a synchronous computation holds the stack. `ctx.cancelled()` cannot see the
    signal, and a second signal has no effect, until the code yields. Morphir keeps its
-   worker-thread model on js. The native Zig stub removes this limit on native (D7).
+   worker-thread model on js. The native C stub removes this limit on native (D7).
 4. **Windows close event.** After `CTRL_CLOSE_EVENT`, Windows ends the process when
    the handler returns or when the system time limit ends (about 5 seconds). The stop
    phase after a console close must end inside that limit. The host cannot extend it.
-5. **Feasibility of the Zig stub is not verified (O1).** Task group 1 is a spike. Owner: consumers get prebuilt stub objects. The package ships one prebuilt Zig object or static library for each native platform, so a consumer needs no Zig toolchain. If prebuilt objects are too complex to ship or link, the stub is written in C as a normal `native-stub`, which the consumer's C compiler builds.
+5. **Feasibility of the signal stub is not verified (O1).** Task group 1 is a spike.
+   Owner (2026-10-23): the stub is a C `native-stub`, which the consumer's C compiler
+   builds, as `moonbitlang/async` builds its own `signal.c`. An earlier plan wrote the
+   stub in Zig and shipped prebuilt objects for each platform. It was dropped: the
+   `link` settings in `moon.pkg` are keyed by backend (`native`), not by operating
+   system or CPU, so a package cannot choose the prebuilt object for the consumer's
+   platform without a build step that runs in every consumer.
 
 ## Goals / Non-Goals
 
@@ -362,11 +369,11 @@ Drivers run the steps:
 
 The console driver is in `hosting/console`. It has one native part and one js part.
 
-**Native: a Zig signal stub (Owner, O1).** The stub is Zig source in
-`hosting/console`, built with the pinned `zig` 0.17.0 into a C-ABI object or static
-library by a moonx task script, and linked through `moon.pkg` (`native-stub` or link
-flags). MoonBit calls it through `extern "c"`. `moonbitlang/async` stays for all other
-async work.
+**Native: a C signal stub (Owner, O1; Owner (2026-10-23): C).** The stub is one C
+source in `hosting/console`, listed in `native-stub` in `moon.pkg`, so the consumer's C
+compiler builds it with the package. It uses `#ifdef _WIN32` for the Windows part, the
+same pattern as `signal.c` in `moonbitlang/async`. MoonBit calls it through
+`extern "c"`. `moonbitlang/async` stays for all other async work.
 
 - Linux and macOS: the stub installs `sigaction` handlers for SIGINT, SIGTERM and
   SIGQUIT. SIGHUP keeps its default action, as in .NET `ConsoleLifetime` (Call).
@@ -385,8 +392,9 @@ async work.
   When the flag is set, it calls `stop_application` with `Signal(kind)`. That cancels
   the command task at its next suspension point.
 - Call (this change): the driver makes sure that the `moonbitlang/async` runtime does
-  not also handle these signals. The spike checks how (for example
-  `set_global_cancellation_signals([])`).
+  not also handle these signals, through the public
+  `@signal.set_global_cancellation_signals([])` of `moonbitlang/async/signal`. The
+  spike verifies on each platform that this removes the runtime handlers.
 - Call (this change): on `CTRL_CLOSE_EVENT` the handler waits until the process ends,
   so Windows does not end the process before the stop phase. The system time limit
   still applies (Platform limits, item 4).
@@ -521,7 +529,7 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 | Package | Targets | Contents |
 | --- | --- | --- |
 | `moonrockz/moon-lander/hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
-| `moonrockz/moon-lander/hosting/console` | native, js | Zig signal stub and native driver; js driver over the TypeScript adapter; process exit |
+| `moonrockz/moon-lander/hosting/console` | native, js | C signal stub and native driver; js driver over the TypeScript adapter; process exit |
 | `moonrockz/moon-lander/hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
 | `moonrockz/moon-lander` (`@lander`) | all | Batteries-included entry (D15): `cli` with the starting settings, the default steps (`formats`, `conventions`, `no_standard_flags`, `no_environments`, `build`, `run`) and `pub using` re-exports of `@hosting` steps |
 
@@ -532,7 +540,7 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   `add-configuration-core`. `hosting` does not import `formats`, so the bare path
   links no format that the application does not register.
 - Call (O1): AGENTS.md gets a narrow exception: the native signal handlers in
-  `hosting/console` use a Zig stub. All other process and filesystem work stays with
+  `hosting/console` use a C stub. All other process and filesystem work stays with
   `moonbitlang/async`. A task in this change makes that edit. The TypeScript exception
   belongs to the `config/host` js story (R12).
 
@@ -807,11 +815,12 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 
 ## Risks / Trade-offs
 
-- [The Zig stub may not build or link on one platform] → Task group 1 is a spike on
-  Linux, macOS and Windows. Owner fallback: write the stub in C as a `native-stub`.
-- [Consumers of the published module must not need Zig] → Owner: the package ships
-  prebuilt stub objects for each native platform. If that is too complex to ship or
-  link, the C fallback applies, and the consumer's C compiler builds the stub.
+- [The C stub may not behave the same on one platform] → Task group 1 is a spike on
+  Linux, macOS and Windows, and in a consumer module outside the workspace.
+- [Windows console events are hard to send from a test] → `GenerateConsoleCtrlEvent`
+  needs a process group that shares a console, and `CTRL_CLOSE_EVENT` cannot be sent
+  from a program. The spike finds what a CI runner allows and records any event that
+  only a manual check covers.
 - [A signal handler must do only async-signal-safe work] → The handler stores two
   atomic values and, on a second signal, calls `_exit` or `ExitProcess`. Nothing else.
 - [The watcher task wakes every 50 ms] → Small cost, and only in the console driver.
@@ -851,8 +860,8 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 
 ## Migration Plan
 
-1. Run the Zig stub spike first. Implement the host after the three configuration
-   changes.
+1. Run the C signal stub spike first. Implement the host after the three
+   configuration changes.
 2. morphir-moonbit moves in steps: first `@hosting.run` with exit codes and the
    telemetry `stopping` hook; then the console driver; then remove
    `interruption_start`, `interruption_stop`, the SIGINT part of `platform.c`, and the

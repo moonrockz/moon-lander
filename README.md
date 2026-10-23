@@ -102,7 +102,7 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.2.0`.
+- `moon.mod` holds the shared version, currently `0.3.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its `version()` export provides a build and test smoke check. Its
@@ -137,8 +137,10 @@ publishes releases.
 
 ## Releases
 
-The `0.2.0` release adds `moonrockz/openrpc`, a portable OpenRPC document
-library. The `0.1.0` release moved `moonrockz/notebooks` here and added MIME
+The `0.3.0` release changes the mediator publish policy (every handler runs,
+then one `PublishFailed`) and adds the async mediator to the unpublished
+framework module; it is the first release with a docs site asset. The `0.2.0`
+release adds `moonrockz/openrpc`, a portable OpenRPC document library. The `0.1.0` release moved `moonrockz/notebooks` here and added MIME
 queries, runtime cell capability inspection, and Ion-backed metadata. See
 [the changelog](CHANGELOG.md) for details and API migration notes.
 

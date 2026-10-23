@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-10-23
+
+Moon-Lander changes the mediator publish policy and adds the async mediator
+in the framework module. The shared workspace version moves to `0.3.0`, so
+`moonrockz/notebooks` and `moonrockz/openrpc` are republished unchanged at
+`0.3.0`. The framework module `moonrockz/moon-lander` is not published.
 
 ### Breaking changes
 

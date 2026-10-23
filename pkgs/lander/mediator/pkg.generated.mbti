@@ -18,6 +18,7 @@ pub fn[C, Ev] topic((C, Ev) -> Unit raise) -> Topic[C, Ev]
 pub(all) suberror MediatorError {
   Rejected(reason~ : String)
   PublishFailed(handlers~ : Int32, failures~ : Array[PublishFailure])
+  TimedOut(after_ms~ : Int32)
 }
 pub fn MediatorError::message(Self) -> String
 

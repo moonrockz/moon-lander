@@ -12,6 +12,8 @@ pub fn[C, Req, Res] middleware(async (async (C, Req) -> Res, C, Req) -> Res) -> 
 
 pub fn[C, Req, Res] sender(async (C, Req) -> Res) -> Sender[C, Req, Res]
 
+pub fn[C, Req, Res] timeout(Int32) -> Middleware[C, Req, Res]
+
 pub fn[C, Ev] topic(async (C, Ev) -> Unit) -> Topic[C, Ev]
 
 // Errors

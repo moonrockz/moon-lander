@@ -57,3 +57,16 @@ pub fn[C, Req, Res] finally_(
     next(ctx, req)
   })
 }
+
+///|
+/// Build a middleware that gives the next step `after_ms` milliseconds. When
+/// the next step does not end in time, the middleware cancels it and raises
+/// `@mediator.TimedOut(after_ms~)`, which holds no request values. A step
+/// that ends in time gives its reply or its error unchanged.
+pub fn[C, Req, Res] timeout(after_ms : Int) -> Middleware[C, Req, Res] {
+  middleware((next, ctx, req) => {
+    @aio.with_timeout(after_ms, () => next(ctx, req), error=@mediator.TimedOut(
+      after_ms~,
+    ))
+  })
+}

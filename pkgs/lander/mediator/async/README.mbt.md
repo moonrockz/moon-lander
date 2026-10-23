@@ -183,3 +183,57 @@ async test "a concurrent publish runs every handler and lists the failure" {
   assert_eq(log, ["welcome Ann"])
 }
 ```
+
+## Cancellation and timeouts
+
+A caller cancels a send or a publish through `moonbitlang/async`, for example
+with `with_timeout_opt` around the call, or when the task group of the caller
+ends. The mediator never catches, wraps, or counts a cancellation:
+
+| Call | When the caller cancels it |
+| --- | --- |
+| `send` | The handler stops. The caller gets no reply and no mediator error |
+| `publish` | The running handler stops and the remaining handlers do not start |
+| `publish_concurrent` | Every running handler stops |
+
+A cancellation is never a failure in `PublishFailed`. `catch` cannot capture a
+cancellation, so a middleware that catches every error does not stop it. The
+failures that a sequential publish held before the cancellation are not
+reported. A caller that needs them publishes without a cancellation scope
+around the publish. The `finally_` hook runs also during a cancellation.
+
+A time limit that a handler sets for itself, for example with
+`with_timeout`, raises an ordinary error. `send` passes it out, and a publish
+lists it as a failure and runs the other handlers.
+
+`@mediator_async.timeout(after_ms)` is a middleware that gives the next step
+`after_ms` milliseconds. When the step does not end in time, the middleware
+cancels it and raises `@mediator.TimedOut(after_ms~)`. Its `message` is
+`Request timed out after <after_ms> ms` and holds no request values.
+
+```mbt check
+///|
+async test "a timeout stops a slow send, and a caller cancellation is not an error" {
+  let log = []
+  let slow : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
+    _,
+    req,
+  ) => {
+    @aio.sleep(1000)
+    log.push("handler ended")
+    let Ping(text) = req
+    "Pong: " + text
+  })
+  let limited = slow.use_(@mediator_async.timeout(50))
+  try limited.send((), Ping("Hello")) catch {
+    @mediator.TimedOut(_) as error =>
+      assert_eq(error.message(), "Request timed out after 50 ms")
+    other => fail("send raised another error: \{other}")
+  } noraise {
+    reply => fail("send gave a reply: \{reply}")
+  }
+  let reply = @aio.with_timeout_opt(50, () => slow.send((), Ping("Hello")))
+  assert_eq(reply, None)
+  assert_eq(log, [])
+}
+```

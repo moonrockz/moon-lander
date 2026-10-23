@@ -52,6 +52,27 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
 - Prefer pure domain functions, explicit inputs, immutable public values, and
   typed alternatives. Keep I/O in host adapters and other boundary code.
 
+## Domain types
+
+Do not use primitive obsession. Parse, do not validate. Make invalid states
+unrepresentable.
+
+- When a value has rules, make a type for it. Do not use a raw `String`, `Int`,
+  `Array` or `Map` for it. Examples: names, prefixes, keys, paths, durations, ports
+  and exit codes.
+- Give each type a smart constructor, for example
+  `AppName::parse(text) -> AppName raise NameError`. Keep the fields private, so the
+  constructor is the only way to make a value. Do not use a `pub(all)` struct or a
+  public tuple struct for a value that has rules.
+- Parse one time, at the boundary where the raw value enters. After the parse, pass
+  the type, not the raw value. Do not check the same rules again later.
+- Use an enum for a fixed set of cases, not a string or an integer code.
+- When a value is valid by construction, give a constructor that cannot fail, for
+  example a constant (`ExitCode::success()`) or a value derived from another valid
+  value (a default prefix from an `AppName`).
+- A parse failure is a typed `suberror` that names the input and the rule it breaks.
+- Test each rule of a smart constructor with values on each side of the limit.
+
 ## Verification
 
 Run `mise run check` after changes. It runs lint, workspace and version validation,
@@ -61,6 +82,25 @@ Install Lefthook with `mise run hooks:install`. Run `mise run format` before
 committing MoonBit changes. Commit the `pkg.generated.mbti` files that `mise run lint`
 writes; lint fails when one is new or changed and not staged. Use Conventional Commits
 without AI attribution.
+
+## Review guidelines
+
+Review each change against this file. The full checklist is the skill
+`.agents/skills/code-review/SKILL.md`. It is the one source for every agent tool:
+the `code-reviewer` agents in `.claude/agents/`, `.cursor/agents/`,
+`.codex/agents/` and `.github/agents/` only point to it. A tool without one of
+these formats reads the skill file directly. Change the checklist only in the
+skill. Report these as problems:
+
+- A raw primitive for a domain value that has rules, a check that repeats rules after
+  a parse, or a public way to make a value that breaks its rules (Domain types).
+- I/O outside host adapters and drivers, or mutable public state.
+- Behavior, a public API or a requirement that changes without an OpenSpec change,
+  or code that disagrees with the spec, the design or the ticked tasks.
+- Library code that does not build and test on `wasm`, `wasm-gc`, `js` and `native`,
+  or a `warnings` override in `moon.pkg` without a comment that gives the reason and
+  when to remove it.
+- A changed public API without its `pkg.generated.mbti` update.
 
 ## Publishing
 

@@ -55,9 +55,9 @@ Bead: lander-4us.19.4
 
 Bead: lander-4us.19.5
 
-- [ ] 5.1 Add `Sender::from_sync` and `Topic::from_sync` of design D9; verify a wrapped core sender with a log middleware runs the core middleware and handler and gives the core reply, and a wrapped core topic raises the core `PublishFailed`
-- [ ] 5.2 Verify the context value passes unchanged: a handler and a middleware read a services record field after a wait and see the value that the caller gave, also when the field changes between two sends
-- [ ] 5.3 Document the one-line lambda for a sync handler, `from_sync`, and a services-record example in the shape of a consumer service (the Morphir workbench and moonrockz/smithy) in the README; verify it runs on `wasm`, `js` and `native`
+- [x] 5.1 Add `Sender::from_sync` and `Topic::from_sync` of design D9; verify a wrapped core sender with a log middleware runs the core middleware and handler and gives the core reply, and a wrapped core topic raises the core `PublishFailed`
+- [x] 5.2 Verify the context value passes unchanged: a handler and a middleware read a services record field after a wait and see the value that the caller gave, also when the field changes between two sends
+- [x] 5.3 Document the one-line lambda for a sync handler, `from_sync`, and a services-record example in the shape of a consumer service (the Morphir workbench and moonrockz/smithy) in the README; verify it runs on `wasm`, `js` and `native`
 
 ## 6. Integration check, acceptance suite and docs
 

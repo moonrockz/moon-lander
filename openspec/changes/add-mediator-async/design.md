@@ -156,6 +156,11 @@ pub fn[C, Req, Res] timeout(after_ms : Int) -> Middleware[C, Req, Res]
   wrap a core value, with its middleware, through its public `send` or
   `publish`. A single sync handler needs no helper: a one-line lambda
   adapts it (Context, probe), and the README shows it.
+- `Topic::from_sync` passes the core `PublishFailed` out unchanged, with the
+  positions and the handler count of the core topic (Owner, 2026-10-22). The
+  core topic does not give its handler count, so after `add` on a wrapped
+  topic the core publish counts as one handler at position 1, and its error
+  is the failure at that position.
 - A core `Middleware` cannot wrap an async next step, because its `next` is
   sync, so the async package has its own `Middleware` type.
 - The other direction (async from sync) is out of scope.

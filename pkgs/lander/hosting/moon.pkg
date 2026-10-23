@@ -1,0 +1,29 @@
+import {
+  "moonrockz/moon-lander/config",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/expect",
+  "moonbitlang/async",
+} for "test"
+
+import {
+  "moonrockz/expect",
+} for "wbtest"
+
+// Temporary until task group 13: only `run` reads the host and builds the
+// contexts and the outcome, and it exists on native and js. On wasm and wasm-gc
+// nothing reads them until `run_embedded`. On every target, the application
+// name and the arguments stay unread until groups 5, 6 and 8. Remove this line
+// when they are read. The pinned build system cannot condition imports by
+// target, so the test import of `moonbitlang/async` is unused on wasm and
+// wasm-gc (29); that part stays.
+warnings = "-7-9-29"
+
+// `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not
+// have. Its tests are async tests, which wasm-gc cannot run.
+options(targets: {
+  "run.mbt": ["native", "js"],
+  "run_test.mbt": ["native", "js"],
+})

@@ -17,7 +17,7 @@ configuration core is pure: hosts give it files and environment values, so the
 same inputs give the same configuration on every target.
 
 ```layers
-Hosting | @lander: arguments, lifecycle, exit codes (planned)
+Hosting | @lander, @hosting: services, lifecycle, exit codes (first slice)
 Binding | @config.bind: typed values with source-aware errors
 Conventions | @conventions: where configuration files are found
 Configuration core | @config: sources, file tree, pure load, merge
@@ -44,7 +44,7 @@ that wait, on `wasm`, `js` and `native`.
 | Binding | [`config`](config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
 | Mediator | [`mediator`](mediator/README.mbt.md) | Typed senders, publish topics that run every handler and report every failure in one `PublishFailed`, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
 | Async mediator | [`mediator/async`](mediator/async/README.mbt.md) | Async senders and topics with sequential and concurrent publish, caller cancellation, the `timeout` middleware, async middleware with a sync `finally_`, and `from_sync` for core values; `wasm`, `js` and `native` |
-| Hosting | `@lander` | Planned |
+| Hosting | `hosting`, `@lander.cli` | First slice: a builder with hosted services that have `start` and `stop` hooks, a services factory, and `@hosting.run` on `native` and `js`, which gives exit code 0 or 1. Arguments, lifecycle events, signals and configuration come next |
 
 The [Configuration](config/README.mbt.md), [Mediator](mediator/README.mbt.md) and
 [Async mediator](mediator/async/README.mbt.md) chapters show the API that exists, with examples that the tests compile and run. The
@@ -63,6 +63,55 @@ import {
 ```
 
 The root package exports `version()`, which gives the module version.
+
+## Run a host
+
+`@lander.cli(name, args)` starts a host builder for an application. Each step
+of the pipeline gives a new builder:
+
+| Step | What it does |
+| --- | --- |
+| `@lander.cli("acme", args)` | Starts the builder with the application name and the arguments |
+| `@hosting.service(name, start=.., stop=..)` | Adds a hosted service. Both hooks are optional and can wait |
+| `@hosting.build(factory)` | Gives the `Host`. It does no I/O, so a host can run more than one time |
+
+```mbt check
+///|
+/// The host of the application `acme`. Its one service writes each hook call
+/// into `log`.
+fn acme_host(log : Array[String]) -> @hosting.Host[Unit] {
+  @lander.cli("acme", ["greet"])
+  |> @hosting.service(
+    "greeter",
+    start=_ => log.push("greeter started"),
+    stop=_ => log.push("greeter stopped"),
+  )
+  |> @hosting.build(_ => ())
+}
+
+///|
+test "build the acme host" {
+  let log = []
+  ignore(acme_host(log))
+  // The build runs no hook.
+  assert_eq(log, [])
+}
+```
+
+On `native` and `js`, `@hosting.run(host, command)` runs the host and gives a
+`RunOutcome`. It does not end the process. The run calls the factory one time,
+runs the `start` hooks in registration order, runs the command, and runs the
+`stop` hooks in reverse order:
+
+| Result | Exit code |
+| --- | --- |
+| All hooks and the command succeed | 0 |
+| The factory, a hook or the command raises an error | 1, and `failures` holds each error |
+
+A failed `start` hook skips the command and the other `start` hooks. The
+services that started still get their `stop` hooks. The test `cli_test.mbt`
+runs `acme_host` this way. A later version adds a run function for every
+target, so this example can run there too.
 
 ## Choose which parsers the executable links
 

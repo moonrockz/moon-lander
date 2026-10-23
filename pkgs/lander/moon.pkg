@@ -1,7 +1,19 @@
 import {
+  "moonrockz/moon-lander/hosting",
+}
+
+import {
   "moonrockz/moon-lander" @lander,
+  "moonbitlang/async",
 } for "test"
+
+// The pinned build system cannot condition imports by target. The async test
+// import is unused on wasm and wasm-gc; retain other warning checks.
+warnings = "-29"
 
 options(
   "is-main": false,
+  // `@hosting.run` exists only on native and js. Its tests are async tests,
+  // which wasm-gc cannot run.
+  targets: { "cli_test.mbt": [ "native", "js" ] },
 )

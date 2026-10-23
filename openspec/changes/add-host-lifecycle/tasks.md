@@ -27,10 +27,10 @@ Bead: lander-4us.5.1
 
 Bead: lander-4us.5.2
 
-- [ ] 2.1 Create the package `moonrockz/moon-lander/hosting` and add `moonbitlang/async` (exact version) to the module; verify `mise run build` passes on wasm, wasm-gc, js and native
-- [ ] 2.2 Add `HostBuilder[S]`, `@hosting.builder`, `service` (with `start` and `stop` only), `build` and `Host[S]` with no configuration (an empty in-memory source); verify a test that builds a `Host[Unit]` on all four targets
-- [ ] 2.3 Add a first `@hosting.run` (native, js) that builds `S`, runs `start`, the command and `stop`, and returns a `RunOutcome` with exit code 0 or 1; verify tests for a clean run and a failing command, also on the Windows leg
-- [ ] 2.4 Add the `@lander.cli(name, args)` shortcut and a runnable example in `pkgs/lander/README.md`; verify the README example compiles as a doc test
+- [x] 2.1 Create the package `moonrockz/moon-lander/hosting` and add `moonbitlang/async` (exact version) to the module; verify `mise run build` passes on wasm, wasm-gc, js and native
+- [x] 2.2 Add `HostBuilder[S]`, `@hosting.builder`, `service` (with `start` and `stop` only), `build` and `Host[S]` with no configuration (an empty in-memory source); verify a test that builds a `Host[Unit]` on all four targets
+- [x] 2.3 Add a first `@hosting.run` (native, js) that builds `S`, runs `start`, the command and `stop`, and returns a `RunOutcome` with exit code 0 or 1; verify tests for a clean run and a failing command, also on the Windows leg
+- [x] 2.4 Add the `@lander.cli(name, args)` shortcut. Rename `pkgs/lander/README.md` to `README.mbt.md` and set `readme` in `pkgs/lander/moon.mod` to it. Add an example that builds a host (`cli`, `service`, `build`); verify that the example compiles as a doc test on all four targets, and that a native and js test runs the same host with `@hosting.run`
 
 ## 3. Pure phase engine and full hook order
 
@@ -160,7 +160,7 @@ Bead: lander-4us.5.16
 - [ ] 16.2 Add `@lander.formats`, `@lander.conventions`, `@lander.no_standard_flags` and `@lander.no_environments`, add the standard flags to the root argparse command without duplicates, and add the `pub using` re-exports of D15; verify the five "Change or turn off a default" scenarios and that `moon info` lists the re-exports in the `@lander` interface
 - [ ] 16.3 Add `@lander.build(factory)`, which changes `HostBuilder[Unit]` to `HostBuilder[S]` and keeps earlier settings and hosted services; verify the "No build step" and "Build after other steps" scenarios on all four targets
 - [ ] 16.4 Add `@lander.run(command)` as a synchronous function with one file per target group: the console driver on native and js, the embedded driver on wasm and wasm-gc; verify that one `fn main` source builds on all four targets and the two "Driver selection by target" scenarios. If the native or js call to the `moonbitlang/async` entry fails, use the fallback in D15 and tell the owner
-- [ ] 16.5 Add the smallest program as a doc test in `pkgs/lander/README.md`, and write every batteries example in the README in the one `@lander` style of D15; verify that `mise run test` compiles the examples
+- [ ] 16.5 Add the smallest program as a doc test in `pkgs/lander/README.mbt.md`, and write every batteries example in the README in the one `@lander` style of D15; verify that `mise run test` compiles the examples
 - [ ] 16.6 Add acceptance tests in `tests/` for "No file present", "Empty file", "One-key partial file" and "Partial user override", with the show and explain helper output and the origin kind `defaults`; verify them on native, js and wasm-gc (with an injected tree)
 - [ ] 16.7 Add the `Program` trait and `run_app(factory)` in `@hosting`, re-export both from `@lander` with `pub using`; verify the "Services record runs as the program" and "Same result as the lambda form" scenarios on all four targets
 - [ ] 16.8 Run `mise run check` and `mise run test:native-zig`; verify both pass

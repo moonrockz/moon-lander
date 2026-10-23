@@ -874,3 +874,7 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 
 - Can the stub wake the event loop through a pipe in place of the 50 ms watcher? The
   spike can measure it. The watcher stays until then.
+- Revisit the wasm driver choice if `moonbitlang/async` gets a WASI 0.3 backend.
+  Today its wasm event loop calls its own `"moonbitlang/async"` host imports, which
+  only `moonrun` supplies, so no standard runtime (for example Wasmtime) can run
+  `@hosting.run` on wasm. With a WASI 0.3 backend, wasm could use the async driver.

@@ -1,0 +1,49 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander/hosting"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander/config",
+}
+
+// Values
+pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
+
+pub fn[S] builder(String, Array[String]) -> HostBuilder[S]
+
+pub fn[S] service(HostBuilder[S], String, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S]
+
+// Errors
+
+// Types and methods
+pub struct BuildContext {
+  config : @config.Config
+}
+
+pub struct Context[S] {
+  services : S
+  config : @config.Config
+}
+
+pub(all) struct ExitCode(Int32) derive(Eq, @debug.Debug)
+pub fn ExitCode::equal(Self, Self) -> Bool
+pub fn ExitCode::not_equal(Self, Self) -> Bool
+pub fn ExitCode::to_repr(Self) -> @debug.Repr
+
+pub struct Host[S] {
+  // private fields
+}
+
+pub struct HostBuilder[S] {
+  // private fields
+}
+
+pub struct RunOutcome {
+  exit_code : ExitCode
+  failures : Array[Error]
+}
+
+// Type aliases
+pub type Hook[S] = async (Context[S]) -> Unit
+
+// Traits

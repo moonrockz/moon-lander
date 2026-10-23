@@ -79,10 +79,12 @@ pub async fn[C, Ev] Topic::publish(
     (c, e) => {
       let failures : Array[@mediator.PublishFailure] = []
       for index, handle in handlers {
+        stop_if_cancelled()
         handle(c, e) catch {
           error => failures.push({ position: index + 1, error })
         }
       }
+      stop_if_cancelled()
       raise_failures(handlers.length(), failures)
     },
     ctx,
@@ -132,6 +134,18 @@ pub async fn[C, Ev] Topic::publish_concurrent(
     ctx,
     ev,
   )
+}
+
+///|
+/// End the current task when the caller cancels it. A handler can raise an
+/// ordinary error after a cancellation, for example from a protected cleanup,
+/// and the `catch` of the loop takes that error, so the loop checks for the
+/// cancellation itself: no later handler starts and no `PublishFailed` hides
+/// the cancellation.
+async fn stop_if_cancelled() -> Unit {
+  if @aio.is_being_cancelled() {
+    @aio.pause()
+  }
 }
 
 ///|

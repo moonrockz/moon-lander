@@ -32,21 +32,33 @@ fn empty_context() -> AcceptanceContext {
 
 ///|
 /// A topic handler that records its start, waits `wait_ms`, records its end,
-/// and raises `Closed(name)` when `fails` is true.
+/// and raises `Closed(name)` when `fails` is true. With `stops=true`, a `defer`
+/// records `stopped` when the handler ends in any way, also by a
+/// cancellation.
 fn handler(
   log : Array[String],
   name : String,
   wait_ms~ : Int = 10,
   fails~ : Bool = false,
+  stops~ : Bool = false,
 ) -> async (AcceptanceContext, Joined) -> Unit {
   (_, ev) => {
     let Joined(person) = ev
     log.push(name + " start " + person)
+    defer note_if(stops, log, name + " stopped " + person)
     @async.sleep(wait_ms)
     log.push(name + " end " + person)
     if fails {
       raise Closed(name)
     }
+  }
+}
+
+///|
+/// Record `text` in `log` when `on` is true.
+fn note_if(on : Bool, log : Array[String], text : String) -> Unit {
+  if on {
+    log.push(text)
   }
 }
 
@@ -68,13 +80,16 @@ fn publish_failures(error : Error) -> (Int, Array[(Int, String)]) raise {
 
 ///|
 /// A ping sender whose handler waits `wait_ms`, records its end and gives
-/// `<greeting>: <text>` from the context.
+/// `<greeting>: <text>` from the context. With `stops=true`, a `defer` records
+/// `ping stopped` when the handler ends in any way.
 fn ping_sender(
   log : Array[String],
   wait_ms~ : Int = 10,
+  stops~ : Bool = false,
 ) -> @mediator_async.Sender[AcceptanceContext, Ping, String] {
   @mediator_async.sender((ctx, req) => {
     log.push("ping start")
+    defer note_if(stops, log, "ping stopped")
     @async.sleep(wait_ms)
     log.push("ping end")
     let Ping(text) = req
@@ -201,41 +216,42 @@ async test "Return after the last handler" {
 ///|
 async test "Cancel a send" {
   let log = []
-  let ping = ping_sender(log, wait_ms=1000)
+  let ping = ping_sender(log, wait_ms=1000, stops=true)
   let reply = @async.with_timeout_opt(50, () => {
     ping.send(empty_context(), Ping("Hello"))
   })
   assert_eq(reply, None)
-  @async.sleep(20)
-  assert_eq(log, ["ping start"])
+  assert_eq(log, ["ping start", "ping stopped"])
 }
 
 ///|
 async test "Cancel a sequential publish" {
   let log = []
   let topic = @mediator_async.topic(handler(log, "one"))
-    .add(handler(log, "two", wait_ms=1000))
+    .add(handler(log, "two", wait_ms=1000, stops=true))
     .add(handler(log, "three"))
   let outcome = @async.with_timeout_opt(100, () => {
     topic.publish(empty_context(), Joined("Ann"))
   })
   assert_eq(outcome, None)
-  @async.sleep(20)
-  assert_eq(log, ["one start Ann", "one end Ann", "two start Ann"])
+  assert_eq(log, [
+    "one start Ann", "one end Ann", "two start Ann", "two stopped Ann",
+  ])
 }
 
 ///|
 async test "Cancel a concurrent publish" {
   let log = []
-  let topic = @mediator_async.topic(handler(log, "one", wait_ms=1000)).add(
-    handler(log, "two", wait_ms=1000),
-  )
+  let topic = @mediator_async.topic(
+    handler(log, "one", wait_ms=1000, stops=true),
+  ).add(handler(log, "two", wait_ms=1000, stops=true))
   let outcome = @async.with_timeout_opt(50, () => {
     topic.publish_concurrent(empty_context(), Joined("Ann"))
   })
   assert_eq(outcome, None)
-  @async.sleep(20)
-  assert_eq(log, ["one start Ann", "two start Ann"])
+  assert_eq(log[0:2].to_owned(), ["one start Ann", "two start Ann"])
+  assert_eq(log.filter(line => line.contains("stopped")).length(), 2)
+  assert_false(log.iter().any(line => line.contains("end")))
 }
 
 // Requirement: A timeout inside a handler is an ordinary failure
@@ -259,15 +275,16 @@ async test "One handler times out" {
 ///|
 async test "The handler is too slow" {
   let log = []
-  let limited = ping_sender(log, wait_ms=1000).use_(@mediator_async.timeout(50))
+  let limited = ping_sender(log, wait_ms=1000, stops=true).use_(
+    @mediator_async.timeout(50),
+  )
   try limited.send(empty_context(), Ping("Hello")) catch {
     @mediator.TimedOut(after_ms~) => assert_eq(after_ms, 50)
     other => fail("send raised another error: \{other}")
   } noraise {
     reply => fail("send gave a reply: \{reply}")
   }
-  @async.sleep(20)
-  assert_eq(log, ["ping start"])
+  assert_eq(log, ["ping start", "ping stopped"])
 }
 
 ///|
@@ -313,15 +330,14 @@ async test "Middleware ends the call" {
 ///|
 async test "Finally after a cancellation" {
   let log = []
-  let hooked = ping_sender(log, wait_ms=1000).use_(
+  let hooked = ping_sender(log, wait_ms=1000, stops=true).use_(
     @mediator_async.finally_((_, _) => log.push("finally")),
   )
   let reply = @async.with_timeout_opt(50, () => {
     hooked.send(empty_context(), Ping("Hello"))
   })
   assert_eq(reply, None)
-  @async.sleep(20)
-  assert_eq(log, ["ping start", "finally"])
+  assert_eq(log, ["ping start", "ping stopped", "finally"])
 }
 
 // Requirement: The context value passes unchanged

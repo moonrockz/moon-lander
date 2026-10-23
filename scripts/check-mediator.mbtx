@@ -55,6 +55,13 @@ fn legs(targets : Array[String]) -> Array[(String, String)] {
 }
 
 ///|
+/// The targets in `targets` that are not wasm, wasm-gc, js or native. A misspelled target would
+/// give zero legs, and zero legs must not count as a pass.
+fn unknown_targets(targets : Array[String]) -> Array[String] {
+  targets.filter(target => !all_targets.contains(target))
+}
+
+///|
 /// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
 /// the output has no such line.
 fn test_count(output : String) -> Int32? {
@@ -72,6 +79,13 @@ fn test_count(output : String) -> Int32? {
 async fn main {
   let targets = @env.args()[1:].filter(arg => !arg.has_prefix("--"))
   let targets = if targets.is_empty() { all_targets } else { targets }
+  let unknown = unknown_targets(targets)
+  guard unknown.is_empty() else {
+    println(
+      "❌ Unknown target: \{unknown.join(", ")}. Use wasm, wasm-gc, js or native.",
+    )
+    @sys.exit(1)
+  }
   for leg in legs(targets) {
     let (path, target) = leg
     let (code, out, err) = @process.collect_output("moon", [
@@ -109,6 +123,14 @@ test "legs give the core paths on four targets and the async paths on three" {
   assert_eq(legs(["wasm-gc"]), [
     ("pkgs/lander/mediator", "wasm-gc"),
     ("tests/mediator-acceptance", "wasm-gc"),
+  ])
+}
+
+///|
+test "unknown_targets names each target that no path supports" {
+  assert_eq(unknown_targets(all_targets), [])
+  assert_eq(unknown_targets(["native", "natve", "wasm-gcc"]), [
+    "natve", "wasm-gcc",
   ])
 }
 

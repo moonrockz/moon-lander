@@ -8,7 +8,8 @@ suberror JobError {
 
 ///|
 /// An async handler that records its start, waits `wait_ms`, records its end,
-/// and gives `done <name>`.
+/// and raises `Broken(name)` when `fails` is true. A `defer` records
+/// `stopped` when the handler ends in any way, also by a cancellation.
 fn job_step(
   log : Array[String],
   name : String,
@@ -18,6 +19,7 @@ fn job_step(
   (_, ev) => {
     let Job(id) = ev
     log.push(name + " start " + id)
+    defer log.push(name + " stopped " + id)
     @aio.sleep(wait_ms)
     log.push(name + " end " + id)
     if fails {
@@ -28,7 +30,7 @@ fn job_step(
 
 ///|
 /// A sender whose handler records its start, waits `wait_ms`, records its end
-/// and gives `done <id>`.
+/// and gives `done <id>`. A `defer` records `stopped` when the handler ends.
 fn slow_sender(
   log : Array[String],
   wait_ms~ : Int,
@@ -36,6 +38,7 @@ fn slow_sender(
   @mediator_async.sender((_, req) => {
     let Job(id) = req
     log.push("start " + id)
+    defer log.push("stopped " + id)
     @aio.sleep(wait_ms)
     log.push("end " + id)
     "done " + id
@@ -49,8 +52,9 @@ async test "a caller cancellation stops send with no reply and no error" {
     slow_sender(log, wait_ms=1000).send((), Job("a"))
   })
   assert_eq(reply, None)
+  assert_eq(log, ["start a", "stopped a"])
   @aio.sleep(20)
-  assert_eq(log, ["start a"])
+  assert_eq(log, ["start a", "stopped a"])
 }
 
 ///|
@@ -65,7 +69,7 @@ async test "a middleware that catches every error does not catch a cancellation"
   )
   let reply = @aio.with_timeout_opt(50, () => guarded.send((), Job("a")))
   assert_eq(reply, None)
-  assert_eq(log, ["start a"])
+  assert_eq(log, ["start a", "stopped a"])
 }
 
 ///|
@@ -76,8 +80,11 @@ async test "a caller cancellation stops a sequential publish at the second handl
     .add(job_step(log, "three"))
   let outcome = @aio.with_timeout_opt(100, () => all.publish((), Job("a")))
   assert_eq(outcome, None)
+  assert_eq(log, [
+    "one start a", "one end a", "one stopped a", "two start a", "two stopped a",
+  ])
   @aio.sleep(20)
-  assert_eq(log, ["one start a", "one end a", "two start a"])
+  assert_eq(log.length(), 5)
 }
 
 ///|
@@ -90,8 +97,9 @@ async test "a caller cancellation stops every handler of a concurrent publish" {
     all.publish_concurrent((), Job("a"))
   })
   assert_eq(outcome, None)
-  @aio.sleep(20)
-  assert_eq(log, ["one start a", "two start a"])
+  assert_eq(log[0:2].to_owned(), ["one start a", "two start a"])
+  assert_eq(log.filter(line => line.contains("stopped")).length(), 2)
+  assert_false(log.iter().any(line => line.contains("end")))
 }
 
 ///|
@@ -127,7 +135,7 @@ async test "a handler timeout is a publish failure and the other handlers run" {
   } noraise {
     _ => fail("publish did not raise")
   }
-  assert_eq(log, ["two start a", "two end a"])
+  assert_eq(log, ["two start a", "two end a", "two stopped a"])
 }
 
 ///|
@@ -140,8 +148,7 @@ async test "the timeout middleware stops a slow handler and raises TimedOut" {
   } noraise {
     reply => fail("send gave a reply: \{reply}")
   }
-  @aio.sleep(20)
-  assert_eq(log, ["start a"])
+  assert_eq(log, ["start a", "stopped a"])
 }
 
 ///|
@@ -149,7 +156,7 @@ async test "the timeout middleware gives the reply of a step that ends in time" 
   let log = []
   let limited = slow_sender(log, wait_ms=10).use_(@mediator_async.timeout(1000))
   assert_eq(limited.send((), Job("a")), "done a")
-  assert_eq(log, ["start a", "end a"])
+  assert_eq(log, ["start a", "end a", "stopped a"])
 }
 
 ///|
@@ -160,6 +167,43 @@ async test "finally runs one time when the caller cancels a send" {
   )
   let reply = @aio.with_timeout_opt(50, () => hooked.send((), Job("a")))
   assert_eq(reply, None)
-  @aio.sleep(20)
-  assert_eq(log, ["start a", "finally"])
+  assert_eq(log, ["start a", "stopped a", "finally"])
+}
+
+///|
+/// A handler that records its start, and when the caller cancels its wait,
+/// runs a protected cleanup that raises an ordinary error.
+fn failing_cleanup(log : Array[String]) -> async (Unit, Job) -> Unit {
+  (_, _) => {
+    log.push("cleanup start")
+    defer log.push("cleanup stopped")
+    let waited = @aio.handle_cancellation(() => @aio.sleep(1000))
+    if waited is None {
+      @aio.protect_from_cancel(() => raise Broken("cleanup"))
+    }
+  }
+}
+
+///|
+async test "a handler error during a cancellation does not start the next handler" {
+  let log = []
+  let all = @mediator_async.topic(failing_cleanup(log)).add((_, _) => {
+    log.push("next start")
+  })
+  let outcome = @aio.with_timeout_opt(50, () => all.publish((), Job("a")))
+  assert_eq(outcome, None)
+  assert_eq(log, ["cleanup start", "cleanup stopped"])
+}
+
+///|
+async test "handler errors during a cancellation give no concurrent PublishFailed" {
+  let log = []
+  let all = @mediator_async.topic(failing_cleanup(log)).add(
+    failing_cleanup(log),
+  )
+  let outcome = @aio.with_timeout_opt(50, () => {
+    all.publish_concurrent((), Job("a"))
+  })
+  assert_eq(outcome, None)
+  assert_eq(log.filter(line => line == "cleanup stopped").length(), 2)
 }

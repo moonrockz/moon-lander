@@ -165,13 +165,20 @@ constructor, which is the only way to make a value. A parse that fails MUST rais
 ### Requirement: Name and exit code rules
 
 An application name SHALL start with an ASCII letter and SHALL hold only ASCII
-letters, digits, `-` and `_`. A service name MUST start with an ASCII letter and MUST
-hold only ASCII letters, digits, `.`, `-` and `_`. An exit
+letters, digits, `-` and `_`. A service name MUST be safe as one file path component: it
+MUST start with a Unicode letter, MUST hold only Unicode letters, combining marks,
+digits, `_`, `-` and `.`, MUST NOT end with `.`, MUST NOT be a Windows device name
+before any extension, and MUST be at most 128 bytes in UTF-8. An exit
 code MUST be in the range 0 to 255.
 
 #### Scenario: Service name with surrounding whitespace
 
 - **WHEN** a program calls `ServiceName::parse(" db")`
+- **THEN** the call raises `HostError::InvalidServiceName`
+
+#### Scenario: Windows device name
+
+- **WHEN** a program calls `ServiceName::parse("nul.log")`
 - **THEN** the call raises `HostError::InvalidServiceName`
 
 #### Scenario: Exit code out of range
@@ -181,13 +188,19 @@ code MUST be in the range 0 to 255.
 
 ### Requirement: Unique service names
 
-Each service of a host SHALL have its own name. A step that adds a service with a
-name that the builder already has MUST raise `HostError::DuplicateService`.
+Each service of a host SHALL have its own name, without regard to letter case. A
+step that adds a service whose name equals a name of the builder, or differs from
+it only in letter case, MUST raise `HostError::DuplicateService`.
 
 #### Scenario: Two services with one name
 
 - **WHEN** a builder has a service named `db`, and the program adds a second service named `db`
 - **THEN** the step raises `HostError::DuplicateService`, and the builder keeps one service named `db`
+
+#### Scenario: Names that differ only in letter case
+
+- **WHEN** a builder has a service named `Données`, and the program adds a service named `DONNÉES`
+- **THEN** the step raises `HostError::DuplicateService`
 
 ### Requirement: Application name and variable prefix
 

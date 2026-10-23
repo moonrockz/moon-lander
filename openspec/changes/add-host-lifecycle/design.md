@@ -813,7 +813,7 @@ not check the rules again.
 | Value | Type | Rule | Group |
 | --- | --- | --- | --- |
 | Application name | `AppName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
-| Service name | `ServiceName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `.`, `-` and `_`. Unique in one host. | 2 |
+| Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode letter; then letters, combining marks, digits, `_`, `-` and `.`; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
 | Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
 | Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
 | Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
@@ -835,10 +835,25 @@ not check the rules again.
   unambiguous, and no path separator or whitespace, so it is safe in file and
   directory names. It starts with a letter, so the default prefix is a valid
   variable name.
-- Call (this change): a service name uses ASCII only. A report shows it as it is,
-  and an ASCII rule excludes every Unicode whitespace, control and direction
-  character, which `moonbitlang/core` has no category data to test. It allows `.`
-  for names such as `db.primary`.
+- Owner (2026-10-23): a service name accepts every Unicode letter, and it must be
+  safe as one component of a file path. The parse uses the Unicode identifier
+  properties `XID_Start` and `XID_Continue` from `moonbit-community/unicode-data`
+  (`xid` and `case_mapping` packages), because `moonbitlang/core` has no Unicode
+  category data. These exclude every separator, reserved punctuation, whitespace,
+  control and direction character. The rule also rejects a trailing `.` (Windows
+  removes it), the Windows device names `CON`, `PRN`, `AUX`, `NUL`, `COM0` to
+  `COM9` and `LPT0` to `LPT9` before any extension, and more than 128 UTF-8 bytes
+  (a path component holds at most 255).
+- Owner (2026-10-23): two service names that differ only in letter case are
+  duplicates in one host, because Windows and macOS give them one file. The
+  check compares the Unicode lowercase form.
+- Owner (2026-10-23): the parse does not normalize to NFC. A release-build probe
+  measured the cost over the ASCII rule: the letter and case data add about 11 KB
+  (wasm-gc), 29 KB (js) and 6 KB (native); NFC
+  (`moonbit-community/unicode-normalization`) adds about 205 KB, 380 KB and 200 KB.
+  The limit: two names that differ only in normalization form (`é` as one
+  character, or `e` and a combining accent) are two services, and macOS gives them
+  one file. Add NFC in `ServiceName::parse` if a real case needs it.
 - Call (this change): a smart constructor that reads text is `parse`; one that
   takes a number is `from_<type>`, for example `ExitCode::from_int`.
 - Call (this change): the signatures in D3, D6, D9, D12 and D13 that still show

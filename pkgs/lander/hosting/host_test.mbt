@@ -45,3 +45,25 @@ test "a second service with the same name is a fault" {
   }
   @expect.expect(name).to_equal(db)
 }
+
+///|
+test "service names that differ only in letter case are duplicates" {
+  let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
+      @hosting.AppName::parse("acme"),
+      [],
+    )
+    |> @hosting.service(@hosting.ServiceName::parse("Données"))
+  for text in ["données", "DONNÉES"] {
+    let name = @hosting.ServiceName::parse(text)
+    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
+      Ok(builder |> @hosting.service(name))
+    catch {
+      err => Err(err)
+    }
+    guard result is Err(@hosting.DuplicateService(name=got)) else {
+      fail("expected DuplicateService for \{text}")
+    }
+    @expect.expect(got).to_equal(name)
+  }
+  ignore(builder |> @hosting.service(@hosting.ServiceName::parse("donnees")))
+}

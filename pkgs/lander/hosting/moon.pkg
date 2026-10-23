@@ -1,6 +1,8 @@
 import {
   "moonrockz/moon-lander/config",
   "moonbitlang/core/debug",
+  "moonbit-community/unicode-data/xid" @xid,
+  "moonbit-community/unicode-data/case_mapping" @case_mapping,
 }
 
 import {

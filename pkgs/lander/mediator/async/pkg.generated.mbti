@@ -2,13 +2,24 @@
 package "moonrockz/moon-lander/mediator/async"
 
 // Values
+pub fn[C, Req, Res] after(async (C, Req, Res) -> Unit) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] before(async (C, Req) -> Unit) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] finally_((C, Req) -> Unit) -> Middleware[C, Req, Res]
+
+pub fn[C, Req, Res] middleware(async (async (C, Req) -> Res, C, Req) -> Res) -> Middleware[C, Req, Res]
+
 pub fn[C, Req, Res] sender(async (C, Req) -> Res) -> Sender[C, Req, Res]
 
 // Errors
 
 // Types and methods
+type Middleware[C, Req, Res]
+
 type Sender[C, Req, Res]
 pub async fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res
+pub fn[C, Req, Res] Sender::use_(Self[C, Req, Res], Middleware[C, Req, Res]) -> Self[C, Req, Res]
 
 // Type aliases
 

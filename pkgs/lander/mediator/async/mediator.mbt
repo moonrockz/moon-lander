@@ -20,6 +20,16 @@ pub fn[C, Req, Res] sender(handle : async (C, Req) -> Res) -> Sender[C, Req, Res
 }
 
 ///|
+/// Wrap a core sender, with its middleware, as an async sender. A send calls
+/// the core `send`, so the core middleware and handler run and the reply or
+/// the error passes out unchanged.
+pub fn[C, Req, Res] Sender::from_sync(
+  core : @mediator.Sender[C, Req, Res],
+) -> Sender[C, Req, Res] {
+  sender((c, r) => core.send(c, r))
+}
+
+///|
 /// Give a new sender with `middleware` inside the middleware that the sender
 /// has. The first middleware attached is the outermost step. The sender
 /// itself does not change.

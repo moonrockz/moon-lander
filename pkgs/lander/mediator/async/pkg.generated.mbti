@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonrockz/moon-lander/mediator/async"
 
+import {
+  "moonrockz/moon-lander/mediator",
+}
+
 // Values
 pub fn[C, Req, Res] after(async (C, Req, Res) -> Unit) -> Middleware[C, Req, Res]
 
@@ -22,11 +26,13 @@ pub fn[C, Ev] topic(async (C, Ev) -> Unit) -> Topic[C, Ev]
 type Middleware[C, Req, Res]
 
 type Sender[C, Req, Res]
+pub fn[C, Req, Res] Sender::from_sync(@mediator.Sender[C, Req, Res]) -> Self[C, Req, Res]
 pub async fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res
 pub fn[C, Req, Res] Sender::use_(Self[C, Req, Res], Middleware[C, Req, Res]) -> Self[C, Req, Res]
 
 type Topic[C, Ev]
 pub fn[C, Ev] Topic::add(Self[C, Ev], async (C, Ev) -> Unit) -> Self[C, Ev]
+pub fn[C, Ev] Topic::from_sync(@mediator.Topic[C, Ev]) -> Self[C, Ev]
 pub async fn[C, Ev] Topic::publish(Self[C, Ev], C, Ev) -> Unit
 pub async fn[C, Ev] Topic::publish_concurrent(Self[C, Ev], C, Ev) -> Unit
 pub fn[C, Ev] Topic::use_(Self[C, Ev], Middleware[C, Ev, Unit]) -> Self[C, Ev]

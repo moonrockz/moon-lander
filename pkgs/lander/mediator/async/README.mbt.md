@@ -237,3 +237,74 @@ async test "a timeout stops a slow send, and a caller cancellation is not an err
   assert_eq(log, [])
 }
 ```
+
+## The context value and the core mediator
+
+Each send and each publish takes a context value of type `C`. The mediator
+gives that exact value to each middleware and to each handler, also after a
+wait, and does not keep it after the call. A consumer service, such as the
+Morphir workbench or moonrockz/smithy, puts its services in a record and
+gives that record as the context.
+
+The async package reuses the core error type `@mediator.MediatorError`, and it
+works with core values in two ways:
+
+| You have | Use | Result |
+| --- | --- | --- |
+| One sync handler | A one-line lambda: `@mediator_async.sender((c, r) => handle(c, r))` | An async sender. A named sync function does not fit an `async` function type, but the lambda does |
+| A core `@mediator.Sender` | `@mediator_async.Sender::from_sync(sender)` | An async sender that runs the core middleware and handler, with the same reply and error |
+| A core `@mediator.Topic` | `@mediator_async.Topic::from_sync(topic)` | An async topic whose publish runs the core publish and passes the core `PublishFailed` out unchanged |
+
+After `add` on a wrapped core topic, the core publish counts as one handler at
+position 1, and its error is the failure at that position. A core
+`@mediator.Middleware` does not fit an async sender; use the async helpers.
+There is no way to call an async sender from sync code.
+
+```mbt check
+///|
+struct Store {
+  users : Array[String]
+}
+
+///|
+struct Services {
+  store : Store
+  greeting : String
+}
+
+///|
+struct Register(String)
+
+///|
+/// A sync handler that the service already has.
+fn greet(services : Services, req : Register) -> String {
+  let Register(name) = req
+  services.greeting + " " + name
+}
+
+///|
+async test "a service registers a user and greets through the core sender" {
+  let greeter : @mediator.Sender[Services, Register, String] = @mediator.sender((
+    services,
+    req,
+  ) => greet(services, req))
+  let greet_async = @mediator_async.Sender::from_sync(greeter)
+  let register : @mediator_async.Sender[Services, Register, String] = @mediator_async.sender((
+    services,
+    req,
+  ) => {
+    @aio.sleep(10)
+    let Register(name) = req
+    services.store.users.push(name)
+    greet_async.send(services, req)
+  })
+  let direct : @mediator_async.Sender[Services, Register, String] = @mediator_async.sender((
+    services,
+    req,
+  ) => greet(services, req))
+  let services = { store: { users: [] }, greeting: "Welcome" }
+  assert_eq(register.send(services, Register("Ann")), "Welcome Ann")
+  assert_eq(direct.send(services, Register("Bo")), "Welcome Bo")
+  assert_eq(services.store.users, ["Ann"])
+}
+```

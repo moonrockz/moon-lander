@@ -9,12 +9,25 @@ struct Topic[C, Ev] {
   /// The first item is the outermost step. No function changes this array
   /// after the topic exists.
   middleware : Array[Middleware[C, Ev, Unit]]
+  /// True when the one handler is the publish of a wrapped core topic, so its
+  /// error passes out unchanged. `add` gives a topic where it is false.
+  wraps_core : Bool
 }
 
 ///|
 /// Build an async topic from its first event handler.
 pub fn[C, Ev] topic(handle : async (C, Ev) -> Unit) -> Topic[C, Ev] {
-  { handlers: [handle], middleware: [] }
+  { handlers: [handle], middleware: [], wraps_core: false }
+}
+
+///|
+/// Wrap a core topic, with its middleware, as an async topic. Both publish
+/// operations call the core `publish` and pass its error out unchanged, so a
+/// failure is the core `@mediator.PublishFailed` with the positions and the
+/// handler count of the core topic. After `add`, the core publish counts as
+/// one handler at position 1, and its error is the failure at that position.
+pub fn[C, Ev] Topic::from_sync(core : @mediator.Topic[C, Ev]) -> Topic[C, Ev] {
+  { handlers: [(c, e) => core.publish(c, e)], middleware: [], wraps_core: true }
 }
 
 ///|
@@ -26,7 +39,7 @@ pub fn[C, Ev] Topic::add(
 ) -> Topic[C, Ev] {
   let handlers = self.handlers.copy()
   handlers.push(handle)
-  { handlers, middleware: self.middleware }
+  { handlers, middleware: self.middleware, wraps_core: false }
 }
 
 ///|
@@ -40,7 +53,7 @@ pub fn[C, Ev] Topic::use_(
 ) -> Topic[C, Ev] {
   let steps = self.middleware.copy()
   steps.push(middleware)
-  { handlers: self.handlers, middleware: steps }
+  { handlers: self.handlers, middleware: steps, wraps_core: self.wraps_core }
 }
 
 ///|
@@ -57,6 +70,9 @@ pub async fn[C, Ev] Topic::publish(
   ev : Ev,
 ) -> Unit {
   let handlers = self.handlers
+  if self.wraps_core {
+    return run(self.middleware, 0, handlers[0], ctx, ev)
+  }
   run(
     self.middleware,
     0,
@@ -88,6 +104,9 @@ pub async fn[C, Ev] Topic::publish_concurrent(
   ev : Ev,
 ) -> Unit {
   let handlers = self.handlers
+  if self.wraps_core {
+    return run(self.middleware, 0, handlers[0], ctx, ev)
+  }
   run(
     self.middleware,
     0,

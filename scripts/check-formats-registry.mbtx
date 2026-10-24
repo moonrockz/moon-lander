@@ -12,6 +12,23 @@ import {
 }
 
 ///|
+/// The candidate modules, in dependency order: the folder and the module name.
+/// The consumer imports the last one. The loopback registry serves each archive.
+let candidates : Array[(String, String)] = [
+  ("pkgs/core", "moonrockz/moon-lander-core"),
+  ("pkgs/lander", "moonrockz/moon-lander"),
+]
+
+///|
+/// A packaged candidate module.
+priv struct Candidate {
+  name : String
+  manifest : String
+  archive : Bytes
+  checksum : String
+}
+
+///|
 async fn command(args : Array[String]) -> String {
   let (code, out, err) = @process.collect_output("moon", args)
   guard code == 0 else { fail(out.text() + err.text()) }
@@ -36,7 +53,8 @@ async fn copy_tree(source : String, destination : String) -> Unit {
 async fn main {
   let root = @fs.realpath(".")
   let script = "\{root}/scripts/check-formats.mbtx"
-  let manifest = @fs.read_file("pkgs/lander/moon.mod").text()
+  let (consumed_dir, consumed) = candidates[candidates.length() - 1]
+  let manifest = @fs.read_file("\{consumed_dir}/moon.mod").text()
   let versions = manifest
     .split("\n")
     .filter(line => line.has_prefix("version = "))
@@ -47,11 +65,20 @@ async fn main {
     .replace_all(old="\"", new="")
     .trim()
     .to_owned()
-  ignore(command(["-C", "pkgs/lander", "package"]))
-  let archive = @fs.read_file(
-    "_build/publish/moonrockz-moon-lander-\{version}.zip",
-  ).binary()
-  let checksum = @crypto.bytes_to_hex_string(@crypto.sha256(archive))
+  let packaged : Array[Candidate] = []
+  for candidate in candidates {
+    let (folder, name) = candidate
+    ignore(command(["-C", folder, "package"]))
+    let archive = @fs.read_file(
+      "_build/publish/\{name.replace_all(old="/", new="-")}-\{version}.zip",
+    ).binary()
+    packaged.push({
+      name,
+      manifest: @fs.read_file("\{folder}/moon.mod").text(),
+      archive,
+      checksum: @crypto.bytes_to_hex_string(@crypto.sha256(archive)),
+    })
+  }
   let dir = @fs.tmpdir(prefix="lander-registry")
   defer @fs.rmdir(dir, recursive=true)
   let home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => {
@@ -68,7 +95,7 @@ async fn main {
   }
   @fs.write_file(
     "\{dir}/consumer/moon.mod",
-    "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"moonrockz/moon-lander@\{version}\" }\n",
+    "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
   )
   let (code, toolchain, err) = @process.collect_output("mise", [
     "where", "http:moonbit",
@@ -109,44 +136,46 @@ async fn main {
       guard code == 0 else { fail(out.text() + err.text()) }
       println(out.text())
     })
-    let installed = "\{dir}/consumer/.mooncakes/moonrockz/moon-lander"
+    let installed = "\{dir}/consumer/.mooncakes/\{consumed}"
     guard @fs.read_file("\{installed}/formats/pkg.mbti").text() ==
-      @fs.read_file("pkgs/lander/formats/pkg.mbti").text() else {
+      @fs.read_file("\{consumed_dir}/formats/pkg.mbti").text() else {
       fail("Published virtual interface differs from the candidate")
     }
     let published = @fs.read_file(
-      "\{isolated}/registry/cache/moonrockz/moon-lander/\{version}.zip",
+      "\{isolated}/registry/cache/\{consumed}/\{version}.zip",
     ).binary()
     println(
       "Public registry consumer verified \{version} on all four targets; archive SHA-256 \{@crypto.bytes_to_hex_string(@crypto.sha256(published))}",
     )
     return
   }
-  // The candidate archive is the only new registry entry. Its dependencies
-  // retain the real pinned entries and checksums from moon update.
-  let dependencies : Map[String, Json] = Map([])
-  for line in manifest.split("\n") {
-    let line = line.trim()
-    if line.has_prefix("\"") && line.contains("@") {
-      let dependency = line
-        .replace_all(old="\"", new="")
-        .replace_all(old=",", new="")
-      let parts = dependency.split("@").map(part => part.to_owned()).collect()
-      guard parts.length() == 2 else { fail("Invalid pinned dependency") }
-      dependencies[parts[0]] = Json::string(parts[1])
+  // The candidate archives are the only new registry entries. Their
+  // dependencies retain the real pinned entries and checksums from moon update.
+  for candidate in packaged {
+    let dependencies : Map[String, Json] = Map([])
+    for line in candidate.manifest.split("\n") {
+      let line = line.trim()
+      if line.has_prefix("\"") && line.contains("@") {
+        let dependency = line
+          .replace_all(old="\"", new="")
+          .replace_all(old=",", new="")
+        let parts = dependency.split("@").map(part => part.to_owned()).collect()
+        guard parts.length() == 2 else { fail("Invalid pinned dependency") }
+        dependencies[parts[0]] = Json::string(parts[1])
+      }
     }
+    @fs.write_file(
+      "\{isolated}/registry/index/user/\{candidate.name}.index",
+      (
+        {
+          "name": Json::string(candidate.name),
+          "version": Json::string(version),
+          "deps": Json::object(dependencies),
+          "checksum": Json::string(candidate.checksum),
+        } : Json).stringify() +
+      "\n",
+    )
   }
-  @fs.write_file(
-    "\{isolated}/registry/index/user/moonrockz/moon-lander.index",
-    (
-      {
-        "name": "moonrockz/moon-lander",
-        "version": Json::string(version),
-        "deps": Json::object(dependencies),
-        "checksum": Json::string(checksum),
-      } : Json).stringify() +
-    "\n",
-  )
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
   let url = "http://\{server.addr}"
@@ -165,8 +194,11 @@ async fn main {
         server.run_forever(allow_failure=true, (request, _, conn) => {
           let path = request.path.replace_all(old="%2F", new="/")
           requests.push(path)
-          let bytes = if path == "/user/moonrockz/moon-lander/\{version}.zip" {
-            archive
+          let candidate = packaged.search_by(candidate => {
+            path == "/user/\{candidate.name}/\{version}.zip"
+          })
+          let bytes = if candidate is Some(index) {
+            packaged[index].archive
           } else {
             guard path.has_prefix("/user/") &&
               path.has_suffix(".zip") &&
@@ -204,15 +236,20 @@ async fn main {
       println(out.text())
     }
   })
-  guard requests.contains("/user/moonrockz/moon-lander/\{version}.zip") else {
-    fail("Consumer did not download the candidate from the loopback registry")
+  for candidate in packaged {
+    guard requests.contains("/user/\{candidate.name}/\{version}.zip") else {
+      fail(
+        "Consumer did not download \{candidate.name} from the loopback registry",
+      )
+    }
   }
-  guard @fs.exists(
-    "\{dir}/consumer/.mooncakes/moonrockz/moon-lander/formats/pkg.mbti",
-  ) else {
+  guard @fs.exists("\{dir}/consumer/.mooncakes/\{consumed}/formats/pkg.mbti") else {
     fail("Registry consumer did not install the virtual interface")
   }
+  let checksums = packaged
+    .map(candidate => "\{candidate.name} \{candidate.checksum}")
+    .join(", ")
   println(
-    "Registry consumer verified all four targets from candidate archive \{checksum}",
+    "Registry consumer verified all four targets from candidate archives \{checksums}",
   )
 }

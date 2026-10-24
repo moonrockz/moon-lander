@@ -1,7 +1,7 @@
 ///|
 test "a builder with one service builds a Host[Unit]" {
   let host : @hosting.Host[Unit] = @hosting.builder(
-      @hosting.AppName::parse("acme"),
+      @lander_core.AppName::parse("acme"),
       ["build"],
     )
     |> @hosting.service(
@@ -16,7 +16,7 @@ test "a builder with one service builds a Host[Unit]" {
 ///|
 test "the factory fixes the services type" {
   let host : @hosting.Host[Array[String]] = @hosting.builder(
-      @hosting.AppName::parse("acme"),
+      @lander_core.AppName::parse("acme"),
       [],
     )
     |> @hosting.service(
@@ -31,7 +31,7 @@ test "the factory fixes the services type" {
 test "a second service with the same name is a fault" {
   let db = @hosting.ServiceName::parse("db")
   let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-      @hosting.AppName::parse("acme"),
+      @lander_core.AppName::parse("acme"),
       [],
     )
     |> @hosting.service(db)
@@ -53,7 +53,7 @@ test "a second service with the same name is a fault" {
 ///|
 test "service names that differ only in letter case are duplicates" {
   let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-      @hosting.AppName::parse("acme"),
+      @lander_core.AppName::parse("acme"),
       [],
     )
     |> @hosting.service(@hosting.ServiceName::parse("Données"))
@@ -87,7 +87,7 @@ test "case pairs that are not symmetric are duplicates" {
     ] {
     let (first, second) = pair
     let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-        @hosting.AppName::parse("acme"),
+        @lander_core.AppName::parse("acme"),
         [],
       )
       |> @hosting.service(@hosting.ServiceName::parse(first))
@@ -105,7 +105,7 @@ test "case pairs that are not symmetric are duplicates" {
 ///|
 test "service takes a String and parses it at the step" {
   let builder : @hosting.HostBuilder[Unit] = "acme"
-    |> @hosting.AppName::parse
+    |> @lander_core.AppName::parse
     |> @hosting.builder([])
     |> @hosting.service("db")
     |> @hosting.service(@hosting.ServiceName::parse("cache"))

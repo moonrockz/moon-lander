@@ -3,19 +3,19 @@ package "moonrockz/moon-lander/hosting"
 
 import {
   "moonbitlang/core/debug",
+  "moonrockz/moon-lander-core",
   "moonrockz/moon-lander/config",
 }
 
 // Values
 pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
-pub fn[S] builder(AppName, Array[String]) -> HostBuilder[S]
+pub fn[S] builder(@moon-lander-core.AppName, Array[String]) -> HostBuilder[S]
 
 pub fn[S] service(HostBuilder[S], &IntoServiceName, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 // Errors
 pub(all) suberror HostError {
-  InvalidAppName(text~ : String, reason~ : String)
   InvalidServiceName(text~ : String, reason~ : String)
   DuplicateService(name~ : ServiceName, existing~ : ServiceName)
   InvalidExitCode(code~ : Int32)
@@ -24,19 +24,6 @@ pub fn HostError::message(Self) -> String
 pub fn HostError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-pub struct AppName {
-  // private fields
-} derive(Eq, Hash, @debug.Debug)
-pub fn AppName::equal(Self, Self) -> Bool
-pub fn AppName::hash(Self) -> Int32
-pub fn AppName::hash_combine(Self, Hasher) -> Unit
-pub fn AppName::not_equal(Self, Self) -> Bool
-pub fn AppName::output(Self, &Logger) -> Unit
-pub fn AppName::parse(String) -> Self raise HostError
-pub fn AppName::to_repr(Self) -> @debug.Repr
-pub fn AppName::to_string(Self) -> String
-pub impl Show for AppName
-
 pub struct BuildContext {
   config : @config.Config
 }

@@ -1,0 +1,42 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-core"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror AppNameError {
+  InvalidAppName(text~ : String, rule~ : AppNameRule)
+} derive(@debug.Debug)
+pub fn AppNameError::message(Self) -> String
+pub fn AppNameError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct AppName {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn AppName::equal(Self, Self) -> Bool
+pub fn AppName::hash(Self) -> Int32
+pub fn AppName::hash_combine(Self, Hasher) -> Unit
+pub fn AppName::not_equal(Self, Self) -> Bool
+pub fn AppName::output(Self, &Logger) -> Unit
+pub fn AppName::parse(String) -> Self raise AppNameError
+pub fn AppName::to_repr(Self) -> @debug.Repr
+pub fn AppName::to_string(Self) -> String
+pub impl Show for AppName
+
+pub enum AppNameRule {
+  Empty
+  FirstNotAsciiLetter
+  CharNotAllowed(Char)
+} derive(Eq, @debug.Debug)
+pub fn AppNameRule::equal(Self, Self) -> Bool
+pub fn AppNameRule::not_equal(Self, Self) -> Bool
+pub fn AppNameRule::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

@@ -59,9 +59,11 @@ supply layered configuration. This change connects that configuration to a lifec
     close), 131 (SIGQUIT, Ctrl-Break), or a code that the application sets.
   - `UsageError` for CLI misuse.
   - Parsed domain types with smart constructors, so invalid values cannot exist:
-    `AppName`, `ServiceName` and `ExitCode` (0 to 255), and `HostError` for a fault
-    in the set-up of a host. Later groups add types for the variable prefix, the
-    environment name, paths and the shutdown timeout.
+    `ServiceName` and `ExitCode` (0 to 255), and `HostError` for a fault in the
+    set-up of a host. `AppName` and its `AppNameError` are in
+    `moonrockz/moon-lander-core` (`split-framework-modules`). Later groups add
+    types for the variable prefix, the environment name, paths and the shutdown
+    timeout.
   - A pure, synchronous phase engine. Drivers run its steps.
   - A configurable shutdown timeout (default 30 seconds).
 - Add the package `moonrockz/moon-lander/hosting/console` (native and js):

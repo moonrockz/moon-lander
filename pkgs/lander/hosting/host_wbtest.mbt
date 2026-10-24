@@ -5,7 +5,7 @@ fn[S] names(services : Array[HostedService[S]]) -> Array[String] {
 
 ///|
 test "the host keeps the name, the arguments and the registration order" {
-  let host : Host[Unit] = builder(AppName::parse("acme"), ["build", "--verbose"])
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), ["build", "--verbose"])
     |> service(ServiceName::parse("db"), start=_ => ())
     |> service(ServiceName::parse("cache"), stop=_ => ())
     |> build(_ => ())
@@ -20,7 +20,7 @@ test "the host keeps the name, the arguments and the registration order" {
 ///|
 test "a step gives a new builder and does not change the earlier one" {
   let args = ["build"]
-  let first : HostBuilder[Unit] = builder(AppName::parse("acme"), args)
+  let first : HostBuilder[Unit] = builder(@lander_core.AppName::parse("acme"), args)
   let second = first |> service(ServiceName::parse("db"))
   args.push("--late")
   @expect.expect(names(first.services)).to_equal([])

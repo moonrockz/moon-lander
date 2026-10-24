@@ -2,9 +2,9 @@
 /// Check the native console signal stub (openspec add-host-lifecycle, task group 1).
 ///
 /// The check runs the `hosting/console` tests and the signal acceptance suite on native, and fails
-/// a leg that runs zero tests. It then copies `pkgs/lander` into a temporary workspace with a
-/// consumer module outside this workspace, and runs the same acceptance suite there, so the
-/// consumer's C compiler builds the stub from the package source.
+/// a leg that runs zero tests. It then copies the framework modules in `libraries` into a
+/// temporary workspace with a consumer module outside this workspace, and runs the same acceptance
+/// suite there, so the consumer's C compiler builds the stub from the package source.
 ///
 /// Usage: `mise run check:console`, or `moonx scripts/check-console.mbtx`. Native only.
 import {
@@ -105,6 +105,24 @@ async fn native_tests(
 }
 
 ///|
+/// The framework modules that the consumer outside the workspace uses by path:
+/// the folder in this repository and the folder in the isolated workspace.
+let libraries : Array[(String, String)] = [
+  ("pkgs/core", "core"),
+  ("pkgs/lander", "library"),
+]
+
+///|
+/// The `moon.work` of the isolated workspace: the consumer and each library.
+fn isolated_work() -> String {
+  let members = ["  \".\",\n"]
+  for library in libraries {
+    members.push("  \"./\{library.1}\",\n")
+  }
+  "members = [\n" + members.join("") + "]\n"
+}
+
+///|
 async fn main {
   let root = @fs.realpath(".")
   for path in paths {
@@ -115,11 +133,10 @@ async fn main {
   }
   let isolated = @fs.tmpdir(prefix="lander-console-consumer")
   defer @fs.rmdir(isolated, recursive=true)
-  copy_tree("pkgs/lander", isolated + "/library")
-  @fs.write_file(
-    isolated + "/moon.work",
-    "members = [\n  \".\",\n  \"./library\",\n]\n",
-  )
+  for library in libraries {
+    copy_tree(library.0, isolated + "/" + library.1)
+  }
+  @fs.write_file(isolated + "/moon.work", isolated_work())
   @fs.write_file(isolated + "/moon.mod", consumer_manifest(version))
   @fs.mkdir(isolated + "/signals")
   for file in suite_files {
@@ -154,4 +171,12 @@ test "the consumer depends on the framework version and the pinned async" {
   let manifest = consumer_manifest("0.3.0")
   assert_true(manifest.contains("\"moonrockz/moon-lander@0.3.0\""))
   assert_true(manifest.contains("\"moonbitlang/async@0.22.5\""))
+}
+
+///|
+test "the isolated workspace lists the consumer and each library" {
+  assert_eq(
+    isolated_work(),
+    "members = [\n  \".\",\n  \"./core\",\n  \"./library\",\n]\n",
+  )
 }

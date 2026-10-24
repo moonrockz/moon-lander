@@ -1,72 +1,11 @@
 ///|
 /// The parse result as text: `ok`, or the error message.
-fn app_name_result(text : String) -> String {
-  try {
-    ignore(@hosting.AppName::parse(text))
-    "ok"
-  } catch {
-    err => err.message()
-  }
-}
-
-///|
-/// The parse result as text: `ok`, or the error message.
 fn service_name_result(text : String) -> String {
   try {
     ignore(@hosting.ServiceName::parse(text))
     "ok"
   } catch {
     err => err.message()
-  }
-}
-
-///|
-/// The characters next to each allowed ASCII range, which no rule allows.
-let outside_ranges : Array[Char] = ['@', '[', '`', '{', '/', ':', ' ']
-
-///|
-test "application names start with a letter and use letters, digits, - and _" {
-  for text in ["a", "z", "A", "Z", "a0", "a9", "my-tool", "my_tool", "a-1_b"] {
-    @expect.expect(app_name_result(text)).to_equal("ok")
-    @expect.expect(@hosting.AppName::parse(text).to_string()).to_equal(text)
-  }
-}
-
-///|
-test "an application name with a space names the text and the character" {
-  let result : Result[@hosting.AppName, @hosting.HostError] = try
-    Ok(@hosting.AppName::parse("my tool"))
-  catch {
-    err => Err(err)
-  }
-  guard result is Err(@hosting.InvalidAppName(text~, reason~)) else {
-    fail("expected InvalidAppName")
-  }
-  @expect.expect(text).to_equal("my tool")
-  @expect.expect(reason).to_equal(
-    "the character \" \" is not allowed; use ASCII letters, digits, '-' and '_'",
-  )
-}
-
-///|
-test "application names that break a rule do not parse" {
-  @expect.expect(app_name_result("")).to_equal(
-    "Invalid application name \"\": the name is empty",
-  )
-  for text in ["0tool", "9tool", "-tool", "_tool", "../etc", " acme"] {
-    @expect.expect(app_name_result(text)).to_equal(
-      "Invalid application name \{text.escape()}: the name must start with an ASCII letter",
-    )
-  }
-  for char in outside_ranges {
-    @expect.expect(app_name_result("a\{char}").contains("is not allowed")).to_equal(
-      true,
-    )
-  }
-  for text in ["my.tool", "a\\b", "café", "tool\n", "a\u{00A0}"] {
-    @expect.expect(app_name_result(text).contains("is not allowed")).to_equal(
-      true,
-    )
   }
 }
 

@@ -30,7 +30,9 @@ See `proposal.md` for the reasons. The current state:
 - Each framework module builds and tests on its own targets, as today.
 - Each group of `tasks.md` lands as one pull request that keeps `mise run check`
   green.
-- `git mv` moves the files, so `git log --follow` and blame keep the history.
+- `git mv` moves whole files, so `git log --follow` and blame keep the history. For
+  code that moves out of part of a file, such as `AppName`, `git blame -C -C` finds
+  the history. The repository squash-merges, so a split commit would not survive.
 - Source files change only their imports, except for the `AppName` move and the new
   `TimeLimit`.
 
@@ -155,7 +157,8 @@ pub enum AppNameRule {
 `pub suberror` and `pub enum` let callers match the cases but not make them. The
 `message` text stays the same as today. `HostError` loses `InvalidAppName`. The host
 builder and `@lander.cli` take `@lander_core.AppName`. The umbrella re-exports
-`AppName` as `@lander.AppName`, as `add-host-lifecycle` design D15 expects.
+`AppName`, `AppNameError` and `AppNameRule` from `@lander`, as `add-host-lifecycle`
+design D15 expects for the host types.
 
 The new error must exist, because a core type cannot raise `HostError`. The rule enum
 costs nothing more at this point, and it closes part of finding 2 of lander-4us.25.
@@ -246,8 +249,8 @@ modules shows this. `version_files` stays `pkgs/lander/version.mbt`.
 |---|---|
 | `check-config.mbtx` | Package paths under `pkgs/config` |
 | `check-mediator.mbtx` | Package paths under `pkgs/mediator` |
-| `check-console.mbtx` | Copy `pkgs/core`, `pkgs/config` and `pkgs/hosting` into the isolated workspace; the consumer imports `moonrockz/moon-lander-hosting` |
-| `check-formats-registry.mbtx` | Package `pkgs/core` and `pkgs/config`; serve both archives from the loopback registry; the consumer imports `moonrockz/moon-lander-config` |
+| `check-console.mbtx` | Group 1 makes it copy a list of modules (core and `pkgs/lander`), because `pkgs/lander` then imports core. Group 6 sets the list to `pkgs/core`, `pkgs/config` and `pkgs/hosting`; the consumer imports `moonrockz/moon-lander-hosting` |
+| `check-formats-registry.mbtx` | Group 1 makes it package and serve a list of candidate modules (core and `pkgs/lander`). Group 3 sets the list to `pkgs/core` and `pkgs/config`; the consumer imports `moonrockz/moon-lander-config` |
 | `build-node-adapter.mbtx`, `build-browser-adapter.mbtx`, `test-node-adapter.mbtx` | Adapter and generated-file paths under `pkgs/config` |
 | `validate-packages.mbtx` | D8 |
 | `publish.mbtx` | List unchanged. Its comment gives the order for the first framework release: core, config, mediator, hosting, umbrella |

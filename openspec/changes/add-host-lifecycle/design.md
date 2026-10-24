@@ -149,7 +149,7 @@ each part itself and reproduces Morphir exactly. The batteries path is in D15.
 ```moonbit
 async fn main {
   "morphir"
-  |> @hosting.AppName::parse
+  |> @lander_core.AppName::parse
   |> @hosting.builder(@env.args())
   |> @hosting_argparse.command(fn(name) {
     @argparse.Command(name,
@@ -584,7 +584,7 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 ```moonbit
 // @lander: the batteries-included entry (D15)
 pub fn cli(
-  name : @hosting.AppName,
+  name : @lander_core.AppName,
   args : Array[String],
   env_vars? : &@hosting.IntoEnvVars,
   working_dir? : String,
@@ -593,7 +593,7 @@ pub fn cli(
 
 // @hosting: the bare entry, with the same starting settings
 pub fn[S] builder(
-  name : AppName,
+  name : @lander_core.AppName,
   args : Array[String],
   env_vars? : &IntoEnvVars,
   working_dir? : String,
@@ -725,6 +725,7 @@ fn main raise {
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
   `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
+  `AppNameError` and `AppNameRule` from `moonrockz/moon-lander-core`, the types
   `ServiceName`, `IntoServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
   `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.
@@ -820,7 +821,7 @@ not check the rules again.
 
 | Value | Type | Rule | Group |
 | --- | --- | --- | --- |
-| Application name | `AppName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
+| Application name | `AppName::parse(text)`, in `moonrockz/moon-lander-core` since `split-framework-modules` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
 | Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode identifier start character (`XID_Start`, letters and letter numbers); then identifier characters (`XID_Continue`: letters, combining marks, digits, `_` and a few connectors), `-` and `.`; no invisible character; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
 | Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
 | Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
@@ -847,8 +848,11 @@ not check the rules again.
   v0.10.17`: abort, exit code 134). In an `async fn main` the `moonbitlang/async`
   entry prints the error and gives exit code 1.
 - Call (this change): one public `suberror HostError` holds the faults of a host
-  set-up: `InvalidAppName(text~, reason~)`, `InvalidServiceName(text~, reason~)`,
-  `DuplicateService(name~)` and `InvalidExitCode(code~)`. `HostError::message` gives
+  set-up: `InvalidServiceName(text~, reason~)`,
+  `DuplicateService(name~)` and `InvalidExitCode(code~)`. The change
+  `split-framework-modules` moved `AppName` to core, so an invalid application
+  name raises the core `AppNameError::InvalidAppName(text~, rule~)`, with the
+  rule as an `AppNameRule` case. `HostError::message` gives
   text for people. A fault in the program is not a `ConfigError` or a
   `UsageError`, because no user input caused it.
 - Call (this change): `AppName` allows no `.`, so `<app>.<env>.<ext>` stays

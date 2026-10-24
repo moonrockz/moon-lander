@@ -1,6 +1,7 @@
 members = [
   ".",
   "./apps/site",
+  "./pkgs/core",
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./pkgs/openrpc",

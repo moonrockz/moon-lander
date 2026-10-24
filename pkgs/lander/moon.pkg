@@ -1,8 +1,10 @@
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander/hosting",
 }
 
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander" @lander,
   "moonbitlang/async",
 } for "test"

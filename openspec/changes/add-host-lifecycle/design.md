@@ -408,9 +408,12 @@ same pattern as `signal.c` in `moonbitlang/async`. MoonBit calls it through
 - After the stop phase, the driver ends the process explicitly with the exit code
   (D8) through libc `exit`, which flushes standard output.
 
-**js: the TypeScript adapter (Owner, O2).** The js console lifetime lives in the
-TypeScript adapter that the `config/host` js story adds. That adapter uses only
-`node:*` APIs and is bundled with Bun. MoonBit js externs call it.
+**js: the TypeScript adapter (Owner, O2).** The js console lifetime lives in a
+TypeScript adapter. Owner (2026-10-23, `split-framework-modules` D2): it is the
+hosting node adapter `pkgs/hosting/adapters/node`, not the `config/host` adapter,
+so the configuration module has no process-signal code. It has the same rules: it
+uses only `node:*` APIs, and `build-node-adapter.mbtx` bundles it with Bun as a
+second entry point. MoonBit js externs call it.
 
 - The adapter installs `process.on` listeners. Linux and macOS: SIGINT, SIGTERM,
   SIGQUIT. Windows: SIGINT (Ctrl-C), SIGBREAK (Ctrl-Break) and SIGHUP (console close),
@@ -543,21 +546,22 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 
 | Package | Targets | Contents |
 | --- | --- | --- |
-| `moonrockz/moon-lander/hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
-| `moonrockz/moon-lander/hosting/console` | native, js | C signal stub and native driver; js driver over the TypeScript adapter; process exit |
-| `moonrockz/moon-lander/hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
+| `moonrockz/moon-lander-hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
+| `moonrockz/moon-lander-hosting/console` | native, js | C signal stub and native driver; js driver over the TypeScript adapter; process exit |
+| `moonrockz/moon-lander-hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
 | `moonrockz/moon-lander` (`@lander`) | all | Batteries-included entry (D15): `cli` with the starting settings, the default steps (`formats`, `conventions`, `no_standard_flags`, `no_environments`, `build`, `run`) and `pub using` re-exports of `@hosting` steps |
 
 - `hosting` imports `config`, `config/conventions`, `config/host` (native and js) and
   `moonbitlang/core/argparse` (for `Context[S].args`).
 - `@lander` imports `hosting`, `hosting/argparse`, `hosting/console` (native and js),
-  `config/conventions` and the virtual package `moonrockz/moon-lander/formats` of
+  `config/conventions` and the virtual package `moonrockz/moon-lander-config/formats` of
   `add-configuration-core`. `hosting` does not import `formats`, so the bare path
   links no format that the application does not register.
 - Call (O1): AGENTS.md gets a narrow exception: the native signal handlers in
   `hosting/console` use a C stub. All other process and filesystem work stays with
   `moonbitlang/async`. A task in this change makes that edit. The TypeScript exception
-  belongs to the `config/host` js story (R12).
+  belongs to the `config/host` js story (R12), and task 12.1 extends it to the
+  hosting node adapter.
 
 ### D12. Environment-variable source (Call (R8), Call (R6))
 

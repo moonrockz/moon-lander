@@ -1,6 +1,6 @@
 import {
   "moonrockz/moon-lander-core" @lander_core,
-  "moonrockz/moon-lander/hosting",
+  "moonrockz/moon-lander-hosting" @hosting,
 }
 
 import {

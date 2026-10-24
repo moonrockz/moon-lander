@@ -27,7 +27,7 @@ Bead: lander-4us.5.1
 
 Bead: lander-4us.5.2
 
-- [x] 2.1 Create the package `moonrockz/moon-lander/hosting` and add `moonbitlang/async` (exact version) to the module; verify `mise run build` passes on wasm, wasm-gc, js and native
+- [x] 2.1 Create the package `moonrockz/moon-lander-hosting` and add `moonbitlang/async` (exact version) to the module; verify `mise run build` passes on wasm, wasm-gc, js and native
 - [x] 2.2 Add `HostBuilder[S]`, `@hosting.builder`, `service` (with `start` and `stop` only), `build` and `Host[S]` with no configuration (an empty in-memory source); verify a test that builds a `Host[Unit]` on all four targets
 - [x] 2.3 Add a first `@hosting.run` (native, js) that builds `S`, runs `start`, the command and `stop`, and returns a `RunOutcome` with exit code 0 or 1; verify tests for a clean run and a failing command, also on the Windows leg
 - [x] 2.4 Add the `@lander.cli(name, args)` shortcut. Rename `pkgs/lander/README.md` to `README.mbt.md` and set `readme` in `pkgs/lander/moon.mod` to it. Add an example that builds a host (`cli`, `service`, `build`); verify that the example compiles as a doc test on all four targets, and that a native and js test runs the same host with `@hosting.run`
@@ -67,7 +67,7 @@ Bead: lander-4us.5.5
 
 Bead: lander-4us.5.6
 
-- [ ] 6.1 Create `moonrockz/moon-lander/hosting/argparse` with `command(make, mappings?)`; make `run` parse `args` one time before any file read and put the result in `Context[S].args`; verify that an unknown option gives `UsageError` with the argparse message and code 2, and that no file read and no hook occur
+- [ ] 6.1 Create `moonrockz/moon-lander-hosting/argparse` with `command(make, mappings?)`; make `run` parse `args` one time before any file read and put the result in `Context[S].args`; verify that an unknown option gives `UsageError` with the argparse message and code 2, and that no file read and no hook occur
 - [ ] 6.2 Parse with an empty command named after the application when no `command` step exists; verify an extra argument gives code 2
 - [ ] 6.3 Add `environment_option`, `config_option`, `isolated_flag` and `project_option`, and fill `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`); verify one test per flag and that no flag value becomes a configuration key
 - [ ] 6.4 Give a `UsageError` for an empty `--environment`, `--config` or `--project` value; verify code 2 and no hook run
@@ -118,7 +118,7 @@ Bead: lander-4us.5.10
 
 Bead: lander-4us.5.11
 
-- [ ] 11.1 Create `moonrockz/moon-lander/hosting/console` `run` for native over the spike stub: install handlers, register the flag as a stop probe, run a 50 ms watcher task that calls `stop_application` with `Signal(kind)`, and end the process with libc `exit(code)`
+- [ ] 11.1 Create `moonrockz/moon-lander-hosting/console` `run` for native over the spike stub: install handlers, register the flag as a stop probe, run a 50 ms watcher task that calls `stop_application` with `Signal(kind)`, and end the process with libc `exit(code)`
 - [ ] 11.2 Add a test program in `tests/` and native acceptance tests that send SIGINT, SIGTERM and SIGQUIT on Linux and macOS; verify codes 130, 143 and 131, the exact `SignalKind`, no core dump, and all stop hooks
 - [ ] 11.3 Add Windows acceptance tests that send each console event that task 1.2 found a CI runner can send to one child process (`CTRL_BREAK_EVENT` at least); verify its code (131 for `CTRL_BREAK_EVENT`) and the stop hooks. For each event that task 1.2 recorded as not sendable from a program (`CTRL_CLOSE_EVENT`, and `CTRL_C_EVENT` to one process group), verify the mapping and the code through a unit test of the handler logic, and record the manual check in the package README
 - [ ] 11.4 Verify that a second SIGINT during a slow stop hook ends the process at once with 130 and skips the remaining hooks
@@ -129,7 +129,7 @@ Bead: lander-4us.5.11
 
 Bead: lander-4us.5.12
 
-- [ ] 12.1 Add the signal functions to the TypeScript adapter of the `config/host` js story (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
+- [ ] 12.1 Create the hosting node adapter `pkgs/hosting/adapters/node` as a second entry point of `build-node-adapter.mbtx`, and extend the AGENTS.md node-adapter exception to it; add the signal functions to it (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
 - [ ] 12.2 Set `process.exitCode`, remove the listeners at the end, and call `process.exit(code)` on a second signal
 - [ ] 12.3 Add js acceptance tests that run the test program under the pinned Node.js and send signals; verify codes 130, 143 and 131, the full stop phase, and a second signal that exits at once, on Linux, macOS and Windows
 - [ ] 12.4 Verify that the bundle also runs the test program under Bun
@@ -162,7 +162,7 @@ Bead: lander-4us.5.15
 
 Bead: lander-4us.5.16
 
-- [ ] 16.1 Add the bare entry `@hosting.builder(name, args, env_vars?, working_dir?, environment?)`, and make `@lander.cli` give `HostBuilder[Unit]` with the defaults of design D15 on: the formats from `moonrockz/moon-lander/formats`, `app_dirs(name, prefix~)`, the standard flags and environment-file discovery; verify the "Smallest program" and "Bare builder" scenarios and the two "Environment files under the batteries entry" scenarios
+- [ ] 16.1 Add the bare entry `@hosting.builder(name, args, env_vars?, working_dir?, environment?)`, and make `@lander.cli` give `HostBuilder[Unit]` with the defaults of design D15 on: the formats from `moonrockz/moon-lander-config/formats`, `app_dirs(name, prefix~)`, the standard flags and environment-file discovery; verify the "Smallest program" and "Bare builder" scenarios and the two "Environment files under the batteries entry" scenarios
 - [ ] 16.2 Add `@lander.formats`, `@lander.conventions`, `@lander.no_standard_flags` and `@lander.no_environments`, add the standard flags to the root argparse command without duplicates, and add the `pub using` re-exports of D15; verify the five "Change or turn off a default" scenarios and that `moon info` lists the re-exports in the `@lander` interface
 - [ ] 16.3 Add `@lander.build(factory)`, which changes `HostBuilder[Unit]` to `HostBuilder[S]` and keeps earlier settings and hosted services; verify the "No build step" and "Build after other steps" scenarios on all four targets
 - [ ] 16.4 Add `@lander.run(command)` as a synchronous function with one file per target group: the console driver on native and js, the embedded driver on wasm and wasm-gc; verify that one `fn main` source builds on all four targets and the two "Driver selection by target" scenarios. If the native or js call to the `moonbitlang/async` entry fails, use the fallback in D15 and tell the owner

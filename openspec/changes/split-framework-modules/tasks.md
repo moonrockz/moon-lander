@@ -59,10 +59,10 @@ Bead: lander-4us.40.5
 
 Bead: lander-4us.40.6
 
-- [ ] 6.1 Create `pkgs/hosting` (`moonrockz/moon-lander-hosting`) with imports of core, config, `moonbitlang/async` and `unicode-data`; move `pkgs/lander/hosting` to the module root and `hosting/console` (with `signal_stub.c`) to `console`; verify that `moon check` builds the module on its targets and `moon test --target native` runs the console tests
-- [ ] 6.2 Change the imports in `pkgs/lander`, `tests/console-signal-acceptance` and the READMEs, and leave `pkgs/lander/moon.mod` with imports of the four framework modules and `moonbitlang/async`; verify `mise run test` on all four targets
-- [ ] 6.3 Change the library list of `check-console.mbtx` (task 1.6) to `pkgs/core`, `pkgs/config` and `pkgs/hosting`, with a consumer that imports `moonrockz/moon-lander-hosting`; verify `mise run check:console` on Linux and macOS and with `mise run test:native-zig`
-- [ ] 6.4 Change the package paths in the proposal, design and tasks of `add-host-lifecycle`, move the js signal listeners of O2 and task 12.1 to `pkgs/hosting/adapters/node` (design D2 and D12), and change the AGENTS.md exceptions for the console stub and the node adapter; verify `mise exec -- openspec validate --all --strict` and that no file outside `openspec/changes/archive/` and the released sections of `CHANGELOG.md` names `moonrockz/moon-lander/hosting`
+- [x] 6.1 Create `pkgs/hosting` (`moonrockz/moon-lander-hosting`) with imports of core, config, `moonbitlang/async` and `unicode-data`; move `pkgs/lander/hosting` to the module root and `hosting/console` (with `signal_stub.c`) to `console`; verify that `moon check` builds the module on its targets and `moon test --target native` runs the console tests
+- [x] 6.2 Change the imports in `pkgs/lander`, `tests/console-signal-acceptance` and the READMEs, and leave `pkgs/lander/moon.mod` with imports of the four framework modules and `moonbitlang/async`; verify `mise run test` on all four targets
+- [x] 6.3 Change the library list of `check-console.mbtx` (task 1.6) to `pkgs/core`, `pkgs/config` and `pkgs/hosting`, with a consumer that imports `moonrockz/moon-lander-hosting`; verify `mise run check:console` on Linux and macOS and with `mise run test:native-zig`
+- [x] 6.4 Change the package paths in the proposal, design and tasks of `add-host-lifecycle`, move the js signal listeners of O2 and task 12.1 to `pkgs/hosting/adapters/node` (design D2 and D12), and change the AGENTS.md exceptions for the console stub and the node adapter; verify `mise exec -- openspec validate --all --strict` and that no file outside `openspec/changes/archive/` and the released sections of `CHANGELOG.md` names `moonrockz/moon-lander/hosting`
 
 ## 7. Dependency check, docs and archive
 

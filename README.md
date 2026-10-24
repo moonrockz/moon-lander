@@ -116,8 +116,12 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   [`moonrockz/moon-lander-mediator`](pkgs/mediator/README.mbt.md), imported as
   `@mediator`, and the async mediator `moonrockz/moon-lander-mediator/async`
   (`@mediator_async`).
+- `pkgs/hosting/` contains `moonrockz/moon-lander-hosting`, imported as
+  `@hosting`: the host builder, hosted services and `run`, and the native console
+  signal stub in `console`.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
-  as `@lander`. Its `version()` export provides a build and test smoke check.
+  as `@lander`: the `cli` entry, the re-exports, and `version()`, which provides a
+  build and test smoke check.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors

@@ -3,11 +3,11 @@ package "moonrockz/moon-lander"
 
 import {
   "moonrockz/moon-lander-core",
-  "moonrockz/moon-lander/hosting",
+  "moonrockz/moon-lander-hosting",
 }
 
 // Values
-pub fn cli(@moon-lander-core.AppName, Array[String]) -> @hosting.HostBuilder[Unit]
+pub fn cli(@moon-lander-core.AppName, Array[String]) -> @moon-lander-hosting.HostBuilder[Unit]
 
 pub fn version() -> String
 

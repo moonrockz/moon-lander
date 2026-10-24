@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonrockz/moon-lander/hosting"
+package "moonrockz/moon-lander-hosting"
 
 import {
   "moonbitlang/core/debug",

@@ -325,9 +325,10 @@ pub(all) enum SignalKind { Interrupt; Terminate; Quit }
   signal arrived on every platform (D7).
 - Call (this change): `StopToken` holds the same check for code that does not get
   `Context[S]`, for example an evaluator.
-- Call (this change): when the command raises `StopRequested`, the host treats it as
-  a normal stop, not as a failure. The stop reason stays the reason of the first
-  request.
+- Call (this change): when the command or a hook raises `StopRequested`, the host
+  treats it as a normal stop, not as a failure. The stop reason stays the reason of the first
+  request. A service whose `starting` or `start` hook raises `StopRequested` does
+  not count as started.
 - Call (this change): event handlers are synchronous and cannot raise. A handler
   that is registered after its event runs at once (like .NET token registration).
 - Owner (2026-10-24): the first event that ends the run sets the stop reason once:
@@ -370,7 +371,7 @@ priv enum StopRequest { Requested } // group 4 adds Signal; group 13 adds Embedd
 fn[S] Engine::start(services : Array[HostedService[S]]) -> Step
 fn Pending::done(self : Pending) -> Step
 fn Pending::failed(self : Pending, error : Error) -> Step
-fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?) -> Step
+fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step
 fn Pending::timed_out(self : Pending) -> Step
 ```
 

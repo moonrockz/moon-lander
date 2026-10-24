@@ -167,7 +167,7 @@ async test "a leg that runs zero tests fails the check" {
   )
   for
     path in [
-      "pkgs", "pkgs/lander", "pkgs/mediator", "pkgs/mediator/async", "tests", "tests/mediator-acceptance",
+      "pkgs", "pkgs/mediator", "pkgs/mediator/async", "tests", "tests/mediator-acceptance",
       "tests/mediator-async-acceptance",
     ] {
     @fs.mkdir("\{dir}/\{path}")

@@ -1,7 +1,13 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonrockz/moon-lander"
 
+import {
+  "moonrockz/moon-lander/hosting",
+}
+
 // Values
+pub fn cli(@hosting.AppName, Array[String]) -> @hosting.HostBuilder[Unit]
+
 pub fn version() -> String
 
 // Errors

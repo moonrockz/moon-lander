@@ -5,6 +5,7 @@ version = "0.3.0"
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.5",
+  "moonbit-community/unicode-data@0.6.0",
   "moonbit-community/toml@0.5.0",
   "moonbit-community/yaml@0.0.8",
   "moonrockz/ion@0.6.0",
@@ -17,4 +18,4 @@ repository = "https://github.com/moonrockz/moon-lander"
 
 license = "Apache-2.0"
 
-readme = "README.md"
+readme = "README.mbt.md"

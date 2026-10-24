@@ -131,7 +131,7 @@ before any hosted-service hook.
 
 #### Scenario: Starting environment is the default
 
-- **WHEN** the application calls `@lander.cli("acme", args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
+- **WHEN** the application calls `@lander.cli(AppName::parse("acme"), args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
 - **THEN** the environment name is `Some("Staging")`, and without that variable it is `Some("Production")`
 
 #### Scenario: Invalid name
@@ -150,10 +150,62 @@ name as an input.
 - **WHEN** environments are on, the arguments contain `--environment Staging`, and `acme.Staging.toml` sits next to `acme.toml`
 - **THEN** the configuration contains the layer from `acme.Staging.toml`
 
+### Requirement: Parsed names and exit codes
+
+The host SHALL take the application name as an `AppName`, each service name as a
+`ServiceName`, and each exit code as an `ExitCode`. Each type MUST have one smart
+constructor, which is the only way to make a value. A parse that fails MUST raise a
+`HostError` that names the text and the broken rule.
+
+#### Scenario: Application name with a space
+
+- **WHEN** a program calls `AppName::parse("my tool")`
+- **THEN** the call raises `HostError::InvalidAppName` with the text `my tool` and a reason that names the character, and no builder exists
+
+### Requirement: Name and exit code rules
+
+An application name SHALL start with an ASCII letter and SHALL hold only ASCII
+letters, digits, `-` and `_`. A service name MUST be safe as one file path component: it
+MUST start with a Unicode letter, MUST hold only Unicode letters, combining marks,
+digits, `_`, `-` and `.`, MUST NOT end with `.`, MUST NOT be a Windows device name
+before any extension, and MUST be at most 128 bytes in UTF-8. An exit
+code MUST be in the range 0 to 255.
+
+#### Scenario: Service name with surrounding whitespace
+
+- **WHEN** a program calls `ServiceName::parse(" db")`
+- **THEN** the call raises `HostError::InvalidServiceName`
+
+#### Scenario: Windows device name
+
+- **WHEN** a program calls `ServiceName::parse("nul.log")`
+- **THEN** the call raises `HostError::InvalidServiceName`
+
+#### Scenario: Exit code out of range
+
+- **WHEN** a program calls `ExitCode::from_int(256)`
+- **THEN** the call raises `HostError::InvalidExitCode`
+
+### Requirement: Unique service names
+
+Each service of a host SHALL have its own name, without regard to letter case. A
+step that adds a service whose name equals a name of the builder, or differs from
+it only in letter case, MUST raise `HostError::DuplicateService`.
+
+#### Scenario: Two services with one name
+
+- **WHEN** a builder has a service named `db`, and the program adds a second service named `db`
+- **THEN** the step raises `HostError::DuplicateService`, and the builder keeps one service named `db`
+
+#### Scenario: Names that differ only in letter case
+
+- **WHEN** a builder has a service named `Données`, and the program adds a service named `DONNÉES`
+- **THEN** the step raises `HostError::DuplicateService`
+
 ### Requirement: Application name and variable prefix
 
-The application name SHALL be given one time, in `@lander.cli(name, args)` or
-`@hosting.builder(name, args)`. The
+The application name SHALL be given one time, as an `AppName`, in
+`@lander.cli(name, args)` or `@hosting.builder(name, args)`. The
 variable prefix MUST default to the application name in upper case, with `-` changed
 to `_`. `@hosting.env_prefix` MUST change the prefix. The host MUST give the name and
 the prefix to the conventions parts.
@@ -632,12 +684,12 @@ source and MUST use a 30-second shutdown timeout.
 
 #### Scenario: Smallest program
 
-- **WHEN** a native program is `@lander.cli("acme", @env.args()) |> @lander.run(fn(ctx) { ... })`, it starts in `/w`, `/w/acme.toml` sets `log.format = "text"`, and the arguments are `--environment Staging`
+- **WHEN** a native program is `@lander.cli(AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })`, it starts in `/w`, `/w/acme.toml` sets `log.format = "text"`, and the arguments are `--environment Staging`
 - **THEN** the run accepts the flag, the environment name is `Some("Staging")`, the configuration holds `log.format = "text"`, and the exit code is 0
 
 #### Scenario: Bare builder
 
-- **WHEN** a program starts with `@hosting.builder("acme", ["--environment", "Staging"])` and has no `command` step
+- **WHEN** a program starts with `@hosting.builder(AppName::parse("acme"), ["--environment", "Staging"])` and has no `command` step
 - **THEN** the run ends with a usage error and exit code 2, and no configuration file is read
 
 ### Requirement: Change or turn off a default

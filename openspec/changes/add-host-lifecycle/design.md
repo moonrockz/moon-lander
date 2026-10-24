@@ -176,7 +176,7 @@ async fn main {
   })
   |> @hosting.app_dirs()   // = @conventions.add(@conventions.app_dirs(name, prefix~)) with host values
   |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
-  |> @hosting.service(@hosting.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @hosting.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @hosting.shutdown_timeout(5_000)
   |> @hosting.build(fn(b) {
     App::{ logs: TelemetrySession::local(b.environment.content_root, ...), ... }
@@ -268,7 +268,7 @@ priv struct HostedService[S] {   // only `service` makes one (D17)
 pub type Hook[S] = async (Context[S]) -> Unit raise
 
 pub fn[S] service(
-  self : HostBuilder[S], name : ServiceName,
+  self : HostBuilder[S], name : &IntoServiceName,
   starting? : Hook[S], start? : Hook[S], started? : Hook[S],
   stopping? : Hook[S], stop? : Hook[S], stopped? : Hook[S],
 ) -> HostBuilder[S] raise HostError
@@ -711,7 +711,7 @@ fn main raise {
   |> @lander.cli(@env.args())
   |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
   |> @lander.build(fn(b) { App::new(b.config) })
-  |> @lander.service(@lander.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @lander.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @lander.shutdown_timeout(5_000)
   |> @lander.run(fn(ctx) { acme_command(ctx) })
 }
@@ -725,7 +725,7 @@ fn main raise {
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
   `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
-  `ServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
+  `ServiceName`, `IntoServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
   `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.
   So a batteries application writes only `@lander` steps. Probe (`moonc v0.10.15`,
@@ -832,7 +832,16 @@ not check the rules again.
   `AppName`, and `service` takes a `ServiceName`. The name is the first argument,
   so the text flows through the parse into the pipeline:
   `"acme" |> @lander.AppName::parse |> @lander.cli(@env.args())` (Owner,
-  2026-10-24: the examples use this form). A program parses its name in
+  2026-10-24: the examples use this form).
+- Owner (2026-10-24): `service` takes `name : &IntoServiceName`, like
+  `IntoEnvVars` (D14): a `ServiceName`, or a `String` that the step parses with
+  `ServiceName::parse`. MoonBit has no overloading, so a sealed trait with two
+  implementations gives one step that takes both. The text is parsed at the step,
+  which already raises `HostError`, and the host holds only the `ServiceName`
+  after it. So `|> @hosting.service("db", start=...)` and
+  `|> @hosting.service(ServiceName::parse("db"), start=...)` give the same
+  service. `cli` and `builder` still take only an `AppName`, because they do not
+  raise. A program parses its name in
   `fn main raise`, or in an `async fn main`. A bad name in a synchronous `main`
   stops the program at start with the error and a stack trace (probe, `moonc
   v0.10.17`: abort, exit code 134). In an `async fn main` the `moonbitlang/async`

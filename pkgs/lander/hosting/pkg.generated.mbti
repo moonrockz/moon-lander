@@ -11,7 +11,7 @@ pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
 pub fn[S] builder(AppName, Array[String]) -> HostBuilder[S]
 
-pub fn[S] service(HostBuilder[S], ServiceName, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
+pub fn[S] service(HostBuilder[S], &IntoServiceName, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 // Errors
 pub(all) suberror HostError {
@@ -77,14 +77,20 @@ pub struct ServiceName {
 pub fn ServiceName::equal(Self, Self) -> Bool
 pub fn ServiceName::hash(Self) -> Int32
 pub fn ServiceName::hash_combine(Self, Hasher) -> Unit
+pub fn ServiceName::into_service_name(Self) -> Self raise HostError
 pub fn ServiceName::not_equal(Self, Self) -> Bool
 pub fn ServiceName::output(Self, &Logger) -> Unit
 pub fn ServiceName::parse(String) -> Self raise HostError
 pub fn ServiceName::to_repr(Self) -> @debug.Repr
 pub fn ServiceName::to_string(Self) -> String
 pub impl Show for ServiceName
+pub impl IntoServiceName for ServiceName
 
 // Type aliases
 pub type Hook[S] = async (Context[S]) -> Unit
 
 // Traits
+pub trait IntoServiceName {
+  fn into_service_name(Self) -> ServiceName raise HostError
+}
+pub impl IntoServiceName for String

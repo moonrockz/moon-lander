@@ -155,12 +155,19 @@ name as an input.
 The host SHALL take the application name as an `AppName`, each service name as a
 `ServiceName`, and each exit code as an `ExitCode`. Each type MUST have one smart
 constructor, which is the only way to make a value. A parse that fails MUST raise a
-`HostError` that names the text and the broken rule.
+`HostError` that names the text and the broken rule. The step that adds a service
+MAY take the name as text; it MUST parse the text with the `ServiceName` rules in
+that step and MUST keep only the `ServiceName`.
 
 #### Scenario: Application name with a space
 
 - **WHEN** a program calls `AppName::parse("my tool")`
 - **THEN** the call raises `HostError::InvalidAppName` with the text `my tool` and a reason that names the character, and no builder exists
+
+#### Scenario: Service name as text
+
+- **WHEN** a program adds a service with the text `db`, and then a service with the text `my db`
+- **THEN** the first step adds the service `db`, and the second step raises `HostError::InvalidServiceName` with the text `my db`
 
 ### Requirement: Name and exit code rules
 

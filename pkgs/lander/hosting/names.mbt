@@ -175,6 +175,27 @@ pub impl Show for ServiceName with output(self, logger) {
 pub extend ServiceName with Show::{output, to_string}
 
 ///|
+/// A value that gives a service name: a `ServiceName`, or a `String` that
+/// `ServiceName::parse` reads. So `service` takes either, and parses text at the
+/// boundary. After that step, the host holds only the `ServiceName`.
+pub trait IntoServiceName {
+  into_service_name(Self) -> ServiceName raise HostError
+}
+
+///|
+pub impl IntoServiceName for ServiceName with into_service_name(self) {
+  self
+}
+
+///|
+pub extend ServiceName with IntoServiceName::{into_service_name}
+
+///|
+pub impl IntoServiceName for String with into_service_name(self) {
+  ServiceName::parse(self)
+}
+
+///|
 /// Whether two names give the same file on a file system that ignores case:
 /// Windows compares names by their uppercase form, and macOS by case folding.
 fn ServiceName::same_file(self : ServiceName, other : ServiceName) -> Bool {

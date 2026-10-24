@@ -72,7 +72,7 @@ of the pipeline gives a new builder:
 | Step | What it does |
 | --- | --- |
 | `@lander.cli(name, args)` | Starts the builder with an `AppName` and the arguments |
-| `@hosting.service(name, start=.., stop=..)` | Adds a hosted service with a `ServiceName`. Both hooks are optional and can wait. A second service whose name equals another or differs from it only in letter case raises `DuplicateService` |
+| `@hosting.service(name, start=.., stop=..)` | Adds a hosted service. `name` is a `ServiceName` or a `String` that the step parses. Both hooks are optional and can wait. A second service whose name equals another or differs from it only in letter case raises `DuplicateService` |
 | `@hosting.build(factory)` | Gives the `Host`. It does no I/O, so a host can run more than one time |
 
 Names and exit codes are types, not raw strings and numbers. Each type has one
@@ -101,7 +101,7 @@ fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
   |> @hosting.AppName::parse
   |> @lander.cli(["greet"])
   |> @hosting.service(
-    @hosting.ServiceName::parse("greeter"),
+    "greeter",
     start=_ => log.push("greeter started"),
     stop=_ => log.push("greeter stopped"),
   )

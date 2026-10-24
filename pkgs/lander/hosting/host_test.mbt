@@ -101,3 +101,31 @@ test "case pairs that are not symmetric are duplicates" {
     }
   }
 }
+
+///|
+test "service takes a String and parses it at the step" {
+  let builder : @hosting.HostBuilder[Unit] = "acme"
+    |> @hosting.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.service("db")
+    |> @hosting.service(@hosting.ServiceName::parse("cache"))
+  let bad : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
+    Ok(builder |> @hosting.service("my db"))
+  catch {
+    err => Err(err)
+  }
+  guard bad is Err(@hosting.InvalidServiceName(text~, ..)) else {
+    fail("expected InvalidServiceName")
+  }
+  @expect.expect(text).to_equal("my db")
+  let dup : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
+    Ok(builder |> @hosting.service("DB"))
+  catch {
+    err => Err(err)
+  }
+  guard dup is Err(@hosting.DuplicateService(name~, existing~)) else {
+    fail("expected DuplicateService")
+  }
+  @expect.expect(name.to_string()).to_equal("DB")
+  @expect.expect(existing.to_string()).to_equal("db")
+}

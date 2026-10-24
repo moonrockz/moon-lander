@@ -330,8 +330,13 @@ pub(all) enum SignalKind { Interrupt; Terminate; Quit }
   request.
 - Call (this change): event handlers are synchronous and cannot raise. A handler
   that is registered after its event runs at once (like .NET token registration).
-- Call (this change): the first stop request sets the reason and the requested code.
-  Later requests have no effect, except that a signal still sets the signal exit code.
+- Owner (2026-10-24): the first event that ends the run sets the stop reason once:
+  a start failure gives `StartFailed`, a command failure gives `Failed`, command
+  completion gives `Completed`, or the first stop request gives its request reason.
+  A request after the reason is set records that a request occurred and keeps the
+  first requested code, without changing the reason. All stop hooks read the same
+  reason. Later requests have no effect, except that a signal still sets the signal
+  exit code.
 - Call (this change): a configuration or factory failure before the start phase sets
   the reason to `StartFailed(error)`.
 - Call (this change): on native and js, a stop request also cancels the command task.
@@ -392,8 +397,9 @@ guard step is Finish(outcome)
 - Call (this change): the engine implements all four replies. `stop_requested` follows
   D5: during the start phase, the current hook ends, the other start hooks and the
   command are skipped, and the started services stop. During the command, the stop
-  phase starts. The first request sets the reason and the requested code, also
-  during the stop phase. Later requests change nothing; group 4 adds the signal
+  phase starts. The first request records the request and its code. It sets the
+  reason only if no reason is set, so all stop hooks read the same reason. Later
+  requests change nothing; group 4 adds the signal
   exception in D5. The engine maps `StopRequest` to `StopReason`. `timed_out`
   outside the stop phase is a driver fault: the engine aborts and names the phase.
   In the stop phase: the other stop hooks are skipped, the stopped event occurs,

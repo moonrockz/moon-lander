@@ -24,7 +24,7 @@ import {
 // nothing reads them until `run_embedded`. On every target, the application
 // name and the arguments stay unread until groups 5, 6 and 8. Remove this line
 // when they are read. The pinned build system cannot condition imports by
-// target, so the test import of `moonbitlang/async` is unused on wasm and
+// target, so the test and wbtest imports of `moonbitlang/async` are unused on wasm and
 // wasm-gc (29); that part stays.
 warnings = "-7-9-29"
 

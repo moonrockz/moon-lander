@@ -176,7 +176,10 @@ test "engine table: stop requests in every phase complete the current action" {
     } else { clean })
     @expect.expect(outcome.requested_code).to_equal(Some(code))
     @expect.expect(outcome.exit_code()).to_equal(code)
-    @expect.expect(outcome.reason is Requested).to_be_true()
+    @expect.expect(match target {
+      RunCommand | Raise(Started) => outcome.reason is Requested
+      _ => outcome.reason is Completed
+    }).to_be_true()
   }
 }
 
@@ -394,7 +397,7 @@ fn EngineSnapshot::check(self : EngineSnapshot, engine : Engine) -> Unit raise {
 }
 
 ///|
-test "engine table: first stop request fixes reason and code" {
+test "engine table: first stop request keeps its code and any existing reason" {
   let first_code = ExitCode::from_int(4)
   let second_code = ExitCode::from_int(5)
   for first in [Action::Hook(ServiceRef::{ index: 0 }, Start), RunCommand,
@@ -406,10 +409,47 @@ test "engine table: first stop request fixes reason and code" {
           pending.stop_requested(Requested, Some(second_code))
         } else { pending.done() }
       })
-      @expect.expect(outcome.reason is Requested).to_be_true()
+      @expect.expect(match first {
+        Hook(_, Start) | RunCommand => outcome.reason is Requested
+        _ => outcome.reason is Completed
+      }).to_be_true()
       @expect.expect(outcome.requested_code).to_equal(code)
       @expect.expect(outcome.exit_code()).to_equal(code.unwrap_or(ExitCode::success()))
     }
+  }
+}
+
+///|
+test "engine table: stop requests preserve the reason throughout stop hooks" {
+  let first_code = ExitCode::from_int(4)
+  let second_code = ExitCode::from_int(5)
+  let cases : Array[(Action?, (StopReason?) -> Bool)] = [
+    (None, reason => reason is Some(Completed)),
+    (Some(Hook(ServiceRef::{ index: 1 }, Start)), reason => reason is Some(StartFailed(HookFailed(1)))),
+    (Some(RunCommand), reason => reason is Some(Failed(HookFailed(1)))),
+  ]
+  for (failure, has_expected_reason) in cases {
+    let reasons = []
+    let (_, outcome) = engine_trace([63, 63], reply=(pending, action) => {
+      match action {
+        Hook(_, Stopping | Stop | Stopped) => {
+          reasons.push(pending.engine.reason)
+          pending.stop_requested(Requested, Some(if reasons.length() == 1 {
+            first_code
+          } else { second_code }))
+        }
+        _ => if failure == Some(action) { pending.failed(HookFailed(1)) }
+        else { pending.done() }
+      }
+    })
+    @expect.expect(reasons.length()).to_equal(if failure is Some(Hook(_, Start)) { 3 } else { 6 })
+    for reason in reasons {
+      @expect.expect(has_expected_reason(reason)).to_be_true()
+    }
+    @expect.expect(has_expected_reason(Some(outcome.reason))).to_be_true()
+    @expect.expect(outcome.requested_code).to_equal(Some(first_code))
+    @expect.expect(outcome.exit_code()).to_equal(if failure is None { first_code } else { ExitCode::failure() })
+    @expect.expect(outcome.failures().length()).to_equal(if failure is None { 0 } else { 1 })
   }
 }
 

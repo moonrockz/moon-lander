@@ -215,7 +215,9 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
     StopRequested(request, code) => {
       if !engine.stop_requested {
         engine.stop_requested = true
-        engine.reason = Some(match request { Requested => Requested })
+        if engine.reason is None {
+          engine.reason = Some(match request { Requested => Requested })
+        }
         engine.requested_code = code
       }
       if engine.phase is Starting {

@@ -9,7 +9,7 @@ async test "factory failure before start has StartFailed reason" {
 }
 
 ///|
-test "configuration failure before start has StartFailed reason" {
+test "outcome of a failure before the start phase has StartFailed reason" {
   let result = outcome(HookFailed(1))
   @expect.expect(result.reason is StartFailed(HookFailed(1))).to_be_true()
   @expect.expect(result.exit_code()).to_equal(ExitCode::failure())

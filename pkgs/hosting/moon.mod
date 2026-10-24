@@ -15,3 +15,5 @@ description = "Host lifecycle for Moon-Lander applications: services, stop reque
 repository = "https://github.com/moonrockz/moon-lander"
 
 license = "Apache-2.0"
+
+readme = "README.mbt.md"

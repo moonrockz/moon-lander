@@ -116,7 +116,8 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   [`moonrockz/moon-lander-mediator`](pkgs/mediator/README.mbt.md), imported as
   `@mediator`, and the async mediator `moonrockz/moon-lander-mediator/async`
   (`@mediator_async`).
-- `pkgs/hosting/` contains `moonrockz/moon-lander-hosting`, imported as
+- `pkgs/hosting/` contains
+  [`moonrockz/moon-lander-hosting`](pkgs/hosting/README.mbt.md), imported as
   `@hosting`: the host builder, hosted services and `run`, and the native console
   signal stub in `console`.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported

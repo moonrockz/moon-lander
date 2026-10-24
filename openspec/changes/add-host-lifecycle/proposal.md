@@ -40,7 +40,7 @@ supply layered configuration. This change connects that configuration to a lifec
   - A fixed run order. The host parses the arguments first with
     `moonbitlang/core/argparse`. Then it fixes the variable set and the working
     directory, finds the environment name, loads the
-    configuration through `@config/host.load` (native, js) or `@config.load` over an
+    configuration through `@host.load` of `moonrockz/moon-lander-config/host` (native, js) or `@config.load` over an
     injected `FileTree` (wasm, wasm-gc, `|> @hosting.files(tree)`), and builds `S`.
   - The environment-variable source. The host adds it with the prefix (default: the
     application name in upper case, `|> @hosting.env_prefix(...)` changes it) and

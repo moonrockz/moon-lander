@@ -102,7 +102,7 @@ Bead: lander-4us.5.8
 Bead: lander-4us.5.9
 
 - [ ] 9.1 Add `@hosting.configure` over the `ConfigBuilder` pipeline, and the builder trait if core gives one; verify an example with `|> @conventions.add(@conventions.app_dirs("acme"))`
-- [ ] 9.2 Load through `@config/host.load(builder)` on native and js; verify the factory reads a merged value
+- [ ] 9.2 Load through `@host.load(builder)` on native and js; verify the factory reads a merged value
 - [ ] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
 - [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
 
@@ -129,7 +129,7 @@ Bead: lander-4us.5.11
 
 Bead: lander-4us.5.12
 
-- [ ] 12.1 Create the hosting node adapter `pkgs/hosting/adapters/node` as a second entry point of `build-node-adapter.mbtx`, and extend the AGENTS.md node-adapter exception to it; add the signal functions to it (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
+- [ ] 12.1 Create the hosting node adapter `pkgs/hosting/adapters/node` as a second entry point of `build-node-adapter.mbtx` (AGENTS.md already allows it); add the signal functions to it (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
 - [ ] 12.2 Set `process.exitCode`, remove the listeners at the end, and call `process.exit(code)` on a second signal
 - [ ] 12.3 Add js acceptance tests that run the test program under the pinned Node.js and send signals; verify codes 130, 143 and 131, the full stop phase, and a second signal that exits at once, on Linux, macOS and Windows
 - [ ] 12.4 Verify that the bundle also runs the test program under Bun

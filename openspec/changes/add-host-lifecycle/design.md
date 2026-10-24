@@ -18,7 +18,7 @@ See proposal.md (Why). This section gives only the facts that shape the design.
   `@lander` is the batteries-included entry. `@hosting.builder` is the bare entry
   (D15).
 - This change depends on `add-configuration-core` (`ConfigBuilder`, sources, the
-  overrides source, `FileTree`, `LoadStep`, `@config.load`, `@config/host.load`,
+  overrides source, `FileTree`, `LoadStep`, `@config.load`, `@host.load` (`moonrockz/moon-lander-config/host`),
   `Config`, `ConfigError`), `add-configuration-conventions` (`@conventions.add`,
   `@conventions.app_dirs`, `@conventions.environments`, `DiscoveryOptions`, the
   environment name rules) and `add-configuration-binding` (`bind`, `Options[T]`). This
@@ -237,7 +237,7 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
    raises `ConfigError::InvalidEnvironmentName` (exit code 2).
 4. The host makes `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`)
    from the standard flags (D10), and gives it to the conventions parts.
-5. The host loads the configuration. Native and js: `@config/host.load(builder)`.
+5. The host loads the configuration. Native and js: `@host.load(builder)`.
    wasm and wasm-gc: `@config.load(builder, tree)` with the tree from
    `@hosting.files`. The merge order is the application sources, then the
    environment variables (priority 600), then the argparse overrides (priority 700).
@@ -560,8 +560,8 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 - Call (O1): AGENTS.md gets a narrow exception: the native signal handlers in
   `hosting/console` use a C stub. All other process and filesystem work stays with
   `moonbitlang/async`. A task in this change makes that edit. The TypeScript exception
-  belongs to the `config/host` js story (R12), and task 12.1 extends it to the
-  hosting node adapter.
+  belongs to the `config/host` js story (R12). `split-framework-modules` extends it to
+  the hosting node adapter `pkgs/hosting/adapters/node`, which task 12.1 creates.
 
 ### D12. Environment-variable source (Call (R8), Call (R6))
 

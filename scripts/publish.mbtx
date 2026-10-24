@@ -12,8 +12,11 @@ import {
 }
 
 ///|
-/// Public modules, in dependency order. The framework module, the workspace
-/// root, the docs site and the test module are not published.
+/// Public modules, in dependency order. The framework modules, the workspace
+/// root, the docs site and the test module are not published. The first framework
+/// release adds the framework modules in this order: `pkgs/core`, `pkgs/config`,
+/// `pkgs/mediator`, `pkgs/hosting`, `pkgs/lander` (openspec split-framework-modules,
+/// design D10).
 let publish_list : Array[(String, String)] = [
   ("pkgs/notebooks", "moonrockz/notebooks"),
   ("pkgs/openrpc", "moonrockz/openrpc"),

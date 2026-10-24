@@ -107,7 +107,10 @@ skill. Report these as problems:
 
 ## Publishing
 
-The module name `moonrockz/moon-lander` is provisional. There is no CLI yet.
+The framework is five modules: `moonrockz/moon-lander-core`, `-config`,
+`-mediator`, `-hosting` and the umbrella `moonrockz/moon-lander`. Each imports only
+the modules below it (`mise run validate` checks this). The module names are
+provisional. There is no CLI yet.
 Do not add UI packages or a separate regolith module. One exception: the unpublished
 docs tool `apps/site` can use Rabbita. No other module can import it, and the
 published library stays UI-free. Consume `zig-cross` through

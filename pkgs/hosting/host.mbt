@@ -63,8 +63,12 @@ pub type Hook[S] = async (Context[S]) -> Unit
 /// A hosted service: a name and its optional hooks.
 priv struct HostedService[S] {
   name : ServiceName
+  starting : Hook[S]?
   start : Hook[S]?
+  started : Hook[S]?
+  stopping : Hook[S]?
   stop : Hook[S]?
+  stopped : Hook[S]?
 }
 
 ///|
@@ -84,19 +88,29 @@ pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuil
 }
 
 ///|
-/// Add a hosted service. The host runs the `start` hooks in registration order
-/// before the command, and the `stop` hooks in reverse order after it. Only a
-/// service that started gets its `stop` hook: its `start` hook succeeded, or it
-/// has no `start` hook and no earlier `start` hook failed. Each service of a
-/// host has its own name: a second service whose name differs only in letter
-/// case raises `DuplicateService`, because the two names give one file on
-/// Windows and macOS. `name` is a `ServiceName`, or a `String` that the step
-/// parses; a bad name raises `InvalidServiceName`.
+/// Add a hosted service with six optional hooks. The host runs all `starting`,
+/// then all `start`, then all `started` hooks in registration order. After the
+/// command it runs all `stopping`, then all `stop`, then all `stopped` hooks in
+/// reverse order, for started services only.
+/// A service counts as started when its `start` hook returns without an error,
+/// or when the service has no `start` hook, the start phase reached its
+/// `starting` step, and its `starting` hook succeeded or is absent.
+/// A service that the start phase did not reach is not started.
+/// A start failure skips the remaining start hooks and the command. A stop
+/// failure does not skip later hooks.
+///
+/// Each service has its own name, without regard to letter case. A duplicate
+/// raises `DuplicateService`. `name` is a `ServiceName`, or a `String` that the
+/// step parses; a bad name raises `InvalidServiceName`.
 pub fn[S] service(
   builder : HostBuilder[S],
   name : &IntoServiceName,
+  starting? : Hook[S],
   start? : Hook[S],
+  started? : Hook[S],
+  stopping? : Hook[S],
   stop? : Hook[S],
+  stopped? : Hook[S],
 ) -> HostBuilder[S] raise HostError {
   let name = name.into_service_name()
   for service in builder.services {
@@ -105,7 +119,7 @@ pub fn[S] service(
     }
   }
   let services = builder.services.copy()
-  services.push({ name, start, stop })
+  services.push({ name, starting, start, started, stopping, stop, stopped })
   { ..builder, services, }
 }
 
@@ -140,10 +154,12 @@ pub fn[S] build(
 pub struct RunOutcome {
   priv exit_code : ExitCode
   priv failures : Array[Error]
+  priv reason : StopReason
+  priv requested_code : ExitCode?
 }
 
 ///|
-/// 0 for a clean run, 1 when a failure occurred.
+/// The requested code, or 0 for a clean run; 1 when a failure occurred.
 pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
   self.exit_code
 }

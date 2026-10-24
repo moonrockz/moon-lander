@@ -277,9 +277,10 @@ pub fn[S] service(
 - Owner: start in registration order, stop in reverse. .NET 8 order: all `starting`,
   then all `start`, then all `started`. Stop: all `stopping`, all `stop`, all
   `stopped`, each in reverse.
-- Call (this change): a service is started when its `start` hook succeeds (or it has
-  no `start` hook and its `starting` hook did not fail). Only started services get stop
-  hooks.
+- Owner (2026-10-24): A service counts as started when its `start` hook returns without
+  an error, or when the service has no `start` hook, the start phase reached its
+  `starting` step, and its `starting` hook succeeded or is absent. A service that the
+  start phase did not reach is not started. Only started services get stop hooks.
 - Call (this change): a stop hook failure does not skip the next hooks. The host
   collects all failures.
 - Stop hooks read the reason with `ctx.lifetime.stop_reason()`.
@@ -329,8 +330,15 @@ pub(all) enum SignalKind { Interrupt; Terminate; Quit }
   request.
 - Call (this change): event handlers are synchronous and cannot raise. A handler
   that is registered after its event runs at once (like .NET token registration).
-- Call (this change): the first stop request sets the reason. Later requests have no
-  effect, except that a signal still sets the signal exit code.
+- Owner (2026-10-24): the first event that ends the run sets the stop reason once:
+  a start failure gives `StartFailed`, a command failure gives `Failed`, command
+  completion gives `Completed`, or the first stop request gives its request reason.
+  A request after the reason is set records that a request occurred and keeps the
+  first requested code, without changing the reason. All stop hooks read the same
+  reason. Later requests have no effect, except that a signal still sets the signal
+  exit code.
+- Call (this change): a configuration or factory failure before the start phase sets
+  the reason to `StartFailed(error)`.
 - Call (this change): on native and js, a stop request also cancels the command task.
   The command stops at its next suspension point and its `defer` blocks run. A command
   protects a critical part with `@async.protect_from_cancel`.
@@ -357,11 +365,12 @@ priv enum Action {
 }
 priv struct ServiceRef { ... }    // only the engine makes one, so it is always in range
 priv struct Pending { ... }       // the reply token of one step
+priv enum StopRequest { Requested } // group 4 adds Signal; group 13 adds Embedder
 
 fn[S] Engine::start(services : Array[HostedService[S]]) -> Step
 fn Pending::done(self : Pending) -> Step
 fn Pending::failed(self : Pending, error : Error) -> Step
-fn Pending::stop_requested(self : Pending, reason : StopReason, code : ExitCode?) -> Step
+fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?) -> Step
 fn Pending::timed_out(self : Pending) -> Step
 ```
 
@@ -388,9 +397,16 @@ guard step is Finish(outcome)
 - Call (this change): the engine implements all four replies. `stop_requested` follows
   D5: during the start phase, the current hook ends, the other start hooks and the
   command are skipped, and the started services stop. During the command, the stop
-  phase starts. During the stop phase, it changes only the code. `timed_out` occurs
-  only in the stop phase: the other stop hooks are skipped, the stopped event occurs,
+  phase starts. The first request records the request and its code. It sets the
+  reason only if no reason is set, so all stop hooks read the same reason. Later
+  requests change nothing; group 4 adds the signal
+  exception in D5. The engine maps `StopRequest` to `StopReason`. `timed_out`
+  outside the stop phase is a driver fault: the engine aborts and names the phase.
+  In the stop phase: the other stop hooks are skipped, the stopped event occurs,
   and the code is 1. Group 4 connects the stop sources and group 10 the timeout.
+- Call (this change): the started event is the last step of the start phase. A stop
+  request in reply to `Raise(Started)` skips the command. A `failed` reply on any
+  `Raise` step is a driver fault: the engine aborts, because event handlers cannot raise.
 - Call (this change): until group 4 adds `Lifetime`, a driver replies `done` to a
   `Raise` action at once. The engine collects each hook failure in the outcome. Group
   5 adds the report on standard error and the exit-code precedence.

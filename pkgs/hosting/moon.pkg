@@ -15,6 +15,8 @@ import {
 
 import {
   "moonrockz/expect",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/async",
 } for "wbtest"
 
 // Temporary until task group 13: only `run` reads the host and builds the
@@ -22,7 +24,7 @@ import {
 // nothing reads them until `run_embedded`. On every target, the application
 // name and the arguments stay unread until groups 5, 6 and 8. Remove this line
 // when they are read. The pinned build system cannot condition imports by
-// target, so the test import of `moonbitlang/async` is unused on wasm and
+// target, so the test and wbtest imports of `moonbitlang/async` are unused on wasm and
 // wasm-gc (29); that part stays.
 warnings = "-7-9-29"
 
@@ -31,4 +33,5 @@ warnings = "-7-9-29"
 options(targets: {
   "run.mbt": ["native", "js"],
   "run_test.mbt": ["native", "js"],
+  "run_wbtest.mbt": ["native", "js"],
 })

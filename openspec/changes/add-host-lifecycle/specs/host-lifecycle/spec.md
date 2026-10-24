@@ -398,13 +398,20 @@ service does not supply and MUST continue with the next hook.
 
 ### Requirement: A service counts as started after its start hook
 
-The host SHALL mark a service as started when its `start` hook returns without an
-error, or when the service has no `start` hook and its `starting` hook did not fail.
+The host SHALL mark a service as started when its `start` hook returns without an error,
+or when the service has no `start` hook, the start phase reached its `starting` step,
+and its `starting` hook succeeded or is absent. A service that the start phase did not
+reach is not started.
 
 #### Scenario: Failure in a starting hook
 
 - **WHEN** service A has a `starting` hook that fails
 - **THEN** A is not started, and A gets no stop hooks
+
+#### Scenario: Start phase does not reach a service without a start hook
+
+- **WHEN** A is registered before B, A.starting fails, and B has no `start` hook
+- **THEN** B is not started, and B gets no stop hooks
 
 ### Requirement: Failed start stops started services
 
@@ -414,8 +421,8 @@ stopped events MUST occur. The started event MUST NOT occur.
 
 #### Scenario: Second service fails to start
 
-- **WHEN** services A, B and C are registered, and B.start fails
-- **THEN** C gets no hooks, the command does not run, A gets its stopping, stop and stopped hooks, and the exit code is 1
+- **WHEN** services A, B and C each have only `start` and `stop` hooks, and B.start fails
+- **THEN** C gets no hooks, the command does not run, A gets its stop hook, and the exit code is 1
 
 #### Scenario: Failure after all services started
 
@@ -448,8 +455,10 @@ event occurred MUST run at once.
 
 The lifetime SHALL accept a stop request from the command, a hook, an event handler,
 a signal, or an embedder. A stop request MUST be idempotent. The first request MUST
-set the stop reason. A stop request during the start phase MUST let the current hook
-finish, skip the remaining start hooks and the command, and stop the started services.
+set the reason only if no start failure, command failure or command completion has
+set it. A later request MUST NOT change the reason. During start, a request MUST let
+the current hook finish, skip the remaining start hooks and command, and stop the
+started services.
 
 #### Scenario: Command asks to stop
 
@@ -460,6 +469,11 @@ finish, skip the remaining start hooks and the command, and stop the started ser
 
 - **WHEN** service A calls `stop_application()` in its `start` hook, and service B is registered after A
 - **THEN** B gets no hooks, the command does not run, and A gets its stop hooks
+
+#### Scenario: Stop request after command failure
+
+- **WHEN** the command fails, and a stop hook calls `stop_application()`
+- **THEN** the stop reason stays `Failed` for all stop hooks and the outcome
 
 ### Requirement: Cancellation checks seen by the running command
 

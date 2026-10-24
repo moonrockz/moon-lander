@@ -38,12 +38,12 @@ Bead: lander-4us.5.2
 
 Bead: lander-4us.5.3
 
-- [ ] 3.1 Add the private engine of design D6: `Engine::start` over the services, `Step`, `Action`, `ServiceRef` and `Pending` with `done` and `failed`; verify white-box table tests for the start order, the reverse stop order and skipped absent hooks on all four targets
-- [ ] 3.2 Add the started-service rule and failed-start handling; verify tests for a failure in `starting`, `start` and `started`
-- [ ] 3.3 Add stop-failure collection; verify that a failing `stop` does not skip the next hooks and makes the code 1, with the failures in `RunOutcome` (group 5 adds the standard-error report)
-- [ ] 3.4 Add a property test: for random service counts, hook sets and failure points, each started service gets each present stop hook exactly once, in reverse order, no step follows `Finish`, and a second reply to one token changes nothing
-- [ ] 3.5 Add the `stop_requested` and `timed_out` replies; verify table tests for a stop request during the start phase, during the command and during the stop phase, and a time-out that skips the other stop hooks, raises the stopped event and gives code 1
-- [ ] 3.6 Give `service` all six hooks and move `@hosting.run` onto the engine, with `done` for each `Raise` action until group 4; verify that the group 2 tests still pass and that `run` gives the hook orders of the spec on native and js
+- [x] 3.1 Add the private engine of design D6: `Engine::start` over the services, `Step`, `Action`, `ServiceRef` and `Pending` with `done` and `failed`; verify white-box table tests for the start order, the reverse stop order and skipped absent hooks on all four targets
+- [x] 3.2 Add the started-service rule and failed-start handling; verify tests for a failure in `starting`, `start` and `started`
+- [x] 3.3 Add stop-failure collection; verify that a failing `stop` does not skip the next hooks and makes the code 1, with the failures in `RunOutcome` (group 5 adds the standard-error report)
+- [x] 3.4 Add a property test: for random service counts, hook sets and failure points, each started service gets each present stop hook exactly once, in reverse order, no step follows `Finish`, and a second reply to one token changes nothing
+- [x] 3.5 Add the `stop_requested` and `timed_out` replies; verify table tests for a stop request during the start phase, during the command and during the stop phase, and a time-out that skips the other stop hooks, raises the stopped event and gives code 1
+- [x] 3.6 Give `service` all six hooks and move `@hosting.run` onto the engine, with `done` for each `Raise` action until group 4; verify that the group 2 tests still pass and that `run` gives the hook orders of the spec on native and js
 
 ## 4. Lifetime, stop requests and cancellation checks
 

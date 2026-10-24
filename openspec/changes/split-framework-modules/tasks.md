@@ -51,9 +51,9 @@ Bead: lander-4us.40.4
 
 Bead: lander-4us.40.5
 
-- [ ] 5.1 Create `pkgs/mediator` (`moonrockz/moon-lander-mediator`) with imports of core and `moonbitlang/async` only, and with no TOML, YAML, JSON5 or Ion module; move `pkgs/lander/mediator` to the module root and `mediator/async` to `async`; keep the `supported_targets` of `async` and add a comment that gives the reason for no `wasm-gc`; verify that `moon check` builds the module on its targets
-- [ ] 5.2 Change the imports in `tests/mediator-acceptance`, `tests/mediator-async-acceptance`, the READMEs and `check-mediator.mbtx`; verify `mise run check:mediator` for each target and `mise run test`
-- [ ] 5.3 Verify the "Mediator without configuration parsers" scenario with a consumer outside the workspace that imports only the mediator module by path, and record its resolved dependencies in the bead
+- [x] 5.1 Create `pkgs/mediator` (`moonrockz/moon-lander-mediator`) with imports of core and `moonbitlang/async` only, and with no TOML, YAML, JSON5 or Ion module; move `pkgs/lander/mediator` to the module root and `mediator/async` to `async`; keep the `supported_targets` of `async` and add a comment that gives the reason for no `wasm-gc`; verify that `moon check` builds the module on its targets
+- [x] 5.2 Change the imports in `tests/mediator-acceptance`, `tests/mediator-async-acceptance`, the READMEs and `check-mediator.mbtx`; verify `mise run check:mediator` for each target and `mise run test`
+- [x] 5.3 Verify the "Mediator without configuration parsers" scenario with a consumer outside the workspace that imports only the mediator module by path, and record its resolved dependencies in the bead
 
 ## 6. Hosting module
 

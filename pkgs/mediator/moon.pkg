@@ -1,0 +1,7 @@
+import {
+  "moonrockz/moon-lander-mediator" @mediator,
+} for "test"
+
+options(
+  "is-main": false,
+)

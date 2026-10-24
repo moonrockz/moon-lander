@@ -32,9 +32,9 @@ let async_targets : Array[String] = ["wasm", "js", "native"]
 /// The mediator packages and their acceptance suites, relative to the workspace root, each with
 /// the targets that it supports.
 let paths : Array[(String, Array[String])] = [
-  ("pkgs/lander/mediator", all_targets),
+  ("pkgs/mediator", all_targets),
   ("tests/mediator-acceptance", all_targets),
-  ("pkgs/lander/mediator/async", async_targets),
+  ("pkgs/mediator/async", async_targets),
   ("tests/mediator-async-acceptance", async_targets),
 ]
 
@@ -112,16 +112,16 @@ async fn main {
 ///|
 test "legs give the core paths on four targets and the async paths on three" {
   let all = legs(all_targets)
-  assert_true(all.contains(("pkgs/lander/mediator", "wasm-gc")))
+  assert_true(all.contains(("pkgs/mediator", "wasm-gc")))
   assert_true(all.contains(("tests/mediator-acceptance", "wasm-gc")))
-  assert_true(all.contains(("pkgs/lander/mediator/async", "wasm")))
-  assert_true(all.contains(("pkgs/lander/mediator/async", "js")))
-  assert_true(all.contains(("pkgs/lander/mediator/async", "native")))
+  assert_true(all.contains(("pkgs/mediator/async", "wasm")))
+  assert_true(all.contains(("pkgs/mediator/async", "js")))
+  assert_true(all.contains(("pkgs/mediator/async", "native")))
   assert_true(all.contains(("tests/mediator-async-acceptance", "native")))
-  assert_false(all.contains(("pkgs/lander/mediator/async", "wasm-gc")))
+  assert_false(all.contains(("pkgs/mediator/async", "wasm-gc")))
   assert_false(all.contains(("tests/mediator-async-acceptance", "wasm-gc")))
   assert_eq(legs(["wasm-gc"]), [
-    ("pkgs/lander/mediator", "wasm-gc"),
+    ("pkgs/mediator", "wasm-gc"),
     ("tests/mediator-acceptance", "wasm-gc"),
   ])
 }
@@ -167,22 +167,22 @@ async test "a leg that runs zero tests fails the check" {
   )
   for
     path in [
-      "pkgs", "pkgs/lander", "pkgs/lander/mediator", "pkgs/lander/mediator/async",
-      "tests", "tests/mediator-acceptance", "tests/mediator-async-acceptance",
+      "pkgs", "pkgs/lander", "pkgs/mediator", "pkgs/mediator/async", "tests", "tests/mediator-acceptance",
+      "tests/mediator-async-acceptance",
     ] {
     @fs.mkdir("\{dir}/\{path}")
   }
-  @fs.write_file("\{dir}/pkgs/lander/mediator/moon.pkg", "")
+  @fs.write_file("\{dir}/pkgs/mediator/moon.pkg", "")
   @fs.write_file(
-    "\{dir}/pkgs/lander/mediator/core_test.mbt",
+    "\{dir}/pkgs/mediator/core_test.mbt",
     "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
   )
   @fs.write_file(
-    "\{dir}/pkgs/lander/mediator/async/moon.pkg",
+    "\{dir}/pkgs/mediator/async/moon.pkg",
     "supported_targets = \"wasm+js+native\"\n",
   )
   @fs.write_file(
-    "\{dir}/pkgs/lander/mediator/async/async_test.mbt",
+    "\{dir}/pkgs/mediator/async/async_test.mbt",
     "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
   )
   @fs.write_file(
@@ -221,7 +221,7 @@ async test "a leg that runs zero tests fails the check" {
   let output = out.text() + err.text()
   assert_eq(code, 0, msg=output)
   assert_true(
-    output.contains("pkgs/lander/mediator/async on wasm: 1 tests"),
+    output.contains("pkgs/mediator/async on wasm: 1 tests"),
     msg=output,
   )
   let (code, out, err) = @process.collect_output(

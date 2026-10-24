@@ -1,6 +1,6 @@
 import {
-  "moonrockz/moon-lander/mediator",
-  "moonrockz/moon-lander/mediator/async" @mediator_async,
+  "moonrockz/moon-lander-mediator" @mediator,
+  "moonrockz/moon-lander-mediator/async" @mediator_async,
   "moonbitlang/async",
 } for "wbtest"
 

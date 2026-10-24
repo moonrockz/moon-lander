@@ -43,12 +43,12 @@ that wait, on `wasm`, `js` and `native`.
 | Browser adapter | [`browser`](../config/browser/README.mbt.md) in `moonrockz/moon-lander-config` | js browser URL mounts with explicit manifests, run inputs, limits, cancellation, and typed boundary errors |
 | Conventions | [`conventions`](../config/conventions/README.mbt.md) in `moonrockz/moon-lander-config` | Walk-up discovery in three layouts, system and global user directories on every platform, local and user overrides, explicit project file, ambiguity, legacy fallback, stop boundary, isolated mode; workspace and environment parts come next |
 | Binding | [`moonrockz/moon-lander-config`](../config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
-| Mediator | [`mediator`](mediator/README.mbt.md) | Typed senders, publish topics that run every handler and report every failure in one `PublishFailed`, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
-| Async mediator | [`mediator/async`](mediator/async/README.mbt.md) | Async senders and topics with sequential and concurrent publish, caller cancellation, the `timeout` middleware, async middleware with a sync `finally_`, and `from_sync` for core values; `wasm`, `js` and `native` |
+| Mediator | [`moonrockz/moon-lander-mediator`](../mediator/README.mbt.md) | Typed senders, publish topics that run every handler and report every failure in one `PublishFailed`, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
+| Async mediator | [`moonrockz/moon-lander-mediator/async`](../mediator/async/README.mbt.md) | Async senders and topics with sequential and concurrent publish, caller cancellation, the `timeout` middleware, async middleware with a sync `finally_`, and `from_sync` for core values; `wasm`, `js` and `native` |
 | Hosting | `hosting`, `@lander.cli` | First slice: a builder with hosted services that have `start` and `stop` hooks, a services factory, and `@hosting.run` on `native` and `js`, which gives exit code 0 or 1. Arguments, lifecycle events, signals and configuration come next |
 
-The [Configuration](../config/README.mbt.md), [Mediator](mediator/README.mbt.md) and
-[Async mediator](mediator/async/README.mbt.md) chapters show the API that exists, with examples that the tests compile and run. The
+The [Configuration](../config/README.mbt.md), [Mediator](../mediator/README.mbt.md) and
+[Async mediator](../mediator/async/README.mbt.md) chapters show the API that exists, with examples that the tests compile and run. The
 [design overview](../../docs/design/overview.md) shows the full design of all
 four changes. The OpenSpec changes in `openspec/changes/` hold the requirements.
 

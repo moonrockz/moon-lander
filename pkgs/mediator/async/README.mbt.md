@@ -11,7 +11,7 @@ Import the package with an explicit alias, because its last path segment is
 
 ```text
 import {
-  "moonrockz/moon-lander/mediator/async" @mediator_async,
+  "moonrockz/moon-lander-mediator/async" @mediator_async,
   "moonbitlang/async",
 }
 ```

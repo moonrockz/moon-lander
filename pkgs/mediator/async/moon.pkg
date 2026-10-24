@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-mediator" @mediator,
+  "moonbitlang/async" @aio,
+}
+
+import {
+  "moonrockz/moon-lander-mediator/async" @mediator_async,
+} for "test"
+
+// No wasm-gc: `moonbitlang/async` has no event loop there (see README.mbt.md).
+// Add wasm-gc when `moonbitlang/async` gives one.
+supported_targets = "wasm+js+native"

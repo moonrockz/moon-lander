@@ -7,6 +7,7 @@ import {
   "moonrockz/notebooks@0.3.0",
   "moonrockz/moon-lander@0.3.0",
   "moonrockz/moon-lander-config@0.3.0",
+  "moonrockz/moon-lander-mediator@0.3.0",
   "moonrockz/openrpc@0.3.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/moonspec@0.11.0",

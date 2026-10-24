@@ -86,7 +86,9 @@ its rule cannot exist:
 | `ExitCode` | `ExitCode::from_int(3)`, or `ExitCode::success()` and `ExitCode::failure()` | 0 to 255 |
 
 A parse that fails raises `HostError` with the text and the broken rule. A
-program parses its names one time, where they are written. A program whose
+program parses its names one time, where they are written. `cli` takes the name
+first, so the text can flow through the parse into the pipeline, as in
+`"acme" |> @hosting.AppName::parse |> @lander.cli(args)`. A program whose
 `main` can raise, `fn main raise { ... }`, lets a bad name stop the program at
 start.
 
@@ -95,7 +97,9 @@ start.
 /// The host of the application `acme`. Its one service writes each hook call
 /// into `log`.
 fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
-  @lander.cli(@hosting.AppName::parse("acme"), ["greet"])
+  "acme"
+  |> @hosting.AppName::parse
+  |> @lander.cli(["greet"])
   |> @hosting.service(
     @hosting.ServiceName::parse("greeter"),
     start=_ => log.push("greeter started"),

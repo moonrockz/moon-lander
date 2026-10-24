@@ -131,7 +131,7 @@ before any hosted-service hook.
 
 #### Scenario: Starting environment is the default
 
-- **WHEN** the application calls `@lander.cli(AppName::parse("acme"), args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
+- **WHEN** the application calls `"acme" |> AppName::parse |> @lander.cli(args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
 - **THEN** the environment name is `Some("Staging")`, and without that variable it is `Some("Production")`
 
 #### Scenario: Invalid name
@@ -695,12 +695,12 @@ source and MUST use a 30-second shutdown timeout.
 
 #### Scenario: Smallest program
 
-- **WHEN** a native program is `@lander.cli(AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })`, it starts in `/w`, `/w/acme.toml` sets `log.format = "text"`, and the arguments are `--environment Staging`
+- **WHEN** a native program is `"acme" |> AppName::parse |> @lander.cli(@env.args()) |> @lander.run(fn(ctx) { ... })`, it starts in `/w`, `/w/acme.toml` sets `log.format = "text"`, and the arguments are `--environment Staging`
 - **THEN** the run accepts the flag, the environment name is `Some("Staging")`, the configuration holds `log.format = "text"`, and the exit code is 0
 
 #### Scenario: Bare builder
 
-- **WHEN** a program starts with `@hosting.builder(AppName::parse("acme"), ["--environment", "Staging"])` and has no `command` step
+- **WHEN** a program starts with `"acme" |> AppName::parse |> @hosting.builder(["--environment", "Staging"])` and has no `command` step
 - **THEN** the run ends with a usage error and exit code 2, and no configuration file is read
 
 ### Requirement: Change or turn off a default

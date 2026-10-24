@@ -148,7 +148,9 @@ each part itself and reproduces Morphir exactly. The batteries path is in D15.
 
 ```moonbit
 async fn main {
-  @hosting.builder(@hosting.AppName::parse("morphir"), @env.args())
+  "morphir"
+  |> @hosting.AppName::parse
+  |> @hosting.builder(@env.args())
   |> @hosting_argparse.command(fn(name) {
     @argparse.Command(name,
       options=[
@@ -649,11 +651,11 @@ The parameter type is `&IntoEnvVars`. Probe results:
 - An empty `{}` is ambiguous. Use `Map([])`.
 
 ```moonbit
-let acme = @lander.AppName::parse("acme")
-@lander.cli(acme, ["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
-@lander.cli(acme, [], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
-@lander.cli(acme, [], env_vars=fixture)   // fixture : Json from @json.parse
-@lander.cli(acme, [], env_vars=Map([]))
+let acme = "acme" |> @lander.AppName::parse
+acme |> @lander.cli(["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
+acme |> @lander.cli([], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
+acme |> @lander.cli([], env_vars=fixture)   // fixture : Json from @json.parse
+acme |> @lander.cli([], env_vars=Map([]))
 ```
 
 JSON rules (Call):
@@ -693,7 +695,9 @@ The smallest program:
 
 ```moonbit
 fn main raise {
-  @lander.cli(@lander.AppName::parse("acme"), @env.args())
+  "acme"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.run(fn(ctx) { ... })
 }
 ```
@@ -702,7 +706,9 @@ A larger program in the one batteries style. It uses only `@lander` steps:
 
 ```moonbit
 fn main raise {
-  @lander.cli(@lander.AppName::parse("acme"), @env.args())
+  "acme"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
   |> @lander.build(fn(b) { App::new(b.config) })
   |> @lander.service(@lander.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
@@ -788,10 +794,10 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 }
 
 // lambda form
-@lander.cli(@lander.AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })
+"acme" |> @lander.AppName::parse |> @lander.cli(@env.args()) |> @lander.run(fn(ctx) { ... })
 
 // object form
-@lander.cli(@lander.AppName::parse("morphir"), @env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
+"morphir" |> @lander.AppName::parse |> @lander.cli(@env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
 ```
 
 - `run_app(factory)` is `build(factory)` followed by
@@ -823,7 +829,10 @@ not check the rules again.
 | Shutdown timeout | A duration type in place of `ms : Int` (D6) | Not negative | 10 |
 
 - Owner: the caller parses, so `@lander.cli` and `@hosting.builder` take an
-  `AppName`, and `service` takes a `ServiceName`. A program parses its name in
+  `AppName`, and `service` takes a `ServiceName`. The name is the first argument,
+  so the text flows through the parse into the pipeline:
+  `"acme" |> @lander.AppName::parse |> @lander.cli(@env.args())` (Owner,
+  2026-10-24: the examples use this form). A program parses its name in
   `fn main raise`, or in an `async fn main`. A bad name in a synchronous `main`
   stops the program at start with the error and a stack trace (probe, `moonc
   v0.10.17`: abort, exit code 134). In an `async fn main` the `moonbitlang/async`

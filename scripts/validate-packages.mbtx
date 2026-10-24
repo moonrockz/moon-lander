@@ -62,24 +62,90 @@ let framework : Array[(String, String, Array[String])] = [
 ]
 
 ///|
-/// The module names that the `moon.mod` text `manifest` imports. An import line is a quoted
-/// module name with an optional `@<version>`.
+/// The module names that the `moon.mod` text `manifest` imports: each quoted string in each
+/// `import { ... }` block, without its `@<version>`. A `//` comment is not read, so a quoted
+/// name in a comment or in another field does not count.
 fn imported_modules(manifest : String) -> Array[String] {
+  let text = manifest
+    .split("\n")
+    .map(line => {
+      match line.find("//") {
+        Some(at) => line[:at].to_owned()
+        None => line.to_owned()
+      }
+    })
+    .collect()
+    .join("\n")
   let names = []
-  for line in manifest.split("\n") {
-    let entry = line.trim_start(chars=" \t\r").to_owned()
-    guard entry.has_prefix("\"") else { continue }
-    let rest = entry[1:]
-    guard rest.find("\"") is Some(end) else { continue }
-    let name = rest[:end].to_owned()
-    names.push(
-      match name.find("@") {
-        Some(at) => name[:at].to_owned()
-        None => name
-      },
-    )
+  let mut rest = text
+  while rest.find("import") is Some(start) {
+    let after = rest[start + 6:].to_owned()
+    guard after.trim_start(chars=" \t\r\n").has_prefix("{") else {
+      rest = after
+      continue
+    }
+    guard after.find("{") is Some(open) &&
+      after.find("}") is Some(close) &&
+      close > open else {
+      break
+    }
+    let block = after[open + 1:close].to_owned()
+    let parts = block.split("\"").map(part => part.to_owned()).collect()
+    for i in 0..<parts.length() {
+      // The odd parts are the text between a pair of quotes.
+      if i % 2 == 1 {
+        let name = parts[i]
+        names.push(
+          match name.find("@") {
+            Some(at) => name[:at].to_owned()
+            None => name
+          },
+        )
+      }
+    }
+    rest = after[close + 1:].to_owned()
   }
   names
+}
+
+///|
+/// The module name in the `moon.mod` text `manifest`: the quoted text of its `name = ` line.
+fn module_name(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    let entry = line.trim_start(chars=" \t\r").to_owned()
+    guard entry.has_prefix("name") else { continue }
+    let parts = entry.split("\"").map(part => part.to_owned()).collect()
+    if parts.length() >= 3 && parts[0].trim(chars=" \t") == "name =" {
+      return Some(parts[1])
+    }
+  }
+  None
+}
+
+///|
+/// One error for each framework module folder that is not an active member, or whose
+/// `moon.mod` gives another module name than the table. `names` maps a folder to the name
+/// in its `moon.mod`.
+fn framework_member_errors(
+  active : Array[String],
+  names : Map[String, String],
+) -> Array[String] {
+  let errors = []
+  for entry in framework {
+    let (folder, name, _) = entry
+    if !active.contains(folder) {
+      errors.push(
+        "\{folder} is a framework module folder but not an active member of moon.work",
+      )
+    } else if names.get(folder) is Some(found) && found != name {
+      errors.push(
+        "\{folder}/moon.mod gives the name \{found}; expected \{name}",
+      )
+    } else if names.get(folder) is None {
+      errors.push("\{folder}/moon.mod gives no module name; expected \{name}")
+    }
+  }
+  errors
 }
 
 ///|
@@ -176,6 +242,18 @@ async fn main {
   let active = members(work)
   if work != "" && active.is_empty() {
     error("moon.work lists no members")
+  }
+  let names : Map[String, String] = Map([])
+  for path in active {
+    if @fs.exists("\{path}/moon.mod") &&
+      module_name(@fs.read_file("\{path}/moon.mod").text()) is Some(name) {
+      names[path] = name
+    }
+  }
+  if work != "" {
+    for message in framework_member_errors(active, names) {
+      error(message)
+    }
   }
   for path in active {
     if !@fs.exists(path) {
@@ -308,4 +386,74 @@ test "a module outside the framework gives no dependency error" {
     #|  "moonrockz/moon-lander-hosting@0.3.0",
     #|}
   assert_eq(dependency_errors("tests", manifest), [])
+}
+
+///|
+test "imports on one line, comments and other fields" {
+  assert_eq(imported_modules("import { \"moonrockz/ion@0.6.0\", \"a/b\" }\n"), [
+    "moonrockz/ion", "a/b",
+  ])
+  let manifest =
+    #|name = "moonrockz/moon-lander-core"
+    #|keywords = [
+    #|  "config",
+    #|]
+    #|// "moonrockz/ion@0.6.0"
+    #|import { "moonbitlang/async@0.22.5", // "x/y"
+    #|  "moonrockz/expect@0.6.1", "moonrockz/ion@0.6.0",
+    #|}
+  assert_eq(imported_modules(manifest), [
+    "moonbitlang/async", "moonrockz/expect", "moonrockz/ion",
+  ])
+  assert_eq(
+    dependency_errors("pkgs/core", "keywords = [\n  \"config\",\n]\n"),
+    [],
+  )
+  assert_eq(
+    dependency_errors("pkgs/core", "import { \"moonrockz/ion@0.6.0\" }").length(),
+    1,
+  )
+  assert_eq(
+    dependency_errors(
+      "pkgs/config", "import {\n  \"moonrockz/moon-lander-core@0.3.0\", \"moonrockz/moon-lander-hosting@0.3.0\",\n}\n",
+    ).length(),
+    1,
+  )
+}
+
+///|
+test "the module name of a moon.mod" {
+  assert_eq(
+    module_name(
+      "name = \"moonrockz/moon-lander-core\"\n\nversion = \"0.3.0\"\n",
+    ),
+    Some("moonrockz/moon-lander-core"),
+  )
+  assert_eq(module_name("version = \"0.3.0\"\n"), None)
+}
+
+///|
+test "each framework module folder is a member with its module name" {
+  let active = [
+    "pkgs/core", "pkgs/config", "pkgs/mediator", "pkgs/hosting", "pkgs/lander",
+  ]
+  let names : Map[String, String] = Map([])
+  for entry in framework {
+    names[entry.0] = entry.1
+  }
+  assert_eq(framework_member_errors(active, names), [])
+  names["pkgs/hosting"] = "moonrockz/lander-hosting"
+  assert_eq(framework_member_errors(active, names), [
+    "pkgs/hosting/moon.mod gives the name moonrockz/lander-hosting; expected moonrockz/moon-lander-hosting",
+  ])
+  names["pkgs/hosting"] = "moonrockz/moon-lander-hosting"
+  assert_eq(
+    framework_member_errors(
+      active.filter(path => path != "pkgs/mediator"),
+      names,
+    ),
+    [
+      "pkgs/mediator is a framework module folder but not an active member of moon.work",
+    ],
+  )
 }

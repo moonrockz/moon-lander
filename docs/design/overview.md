@@ -313,10 +313,10 @@ gives the same result on all four targets.
 
 ## The framework modules
 
-The framework is five MoonBit modules. An application imports only the modules it
-uses, and a module imports only the modules below it, so a type such as
-`AppName` or `TimeLimit` has one set of rules for all of them. A program that uses
-only the mediator gets no configuration parser.
+The framework is five MoonBit modules. An application imports only the modules
+that it uses. Each module imports only the modules below it. `AppName` and
+`TimeLimit` are in core, so all modules use the same rules for them. A program
+that uses only the mediator gets no configuration parser.
 
 ```text
 moonrockz/moon-lander-core          AppName, TimeLimit (MoonBit core only)

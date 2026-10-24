@@ -138,8 +138,9 @@ as published), runs `mise run check:openrpc-published -- --checksum <sha>`
 against the archive it built, and only then creates the GitHub release `vX.Y.Z`.
 Repository access to that secret must be verified before the first run.
 
-The framework modules (`moonrockz/moon-lander-core`, `-config`, `-mediator`,
-`-hosting` and `moonrockz/moon-lander`) stay unpublished. Before publishing them,
+The framework modules (`moonrockz/moon-lander-core`,
+`moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
+`moonrockz/moon-lander-hosting` and `moonrockz/moon-lander`) stay unpublished. Before publishing them,
 run `mise run check:formats-registry` on the exact candidate, and keep release gate
 `lander-4us.9` open until `mise run check:formats-published` passes on all four
 targets for that candidate with its source SHA and published archive checksum

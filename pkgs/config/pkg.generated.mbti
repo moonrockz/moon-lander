@@ -6,6 +6,7 @@ import {
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "moonrockz/ion/ion",
+  "moonrockz/moon-lander-core",
 }
 
 // Values
@@ -538,6 +539,7 @@ pub impl[T : FromConfig] FromConfig for Array[T]
 pub impl[T : FromConfig] FromConfig for Map[String, T]
 pub impl FromConfig for @ion.Decimal
 pub impl FromConfig for @ion.Timestamp
+pub impl FromConfig for @moon-lander-core.TimeLimit
 
 pub(open) trait SecretResolver {
   fn resolve(Self, SecretRef, Origin) -> Secret raise SecretError

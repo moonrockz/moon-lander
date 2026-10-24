@@ -172,6 +172,24 @@ pub impl FromConfig for String with from_config(node) {
 }
 
 ///|
+/// A time limit from its text form, for example `"30s"` or `"1m 30s"`. Only
+/// text or a symbol with text can give one: a number has no unit, so it fails.
+/// Text that `TimeLimit::parse` rejects fails with the parse message, which
+/// names the input and the broken rule.
+pub impl FromConfig for @lander_core.TimeLimit with from_config(node) {
+  let value = node.present()
+  let text = match value.ion.kind() {
+    String(text) => text
+    Symbol(token) if token.text() is Some(text) => text
+    _ =>
+      node.mismatch(value, "time limit text with a unit, such as \"30s\"")
+  }
+  @lander_core.TimeLimit::parse(text) catch {
+    error => node.fail(error.message())
+  }
+}
+
+///|
 pub impl FromConfig for Bool with from_config(node) {
   let value = node.present()
   guard value.ion.kind() is Bool(flag) else { node.mismatch(value, "bool") }

@@ -44,8 +44,8 @@ Bead: lander-4us.40.3
 
 Bead: lander-4us.40.4
 
-- [ ] 4.1 Add `impl FromConfig for @lander_core.TimeLimit` in the configuration core (design D7); verify the four scenarios of "Bind a time limit" on all four targets, with a decode error that names the rule and blames the source
-- [ ] 4.2 Add a time-limit example to the binding section of `pkgs/config/README.mbt.md`; verify that `mise run test` runs it
+- [x] 4.1 Add `impl FromConfig for @lander_core.TimeLimit` in the configuration core (design D7); verify the four scenarios of "Bind a time limit" on all four targets, with a decode error that names the rule and blames the source
+- [x] 4.2 Add a time-limit example to the binding section of `pkgs/config/README.mbt.md`; verify that `mise run test` runs it
 
 ## 5. Mediator module
 

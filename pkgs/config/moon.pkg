@@ -1,4 +1,5 @@
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/ion/ion" @ion,
   "moonrockz/ion/json" @ion_json,
   "moonrockz/ion/text" @ion_text,

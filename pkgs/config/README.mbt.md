@@ -764,7 +764,8 @@ path, its value, and the sources to blame.
 
 The package supplies `FromConfig` for `String`, `Bool`, `Int`, `Int64`,
 `UInt64`, `Double`, `@bigint.BigInt`, `@ion.Decimal`, `@ion.Timestamp`,
-`SecretRef`, `T?`, `Array[T]`, `Map[String, T]` and `Sourced[T]`. The integer
+`@lander_core.TimeLimit`, `SecretRef`, `T?`, `Array[T]`, `Map[String, T]` and
+`Sourced[T]`. The integer
 types accept only an integer value in their range, so `80.5` fails for `Int`.
 `@ion.Decimal` accepts a decimal or an integer. `Double` accepts a float, an
 integer or a decimal. A node with no value gives `None` for `T?` and fails with
@@ -820,6 +821,30 @@ test "exact decoding keeps the decimal scale and the file" {
   guard billing.lock.blame is Set([origin]) else { fail("one origin") }
   @expect.expect(origin.location).to_equal(Some("/srv/app.ion"))
   @expect.expect(billing.server).to_equal({ host: "localhost", port: 8080 })
+}
+```
+
+### Time limits
+
+`@lander_core.TimeLimit` from `moonrockz/moon-lander-core` binds from text in
+its text form, such as `"30s"`, `"1.5s"` or `"1m 30s"`. A number fails, because
+it has no unit. Text that does not parse fails with a decode error that names the
+broken rule and the sources to blame. The bound value gives its milliseconds as
+an `Int`, which the timeouts of `moonbitlang/async` take:
+
+```mbt check
+///|
+test "bind a timeout from configuration text" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.file("/srv/app.toml")
+  let tree = @config.FileTree::new(complete=true).with_file(
+    "/srv/app.toml", "[http]\ntimeout = \"1m 30s\"",
+  )
+  guard @config.load(builder, tree) is Done(config) else { fail("no config") }
+  let timeout : @lander_core.TimeLimit = config
+    |> @config.bind_with("http.timeout")
+  @expect.expect(timeout.to_millis()).to_equal(90000)
 }
 ```
 

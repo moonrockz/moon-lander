@@ -177,7 +177,7 @@ async fn main {
   |> @hosting.app_dirs()   // = @conventions.add(@conventions.app_dirs(name, prefix~)) with host values
   |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
   |> @hosting.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
-  |> @hosting.shutdown_timeout(5_000)
+  |> @hosting.shutdown_timeout(TimeLimit::seconds(5))
   |> @hosting.build(fn(b) {
     App::{ logs: TelemetrySession::local(b.environment.content_root, ...), ... }
   })
@@ -337,22 +337,63 @@ pub(all) enum SignalKind { Interrupt; Terminate; Quit }
 - Call (this change): a stop request during the start phase lets the current hook
   end, skips the other start hooks and the command, and stops the started services.
 
-### D6. Pure phase engine and drivers (Call: pure engine; Call (this change): drivers)
+### D6. Pure phase engine and drivers (Call: pure engine; Owner (2026-10-24): private engine with reply tokens, no type-state; Call (this change): drivers)
 
-The engine is a state machine over explicit inputs. It has no I/O and no async code.
+The engine is a state machine over explicit replies. It has no I/O and no async
+code. It is private to `@hosting`: the drivers of the package (`run` and
+`run_embedded`) use it, and white-box tests step through it on all four targets.
+The console driver uses `@hosting.run`, so no other package needs the engine.
 
 ```moonbit
-pub(all) enum Step {
-  Starting(Int); Start(Int); Started(Int); RaiseStarted; RunCommand
-  RaiseStopping; Stopping(Int); Stop(Int); Stopped(Int); RaiseStopped
-  Finish(ExitCode)
+priv struct Engine { ... }        // phase, place, started services, failures, reason, code
+priv enum Step {
+  Run(Pending, Action)            // the driver runs the action, then replies with the token
+  Finish(RunOutcome)              // no token, so the loop ends here
 }
-pub(all) enum Input {
-  Done; HookFailed(Error); StopRequested(StopReason, ExitCode?); TimedOut
+priv enum Action {
+  Hook(ServiceRef, Phase)         // Phase: Starting, Start, Started, Stopping, Stop, Stopped
+  RunCommand
+  Raise(Event)                    // Event: Started, Stopping, Stopped
 }
-pub fn Engine::new(service_count : Int, hooks : HookMask) -> Engine
-pub fn Engine::next(self : Engine, input : Input) -> (Engine, Step)
+priv struct ServiceRef { ... }    // only the engine makes one, so it is always in range
+priv struct Pending { ... }       // the reply token of one step
+
+fn[S] Engine::start(services : Array[HostedService[S]]) -> Step
+fn Pending::done(self : Pending) -> Step
+fn Pending::failed(self : Pending, error : Error) -> Step
+fn Pending::stop_requested(self : Pending, reason : StopReason, code : ExitCode?) -> Step
+fn Pending::timed_out(self : Pending) -> Step
 ```
+
+A driver is one loop:
+
+```moonbit
+let mut step = Engine::start(host.services)
+while step is Run(pending, action) {
+  step = try run_action(action) catch { e => pending.failed(e) } noraise { _ => pending.done() }
+}
+guard step is Finish(outcome)
+```
+
+- Owner (2026-10-24): no type-state (a type parameter for each phase). The next phase
+  depends on runtime results, the service count is a runtime value, and the drivers
+  share one loop. A private phase enum holds the state, and states that cannot occur
+  stay inside the engine.
+- Call (this change): each step that waits for a result carries a `Pending` token, and
+  only that token advances the engine. So a driver cannot reply to a step that waits
+  for nothing, or reply after `Finish`. MoonBit has no linear types, so a second reply
+  to one token is possible; it gives the same step again and changes nothing.
+- Call (this change): the engine reads which hooks each service has from the services.
+  It skips an absent hook without a step. There is no separate count or hook mask.
+- Call (this change): the engine implements all four replies. `stop_requested` follows
+  D5: during the start phase, the current hook ends, the other start hooks and the
+  command are skipped, and the started services stop. During the command, the stop
+  phase starts. During the stop phase, it changes only the code. `timed_out` occurs
+  only in the stop phase: the other stop hooks are skipped, the stopped event occurs,
+  and the code is 1. Group 4 connects the stop sources and group 10 the timeout.
+- Call (this change): until group 4 adds `Lifetime`, a driver replies `done` to a
+  `Raise` action at once. The engine collects each hook failure in the outcome. Group
+  5 adds the report on standard error and the exit-code precedence.
 
 Drivers run the steps:
 
@@ -693,7 +734,7 @@ Owner: "lean on minimal config and sane defaults". There are two entry layers:
 | Variables source | `<PREFIX>_*` at 600; `<PREFIX>_HOME` and `<PREFIX>_ENVIRONMENT` reserved | `\|> @lander.env_prefix(...)`, `\|> @lander.skip_env_source()` | Same (D12) |
 | Services | `S = Unit` when the application does not call `build` | `\|> @lander.build(factory)` | `\|> @hosting.build(factory)` gives `Host[S]` |
 | Driver | Console driver on native and js, embedded driver on wasm and wasm-gc | `\|> @lander.run(command)` | The application selects a driver |
-| Shutdown timeout | 30 s, as in .NET | `\|> @lander.shutdown_timeout(ms)` | Same (D6) |
+| Shutdown timeout | 30 s, as in .NET | `\|> @lander.shutdown_timeout(limit)` | Same (D6) |
 
 The smallest program:
 
@@ -716,7 +757,7 @@ fn main raise {
   |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
   |> @lander.build(fn(b) { App::new(b.config) })
   |> @lander.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
-  |> @lander.shutdown_timeout(5_000)
+  |> @lander.shutdown_timeout(TimeLimit::seconds(5))
   |> @lander.run(fn(ctx) { acme_command(ctx) })
 }
 ```
@@ -831,7 +872,7 @@ not check the rules again.
 | Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
 | Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
 | Working directory and content root | A path type with `/` separators (D9, D13) | Not empty; absolute | 7, 8 |
-| Shutdown timeout | A duration type in place of `ms : Int` (D6) | Not negative | 10 |
+| Shutdown timeout | `TimeLimit` from `moonrockz/moon-lander-core` (Owner, 2026-10-23; `split-framework-modules`) | 1 ms to the largest `Int` in milliseconds | 10 |
 
 - Owner: the caller parses, so `@lander.cli` and `@hosting.builder` take an
   `AppName`, and `service` takes a `ServiceName`. The name is the first argument,
@@ -912,7 +953,7 @@ not check the rules again.
 | `StopApplication()` | (none) | `Lifetime::stop_application(exit_code?)` |
 | `stoppingToken` | (none) | `ctx.cancelled()`, `StopToken` and task cancellation |
 | `ConsoleLifetime` | (none); Morphir calls `exit(130)` | `@hosting_console.run`, or `@lander.run` (D15) |
-| `HostOptions.ShutdownTimeout` (30 s) | (none) | `@hosting.shutdown_timeout(ms)` (30 s) |
+| `HostOptions.ShutdownTimeout` (30 s) | (none) | `@hosting.shutdown_timeout(limit)` (30 s) |
 | `IHostEnvironment` | (none) | `HostEnvironment` |
 | Host configuration (`DOTNET_` variables, args) | (none) | argparse first, then `<PREFIX>_ENVIRONMENT` |
 | `Environment.ExitCode` | Last `Some(code)` wins; error gives 1 | `set_exit_code`; precedence in D8 |

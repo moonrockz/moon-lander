@@ -773,7 +773,7 @@ record SHALL be `Unit`. `@lander.build(factory)` MUST set the services record ty
 
 #### Scenario: Build after other steps
 
-- **WHEN** the pipeline contains `@lander.shutdown_timeout(5_000)` and then `@lander.build(factory)`
+- **WHEN** the pipeline contains `@lander.shutdown_timeout(TimeLimit::seconds(5))` and then `@lander.build(factory)`
 - **THEN** the factory runs one time, the command gets the `S` that it gives, and the shutdown timeout is 5000 ms
 
 ### Requirement: Driver selection by target

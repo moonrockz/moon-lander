@@ -98,7 +98,7 @@ supply layered configuration. This change connects that configuration to a lifec
     name), `S = Unit` until `|> @lander.build(factory)`, and a 30-second shutdown
     timeout. `|> @lander.formats(...)`, `|> @lander.conventions(...)`,
     `|> @lander.no_standard_flags()`, `|> @lander.no_environments()` and
-    `|> @lander.shutdown_timeout(ms)` change or turn off a default.
+    `|> @lander.shutdown_timeout(limit)` change or turn off a default.
   - `|> @lander.run(command)` selects the console driver on native and js and the
     embedded driver on wasm and wasm-gc. The smallest program is
     `"acme" |> AppName::parse |> @lander.cli(@env.args()) |> @lander.run(fn(ctx) { ... })`.

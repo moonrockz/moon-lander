@@ -3,6 +3,7 @@ members = [
   "./apps/site",
   "./pkgs/core",
   "./pkgs/config",
+  "./pkgs/mediator",
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./pkgs/openrpc",

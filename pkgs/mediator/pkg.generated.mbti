@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonrockz/moon-lander/mediator"
+package "moonrockz/moon-lander-mediator"
 
 // Values
 pub fn[C, Req, Res] after((C, Req, Res) -> Unit raise) -> Middleware[C, Req, Res]

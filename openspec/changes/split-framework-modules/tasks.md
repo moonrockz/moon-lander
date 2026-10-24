@@ -51,9 +51,9 @@ Bead: lander-4us.40.4
 
 Bead: lander-4us.40.5
 
-- [ ] 5.1 Create `pkgs/mediator` (`moonrockz/moon-lander-mediator`) with imports of core and `moonbitlang/async` only, and with no TOML, YAML, JSON5 or Ion module; move `pkgs/lander/mediator` to the module root and `mediator/async` to `async`; keep the `supported_targets` of `async` and add a comment that gives the reason for no `wasm-gc`; verify that `moon check` builds the module on its targets
-- [ ] 5.2 Change the imports in `tests/mediator-acceptance`, `tests/mediator-async-acceptance`, the READMEs and `check-mediator.mbtx`; verify `mise run check:mediator` for each target and `mise run test`
-- [ ] 5.3 Verify the "Mediator without configuration parsers" scenario with a consumer outside the workspace that imports only the mediator module by path, and record its resolved dependencies in the bead
+- [x] 5.1 Create `pkgs/mediator` (`moonrockz/moon-lander-mediator`) with imports of core and `moonbitlang/async` only, and with no TOML, YAML, JSON5 or Ion module; move `pkgs/lander/mediator` to the module root and `mediator/async` to `async`; keep the `supported_targets` of `async` and add a comment that gives the reason for no `wasm-gc`; verify that `moon check` builds the module on its targets
+- [x] 5.2 Change the imports in `tests/mediator-acceptance`, `tests/mediator-async-acceptance`, the READMEs and `check-mediator.mbtx`, and add `mediator` to `packages` and `api` in `site/site.json`; verify `mise run check:mediator` for each target and `mise run test`
+- [x] 5.3 Verify the "Mediator without configuration parsers" scenario with a consumer outside the workspace that imports only the mediator module by path, and record its resolved dependencies in the bead
 
 ## 6. Hosting module
 
@@ -70,7 +70,7 @@ Bead: lander-4us.40.7
 
 - [ ] 7.1 Add the dependency-direction check of design D8 to `validate-packages.mbtx`, with script tests for an allowed import, an import against the direction and a core import; verify the "Import against the direction" and "Core imports a third-party module" scenarios and that `mise run validate` passes on the real workspace
 - [ ] 7.2 Add a test fixture to `versions.mbtx` with two sibling framework modules; verify the "Version drift" and "Set the version" scenarios
-- [ ] 7.3 Change `site/site.json` (`api` lists the five framework folders, and `packages` adds `mediator` and `hosting` beside the `core` and `config` of task 3.5), `publish.mbtx` (the comment with the release order), the path filters in `.github/workflows/`, `README.md` and `docs/design/overview.md`; verify that `mise run build:site` passes, that the "API package index" scenario holds, that the config and mediator guide pages exist at their new URLs, and that `api:` links to old paths fail the build
+- [ ] 7.3 Change `site/site.json` (`api` lists the five framework folders, and `packages` adds `hosting` beside the `core`, `config` and `mediator` of tasks 3.5 and 5.2), `publish.mbtx` (the comment with the release order), the path filters in `.github/workflows/`, `README.md` and `docs/design/overview.md`; verify that `mise run build:site` passes, that the "API package index" scenario holds, that the config and mediator guide pages exist at their new URLs, and that `api:` links to old paths fail the build
 - [ ] 7.4 Change the "Publishing" section of AGENTS.md to name the five framework modules; verify that no file outside `openspec/changes/archive/` and the released sections of `CHANGELOG.md` names a `moonrockz/moon-lander/<package>` path
 - [ ] 7.5 Measure the CI time of `mise run check` before and after the split, and record it in the bead
 - [ ] 7.6 Archive this change with `openspec archive split-framework-modules` in the same pull request; verify `mise exec -- openspec validate --all --strict`

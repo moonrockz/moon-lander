@@ -1,5 +1,5 @@
 import {
-  "moonrockz/moon-lander/mediator",
+  "moonrockz/moon-lander-mediator" @mediator,
   "moonrockz/moonspec",
   "moonrockz/moonspec/core" @moonspec_core,
   "moonrockz/moonspec/runner",

@@ -6,7 +6,7 @@ of [Foundatio.Mediator](https://github.com/FoundatioFx/Foundatio.Mediator), with
 one important difference: registration is explicit, and the compiler is the
 registry. There is no handler discovery, no text key, and no runtime lookup.
 
-Import `moonrockz/moon-lander/mediator` as `@mediator`. The package is pure and
+Import `moonrockz/moon-lander-mediator` as `@mediator`. The package is pure and
 synchronous, so it has the same API and the same behavior on `wasm`, `wasm-gc`,
 `js`, and `native`. Each `mbt check` block on this page runs as a test with
 `mise run test`.

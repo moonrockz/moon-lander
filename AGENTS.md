@@ -33,8 +33,11 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   through nonzero exit codes. Exception: js file access in `moonrockz/moon-lander-config/host` uses the
   TypeScript adapter over `node:fs` in `pkgs/config/adapters/node/`, built with Bun
   through `scripts/build-node-adapter.mbtx`. Its test fixtures use a separate
-  TypeScript entry point and generated test file.
-- Native signal handlers in `pkgs/lander/hosting/console` use a C stub
+  TypeScript entry point and generated test file. The js signal listeners of
+  `moonrockz/moon-lander-hosting/console` use a TypeScript adapter over `node:*` in
+  `pkgs/hosting/adapters/node/`, with the same rules, built by the same script as a
+  second entry point.
+- Native signal handlers in `pkgs/hosting/console` use a C stub
   (`signal_stub.c`, a `native-stub`), because `moonbitlang/async` gives no SIGQUIT,
   no signal identity and no handler that runs during code that never yields. The
   stub does only async-signal-safe work. All other process and filesystem work stays

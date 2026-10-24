@@ -18,7 +18,7 @@ import {
 ///|
 /// The native suites of the stub, relative to the workspace root.
 let paths : Array[String] = [
-  "pkgs/lander/hosting/console", "tests/console-signal-acceptance",
+  "pkgs/hosting/console", "tests/console-signal-acceptance",
 ]
 
 ///|
@@ -55,7 +55,7 @@ fn workspace_version(manifest : String) -> String? {
 /// The `moon.mod` of the consumer module. It depends on the copied framework module and on the
 /// pinned `moonbitlang/async`, as an application does.
 fn consumer_manifest(version : String) -> String {
-  "name = \"console-consumer\"\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
+  "name = \"console-consumer\"\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander-hosting@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
 }
 
 ///|
@@ -110,7 +110,7 @@ async fn native_tests(
 let libraries : Array[(String, String)] = [
   ("pkgs/core", "core"),
   ("pkgs/config", "config"),
-  ("pkgs/lander", "library"),
+  ("pkgs/hosting", "hosting"),
 ]
 
 ///|
@@ -170,7 +170,7 @@ test "workspace_version reads the root version" {
 ///|
 test "the consumer depends on the framework version and the pinned async" {
   let manifest = consumer_manifest("0.3.0")
-  assert_true(manifest.contains("\"moonrockz/moon-lander@0.3.0\""))
+  assert_true(manifest.contains("\"moonrockz/moon-lander-hosting@0.3.0\""))
   assert_true(manifest.contains("\"moonbitlang/async@0.22.5\""))
 }
 
@@ -178,6 +178,6 @@ test "the consumer depends on the framework version and the pinned async" {
 test "the isolated workspace lists the consumer and each library" {
   assert_eq(
     isolated_work(),
-    "members = [\n  \".\",\n  \"./core\",\n  \"./config\",\n  \"./library\",\n]\n",
+    "members = [\n  \".\",\n  \"./core\",\n  \"./config\",\n  \"./hosting\",\n]\n",
   )
 }

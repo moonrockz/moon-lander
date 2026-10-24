@@ -7,6 +7,7 @@ import {
 }
 
 import {
+  "moonrockz/moon-lander-hosting" @hosting,
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/expect",
   "moonbitlang/async",

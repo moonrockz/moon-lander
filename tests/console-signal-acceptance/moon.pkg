@@ -1,5 +1,5 @@
 import {
-  "moonrockz/moon-lander/hosting/console",
+  "moonrockz/moon-lander-hosting/console",
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/async/stdio",

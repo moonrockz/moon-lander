@@ -45,7 +45,7 @@ that wait, on `wasm`, `js` and `native`.
 | Binding | [`moonrockz/moon-lander-config`](../config/README.mbt.md) | `bind`, `bind_root`, and `bind_or` over a default, with source-aware decode errors; validation comes next |
 | Mediator | [`moonrockz/moon-lander-mediator`](../mediator/README.mbt.md) | Typed senders, publish topics that run every handler and report every failure in one `PublishFailed`, a middleware pipeline with fixed order and short-circuit, an explicit context value and `MediatorError`; one synchronous API on all four targets |
 | Async mediator | [`moonrockz/moon-lander-mediator/async`](../mediator/async/README.mbt.md) | Async senders and topics with sequential and concurrent publish, caller cancellation, the `timeout` middleware, async middleware with a sync `finally_`, and `from_sync` for core values; `wasm`, `js` and `native` |
-| Hosting | `hosting`, `@lander.cli` | First slice: a builder with hosted services that have `start` and `stop` hooks, a services factory, and `@hosting.run` on `native` and `js`, which gives exit code 0 or 1. Arguments, lifecycle events, signals and configuration come next |
+| Hosting | [`moonrockz/moon-lander-hosting`](../hosting/README.mbt.md) (`@hosting`), `@lander.cli` | First slice: a builder with hosted services that have `start` and `stop` hooks, a services factory, and `@hosting.run` on `native` and `js`, which gives exit code 0 or 1. Arguments, lifecycle events, signals and configuration come next |
 
 The [Configuration](../config/README.mbt.md), [Mediator](../mediator/README.mbt.md) and
 [Async mediator](../mediator/async/README.mbt.md) chapters show the API that exists, with examples that the tests compile and run. The

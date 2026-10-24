@@ -4,6 +4,7 @@ members = [
   "./pkgs/core",
   "./pkgs/config",
   "./pkgs/mediator",
+  "./pkgs/hosting",
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./pkgs/openrpc",

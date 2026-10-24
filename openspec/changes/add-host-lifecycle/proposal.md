@@ -13,7 +13,7 @@ supply layered configuration. This change connects that configuration to a lifec
 
 ## What Changes
 
-- Add the package `moonrockz/moon-lander/hosting` (`@hosting`):
+- Add the package `moonrockz/moon-lander-hosting` (`@hosting`):
   - `HostBuilder[S]`, composed with pipelines (`|>`). It holds the application name,
     the arguments, the starting variable set, the working directory, the
     configuration sources, the services factory, the hosted services, the default
@@ -40,7 +40,7 @@ supply layered configuration. This change connects that configuration to a lifec
   - A fixed run order. The host parses the arguments first with
     `moonbitlang/core/argparse`. Then it fixes the variable set and the working
     directory, finds the environment name, loads the
-    configuration through `@config/host.load` (native, js) or `@config.load` over an
+    configuration through `@host.load` of `moonrockz/moon-lander-config/host` (native, js) or `@config.load` over an
     injected `FileTree` (wasm, wasm-gc, `|> @hosting.files(tree)`), and builds `S`.
   - The environment-variable source. The host adds it with the prefix (default: the
     application name in upper case, `|> @hosting.env_prefix(...)` changes it) and
@@ -66,13 +66,14 @@ supply layered configuration. This change connects that configuration to a lifec
     timeout.
   - A pure, synchronous phase engine. Drivers run its steps.
   - A configurable shutdown timeout (default 30 seconds).
-- Add the package `moonrockz/moon-lander/hosting/console` (native and js):
+- Add the package `moonrockz/moon-lander-hosting/console` (native and js):
   - Native: a C signal stub (`native-stub`). On Linux and macOS it handles SIGINT, SIGTERM and
     SIGQUIT. On Windows it handles `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and
     `CTRL_CLOSE_EVENT`. It records which signal arrived, sets an atomic stop flag, and
     ends the process at once on a second signal, also during synchronous code.
-  - js: `process.on` listeners in the TypeScript adapter (built with Bun) that the
-    `config/host` js story adds.
+  - js: `process.on` listeners in the hosting TypeScript adapter
+    `pkgs/hosting/adapters/node` (built with Bun), beside the `config/host` adapter
+    (`split-framework-modules` D2).
   - After a graceful signal stop, the process exits explicitly with 130, 143 or 131 on
     every platform.
 - Add a first spike task group. It proves that a C `native-stub` in `hosting/console`
@@ -82,7 +83,7 @@ supply layered configuration. This change connects that configuration to a lifec
   back to the owner.
 - Add an embedded driver for wasm and wasm-gc. The lifetime stops through
   `stop_application` or through a stop probe that the embedder supplies.
-- Add the package `moonrockz/moon-lander/hosting/argparse`. It gives the standard
+- Add the package `moonrockz/moon-lander-hosting/argparse`. It gives the standard
   flags `--environment`, `--config`, `--isolated` and `--project` (on under `@lander`,
   opt-in on the bare `@hosting.builder`), and maps
   them to the environment name and the conventions `DiscoveryOptions`. It turns mapped
@@ -125,15 +126,16 @@ None. This change depends on `configuration-core`, `configuration-conventions` a
 
 ## Impact
 
-- New packages in the `moonrockz/moon-lander` module: `hosting`, `hosting/console`,
-  `hosting/argparse`. The root package `@lander` gets the batteries-included entry:
+- New packages in the `moonrockz/moon-lander-hosting` module (`pkgs/hosting`, since
+  `split-framework-modules`): the root package `@hosting`, `console` and `argparse`.
+  The root package `@lander` of `moonrockz/moon-lander` gets the batteries-included entry:
   `cli`, its default steps, `run`, and `pub using` re-exports of `@hosting` steps.
   `@lander` imports the `formats` virtual package of `add-configuration-core`.
 - New dependencies: `moonbitlang/async` (task groups, cancellation, timeouts),
   `moonbitlang/core/argparse` and `moonbitlang/core/env`. The native build of
   `hosting/console` compiles a C stub with the consumer's C compiler, which native
-  MoonBit builds already need. The js driver uses the TypeScript adapter from the
-  `config/host` js story.
+  MoonBit builds already need. The js driver uses the hosting TypeScript adapter
+  `pkgs/hosting/adapters/node`.
 - AGENTS.md: a narrow exception lets `hosting/console` use a C stub for native
   signal handlers. All other process work stays with `moonbitlang/async`.
 - Windows is a target. Tests for the native stub and the js driver run on the

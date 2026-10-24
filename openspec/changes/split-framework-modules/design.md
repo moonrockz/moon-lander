@@ -246,8 +246,8 @@ modules shows this. `version_files` stays `pkgs/lander/version.mbt`.
 |---|---|
 | `check-config.mbtx` | Package paths under `pkgs/config` |
 | `check-mediator.mbtx` | Package paths under `pkgs/mediator` |
-| `check-console.mbtx` | Copy `pkgs/core`, `pkgs/config` and `pkgs/hosting` into the isolated workspace; the consumer imports `moonrockz/moon-lander-hosting` |
-| `check-formats-registry.mbtx` | Package `pkgs/core` and `pkgs/config`; serve both archives from the loopback registry; the consumer imports `moonrockz/moon-lander-config` |
+| `check-console.mbtx` | Group 1 makes it copy a list of modules (core and `pkgs/lander`), because `pkgs/lander` then imports core. Group 6 sets the list to `pkgs/core`, `pkgs/config` and `pkgs/hosting`; the consumer imports `moonrockz/moon-lander-hosting` |
+| `check-formats-registry.mbtx` | Group 1 makes it package and serve a list of candidate modules (core and `pkgs/lander`). Group 3 sets the list to `pkgs/core` and `pkgs/config`; the consumer imports `moonrockz/moon-lander-config` |
 | `build-node-adapter.mbtx`, `build-browser-adapter.mbtx`, `test-node-adapter.mbtx` | Adapter and generated-file paths under `pkgs/config` |
 | `validate-packages.mbtx` | D8 |
 | `publish.mbtx` | List unchanged. Its comment gives the order for the first framework release: core, config, mediator, hosting, umbrella |

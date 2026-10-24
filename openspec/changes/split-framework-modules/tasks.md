@@ -13,12 +13,13 @@ from lander-4us.5.3 on wait for group 6.
 
 Bead: lander-4us.40.1
 
-- [ ] 1.1 Create `pkgs/core` with `moon.mod` (`moonrockz/moon-lander-core`, root version, no imports, `readme = "README.mbt.md"`) and a root `moon.pkg`; add `./pkgs/core` to `moon.work`; verify that `mise run validate` and `mise run validate:versions` pass and that `moon check --target all` builds the empty module
-- [ ] 1.2 Verify that `pkgs/lander` can import the core root package with the explicit alias `@lander_core` on wasm, wasm-gc, js and native (design D3 risk), and record the result in the bead
-- [ ] 1.3 Move `AppName`, its trait impls and its tests from `pkgs/lander/hosting/names.mbt` to core with `git mv` or a split commit; add `AppNameError` and `AppNameRule` (design D5); remove `InvalidAppName` from `HostError`; verify each `AppName` rule on both sides of its limit with `inspect` and `assert_eq` only, and that each rule gives its own `AppNameRule` case
-- [ ] 1.4 Make `@hosting.builder`, `@lander.cli` and the hosting tests take `@lander_core.AppName`, and re-export it as `@lander.AppName`; verify `mise run test` on all four targets and the native and js `@hosting.run` tests
-- [ ] 1.5 Change the `AppName` scenario in `openspec/changes/add-host-lifecycle/specs/host-lifecycle/spec.md` (`HostError::InvalidAppName` becomes `AppNameError::InvalidAppName` with a rule) and the `AppName` rows in its design; verify `mise exec -- openspec validate --all --strict`
-- [ ] 1.6 Write `pkgs/core/README.mbt.md` with a doc-test example that parses an application name and matches a failure by its rule; verify that `mise run test` compiles and runs it on all four targets
+- [x] 1.1 Create `pkgs/core` with `moon.mod` (`moonrockz/moon-lander-core`, root version, no imports, `readme = "README.mbt.md"`) and a root `moon.pkg`; add `./pkgs/core` to `moon.work`; verify that `mise run validate` and `mise run validate:versions` pass and that `moon check --target all` builds the empty module
+- [x] 1.2 Verify that `pkgs/lander` can import the core root package with the explicit alias `@lander_core` on wasm, wasm-gc, js and native (design D3 risk), and record the result in the bead
+- [x] 1.3 Move `AppName`, its trait impls and its tests from `pkgs/lander/hosting/names.mbt` to core with `git mv` or a split commit; add `AppNameError` and `AppNameRule` (design D5); remove `InvalidAppName` from `HostError`; verify each `AppName` rule on both sides of its limit with `inspect` and `assert_eq` only, and that each rule gives its own `AppNameRule` case
+- [x] 1.4 Make `@hosting.builder`, `@lander.cli` and the hosting tests take `@lander_core.AppName`, and re-export it as `@lander.AppName`; verify `mise run test` on all four targets and the native and js `@hosting.run` tests
+- [x] 1.5 Change the `AppName` scenario in `openspec/changes/add-host-lifecycle/specs/host-lifecycle/spec.md` (`HostError::InvalidAppName` becomes `AppNameError::InvalidAppName` with a rule) and the `AppName` rows in its design; verify `mise exec -- openspec validate --all --strict`
+- [x] 1.6 Make `check-formats-registry.mbtx` package and serve a list of candidate modules, and `check-console.mbtx` copy a list of framework modules into its isolated workspace, both with core and `pkgs/lander` for now, because `pkgs/lander` now imports core; verify `mise run check:formats-registry`, `mise run check:console` and `mise run test:scripts`
+- [x] 1.7 Write `pkgs/core/README.mbt.md` with a doc-test example that parses an application name and matches a failure by its rule; verify that `mise run test` compiles and runs it on all four targets
 
 ## 2. Time limit in core
 
@@ -36,7 +37,7 @@ Bead: lander-4us.40.3
 - [ ] 3.1 Create `pkgs/config` (`moonrockz/moon-lander-config`) with the third-party imports that config needs and an import of core; move `pkgs/lander/config` to the module root, `config/conventions`, `config/host` and `config/browser` below it, `config/formats/<name>` to `parsers/<name>`, `pkgs/lander/formats` and `formats/toml` to `formats` and `formats/toml`, and `pkgs/lander/adapters` to `pkgs/config/adapters` (design D2 to D4); verify that `moon check --target all` builds the module
 - [ ] 3.2 Change every import of the moved packages in `pkgs/lander`, `tests/` and the package READMEs to the new paths and the aliases of design D3; remove the config imports from `pkgs/lander/moon.mod`; verify `mise run test` on all four targets
 - [ ] 3.3 Change `build-node-adapter.mbtx`, `test-node-adapter.mbtx`, `build-browser-adapter.mbtx` and `check-config.mbtx` to the new paths, and update their own tests; verify `mise run check:node-adapter`, `mise run check:browser-adapter`, `mise run check:browser-fixture` and `mise run check:config`
-- [ ] 3.4 Change `check-formats-registry.mbtx` to package `pkgs/core` and `pkgs/config` and to serve both archives from the loopback registry, with a consumer that imports `moonrockz/moon-lander-config` (also in its `--published` mode for the release gate lander-4us.9); verify `mise run check:formats` and `mise run check:formats-registry` on all four targets, and the scenarios of the `configuration-core` delta with the new override path
+- [ ] 3.4 Change the candidate list of `check-formats-registry.mbtx` (task 1.6) to `pkgs/core` and `pkgs/config`, with a consumer that imports `moonrockz/moon-lander-config` (also in its `--published` mode for the release gate lander-4us.9); verify `mise run check:formats` and `mise run check:formats-registry` on all four targets, and the scenarios of the `configuration-core` delta with the new override path
 - [ ] 3.5 Change the paths in the AGENTS.md adapter exceptions and in `.config/mise/config.toml`; verify that `mise run check` passes
 
 ## 4. Time limit binding
@@ -60,7 +61,7 @@ Bead: lander-4us.40.6
 
 - [ ] 6.1 Create `pkgs/hosting` (`moonrockz/moon-lander-hosting`) with imports of core, config, `moonbitlang/async` and `unicode-data`; move `pkgs/lander/hosting` to the module root and `hosting/console` (with `signal_stub.c`) to `console`; verify that `moon check` builds the module on its targets and `moon test --target native` runs the console tests
 - [ ] 6.2 Change the imports in `pkgs/lander`, `tests/console-signal-acceptance` and the READMEs, and leave `pkgs/lander/moon.mod` with imports of the four framework modules and `moonbitlang/async`; verify `mise run test` on all four targets
-- [ ] 6.3 Change `check-console.mbtx` to copy `pkgs/core`, `pkgs/config` and `pkgs/hosting` into the isolated workspace, with a consumer that imports `moonrockz/moon-lander-hosting`; verify `mise run check:console` on Linux and macOS and with `mise run test:native-zig`
+- [ ] 6.3 Change the library list of `check-console.mbtx` (task 1.6) to `pkgs/core`, `pkgs/config` and `pkgs/hosting`, with a consumer that imports `moonrockz/moon-lander-hosting`; verify `mise run check:console` on Linux and macOS and with `mise run test:native-zig`
 - [ ] 6.4 Change the package paths in the proposal, design and tasks of `add-host-lifecycle`, move the js signal listeners of O2 and task 12.1 to `pkgs/hosting/adapters/node` (design D2 and D12), and change the AGENTS.md exceptions for the console stub and the node adapter; verify `mise exec -- openspec validate --all --strict` and that no file outside `openspec/changes/archive/` and the released sections of `CHANGELOG.md` names `moonrockz/moon-lander/hosting`
 
 ## 7. Dependency check, docs and archive

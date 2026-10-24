@@ -85,10 +85,12 @@ its rule cannot exist:
 | `ServiceName` | `ServiceName::parse("db")` | Safe as one file path component: starts with a Unicode identifier start character (`XID_Start`, letters and letter numbers); then identifier characters (`XID_Continue`: letters, combining marks, digits, `_` and a few connectors), `-` and `.`; no invisible character; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8 |
 | `ExitCode` | `ExitCode::from_int(3)`, or `ExitCode::success()` and `ExitCode::failure()` | 0 to 255 |
 
-A parse that fails raises `HostError` with the text and the broken rule. A
+A parse that fails raises an error with the text and the broken rule:
+`AppNameError` for `AppName`, which comes from `moonrockz/moon-lander-core` and
+which `@lander` re-exports, and `HostError` for the other types. A
 program parses its names one time, where they are written. `cli` takes the name
 first, so the text can flow through the parse into the pipeline, as in
-`"acme" |> @hosting.AppName::parse |> @lander.cli(args)`. A program whose
+`"acme" |> @lander.AppName::parse |> @lander.cli(args)`. A program whose
 `main` can raise, `fn main raise { ... }`, lets a bad name stop the program at
 start.
 
@@ -98,7 +100,7 @@ start.
 /// into `log`.
 fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
   "acme"
-  |> @hosting.AppName::parse
+  |> @lander.AppName::parse
   |> @lander.cli(["greet"])
   |> @hosting.service(
     "greeter",

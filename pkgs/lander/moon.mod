@@ -3,6 +3,7 @@ name = "moonrockz/moon-lander"
 version = "0.3.0"
 
 import {
+  "moonrockz/moon-lander-core@0.3.0",
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.5",
   "moonbit-community/unicode-data@0.6.0",

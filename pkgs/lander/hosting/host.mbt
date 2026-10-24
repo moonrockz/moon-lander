@@ -71,7 +71,7 @@ priv struct HostedService[S] {
 /// The settings of a host before the services factory exists. Each step gives
 /// a new builder, so a builder value does not change.
 pub struct HostBuilder[S] {
-  priv name : AppName
+  priv name : @lander_core.AppName
   priv args : Array[String]
   priv services : Array[HostedService[S]]
 }
@@ -79,7 +79,7 @@ pub struct HostBuilder[S] {
 ///|
 /// Start a bare host builder with the application name and the command-line
 /// arguments. The builder turns on no default.
-pub fn[S] builder(name : AppName, args : Array[String]) -> HostBuilder[S] {
+pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
   { name, args: args.copy(), services: [] }
 }
 
@@ -113,7 +113,7 @@ pub fn[S] service(
 /// A host that is ready to run. `build` does no I/O, so the same host can run
 /// more than one time.
 pub struct Host[S] {
-  priv name : AppName
+  priv name : @lander_core.AppName
   priv args : Array[String]
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise

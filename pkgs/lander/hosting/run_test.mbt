@@ -8,7 +8,7 @@ suberror CommandError {
 /// A host with two services that write each hook call into the services
 /// record, an array of events.
 fn two_services() -> @hosting.Host[Array[String]] raise {
-  @hosting.builder(@hosting.AppName::parse("acme"), [])
+  @hosting.builder(@lander_core.AppName::parse("acme"), [])
   |> @hosting.service(
     @hosting.ServiceName::parse("db"),
     start=ctx => ctx.services.push("db.start"),
@@ -57,7 +57,7 @@ async test "a failing command still runs the stop hooks and gives 1" {
 async test "the factory runs one time and each hook gets its record" {
   let mut calls = 0
   let seen = []
-  let outcome = @hosting.builder(@hosting.AppName::parse("acme"), [])
+  let outcome = @hosting.builder(@lander_core.AppName::parse("acme"), [])
     |> @hosting.service(@hosting.ServiceName::parse("a"), start=ctx => seen.push(ctx.services))
     |> @hosting.service(@hosting.ServiceName::parse("b"), stop=ctx => seen.push(ctx.services))
     |> @hosting.build(_ => {
@@ -81,7 +81,7 @@ fn three_services(
   fail_stop? : String,
 ) -> @hosting.Host[Unit] raise {
   let mut builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-    @hosting.AppName::parse("acme"),
+    @lander_core.AppName::parse("acme"),
     [],
   )
   for name in ["a", "b", "c"] {
@@ -132,7 +132,7 @@ async test "a failed stop does not skip the other stop hooks" {
 async test "a failed factory runs no hook and gives 1" {
   let log = []
   let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-    @hosting.AppName::parse("acme"),
+    @lander_core.AppName::parse("acme"),
     [],
   )
   let outcome = builder
@@ -151,7 +151,7 @@ async test "a failed factory runs no hook and gives 1" {
 ///|
 async test "a service with no start hook still gets its stop hook" {
   let log = []
-  let outcome = @hosting.builder(@hosting.AppName::parse("acme"), [])
+  let outcome = @hosting.builder(@lander_core.AppName::parse("acme"), [])
     |> @hosting.service(
       @hosting.ServiceName::parse("log"),
       stop=_ => log.push("log.stop"),
@@ -164,7 +164,7 @@ async test "a service with no start hook still gets its stop hook" {
 
 ///|
 async test "the failures of an outcome are a copy" {
-  let outcome = @hosting.builder(@hosting.AppName::parse("acme"), [])
+  let outcome = @hosting.builder(@lander_core.AppName::parse("acme"), [])
     |> @hosting.build(_ => ())
     |> @hosting.run(_ => ())
   outcome.failures().push(Failure("added"))

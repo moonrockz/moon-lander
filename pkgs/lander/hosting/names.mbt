@@ -1,9 +1,8 @@
 ///|
-/// A fault in the program that sets up a host: a name, a code or a service set
-/// that breaks its rules.
+/// A fault in the program that sets up a host: a service name, a code or a
+/// service set that breaks its rules. An invalid application name is an
+/// `@lander_core.AppNameError`.
 pub(all) suberror HostError {
-  /// The text is not a valid application name.
-  InvalidAppName(text~ : String, reason~ : String)
   /// The text is not a valid service name.
   InvalidServiceName(text~ : String, reason~ : String)
   /// The builder already has the service `existing`, whose name equals `name`
@@ -20,8 +19,6 @@ pub extend HostError with @debug.Debug::{to_repr}
 /// Text for people that describes the fault.
 pub fn HostError::message(self : HostError) -> String {
   match self {
-    InvalidAppName(text~, reason~) =>
-      "Invalid application name \{text.escape()}: \{reason}"
     InvalidServiceName(text~, reason~) =>
       "Invalid service name \{text.escape()}: \{reason}"
     DuplicateService(name~, existing~) =>
@@ -34,55 +31,6 @@ pub fn HostError::message(self : HostError) -> String {
       "Invalid exit code \{code}: an exit code is in the range 0 to 255"
   }
 }
-
-///|
-/// The name of an application. It starts with an ASCII letter, and holds only
-/// ASCII letters, digits, `-` and `_`. So it is safe in file and directory
-/// names, and it gives a valid environment-variable prefix.
-pub struct AppName {
-  priv text : String
-} derive(Eq, Hash, Debug)
-
-///|
-pub extend AppName with Eq::{equal, not_equal}
-
-///|
-pub extend AppName with Hash::{hash, hash_combine}
-
-///|
-pub extend AppName with @debug.Debug::{to_repr}
-
-///|
-/// Parse an application name, for example `acme` or `my-tool`.
-pub fn AppName::parse(text : String) -> AppName raise HostError {
-  fn invalid(reason : String) -> HostError {
-    InvalidAppName(text~, reason~)
-  }
-
-  guard text.iter().head() is Some(first) else {
-    raise invalid("the name is empty")
-  }
-  guard is_ascii_letter(first) else {
-    raise invalid("the name must start with an ASCII letter")
-  }
-  for char in text {
-    guard is_name_char(char) else {
-      raise invalid(
-        "the character \{char.to_string().escape()} is not allowed; use ASCII letters, digits, '-' and '_'",
-      )
-    }
-  }
-  { text, }
-}
-
-///|
-/// The name as text, which `AppName::parse` reads back to an equal name.
-pub impl Show for AppName with output(self, logger) {
-  logger.write_string(self.text)
-}
-
-///|
-pub extend AppName with Show::{output, to_string}
 
 ///|
 /// The name of a hosted service. It is safe as one component of a file path on
@@ -267,15 +215,4 @@ fn is_windows_device_name(text : String) -> Bool {
   chars.length() == 4 &&
   (upper.has_prefix("COM") || upper.has_prefix("LPT")) &&
   (chars[3] is ('0'..='9'))
-}
-
-///|
-fn is_ascii_letter(char : Char) -> Bool {
-  (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
-}
-
-///|
-/// An ASCII letter, an ASCII digit, `-` or `_`.
-fn is_name_char(char : Char) -> Bool {
-  is_ascii_letter(char) || (char >= '0' && char <= '9') || char == '-' || char == '_'
 }

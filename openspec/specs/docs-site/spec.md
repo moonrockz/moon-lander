@@ -451,7 +451,7 @@ the package README as its summary.
 
 #### Scenario: Index
 - **WHEN** a user opens `/moon-lander/api/`
-- **THEN** the page lists the modules `moonrockz/moon-lander`, `moonrockz/notebooks` and `moonrockz/openrpc`, and links `/moon-lander/api/moonrockz/notebooks/`
+- **THEN** the page lists the modules `moonrockz/moon-lander`, `moonrockz/moon-lander-core`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`, `moonrockz/moon-lander-hosting`, `moonrockz/notebooks` and `moonrockz/openrpc`, and links `/moon-lander/api/moonrockz/moon-lander-config/` and `/moon-lander/api/moonrockz/notebooks/`
 
 ### Requirement: API links in prose
 

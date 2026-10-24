@@ -311,6 +311,35 @@ gives the same result on all four targets.
 | js | `moonrockz/moon-lander-config/host` with a TypeScript adapter over `node:fs`, bundled with Bun |
 | wasm, wasm-gc | Nothing. The embedder gives a complete tree with the pipeline step `@hosting.files(tree)`. |
 
+## The framework modules
+
+The framework is five MoonBit modules. An application imports only the modules
+that it uses. Each module imports only the modules below it. `AppName` and
+`TimeLimit` are in core, so all modules use the same rules for them. A program
+that uses only the mediator gets no configuration parser.
+
+```text
+moonrockz/moon-lander-core          AppName, TimeLimit (MoonBit core only)
+     ↑               ↑
+moon-lander-config   moon-lander-mediator
+     ↑
+moon-lander-hosting                 (core, config)
+     ↑
+moonrockz/moon-lander               @lander entry (all four)
+```
+
+| Module | Folder | Import as |
+| --- | --- | --- |
+| `moonrockz/moon-lander-core` | `pkgs/core` | `@lander_core` |
+| `moonrockz/moon-lander-config` | `pkgs/config` | `@config`, and `@conventions`, `@host`, `@browser`, `@formats` and `@toml` for its packages |
+| `moonrockz/moon-lander-mediator` | `pkgs/mediator` | `@mediator`, and `@mediator_async` for `async` |
+| `moonrockz/moon-lander-hosting` | `pkgs/hosting` | `@hosting`, and `@console` for `console` |
+| `moonrockz/moon-lander` | `pkgs/lander` | `@lander` |
+
+`mise run validate` fails when a module imports against this direction. The change
+[split-framework-modules](https://github.com/moonrockz/moon-lander/tree/main/openspec/changes/archive/2026-10-24-split-framework-modules)
+holds the decisions.
+
 ## The four changes
 
 | Change | What it owns |

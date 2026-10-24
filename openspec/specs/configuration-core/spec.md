@@ -881,11 +881,11 @@ extension.
 
 ### Requirement: Linked format set
 
-The package `moonrockz/moon-lander/formats` SHALL be a virtual package with a
+The package `moonrockz/moon-lander-config/formats` SHALL be a virtual package with a
 default implementation. Its function `formats()` MUST give the formats that the
 program links. The default implementation MUST give the TOML, YAML, JSON5 and Ion
 formats in that order. The JSON5 format MUST cover `.json` and `.json5`. The
-`config` package MUST NOT import `formats`.
+configuration core package `moonrockz/moon-lander-config` MUST NOT import `formats`.
 
 #### Scenario: Default linked formats
 
@@ -894,7 +894,7 @@ formats in that order. The JSON5 format MUST cover `.json` and `.json5`. The
 
 ### Requirement: Trim formats with one line
 
-The package `moonrockz/moon-lander/formats/toml` SHALL implement `formats` with the
+The package `moonrockz/moon-lander-config/formats/toml` SHALL implement `formats` with the
 TOML format only. An application MUST be able to select it with one `overrides`
 entry in its main `moon.pkg` and no code change. The program MUST then link no
 parser of the other formats. An application MUST be able to select its own
@@ -902,7 +902,7 @@ implementation package in the same way.
 
 #### Scenario: Trim to TOML with one line
 
-- **WHEN** the main `moon.pkg` of an application has `overrides: [ "moonrockz/moon-lander/formats/toml" ]`
+- **WHEN** the main `moon.pkg` of an application has `overrides: [ "moonrockz/moon-lander-config/formats/toml" ]`
 - **THEN** `formats()` gives only the TOML format, and the application source has no change
 
 #### Scenario: Unused parsers are not linked

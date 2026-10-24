@@ -21,13 +21,17 @@ An application composes a host with pipelines, then calls `run`.
 ```moonbit notest
 // The smallest program: every default is on.
 async fn main {
-  @lander.cli(@lander.AppName::parse("acme"), @env.args())
+  "acme"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.run(fn(ctx) { ... })
 }
 
 // A typed services record and a shorter shutdown timeout.
 async fn main {
-  @lander.cli(@lander.AppName::parse("morphir"), @env.args())
+  "morphir"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.shutdown_timeout(5_000)
   |> @lander.build(fn(b) { App::{ logs: TelemetrySession::local(b.environment.content_root) } })
   |> @lander.run(morphir_command)
@@ -37,13 +41,17 @@ async fn main {
 impl @lander.Program for App with run(self, ctx) -> Unit raise { build_all(ctx) }
 
 async fn main {
-  @lander.cli(@lander.AppName::parse("morphir"), @env.args()) |> @lander.run_app(App::new)
+  "morphir"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
+  |> @lander.run_app(App::new)
 }
 ```
 
 The application name is an `AppName`, not a raw string. `AppName::parse` checks
 the name one time, where the program writes it, and a bad name stops the program
-at start (design D17). Service names and exit codes are parsed types too.
+at start (design D17). `cli` takes the name first, so the text flows through the
+parse into the pipeline. Service names and exit codes are parsed types too.
 
 `run` takes a function. `run_app` takes a factory for a services record that
 implements `Program`. MoonBit has no generic traits and no overloading, so the two
@@ -79,7 +87,9 @@ tests give the same result each time.
 
 ```moonbit notest
 // A test: no process reads. Give a Map literal or a Json value, such as a parsed fixture.
-@lander.cli(@lander.AppName::parse("morphir"), ["build"],
+"morphir"
+|> @lander.AppName::parse
+|> @lander.cli(["build"],
   env_vars={ "HOME": "/t/home", "MORPHIR_ENVIRONMENT": "Staging" },
   working_dir="/t/repo/pkgs/api")
 ```

@@ -1,0 +1,15 @@
+import {
+  "moonrockz/moon-lander-config" @config,
+  "moonbit-community/yaml" @yaml_lib,
+  "moonrockz/ion/ion" @ion,
+  "moonbitlang/core/bigint",
+  "moonbitlang/core/double",
+  "moonbitlang/core/string",
+}
+
+import {
+  "moonrockz/expect",
+  "moonrockz/ion/ion" @ion,
+  "moonbit-community/yaml" @yaml_lib,
+  "moonbitlang/core/bigint",
+} for "test"

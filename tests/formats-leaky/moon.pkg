@@ -1,11 +1,11 @@
 import {
-  "moonrockz/moon-lander/formats",
-  "moonrockz/moon-lander/config/formats/yaml",
+  "moonrockz/moon-lander-config/formats",
+  "moonrockz/moon-lander-config/parsers/yaml",
   "moonbitlang/core/debug",
 }
 
 pkgtype(kind: "executable")
 
 options(
-  overrides: [ "moonrockz/moon-lander/formats/toml" ],
+  overrides: [ "moonrockz/moon-lander-config/formats/toml" ],
 )

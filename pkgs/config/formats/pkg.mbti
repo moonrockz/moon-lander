@@ -1,0 +1,7 @@
+package "moonrockz/moon-lander-config/formats"
+
+import {
+  "moonrockz/moon-lander-config",
+}
+
+fn formats() -> Array[@config.Format]

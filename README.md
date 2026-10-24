@@ -13,7 +13,7 @@ package. One override in the executable's `moon.pkg` selects TOML only, with no
 application source change. A consumer can also provide its own format set.
 Unused parsers can then be omitted from the linked output.
 
-The [format selection guide](pkgs/lander/formats/README.mbt.md) shows the builder
+The [format selection guide](pkgs/config/formats/README.mbt.md) shows the builder
 code, the TOML-only override, a custom combination, and the MoonBit
 virtual-package feature that enables this build-time selection.
 

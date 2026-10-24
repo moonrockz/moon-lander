@@ -40,7 +40,7 @@ async fn main {
     println("Testing config/host on \{runtime}")
     let code = @process.run(
       "moon",
-      ["test", "--deny-warn", "--target", "js", "pkgs/lander/config/host"],
+      ["test", "--deny-warn", "--target", "js", "pkgs/config/host"],
       extra_env={ "MOON_NODE_OVERRIDE": runtime },
       stdout=@stdio.stdout,
       stderr=@stdio.stderr,

@@ -1,4 +1,4 @@
 import {
-  "moonrockz/moon-lander/config",
-  "moonrockz/moon-lander/formats",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/formats",
 }

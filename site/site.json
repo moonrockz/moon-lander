@@ -5,8 +5,8 @@
   "site_url": "https://moonrockz.github.io/moon-lander/",
   "repo_url": "https://github.com/moonrockz/moon-lander",
   "versions": { "since": "0.3" },
-  "packages": ["lander", "notebooks", "openrpc"],
-  "api": ["pkgs/lander", "pkgs/notebooks", "pkgs/openrpc"],
+  "packages": ["lander", "core", "config", "notebooks", "openrpc"],
+  "api": ["pkgs/lander", "pkgs/core", "pkgs/config", "pkgs/notebooks", "pkgs/openrpc"],
   "nav": [
     { "group": "Design", "items": ["design/"] },
     { "group": "Packages", "items": ["packages/"] },

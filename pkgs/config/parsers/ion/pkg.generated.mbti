@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-config/parsers/ion"
+
+import {
+  "moonrockz/moon-lander-config",
+}
+
+// Values
+pub fn format() -> @moon-lander-config.Format
+
+pub fn parse(String, origin~ : String) -> @moon-lander-config.ConfigValue raise @moon-lander-config.ConfigError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

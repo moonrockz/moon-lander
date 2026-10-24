@@ -2,22 +2,22 @@
 package "moonrockz/moon-lander-tests/config-conventions-preset"
 
 import {
-  "moonrockz/moon-lander/config",
-  "moonrockz/moon-lander/config/conventions",
+  "moonrockz/moon-lander-config",
+  "moonrockz/moon-lander-config/conventions",
 }
 
 // Values
 pub fn at_root(String) -> String
 
-pub fn builder(Case) -> @config.ConfigBuilder raise @config.ConfigError
+pub fn builder(Case) -> @moon-lander-config.ConfigBuilder raise @moon-lander-config.ConfigError
 
 pub fn case_named(String) -> Case
 
 pub fn cases() -> Array[Case]
 
-pub fn formats() -> Array[@config.Format]
+pub fn formats() -> Array[@moon-lander-config.Format]
 
-pub fn load(Case) -> @config.Config raise @config.ConfigError
+pub fn load(Case) -> @moon-lander-config.Config raise @moon-lander-config.ConfigError
 
 pub fn morphir() -> @conventions.Conventions
 
@@ -25,7 +25,7 @@ pub fn observe(Case) -> String
 
 pub let root : String
 
-pub fn tree(Array[(String, String)]) -> @config.FileTree
+pub fn tree(Array[(String, String)]) -> @moon-lander-config.FileTree
 
 // Errors
 
@@ -37,10 +37,10 @@ pub(all) struct Case {
   config : String?
   isolated : Bool
   project : String?
-  platform : @config.Platform
+  platform : @moon-lander-config.Platform
   env_vars : Array[(String, String)]
 }
-pub fn Case::new(String, Array[(String, String)], start? : String, config? : String, isolated? : Bool, project? : String, platform? : @config.Platform, env_vars? : Array[(String, String)]) -> Self
+pub fn Case::new(String, Array[(String, String)], start? : String, config? : String, isolated? : Bool, project? : String, platform? : @moon-lander-config.Platform, env_vars? : Array[(String, String)]) -> Self
 
 // Type aliases
 

@@ -66,11 +66,11 @@ async fn bundle(
 ///|
 async fn main {
   let library = bundle(
-    "pkgs/lander/adapters/node/index.ts", "pkgs/lander/config/host/node.generated.js.mbt",
+    "pkgs/config/adapters/node/index.ts", "pkgs/config/host/node.generated.js.mbt",
     "node_adapter", "NodeAdapter",
   )
   let fixture = bundle(
-    "pkgs/lander/adapters/node/fixture.ts", "pkgs/lander/config/host/node_fixture.generated.js_wbtest.mbt",
+    "pkgs/config/adapters/node/fixture.ts", "pkgs/config/host/node_fixture.generated.js_wbtest.mbt",
     "node_fixture", "NodeFixture",
   )
   if !library || !fixture {
@@ -83,12 +83,12 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
   let script = @fs.realpath("build-node-adapter.mbtx")
   let dir = @fs.tmpdir(prefix="lander-node-current")
   defer @fs.rmdir(dir, recursive=true)
-  @fs.mkdir("\{dir}/pkgs/lander/adapters/node", recursive=true)
-  @fs.mkdir("\{dir}/pkgs/lander/config/host", recursive=true)
-  let entry = "\{dir}/pkgs/lander/adapters/node/index.ts"
+  @fs.mkdir("\{dir}/pkgs/config/adapters/node", recursive=true)
+  @fs.mkdir("\{dir}/pkgs/config/host", recursive=true)
+  let entry = "\{dir}/pkgs/config/adapters/node/index.ts"
   @fs.write_file(entry, "export const value: number = 1;\n")
   @fs.write_file(
-    "\{dir}/pkgs/lander/adapters/node/fixture.ts",
+    "\{dir}/pkgs/config/adapters/node/fixture.ts",
     "export const fixture = 1;\n",
   )
   let (missing, _, _) = @process.collect_output(
@@ -105,7 +105,7 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
     cwd=dir,
   )
   assert_eq(current, 0, msg=out.text() + err.text())
-  let generated = "\{dir}/pkgs/lander/config/host/node.generated.js.mbt"
+  let generated = "\{dir}/pkgs/config/host/node.generated.js.mbt"
   let before = @fs.read_file(generated).text()
   @fs.write_file(entry, "export const value: number = 2;\n")
   let (stale, out, err) = @process.collect_output(

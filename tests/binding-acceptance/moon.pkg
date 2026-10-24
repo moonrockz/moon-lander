@@ -1,7 +1,7 @@
 import {
-  "moonrockz/moon-lander/config",
-  "moonrockz/moon-lander/config/formats/toml",
-  "moonrockz/moon-lander/config/formats/ion" @ion_format,
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/parsers/toml",
+  "moonrockz/moon-lander-config/parsers/ion" @ion_format,
   "moonrockz/ion/ion" @ion,
   "moonrockz/moonspec",
   "moonrockz/moonspec/core" @moonspec_core,

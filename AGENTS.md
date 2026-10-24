@@ -31,7 +31,7 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   tasks. Pin imports. Do not replace these tasks with shell or PowerShell scripts.
 - Use `moonbitlang/async` for process and filesystem operations. Propagate failures
   through nonzero exit codes. Exception: js file access in `config/host` uses the
-  TypeScript adapter over `node:fs` in `pkgs/lander/adapters/node/`, built with Bun
+  TypeScript adapter over `node:fs` in `pkgs/config/adapters/node/`, built with Bun
   through `scripts/build-node-adapter.mbtx`. Its test fixtures use a separate
   TypeScript entry point and generated test file.
 - Native signal handlers in `pkgs/lander/hosting/console` use a C stub
@@ -39,7 +39,7 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   no signal identity and no handler that runs during code that never yields. The
   stub does only async-signal-safe work. All other process and filesystem work stays
   with `moonbitlang/async`.
-- Browser Web API calls may use TypeScript in `pkgs/lander/adapters/browser/`,
+- Browser Web API calls may use TypeScript in `pkgs/config/adapters/browser/`,
   bundled with the pinned Bun browser target through moonx. The unpublished
   feasibility fixture and Playwright tests live under `tests/`; HTTP serving,
   installation, build and process lifecycle stay in MoonBit task scripts. No

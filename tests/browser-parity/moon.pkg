@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
-  "moonrockz/moon-lander/config",
-  "moonrockz/moon-lander/config/formats/toml",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/parsers/toml",
   "moonrockz/moon-lander-tests/config-fixture" @fixture,
 }

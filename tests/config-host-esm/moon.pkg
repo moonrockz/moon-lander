@@ -1,7 +1,7 @@
 import {
   "moonbitlang/async",
-  "moonrockz/moon-lander/config",
-  "moonrockz/moon-lander/config/host",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/host",
 }
 
 supported_targets = "js"

@@ -2,15 +2,15 @@
 package "moonrockz/moon-lander-tests/config-fixture"
 
 import {
-  "moonrockz/moon-lander/config",
+  "moonrockz/moon-lander-config",
 }
 
 // Values
-pub fn builder() -> @config.ConfigBuilder raise @config.ConfigError
+pub fn builder() -> @moon-lander-config.ConfigBuilder raise @moon-lander-config.ConfigError
 
 pub fn files() -> Array[(String, String)]
 
-pub fn load() -> @config.Config raise @config.ConfigError
+pub fn load() -> @moon-lander-config.Config raise @moon-lander-config.ConfigError
 
 // Errors
 

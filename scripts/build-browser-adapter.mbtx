@@ -21,7 +21,7 @@ async fn main {
   defer @fs.rmdir(dir, recursive=true)
   let output = "\{dir}/adapter.js"
   command([
-    "build", "pkgs/lander/adapters/browser/entry.ts", "--target=browser", "--format=iife",
+    "build", "pkgs/config/adapters/browser/entry.ts", "--target=browser", "--format=iife",
     "--outfile", output,
   ])
   let bundle = @fs.read_file(output).text().replace_all(old="\r\n", new="\n")
@@ -29,10 +29,10 @@ async fn main {
   // permission or uses the DOM. Reject these Web APIs in the production adapter
   // bundle and in the MoonBit sources of the public browser package.
   let sources = [bundle]
-  if @fs.exists("pkgs/lander/config/browser") {
-    for name in @fs.readdir("pkgs/lander/config/browser", sort=true) {
+  if @fs.exists("pkgs/config/browser") {
+    for name in @fs.readdir("pkgs/config/browser", sort=true) {
       if name.has_suffix(".mbt") && !name.has_suffix(".generated.js.mbt") {
-        sources.push(@fs.read_file("pkgs/lander/config/browser/\{name}").text())
+        sources.push(@fs.read_file("pkgs/config/browser/\{name}").text())
       }
     }
   }
@@ -60,7 +60,7 @@ async fn main {
     }
   }
   source.write_string("  #|  return adapter;\n  #|}\n")
-  let generated = "pkgs/lander/config/browser/browser.generated.js.mbt"
+  let generated = "pkgs/config/browser/browser.generated.js.mbt"
   let source = source.to_string()
   if @env.args().contains("--check") {
     guard @fs.exists(generated) && @fs.read_file(generated).text() == source else {
@@ -78,10 +78,10 @@ async test "freshness rejects changed behavior and forbidden imports without rew
   let script = @fs.realpath("build-browser-adapter.mbtx")
   let dir = @fs.tmpdir(prefix="lander-browser-freshness")
   defer @fs.rmdir(dir, recursive=true)
-  @fs.mkdir("\{dir}/pkgs/lander/adapters/browser", recursive=true)
-  @fs.mkdir("\{dir}/pkgs/lander/config/browser", recursive=true)
-  let entry = "\{dir}/pkgs/lander/adapters/browser/entry.ts"
-  let generated = "\{dir}/pkgs/lander/config/browser/browser.generated.js.mbt"
+  @fs.mkdir("\{dir}/pkgs/config/adapters/browser", recursive=true)
+  @fs.mkdir("\{dir}/pkgs/config/browser", recursive=true)
+  let entry = "\{dir}/pkgs/config/adapters/browser/entry.ts"
+  let generated = "\{dir}/pkgs/config/browser/browser.generated.js.mbt"
   @fs.write_file(
     entry, "declare function receiveBrowserAdapter(value: unknown): void; receiveBrowserAdapter({value: 1});\n",
   )

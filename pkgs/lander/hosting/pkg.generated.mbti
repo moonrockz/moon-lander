@@ -3,8 +3,8 @@ package "moonrockz/moon-lander/hosting"
 
 import {
   "moonbitlang/core/debug",
+  "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-core",
-  "moonrockz/moon-lander/config",
 }
 
 // Values
@@ -25,12 +25,12 @@ pub fn HostError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct BuildContext {
-  config : @config.Config
+  config : @moon-lander-config.Config
 }
 
 pub struct Context[S] {
   services : S
-  config : @config.Config
+  config : @moon-lander-config.Config
 }
 
 pub struct ExitCode {

@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/async/js_async",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
+}
+
+import {
+  "moonrockz/moon-lander-config/parsers/toml",
+} for "wbtest"
+
+supported_targets = "js"

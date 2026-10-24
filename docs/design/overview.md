@@ -123,7 +123,7 @@ ir.strict_mode = true
 it. A default that only `bind_or` gives is not in the configuration, so
 `config show` does not list it.
 
-The formats come from a MoonBit virtual package, `moonrockz/moon-lander/formats`.
+The formats come from a MoonBit virtual package, `moonrockz/moon-lander-config/formats`.
 Its default implementation returns all the formats. An application can link only
 TOML with one override in its own `moon.pkg`. The code does not change.
 
@@ -131,11 +131,11 @@ TOML with one override in its own `moon.pkg`. The code does not change.
 pkgtype(kind: "executable")
 
 options(
-  overrides: ["moonrockz/moon-lander/formats/toml"],
+  overrides: ["moonrockz/moon-lander-config/formats/toml"],
 )
 ```
 
-The implemented [format selection guide](../../pkgs/lander/formats/README.mbt.md)
+The implemented [format selection guide](../../pkgs/config/formats/README.mbt.md)
 shows how callers register the selected formats, how to supply a custom set,
 and how MoonBit's virtual interface and build-time override make trimming work.
 
@@ -307,8 +307,8 @@ gives the same result on all four targets.
 
 | Target | What answers a `Need` |
 | --- | --- |
-| native | `config/host` with the `moonbitlang/async` file system |
-| js | `config/host` with a TypeScript adapter over `node:fs`, bundled with Bun |
+| native | `moonrockz/moon-lander-config/host` with the `moonbitlang/async` file system |
+| js | `moonrockz/moon-lander-config/host` with a TypeScript adapter over `node:fs`, bundled with Bun |
 | wasm, wasm-gc | Nothing. The embedder gives a complete tree with the pipeline step `@hosting.files(tree)`. |
 
 ## The four changes

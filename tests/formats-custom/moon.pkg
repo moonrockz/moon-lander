@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/debug",
-  "moonrockz/moon-lander/formats",
+  "moonrockz/moon-lander-config/formats",
 }
 
 pkgtype(kind: "executable")

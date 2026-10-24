@@ -13,8 +13,8 @@ async fn main {
     .replace_all(old="\r\n", new="\n")
   for target in ["wasm", "wasm-gc", "js", "native"] {
     let (code, out, err) = @process.collect_output("moon", [
-      "test", "--deny-warn", "--target", target, "pkgs/lander/config", "pkgs/lander/config/formats/toml",
-      "pkgs/lander/config/formats/yaml", "pkgs/lander/config/formats/json5", "pkgs/lander/config/formats/ion",
+      "test", "--deny-warn", "--target", target, "pkgs/config", "pkgs/config/parsers/toml",
+      "pkgs/config/parsers/yaml", "pkgs/config/parsers/json5", "pkgs/config/parsers/ion",
       "tests/config-acceptance",
     ])
     guard code == 0 else { fail(out.text() + err.text()) }

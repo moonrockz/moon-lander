@@ -13,7 +13,7 @@ package. One override in the executable's `moon.pkg` selects TOML only, with no
 application source change. A consumer can also provide its own format set.
 Unused parsers can then be omitted from the linked output.
 
-The [format selection guide](pkgs/lander/formats/README.mbt.md) shows the builder
+The [format selection guide](pkgs/config/formats/README.mbt.md) shows the builder
 code, the TOML-only override, a custom combination, and the MoonBit
 virtual-package feature that enables this build-time selection.
 
@@ -104,10 +104,16 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
 
 - `moon.mod` holds the shared version, currently `0.3.0`.
 - `moon.work` lists the workspace members.
+- `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
+  imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
+- `pkgs/config/` contains
+  [`moonrockz/moon-lander-config`](pkgs/config/README.mbt.md), imported as
+  `@config`. The configuration core is the module root. `parsers/<name>` holds
+  the format parsers, the `formats` virtual package selects the linked parsers,
+  and `conventions`, `host` and `browser` hold discovery and the host adapters.
+  `adapters/` holds the TypeScript adapters.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
-  as `@lander`. Its `version()` export provides a build and test smoke check. Its
-  `config` packages hold the configuration core and `formats` selects the linked
-  parsers through a virtual package.
+  as `@lander`. Its `version()` export provides a build and test smoke check.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors

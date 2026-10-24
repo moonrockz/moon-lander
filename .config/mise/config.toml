@@ -9,7 +9,7 @@
 # Node.js runs the js target in `moon test --target js` and `moon run --target js`.
 node = "24.14.1"
 
-# Bun builds and bundles the TypeScript host adapter for the js target (pkgs/lander/adapters/node/)
+# Bun builds and bundles the TypeScript host adapter for the js target (pkgs/config/adapters/node/)
 bun = "1.4.3"
 
 # Browser harness CLI; must match tests/browser/package.json exactly, and the Playwright image tag of

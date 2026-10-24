@@ -109,6 +109,7 @@ async fn native_tests(
 /// the folder in this repository and the folder in the isolated workspace.
 let libraries : Array[(String, String)] = [
   ("pkgs/core", "core"),
+  ("pkgs/config", "config"),
   ("pkgs/lander", "library"),
 ]
 
@@ -177,6 +178,6 @@ test "the consumer depends on the framework version and the pinned async" {
 test "the isolated workspace lists the consumer and each library" {
   assert_eq(
     isolated_work(),
-    "members = [\n  \".\",\n  \"./core\",\n  \"./library\",\n]\n",
+    "members = [\n  \".\",\n  \"./core\",\n  \"./config\",\n  \"./library\",\n]\n",
   )
 }

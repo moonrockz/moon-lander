@@ -1,0 +1,6 @@
+import {
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/parsers/toml" @toml_format,
+}
+
+virtual(implement: "moonrockz/moon-lander-config/formats")

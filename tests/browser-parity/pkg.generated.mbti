@@ -2,17 +2,17 @@
 package "moonrockz/moon-lander-tests/browser-parity"
 
 import {
-  "moonrockz/moon-lander/config",
+  "moonrockz/moon-lander-config",
 }
 
 // Values
-pub fn cases() -> Array[Case] raise @config.ConfigError
+pub fn cases() -> Array[Case] raise @moon-lander-config.ConfigError
 
 pub fn failure(Error) -> String
 
-pub fn observe(Case, @config.Config) -> String
+pub fn observe(Case, @moon-lander-config.Config) -> String
 
-pub fn reference() -> String raise @config.ConfigError
+pub fn reference() -> String raise @moon-lander-config.ConfigError
 
 pub fn revision(Array[Case]) -> String
 
@@ -21,7 +21,7 @@ pub fn revision(Array[Case]) -> String
 // Types and methods
 pub struct Case {
   name : String
-  builder : @config.ConfigBuilder
+  builder : @moon-lander-config.ConfigBuilder
   files : Array[(String, String)]
   bind : Bool
 }

@@ -4,12 +4,9 @@ version = "0.3.0"
 
 import {
   "moonrockz/moon-lander-core@0.3.0",
+  "moonrockz/moon-lander-config@0.3.0",
   "moonbitlang/async@0.22.5",
-  "moonbitlang/x@0.5.5",
   "moonbit-community/unicode-data@0.6.0",
-  "moonbit-community/toml@0.5.0",
-  "moonbit-community/yaml@0.0.8",
-  "moonrockz/ion@0.6.0",
   "moonrockz/expect@0.6.1",
 }
 

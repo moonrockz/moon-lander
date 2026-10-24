@@ -16,7 +16,7 @@ import {
 /// The consumer imports the last one. The loopback registry serves each archive.
 let candidates : Array[(String, String)] = [
   ("pkgs/core", "moonrockz/moon-lander-core"),
-  ("pkgs/lander", "moonrockz/moon-lander"),
+  ("pkgs/config", "moonrockz/moon-lander-config"),
 ]
 
 ///|

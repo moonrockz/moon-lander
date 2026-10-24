@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/ion/ion" @ion_lib,
+  "moonrockz/ion/text" @text,
+}
+
+import {
+  "moonrockz/expect",
+  "moonrockz/moon-lander-config/parsers/toml",
+  "moonrockz/moon-lander-config/parsers/yaml",
+  "moonrockz/moon-lander-config/parsers/json5",
+} for "test"

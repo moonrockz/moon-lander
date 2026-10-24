@@ -94,6 +94,8 @@ Use `ctx.cancelled()` to read the stop state, or `ctx.check_cancelled()` to rais
 `StopRequested`. `ctx.lifetime.stop_token()` gives the same checks to code that
 does not receive the context. These checks read stop requests, registered host
 probes, and, on native and js, the current async task's cancellation state.
+On native and js, read these checks inside an async task of the run.
+A probe stop reaches a suspended command only through the driver that owns the probe.
 A command or hook that raises `StopRequested` ends as a stop and adds no failure.
 A service whose starting or start hook raises it does not count as started.
 
@@ -112,8 +114,8 @@ test "a command requests stop and polls its token" {
 On js, Node.js cannot deliver a signal listener while a synchronous loop keeps
 running. Long synchronous loops must call `@async.pause()` at intervals to give
 the event loop time to run the listener. A cancellation check alone does not
-yield. On native, synchronous loops can poll host signal probes, but a task
-cancellation still takes effect at a suspension point.
+yield. The console driver, a later part of `add-host-lifecycle`, will give native
+code signal probes to poll. A task cancellation takes effect at a suspension point.
 
 ```mbt check
 ///|

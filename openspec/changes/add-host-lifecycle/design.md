@@ -371,7 +371,7 @@ priv enum StopRequest { Requested } // group 4 adds Signal; group 13 adds Embedd
 fn[S] Engine::start(services : Array[HostedService[S]]) -> Step
 fn Pending::done(self : Pending) -> Step
 fn Pending::failed(self : Pending, error : Error) -> Step
-fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?) -> Step
+fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step
 fn Pending::timed_out(self : Pending) -> Step
 ```
 

@@ -551,22 +551,32 @@ test "request then failure counts failure and follows the failed-start marking r
 /// Extend the hook/failure laws with a request at any emitted step, including a
 /// request followed by failure. The model below has no engine instructions.
 test "law: requests from any step preserve cleanup and single-use reply effects" {
-  @expect.for_all((input : (Array[UInt], UInt, UInt)) => {
+  @expect.for_all((input : (Array[UInt], UInt, UInt, UInt)) => {
     let masks = input.0.map(value => (value & 63).reinterpret_as_int())
     let target = (input.1 % (masks.length() * 6 + 4).reinterpret_as_uint()).reinterpret_as_int()
+    let code = ExitCode::from_int((input.3 % 256).reinterpret_as_int()) catch { _ => abort("code in range") }
     let expected : Array[Action] = []
     let started = Array::make(masks.length(), false)
     let mut ended = false
     let mut failures = 0
+    let expected_reason : Ref[StopReason?] = Ref(None)
     let emit = (action : Action) => {
       let index = expected.length()
       expected.push(action)
-      let request = index == target
+      let request = index >= target
       let failure = match action {
         Raise(_) => false
         _ => ((input.2 >> (index % 32)) & 1) != 0
       }
       if failure { failures += 1 }
+      if expected_reason.val is None {
+        expected_reason.val = if request { Some(Requested) }
+          else { match action {
+            Hook(_, Starting | Start | Started) if failure => Some(StartFailed(HookFailed(index)))
+            RunCommand => Some(if failure { Failed(HookFailed(index)) } else { Completed })
+            _ => None
+          } }
+      }
       let interrupted = request && !failure && (input.1 & 0x80000000U) != 0 && !(action is Raise(_))
       (request, failure, interrupted)
     }
@@ -604,8 +614,8 @@ test "law: requests from any step preserve cleanup and single-use reply effects"
         _ => if ((input.2 >> (index % 32)) & 1) != 0 { Some(HookFailed(index)) } else { None }
       }
       let interrupted = (input.1 & 0x80000000U) != 0 && !(action is Raise(_))
-      step = if index == target {
-        pending.stop_requested(Requested, None, result=match error { Some(error) => Failed(error); None => if interrupted { Interrupted } else { Returned } })
+      step = if index >= target {
+        pending.stop_requested(Requested, Some(code), result=match error { Some(error) => Failed(error); None => if interrupted { Interrupted } else { Returned } })
       } else if error is Some(error) { pending.failed(error) }
       else { pending.done() }
       tokens.push((pending, step))
@@ -614,7 +624,15 @@ test "law: requests from any step preserve cleanup and single-use reply effects"
     @expect.expect(actual).to_equal(expected)
     guard step is Finish(result) else { fail("expected Finish") }
     @expect.expect(result.failures().length()).to_equal(failures)
-    @expect.expect(result.exit_code()).to_equal(if failures == 0 { ExitCode::success() } else { ExitCode::failure() })
+    @expect.expect(match (expected_reason.val.unwrap(), result.reason) {
+      (Requested, Requested) | (Completed, Completed) => true
+      (StartFailed(HookFailed(expected)), StartFailed(HookFailed(actual))) => expected == actual
+      (Failed(HookFailed(expected)), Failed(HookFailed(actual))) => expected == actual
+      _ => false
+    }).to_be_true()
+    let requested_code = if target < expected.length() { Some(code) } else { None }
+    @expect.expect(result.requested_code).to_equal(requested_code)
+    @expect.expect(result.exit_code()).to_equal(if failures == 0 { requested_code.unwrap_or(ExitCode::success()) } else { ExitCode::failure() })
     let engine = last.unwrap()
     let snapshot = EngineSnapshot::take(engine)
     same_step(step, engine.next())

@@ -23,6 +23,7 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)
   }
+  if @async.is_being_cancelled() { lifetime.stop_application() }
   @async.protect_from_cancel(() => {
     while step is Run(pending, action) {
       step = run_step(host, ctx, command, pending, action)
@@ -55,6 +56,7 @@ async fn[S] run_step(host : Host[S], ctx : Context[S], command : Hook[S], pendin
     }
   })
   if completed is None { lifetime.stop_application() }
+  ignore(lifetime.probe_stop())
   let result = completed.unwrap_or(Interrupted)
   let next = if lifetime.request is Some(request) {
     pending.stop_requested(request, lifetime.requested_code, result~, observed_signal?=lifetime.signal)

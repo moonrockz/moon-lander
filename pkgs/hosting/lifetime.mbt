@@ -117,11 +117,12 @@ pub fn Lifetime::stop_application(self : Lifetime, exit_code? : ExitCode) -> Uni
 pub fn Lifetime::set_exit_code(self : Lifetime, code : ExitCode) -> Unit { self.exit_code = Some(code) }
 
 ///|
-/// The first reason that ended the run, or None while it is still running.
+/// The first event that ended the run, or None until an event ends it.
 pub fn Lifetime::stop_reason(self : Lifetime) -> StopReason? { self.reason }
 
 ///|
 /// A handle with the same stop checks as its lifetime.
+/// During a run on native and js, read its checks inside an async task of the run.
 pub struct StopToken { priv lifetime : Lifetime }
 
 ///|
@@ -152,6 +153,7 @@ pub fn StopToken::check_cancelled(self : StopToken) -> Unit raise StopRequested 
 
 ///|
 /// Read the lifetime's stop state and the current task's cancellation state.
+/// On native and js, read this check inside an async task of the run.
 pub fn[S] Context::cancelled(self : Context[S]) -> Bool { self.lifetime.cancelled() }
 
 ///|
@@ -162,6 +164,7 @@ pub fn[S] Context::check_cancelled(self : Context[S]) -> Unit raise StopRequeste
 
 ///|
 /// Read stop requests, registered probes and the current task's cancellation.
+/// During a run on native and js, read this check inside an async task of the run.
 /// Outside a running driver the token reads only its lifetime and probes.
 pub fn StopToken::cancelled(self : StopToken) -> Bool {
   self.lifetime.cancelled()

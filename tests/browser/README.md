@@ -1,9 +1,9 @@
 # Browser feasibility fixture
 
-This private harness exercises the production `config/browser` package and the
+This private harness exercises the production `moonrockz/moon-lander-config/browser` package and the
 original feasibility proof. The fixture imports the configuration core, TOML,
 the public browser package, and `moonbitlang/async/js_async`. It does not import
-`config/host`. `tests/browser-consumer` is the runnable headless guide example.
+`moonrockz/moon-lander-config/host`. `tests/browser-consumer` is the runnable headless guide example.
 
 From the workspace root:
 

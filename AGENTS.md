@@ -30,7 +30,7 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
 - Write automation in `scripts/*.mbtx`, run with `moonx`, and expose it as mise
   tasks. Pin imports. Do not replace these tasks with shell or PowerShell scripts.
 - Use `moonbitlang/async` for process and filesystem operations. Propagate failures
-  through nonzero exit codes. Exception: js file access in `config/host` uses the
+  through nonzero exit codes. Exception: js file access in `moonrockz/moon-lander-config/host` uses the
   TypeScript adapter over `node:fs` in `pkgs/config/adapters/node/`, built with Bun
   through `scripts/build-node-adapter.mbtx`. Its test fixtures use a separate
   TypeScript entry point and generated test file.

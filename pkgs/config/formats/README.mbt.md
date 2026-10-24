@@ -145,14 +145,19 @@ The hand-written `formats/pkg.mbti` defines its contract:
 package "moonrockz/moon-lander-config/formats"
 
 import {
-  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config",
 }
 
 fn formats() -> Array[@config.Format]
 ```
 
+The interface imports the module root without an alias, because the `pkg.mbti`
+syntax does not accept one. It names the type with `@config`, the alias that
+the package gives the import in its `moon.pkg`.
+
 The interface uses `fn` without `pub`. Implementations provide a matching
-`pub fn`; the `Format` type stays in the ordinary `config` package. MoonBit's
+`pub fn`; the `Format` type stays in the configuration core,
+`moonrockz/moon-lander-config` (`@config`). MoonBit's
 current virtual-package interface supports plain functions, which is why this
 contract is a function returning descriptors.
 

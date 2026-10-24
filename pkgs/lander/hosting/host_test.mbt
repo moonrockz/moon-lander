@@ -40,10 +40,14 @@ test "a second service with the same name is a fault" {
   catch {
     err => Err(err)
   }
-  guard result is Err(@hosting.DuplicateService(name~)) else {
+  guard result is Err(@hosting.DuplicateService(name~, existing~) as err) else {
     fail("expected DuplicateService")
   }
   @expect.expect(name).to_equal(db)
+  @expect.expect(existing).to_equal(db)
+  @expect.expect(err.message()).to_equal(
+    "The host already has a service named \"db\"",
+  )
 }
 
 ///|
@@ -60,10 +64,40 @@ test "service names that differ only in letter case are duplicates" {
     catch {
       err => Err(err)
     }
-    guard result is Err(@hosting.DuplicateService(name=got)) else {
+    guard result is Err(@hosting.DuplicateService(name=got, existing~) as err) else {
       fail("expected DuplicateService for \{text}")
     }
     @expect.expect(got).to_equal(name)
+    @expect.expect(existing.to_string()).to_equal("Données")
+    @expect.expect(err.message()).to_equal(
+      "The host already has a service named \"Données\"; \{text.escape()} differs from it only in letter case",
+    )
   }
   ignore(builder |> @hosting.service(@hosting.ServiceName::parse("donnees")))
+}
+
+///|
+test "case pairs that are not symmetric are duplicates" {
+  for
+    pair in [
+      ("ΟΔΟΣ", "οδος"),
+      ("\u{00B5}s", "\u{03BC}s"),
+      ("\u{017F}vc", "svc"),
+      ("Straße", "STRASSE"),
+    ] {
+    let (first, second) = pair
+    let builder : @hosting.HostBuilder[Unit] = @hosting.builder(
+        @hosting.AppName::parse("acme"),
+        [],
+      )
+      |> @hosting.service(@hosting.ServiceName::parse(first))
+    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
+      Ok(builder |> @hosting.service(@hosting.ServiceName::parse(second)))
+    catch {
+      err => Err(err)
+    }
+    guard result is Err(@hosting.DuplicateService(..)) else {
+      fail("expected DuplicateService for \{first} and \{second}")
+    }
+  }
 }

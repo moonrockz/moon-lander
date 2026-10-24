@@ -97,8 +97,10 @@ pub fn[S] service(
   start? : Hook[S],
   stop? : Hook[S],
 ) -> HostBuilder[S] raise HostError {
-  if builder.services.iter().any(service => service.name.same_file(name)) {
-    raise DuplicateService(name~)
+  for service in builder.services {
+    if service.name.same_file(name) {
+      raise DuplicateService(name~, existing=service.name)
+    }
   }
   let services = builder.services.copy()
   services.push({ name, start, stop })

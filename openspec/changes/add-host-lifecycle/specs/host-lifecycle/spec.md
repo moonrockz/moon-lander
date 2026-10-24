@@ -166,14 +166,20 @@ constructor, which is the only way to make a value. A parse that fails MUST rais
 
 An application name SHALL start with an ASCII letter and SHALL hold only ASCII
 letters, digits, `-` and `_`. A service name MUST be safe as one file path component: it
-MUST start with a Unicode letter, MUST hold only Unicode letters, combining marks,
-digits, `_`, `-` and `.`, MUST NOT end with `.`, MUST NOT be a Windows device name
-before any extension, and MUST be at most 128 bytes in UTF-8. An exit
+MUST start with an `XID_Start` character, MUST hold only `XID_Continue` characters,
+`-` and `.`, MUST NOT hold an invisible character, MUST NOT end with `.`, MUST NOT
+be a Windows device name before any extension, and MUST be at most 128 bytes in
+UTF-8. An exit
 code MUST be in the range 0 to 255.
 
 #### Scenario: Service name with surrounding whitespace
 
 - **WHEN** a program calls `ServiceName::parse(" db")`
+- **THEN** the call raises `HostError::InvalidServiceName`
+
+#### Scenario: Invisible character
+
+- **WHEN** a program calls `ServiceName::parse("d\u{200D}b")`
 - **THEN** the call raises `HostError::InvalidServiceName`
 
 #### Scenario: Windows device name
@@ -200,6 +206,11 @@ it only in letter case, MUST raise `HostError::DuplicateService`.
 #### Scenario: Names that differ only in letter case
 
 - **WHEN** a builder has a service named `Données`, and the program adds a service named `DONNÉES`
+- **THEN** the step raises `HostError::DuplicateService` with the name `DONNÉES` and the existing name `Données`
+
+#### Scenario: Case pairs that are not symmetric
+
+- **WHEN** a builder has a service named `ΟΔΟΣ`, and the program adds a service named `οδος`
 - **THEN** the step raises `HostError::DuplicateService`
 
 ### Requirement: Application name and variable prefix

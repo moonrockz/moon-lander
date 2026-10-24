@@ -281,9 +281,11 @@ pub fn[S] service(
 - Call (this change): a stop hook failure does not skip the next hooks. The host
   collects all failures.
 - Stop hooks read the reason with `ctx.lifetime.stop_reason()`.
-- Owner (2026-10-23, D17): each service of a host has its own `ServiceName`. A
-  second service with the same name raises `HostError::DuplicateService`, so a
-  builder never holds two services with one name.
+- Owner (2026-10-23, D17): each service of a host has its own `ServiceName`,
+  without regard to letter case. A second service whose name equals a name of the
+  builder, or differs from it only in letter case, raises
+  `HostError::DuplicateService(name~, existing~)`, so a builder never holds two
+  services that give one file.
 
 ### D5. Lifetime, stop requests and cancellation checks (Owner: .NET `IHostApplicationLifetime`; O1)
 
@@ -813,7 +815,7 @@ not check the rules again.
 | Value | Type | Rule | Group |
 | --- | --- | --- | --- |
 | Application name | `AppName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
-| Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode letter; then letters, combining marks, digits, `_`, `-` and `.`; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
+| Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode identifier start character (`XID_Start`, letters and letter numbers); then identifier characters (`XID_Continue`: letters, combining marks, digits, `_` and a few connectors), `-` and `.`; no invisible character; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
 | Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
 | Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
 | Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
@@ -840,13 +842,20 @@ not check the rules again.
   properties `XID_Start` and `XID_Continue` from `moonbit-community/unicode-data`
   (`xid` and `case_mapping` packages), because `moonbitlang/core` has no Unicode
   category data. These exclude every separator, reserved punctuation, whitespace,
-  control and direction character. The rule also rejects a trailing `.` (Windows
+  control and direction character. `XID_Continue` also allows a few connector
+  characters such as `·` and `‿`, which are safe in a path. The parse rejects the
+  invisible identifier characters (the default-ignorable code points in
+  `XID_Continue`, such as U+200C, U+200D and the variation selectors, and the
+  Hangul fillers): macOS HFS+ ignores U+200C and U+200D in names, and a report
+  cannot show them. The rule also rejects a trailing `.` (Windows
   removes it), the Windows device names `CON`, `PRN`, `AUX`, `NUL`, `COM0` to
   `COM9` and `LPT0` to `LPT9` before any extension, and more than 128 UTF-8 bytes
   (a path component holds at most 255).
 - Owner (2026-10-23): two service names that differ only in letter case are
   duplicates in one host, because Windows and macOS give them one file. The
-  check compares the Unicode lowercase form.
+  check compares the lowercase of the uppercase of each character, so pairs whose
+  case mappings are not symmetric also match: `Σ`, `σ` and `ς`; `µ` and `μ`;
+  `ſ` and `s`; `ß` and `SS`.
 - Owner (2026-10-23): the parse does not normalize to NFC. A release-build probe
   measured the cost over the ASCII rule: the letter and case data add about 11 KB
   (wasm-gc), 29 KB (js) and 6 KB (native); NFC

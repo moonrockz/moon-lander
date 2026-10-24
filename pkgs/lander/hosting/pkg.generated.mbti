@@ -17,7 +17,7 @@ pub fn[S] service(HostBuilder[S], ServiceName, start? : async (Context[S]) -> Un
 pub(all) suberror HostError {
   InvalidAppName(text~ : String, reason~ : String)
   InvalidServiceName(text~ : String, reason~ : String)
-  DuplicateService(name~ : ServiceName)
+  DuplicateService(name~ : ServiceName, existing~ : ServiceName)
   InvalidExitCode(code~ : Int32)
 } derive(@debug.Debug)
 pub fn HostError::message(Self) -> String

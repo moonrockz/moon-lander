@@ -200,14 +200,22 @@ pub enum TimeLimitRule {
 - For a code constructor, `input` is the count with its unit, for example `-1ms`.
 - Grammar: a part is a number, at most one space, and a unit. A number is ASCII
   digits, with an optional `.` and one or more digits after it (`.5` and `5.` are
-  `NotANumber`). A unit is the longest run of ASCII letters after the number. The
-  units are `ms`, `millisecond`, `milliseconds`, `s`, `second`, `seconds`, `m`,
+  `NotANumber`). The unit text is the run of characters after the number that are
+  not ASCII digits, spaces or `.`, so an error names the full unit text, for example
+  `µs`. The units are `ms`, `millisecond`, `milliseconds`, `s`, `second`, `seconds`, `m`,
   `minute`, `minutes`, `h`, `hour` and `hours`. They are lower case only, and the
   singular and plural forms are the same unit. At most one space goes between parts,
-  and none at the start or the end.
-- The sum uses exact decimal arithmetic (`moonbitlang/core/bigint`, part of core), so
-  a long fraction or a large number gives `NotWholeMilliseconds` or `AboveLargest`,
-  and never an overflow or a rounding.
+  and none at the start or the end. Other whitespace, such as a tab or a final
+  newline, is `UnexpectedSpace`.
+- Each part must be a whole number of milliseconds (call, after review: simpler
+  than a check of the total, and the same for all common inputs).
+- The sum is exact in `Int64`, and linear in the text. The parse removes the zeros
+  at the start of the whole digits and at the end of the fraction digits. A
+  fraction with more than 7 digits after that is never whole, because the largest
+  unit, 3 600 000 ms, is 2^7 * 3^2 * 5^5. A whole number with more than 10 digits
+  is above the largest limit. Review found that `moonbitlang/core/bigint` gives a
+  wrong value on wasm-gc for about 4 500 digits and more, and is quadratic, so the
+  parse does not use it.
 - A check order gives one rule for each input: the shape rules first (`Empty`,
   `UnexpectedSpace`, `NotANumber`, `MissingUnit`, `UnknownUnit`), then the order rules
   (`UnitsOutOfOrder`, `RepeatedUnit`), then the value rules (`NotWholeMilliseconds`,

@@ -60,7 +60,8 @@ that a caller can pass it to `moonbitlang/async`.
 The system SHALL parse a time limit from one or more parts. Each part is a decimal
 number, an optional space and a unit. Parts MUST go from the largest unit to the
 smallest, with each unit at most one time, and with an optional space between parts.
-The total MUST be in the time-limit range.
+Each part MUST be a whole number of milliseconds, and the total MUST be in the
+time-limit range.
 
 #### Scenario: Short units
 
@@ -94,13 +95,23 @@ the broken rule as an enum case. Each rule in the scenarios MUST have its own ca
 
 #### Scenario: Unknown unit
 
-- **WHEN** the system parses `30d`, `10 secs` and `10 Seconds`
-- **THEN** each fails with the rule "unknown unit" and the unit text `d`, `secs` or `Seconds`
+- **WHEN** the system parses `30d`, `10 secs`, `10 Seconds` and `10µs`
+- **THEN** each fails with the rule "unknown unit" and the unit text `d`, `secs`, `Seconds` or `µs`
 
 #### Scenario: Less than one millisecond
 
 - **WHEN** the system parses `1ms` and `0.5ms`
 - **THEN** the first succeeds and the second fails with the rule "not a whole number of milliseconds"
+
+#### Scenario: Each part is checked
+
+- **WHEN** the system parses `1.0005s 0.5ms`, whose total is 1 001 milliseconds
+- **THEN** it fails with the rule "not a whole number of milliseconds"
+
+#### Scenario: Long digit runs
+
+- **WHEN** the system parses `1.` and 5 000 zeros and `s`, on wasm, wasm-gc, js and native
+- **THEN** each target gives 1 000 milliseconds
 
 #### Scenario: Fraction of a millisecond in seconds
 
@@ -134,7 +145,7 @@ the broken rule as an enum case. Each rule in the scenarios MUST have its own ca
 
 #### Scenario: Empty or extra space
 
-- **WHEN** the system parses the empty text, ` 10s`, `10s `, `10  s` and `1m  30s`
+- **WHEN** the system parses the empty text, ` 10s`, `10s `, `10  s`, `1m  30s`, `10s` with a final newline and `10` and a tab and `s`
 - **THEN** each fails with the rule "unexpected space" or, for the empty text, the rule "empty"
 
 ### Requirement: Time limit text round trip

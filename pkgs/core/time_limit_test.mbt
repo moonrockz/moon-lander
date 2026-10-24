@@ -222,3 +222,59 @@ test "the error message names the input and the rule" {
     "Invalid time limit \"0s\": the value must be greater than zero",
   ])
 }
+
+///|
+test "long digit runs give the same value on every target" {
+  let zeros = String::make(5000, '0')
+  assert_eq(parsed_millis("1.\{zeros}s"), 1000)
+  assert_eq(parsed_millis("\{zeros}1500ms"), 1500)
+  assert_eq(parsed_millis("\{zeros}1.5\{zeros}s"), 1500)
+}
+
+///|
+test "the parse time is linear in the text" {
+  let zeros = String::make(200_000, '0')
+  assert_eq(parsed_millis("1.\{zeros}ms"), 1)
+  assert_true(parse_rule("1\{zeros}ms") is Some(AboveLargest))
+}
+
+///|
+test "fractions next to the 7-digit limit" {
+  assert_eq(parsed_millis("0.0000125h"), 45)
+  assert_eq(parsed_millis("0.00001250h"), 45)
+  assert_true(parse_rule("0.0000001h") is Some(NotWholeMilliseconds))
+  assert_true(parse_rule("0.00000001h") is Some(NotWholeMilliseconds))
+  assert_true(parse_rule("0.00000125h") is Some(NotWholeMilliseconds))
+}
+
+///|
+test "whole numbers next to the 10-digit limit" {
+  assert_true(parse_rule("9999999999ms") is Some(AboveLargest))
+  assert_true(parse_rule("10000000000ms") is Some(AboveLargest))
+  assert_eq(parsed_millis("0000000002147483647ms"), 2147483647)
+}
+
+///|
+test "each part must be a whole number of milliseconds" {
+  assert_true(parse_rule("1.0005s 0.5ms") is Some(NotWholeMilliseconds))
+  assert_true(parse_rule("1\{String::make(20, '0')}h 0.5ms") is Some(NotWholeMilliseconds))
+}
+
+///|
+test "whitespace that is not a space is unexpected" {
+  for text in ["10s\n", "\t10s", "10\ts", "10\u{00A0}s", "1m\r\n30s"] {
+    assert_true(parse_rule(text) is Some(UnexpectedSpace))
+  }
+}
+
+///|
+test "an unknown unit holds the full text that follows the number" {
+  for (text, unit) in [
+    ("10µs", "µs"),
+    ("10 séconds", "séconds"),
+    ("10%", "%"),
+    ("1m,30s", "m,"),
+  ] {
+    assert_true(parse_rule(text) is Some(UnknownUnit(found)) && found == unit)
+  }
+}

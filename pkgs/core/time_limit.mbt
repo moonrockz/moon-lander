@@ -3,7 +3,8 @@
 pub enum TimeLimitRule {
   /// The text is empty.
   Empty
-  /// A space is at the start or the end, or two spaces are next to each other.
+  /// A space is at the start or the end, two spaces are next to each other, or
+  /// the text holds whitespace that is not a space, such as a tab or a newline.
   UnexpectedSpace
   /// A part does not start with a number such as `10` or `1.5`.
   NotANumber
@@ -15,7 +16,7 @@ pub enum TimeLimitRule {
   UnitsOutOfOrder
   /// Two parts have the same unit.
   RepeatedUnit
-  /// The value is not a whole number of milliseconds.
+  /// A part is not a whole number of milliseconds.
   NotWholeMilliseconds
   /// The value is zero or less.
   NotPositive
@@ -55,7 +56,7 @@ pub fn TimeLimitError::message(self : TimeLimitError) -> String {
       "the unit \{unit.escape()} is not known; use ms, s, m or h, or millisecond(s), second(s), minute(s) or hour(s)"
     UnitsOutOfOrder => "the parts must go from the largest unit to the smallest"
     RepeatedUnit => "each unit can occur only one time"
-    NotWholeMilliseconds => "the value must be a whole number of milliseconds"
+    NotWholeMilliseconds => "each part must be a whole number of milliseconds"
     NotPositive => "the value must be greater than zero"
     AboveLargest =>
       "the value must not be more than \{MAX_MILLIS} milliseconds (\{LARGEST_TEXT})"
@@ -181,7 +182,9 @@ pub fn TimeLimit::parse(text : String) -> TimeLimit raise TimeLimitError {
 
   let chars = Array::from_iter(text.iter())
   guard chars.length() > 0 else { raise invalid(Empty) }
-  guard chars[0] != ' ' && chars[chars.length() - 1] != ' ' else {
+  guard chars[0] != ' ' &&
+    chars[chars.length() - 1] != ' ' &&
+    !chars.iter().any(char => char != ' ' && char.is_whitespace()) else {
     raise invalid(UnexpectedSpace)
   }
   // The shape: read each part.
@@ -201,7 +204,7 @@ pub fn TimeLimit::parse(text : String) -> TimeLimit raise TimeLimitError {
       raise invalid(NotANumber)
     }
     index = skip_one_space(chars, index) catch { _ => raise invalid(UnexpectedSpace) }
-    let unit_text = take_while(chars, index, is_ascii_letter_char)
+    let unit_text = take_while(chars, index, is_unit_char)
     guard unit_text.length() > 0 else { raise invalid(MissingUnit) }
     guard unit_of(unit_text) is Some(unit) else {
       raise invalid(UnknownUnit(unit_text))
@@ -220,20 +223,71 @@ pub fn TimeLimit::parse(text : String) -> TimeLimit raise TimeLimitError {
       raise invalid(UnitsOutOfOrder)
     }
   }
-  // The value: exact decimal arithmetic, so no part can overflow or round.
-  let mut total = 0N
+  // The value. Each part is checked in Int64 after its zeros at the start of
+  // the whole digits and at the end of the fraction digits go, so the work is
+  // linear in the text and nothing can overflow. A fraction with more than 7
+  // digits after that is never a whole number of milliseconds, because the
+  // largest unit, 3 600 000 ms, is 2^7 * 3^2 * 5^5. A whole number with more
+  // than 10 digits is above the largest limit for every unit.
+  let mut total = 0L
+  let mut above = false
   for part in parts {
-    let digits = @bigint.BigInt::from_string(part.whole + part.fraction)
-    let scaled = digits * @bigint.BigInt::from_int64(part.unit.millis())
-    let divisor = @bigint.BigInt::pow(10N, @bigint.BigInt::from_int(part.fraction.length()))
-    guard scaled % divisor == 0N else { raise invalid(NotWholeMilliseconds) }
-    total = total + scaled / divisor
+    let whole = trim_char(part.whole, '0', start=true)
+    let fraction = trim_char(part.fraction, '0', start=false)
+    guard fraction.length() <= 7 else { raise invalid(NotWholeMilliseconds) }
+    let unit = part.unit.millis()
+    let divisor = power_of_ten(fraction.length())
+    let scaled_fraction = digits_value(fraction) * unit
+    guard scaled_fraction % divisor == 0L else {
+      raise invalid(NotWholeMilliseconds)
+    }
+    if whole.length() > 10 {
+      above = true
+    } else {
+      total += digits_value(whole) * unit + scaled_fraction / divisor
+    }
   }
-  guard total > 0N else { raise invalid(NotPositive) }
-  guard total <= @bigint.BigInt::from_int64(MAX_MILLIS) else {
-    raise invalid(AboveLargest)
-  }
+  guard above || total > 0L else { raise invalid(NotPositive) }
+  guard !above && total <= MAX_MILLIS else { raise invalid(AboveLargest) }
   { millis: total.to_int() }
+}
+
+///|
+/// `text` without the characters `char` at its start or at its end.
+fn trim_char(text : String, char : Char, start~ : Bool) -> String {
+  let chars = Array::from_iter(text.iter())
+  let mut from = 0
+  let mut to = chars.length()
+  if start {
+    while from < to && chars[from] == char {
+      from += 1
+    }
+  } else {
+    while to > from && chars[to - 1] == char {
+      to -= 1
+    }
+  }
+  String::from_array(chars[from:to].to_owned())
+}
+
+///|
+/// The value of at most 10 ASCII digits. The empty text is 0.
+fn digits_value(digits : String) -> Int64 {
+  let mut value = 0L
+  for char in digits {
+    value = value * 10L + (char.to_int() - '0'.to_int()).to_int64()
+  }
+  value
+}
+
+///|
+/// 10 to the power `exponent`, for an exponent from 0 to 7.
+fn power_of_ten(exponent : Int) -> Int64 {
+  let mut value = 1L
+  for _ in 0..<exponent {
+    value *= 10L
+  }
+  value
 }
 
 ///|
@@ -264,8 +318,11 @@ fn is_digit(char : Char) -> Bool {
 }
 
 ///|
-fn is_ascii_letter_char(char : Char) -> Bool {
-  (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+/// A character of a unit: anything except an ASCII digit, a space and `.`. So
+/// the unit text in an error is the full text that the user wrote, for example
+/// `µs` or `séconds`.
+fn is_unit_char(char : Char) -> Bool {
+  !is_digit(char) && char != ' ' && char != '.'
 }
 
 ///|

@@ -87,13 +87,13 @@ rule as a `TimeLimitRule` case:
 | Rule | Case | Example that breaks it |
 | --- | --- | --- |
 | Not empty | `Empty` | `""` |
-| At most one space, only inside or between parts | `UnexpectedSpace` | ` 10s`, `10  s` |
+| At most one space, only inside or between parts; no other whitespace | `UnexpectedSpace` | ` 10s`, `10  s`, `10\ts` |
 | Each part starts with a number | `NotANumber` | `-1s`, `.5s` |
 | Each number has a unit | `MissingUnit` | `5000` |
-| A known unit, in lower case | `UnknownUnit(unit)` | `30d`, `10 Seconds` |
+| A known unit, in lower case | `UnknownUnit(unit)` | `30d`, `10 Seconds`, `10µs` |
 | Largest unit first | `UnitsOutOfOrder` | `30s 1m` |
 | Each unit one time | `RepeatedUnit` | `1m 1m` |
-| A whole number of milliseconds | `NotWholeMilliseconds` | `0.5ms`, `1.0005s` |
+| Each part a whole number of milliseconds | `NotWholeMilliseconds` | `0.5ms`, `1.0005s` |
 | Greater than zero | `NotPositive` | `0s` |
 | Not more than the largest limit | `AboveLargest` | `597h` |
 

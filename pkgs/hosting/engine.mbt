@@ -1,12 +1,19 @@
 ///|
-/// Group 4 will expose the lifetime reasons. Until then they stay in the engine.
-// No lifetime reader exists until group 4. Remove when Lifetime reads reasons.
+// No lifetime reader exists until group 4.
+// Remove when Lifetime reads reasons.
 #warnings("-6")
 priv enum StopReason {
   Completed
   Requested
   StartFailed(Error)
   Failed(Error)
+}
+
+///|
+// Group 4 connects lifetime stop sources. Remove when the driver constructs requests.
+#warnings("-6")
+priv enum StopRequest {
+  Requested
 }
 
 ///|
@@ -30,7 +37,7 @@ priv enum Event {
 /// Only Engine::start makes a reference, from a service's registration index.
 priv struct ServiceRef {
   index : Int
-} derive(Eq, Hash, Debug)
+} derive(Eq, Debug)
 
 ///|
 // Eq and Debug support white-box laws only. Remove when a driver uses them.
@@ -69,12 +76,13 @@ priv struct Engine {
   instructions : Array[Instruction]
   stop_at : Int
   stopped_at : Int
-  started : Map[ServiceRef, Unit]
+  started : Array[Bool]
   failures : Array[Error]
   mut position : Int
   mut phase : EnginePhase
   mut reason : StopReason?
   mut requested_code : ExitCode?
+  mut stop_requested : Bool
   mut timed_out : Bool
 }
 
@@ -131,8 +139,8 @@ fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   let stopped_at = instructions.length()
   instructions.push(Emit(Raise(Stopped)))
   let engine : Engine = {
-    instructions, stop_at, stopped_at, started: {}, failures: [], position: 0,
-    phase: Starting, reason: None, requested_code: None, timed_out: false,
+    instructions, stop_at, stopped_at, started: Array::make(services.length(), false), failures: [], position: 0,
+    phase: Starting, reason: None, requested_code: None, stop_requested: false, timed_out: false,
   }
   engine.next()
 }
@@ -146,11 +154,11 @@ fn Engine::next(self : Engine) -> Step {
     let instruction = self.instructions[self.position]
     self.position += 1
     match instruction {
-      MarkStarted(reference) => self.started[reference] = ()
+      MarkStarted(reference) => self.started[reference.index] = true
       Emit(action) => {
         match action {
           Hook(reference, Stopping | Stop | Stopped) =>
-            if !self.started.contains(reference) { continue }
+            if !self.started[reference.index] { continue }
           Raise(Stopping) => {
             self.phase = Stopping
             if self.reason is None { self.reason = Some(Completed) }
@@ -180,7 +188,7 @@ fn Engine::next(self : Engine) -> Step {
 priv enum Reply {
   Done
   Failed(Error)
-  StopRequested(StopReason, ExitCode?)
+  StopRequested(StopRequest, ExitCode?)
   TimedOut
 }
 
@@ -191,6 +199,7 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
   match reply {
     Done => ()
     Failed(error) => {
+      if self.action is Raise(_) { abort("failed reply to a Raise step") }
       engine.failures.push(error)
       match engine.phase {
         Starting => {
@@ -203,25 +212,32 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
         _ => ()
       }
     }
-    StopRequested(reason, code) => {
-      if engine.reason is None { engine.reason = Some(reason) }
-      if code is Some(_) { engine.requested_code = code }
+    StopRequested(request, code) => {
+      if !engine.stop_requested {
+        engine.stop_requested = true
+        engine.reason = Some(match request { Requested => Requested })
+        engine.requested_code = code
+      }
       if engine.phase is Starting {
         // The current hook succeeded. Consume its mark before skipping startup.
         if engine.position < engine.instructions.length() &&
           engine.instructions[engine.position] is MarkStarted(reference) &&
           self.action is Hook(current, Starting | Start) && current == reference {
-          engine.started[reference] = ()
+          engine.started[reference.index] = true
         }
         engine.position = engine.stop_at
       }
     }
     TimedOut => {
-      if engine.phase is Stopping {
-        engine.timed_out = true
-        // A timeout while raising Stopped must not raise the event twice.
-        engine.position = if engine.position > engine.stopped_at { engine.position } else { engine.stopped_at }
+      match engine.phase {
+        Starting => abort("timed_out outside the stop phase: Starting")
+        Command => abort("timed_out outside the stop phase: Command")
+        Finished(_) => abort("timed_out outside the stop phase: Finished")
+        Stopping => ()
       }
+      engine.timed_out = true
+      // A timeout while raising Stopped must not raise the event twice.
+      engine.position = if engine.position > engine.stopped_at { engine.position } else { engine.stopped_at }
     }
   }
   let next = engine.next()
@@ -242,8 +258,8 @@ fn Pending::failed(self : Pending, error : Error) -> Step { self.respond(Failed(
 ///|
 // Group 4 connects lifetime stop sources. Remove when the driver uses this reply.
 #warnings("-1")
-fn Pending::stop_requested(self : Pending, reason : StopReason, code : ExitCode?) -> Step {
-  self.respond(StopRequested(reason, code))
+fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?) -> Step {
+  self.respond(StopRequested(request, code))
 }
 
 ///|

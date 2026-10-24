@@ -398,13 +398,20 @@ service does not supply and MUST continue with the next hook.
 
 ### Requirement: A service counts as started after its start hook
 
-The host SHALL mark a service as started when its `start` hook returns without an
-error, or when the service has no `start` hook and its `starting` hook did not fail.
+The host SHALL mark a service as started when its `start` hook returns without an error,
+or when the service has no `start` hook, the start phase reached its `starting` step,
+and its `starting` hook succeeded or is absent. A service that the start phase did not
+reach is not started.
 
 #### Scenario: Failure in a starting hook
 
 - **WHEN** service A has a `starting` hook that fails
 - **THEN** A is not started, and A gets no stop hooks
+
+#### Scenario: Start phase does not reach a service without a start hook
+
+- **WHEN** A is registered before B, A.starting fails, and B has no `start` hook
+- **THEN** B is not started, and B gets no stop hooks
 
 ### Requirement: Failed start stops started services
 
@@ -414,8 +421,8 @@ stopped events MUST occur. The started event MUST NOT occur.
 
 #### Scenario: Second service fails to start
 
-- **WHEN** services A, B and C are registered, and B.start fails
-- **THEN** C gets no hooks, the command does not run, A gets its stopping, stop and stopped hooks, and the exit code is 1
+- **WHEN** services A, B and C each have only `start` and `stop` hooks, and B.start fails
+- **THEN** C gets no hooks, the command does not run, A gets its stop hook, and the exit code is 1
 
 #### Scenario: Failure after all services started
 

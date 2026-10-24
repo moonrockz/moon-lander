@@ -44,5 +44,5 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
 ///|
 /// A configuration or factory failure before the engine starts.
 fn outcome(error : Error) -> RunOutcome {
-  { exit_code: ExitCode::failure(), failures: [error], reason: Failed(error), requested_code: None }
+  { exit_code: ExitCode::failure(), failures: [error], reason: StartFailed(error), requested_code: None }
 }

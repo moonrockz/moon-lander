@@ -176,9 +176,7 @@ test "engine table: stop requests in every phase complete the current action" {
     } else { clean })
     @expect.expect(outcome.requested_code).to_equal(Some(code))
     @expect.expect(outcome.exit_code()).to_equal(code)
-    if target == RunCommand || target == Raise(Started) {
-      @expect.expect(outcome.reason is Requested).to_be_true()
-    } else { @expect.expect(outcome.reason is Completed).to_be_true() }
+    @expect.expect(outcome.reason is Requested).to_be_true()
   }
 }
 
@@ -234,10 +232,20 @@ fn same_step(left : Step, right : Step) -> Unit raise {
 /// An independent model builds the expected trace from each service's hook and
 /// failure choices. It does not use the engine's instructions or started set.
 test "law: random hooks and failures preserve cleanup, Finish and token replies" {
+  let reached_command = Ref(0)
+  let stop_failure_after_clean_start = Ref(0)
   @expect.for_all(
-    (input : (Array[UInt], Bool)) => {
+    (input : (Array[UInt], (UInt?, UInt?, UInt?, UInt?, UInt?, UInt?), Bool)) => {
       let choices = input.0
       let masks = choices.map(value => (value & 63).reinterpret_as_int())
+      let failure_indices = [input.1.0, input.1.1, input.1.2, input.1.3, input.1.4, input.1.5]
+        .map(index => if choices.is_empty() { None } else {
+          match index {
+            Some(value) if (value & 1) == 1 =>
+              Some(((value >> 1) % choices.length().reinterpret_as_uint()).reinterpret_as_int())
+            _ => None
+          }
+        })
       let expected = []
       let started = Array::make(choices.length(), false)
       let mut start_failed = false
@@ -247,7 +255,7 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
         for i, choice in choices {
           if (choice & (1U << phase_index)) != 0 {
             expected.push("\{i}.\{["Starting", "Start", "Started"][phase_index]}")
-            if (choice & (64U << phase_index)) != 0 {
+            if failure_indices[phase_index] == Some(i) {
               start_failed = true
               failure_count += 1
               break
@@ -261,18 +269,21 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
       if !start_failed {
         expected.push("event.Started")
         expected.push("command")
-        if input.1 { failure_count += 1 }
+        if input.2 { failure_count += 1 }
       }
+      let start_failure_count = failure_count
+      if !start_failed { reached_command.val += 1 }
       expected.push("event.Stopping")
       for phase_index = 3; phase_index < 6; phase_index = phase_index + 1 {
         for i = choices.length() - 1; i >= 0; i = i - 1 {
           if started[i] && (choices[i] & (1U << phase_index)) != 0 {
             expected.push("\{i}.\{["Stopping", "Stop", "Stopped"][phase_index - 3]}")
-            if (choices[i] & (64U << phase_index)) != 0 { failure_count += 1 }
+            if failure_indices[phase_index] == Some(i) { failure_count += 1 }
           }
         }
       }
       expected.push("event.Stopped")
+      if !start_failed && failure_count > start_failure_count { stop_failure_after_clean_start.val += 1 }
       let mut step = Engine::start(engine_services(masks))
       let actual = []
       let tokens : Array[(Pending, Step)] = []
@@ -292,21 +303,19 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
               Stop => 4
               Stopped => 5
             }
-            if (choices[reference.index] & (64U << phase_index)) != 0 {
+            if failure_indices[phase_index] == Some(reference.index) {
               pending.failed(HookFailed(reference.index))
             } else { pending.done() }
           }
-          RunCommand => if input.1 { pending.failed(HookFailed(-1)) } else { pending.done() }
+          RunCommand => if input.2 { pending.failed(HookFailed(-1)) } else { pending.done() }
           _ => pending.done()
         }
-        let position = engine.position
-        let failures = engine.failures.length()
+        let snapshot = EngineSnapshot::take(engine)
         same_step(step, pending.done())
         same_step(step, pending.failed(HookFailed(-2)))
         same_step(step, pending.stop_requested(Requested, Some(ExitCode::failure())))
         same_step(step, pending.timed_out())
-        @expect.expect(engine.position).to_equal(position)
-        @expect.expect(engine.failures.length()).to_equal(failures)
+        snapshot.check(engine)
         tokens.push((pending, step))
       }
       @expect.expect(actual).to_equal(expected)
@@ -317,7 +326,14 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
       } else { ExitCode::failure() })
       guard last_engine is Some(engine) else { fail("missing engine") }
       same_step(step, engine.next())
-      for (pending, cached) in tokens { same_step(cached, pending.done()) }
+      let snapshot = EngineSnapshot::take(engine)
+      for (pending, cached) in tokens {
+        same_step(cached, pending.done())
+        same_step(cached, pending.failed(HookFailed(-2)))
+        same_step(cached, pending.stop_requested(Requested, Some(ExitCode::failure())))
+        same_step(cached, pending.timed_out())
+        snapshot.check(engine)
+      }
       same_step(step, engine.next())
     },
     count=300,
@@ -325,6 +341,9 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
     max_shrinks=100,
     seed=7303,
   )
+  // Seed 7303, 300 cases: 192 reach command; 52 have stop failures after clean start.
+  @expect.expect(reached_command.val >= 180).to_be_true()
+  @expect.expect(stop_failure_after_clean_start.val >= 40).to_be_true()
 }
 
 ///|
@@ -337,4 +356,108 @@ test "a start-phase stop request never marks a later no-start service" {
     })
     @expect.expect(trace).to_equal(["0.Starting", "event.Stopping", "event.Stopped"])
   }
+}
+
+///|
+priv struct EngineSnapshot {
+  started : Array[Bool]
+  reason : StopReason?
+  requested_code : ExitCode?
+  stop_requested : Bool
+  timed_out : Bool
+  position : Int
+  phase : EnginePhase
+  failures : Array[Error]
+}
+
+///|
+fn EngineSnapshot::take(engine : Engine) -> EngineSnapshot {
+  { started: engine.started.copy(), reason: engine.reason,
+    requested_code: engine.requested_code, stop_requested: engine.stop_requested,
+    timed_out: engine.timed_out, position: engine.position, phase: engine.phase,
+    failures: engine.failures.copy() }
+}
+
+///|
+fn EngineSnapshot::check(self : EngineSnapshot, engine : Engine) -> Unit raise {
+  @expect.expect(engine.started).to_equal(self.started)
+  @expect.expect(physical_equal(engine.reason, self.reason)).to_be_true()
+  @expect.expect(engine.requested_code).to_equal(self.requested_code)
+  @expect.expect(engine.stop_requested).to_equal(self.stop_requested)
+  @expect.expect(engine.timed_out).to_equal(self.timed_out)
+  @expect.expect(engine.position).to_equal(self.position)
+  @expect.expect(physical_equal(engine.phase, self.phase)).to_be_true()
+  @expect.expect(engine.failures.length()).to_equal(self.failures.length())
+  for i, error in engine.failures {
+    @expect.expect(physical_equal(error, self.failures[i])).to_be_true()
+  }
+}
+
+///|
+test "engine table: first stop request fixes reason and code" {
+  let first_code = ExitCode::from_int(4)
+  let second_code = ExitCode::from_int(5)
+  for first in [Action::Hook(ServiceRef::{ index: 0 }, Start), RunCommand,
+    Raise(Stopping), Hook(ServiceRef::{ index: 0 }, Stopping)] {
+    for code in [None, Some(first_code)] {
+      let (_, outcome) = engine_trace([63], reply=(pending, action) => {
+        if action == first { pending.stop_requested(Requested, code) }
+        else if action == Hook(ServiceRef::{ index: 0 }, Stop) {
+          pending.stop_requested(Requested, Some(second_code))
+        } else { pending.done() }
+      })
+      @expect.expect(outcome.reason is Requested).to_be_true()
+      @expect.expect(outcome.requested_code).to_equal(code)
+      @expect.expect(outcome.exit_code()).to_equal(code.unwrap_or(ExitCode::success()))
+    }
+  }
+}
+
+///|
+test "started event stop request skips command" {
+  let (trace, outcome) = engine_trace([63], reply=(pending, action) => {
+    if action == Raise(Started) { pending.stop_requested(Requested, None) }
+    else { pending.done() }
+  })
+  @expect.expect(trace).to_equal([
+    "0.Starting", "0.Start", "0.Started", "event.Started", "event.Stopping",
+    "0.Stopping", "0.Stop", "0.Stopped", "event.Stopped",
+  ])
+  @expect.expect(outcome.reason is Requested).to_be_true()
+}
+
+///|
+test "panic timed_out in Starting is a driver fault" {
+  guard Engine::start(engine_services([2])) is Run(pending, _) else { fail("missing start") }
+  ignore(pending.timed_out())
+}
+
+///|
+test "panic timed_out in Command is a driver fault" {
+  guard Engine::start(engine_services([])) is Run(started, _) else { fail("missing Started") }
+  guard started.done() is Run(command, _) else { fail("missing command") }
+  ignore(command.timed_out())
+}
+
+///|
+test "panic failed on Raise Started is a driver fault" {
+  guard Engine::start(engine_services([])) is Run(pending, _) else { fail("missing Started") }
+  ignore(pending.failed(HookFailed(0)))
+}
+
+///|
+test "panic failed on Raise Stopping is a driver fault" {
+  guard Engine::start(engine_services([])) is Run(started, _) else { fail("missing Started") }
+  guard started.done() is Run(command, _) else { fail("missing command") }
+  guard command.done() is Run(stopping, _) else { fail("missing Stopping") }
+  ignore(stopping.failed(HookFailed(0)))
+}
+
+///|
+test "panic failed on Raise Stopped is a driver fault" {
+  guard Engine::start(engine_services([])) is Run(started, _) else { fail("missing Started") }
+  guard started.done() is Run(command, _) else { fail("missing command") }
+  guard command.done() is Run(stopping, _) else { fail("missing Stopping") }
+  guard stopping.done() is Run(stopped, _) else { fail("missing Stopped") }
+  ignore(stopped.failed(HookFailed(0)))
 }

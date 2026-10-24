@@ -91,8 +91,11 @@ pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuil
 /// Add a hosted service with six optional hooks. The host runs all `starting`,
 /// then all `start`, then all `started` hooks in registration order. After the
 /// command it runs all `stopping`, then all `stop`, then all `stopped` hooks in
-/// reverse order, for started services only. A service starts when `start`
-/// succeeds, or when it has no `start` and its `starting` phase succeeds.
+/// reverse order, for started services only.
+/// A service counts as started when its `start` hook returns without an error,
+/// or when the service has no `start` hook, the start phase reached its
+/// `starting` step, and its `starting` hook succeeded or is absent.
+/// A service that the start phase did not reach is not started.
 /// A start failure skips the remaining start hooks and the command. A stop
 /// failure does not skip later hooks.
 ///

@@ -16,6 +16,7 @@ import {
 import {
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
+  "moonbitlang/async",
 } for "wbtest"
 
 // Temporary until task group 13: only `run` reads the host and builds the
@@ -32,4 +33,5 @@ warnings = "-7-9-29"
 options(targets: {
   "run.mbt": ["native", "js"],
   "run_test.mbt": ["native", "js"],
+  "run_wbtest.mbt": ["native", "js"],
 })

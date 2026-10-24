@@ -112,6 +112,10 @@ Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
   the format parsers, the `formats` virtual package selects the linked parsers,
   and `conventions`, `host` and `browser` hold discovery and the host adapters.
   `adapters/` holds the TypeScript adapters.
+- `pkgs/mediator/` contains
+  [`moonrockz/moon-lander-mediator`](pkgs/mediator/README.mbt.md), imported as
+  `@mediator`, and the async mediator `moonrockz/moon-lander-mediator/async`
+  (`@mediator_async`).
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`. Its `version()` export provides a build and test smoke check.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),

@@ -18,4 +18,8 @@ pub fn version() -> String
 // Type aliases
 pub using @moon-lander-core {type AppName}
 
+pub using @moon-lander-core {type AppNameError}
+
+pub using @moon-lander-core {type AppNameRule}
+
 // Traits

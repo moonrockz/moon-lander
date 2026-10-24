@@ -724,8 +724,8 @@ fn main raise {
   step is an alias: a `pub using` re-export, so one function has one document. The
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
-  `error_report` and `shutdown_timeout` from `@hosting`, the type `AppName` from
-  `moonrockz/moon-lander-core`, the types
+  `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
+  `AppNameError` and `AppNameRule` from `moonrockz/moon-lander-core`, the types
   `ServiceName`, `IntoServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
   `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.

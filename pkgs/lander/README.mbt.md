@@ -86,8 +86,9 @@ its rule cannot exist:
 | `ExitCode` | `ExitCode::from_int(3)`, or `ExitCode::success()` and `ExitCode::failure()` | 0 to 255 |
 
 A parse that fails raises an error with the text and the broken rule:
-`AppNameError` for `AppName`, which comes from `moonrockz/moon-lander-core` and
-which `@lander` re-exports, and `HostError` for the other types. A
+`AppNameError` for `AppName`, and `HostError` for the other types. `AppName`,
+`AppNameError` and `AppNameRule` come from `moonrockz/moon-lander-core`, and
+`@lander` re-exports them. A
 program parses its names one time, where they are written. `cli` takes the name
 first, so the text can flow through the parse into the pipeline, as in
 `"acme" |> @lander.AppName::parse |> @lander.cli(args)`. A program whose

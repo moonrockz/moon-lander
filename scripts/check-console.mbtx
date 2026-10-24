@@ -2,10 +2,9 @@
 /// Check the native console signal stub (openspec add-host-lifecycle, task group 1).
 ///
 /// The check runs the `hosting/console` tests and the signal acceptance suite on native, and fails
-/// a leg that runs zero tests. It then copies the framework modules in `libraries` into a temporary
-/// workspace with a
-/// consumer module outside this workspace, and runs the same acceptance suite there, so the
-/// consumer's C compiler builds the stub from the package source.
+/// a leg that runs zero tests. It then copies the framework modules in `libraries` into a
+/// temporary workspace with a consumer module outside this workspace, and runs the same acceptance
+/// suite there, so the consumer's C compiler builds the stub from the package source.
 ///
 /// Usage: `mise run check:console`, or `moonx scripts/check-console.mbtx`. Native only.
 import {

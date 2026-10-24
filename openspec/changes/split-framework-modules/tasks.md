@@ -3,7 +3,7 @@
 Epic: lander-4us.40
 
 Each group is one pull request. Run `mise run check` after each group, and run
-`mise run format` before each commit. Move files with `git mv`. Stage the moved and
+`mise run format` before each commit. Move whole files with `git mv`. Stage the moved and
 new `pkg.generated.mbti` files that lint writes. Group 1 comes first. Groups 2 and 5
 can go in parallel with group 3. Group 4 needs groups 2 and 3. Group 6 needs group 3.
 Group 7 needs all others and archives the change. The groups of `add-host-lifecycle`
@@ -15,8 +15,8 @@ Bead: lander-4us.40.1
 
 - [x] 1.1 Create `pkgs/core` with `moon.mod` (`moonrockz/moon-lander-core`, root version, no imports, `readme = "README.mbt.md"`) and a root `moon.pkg`; add `./pkgs/core` to `moon.work`; verify that `mise run validate` and `mise run validate:versions` pass and that `moon check --target all` builds the empty module
 - [x] 1.2 Verify that `pkgs/lander` can import the core root package with the explicit alias `@lander_core` on wasm, wasm-gc, js and native (design D3 risk), and record the result in the bead
-- [x] 1.3 Move `AppName`, its trait impls and its tests from `pkgs/lander/hosting/names.mbt` to core with `git mv` or a split commit; add `AppNameError` and `AppNameRule` (design D5); remove `InvalidAppName` from `HostError`; verify each `AppName` rule on both sides of its limit with `inspect` and `assert_eq` only, and that each rule gives its own `AppNameRule` case
-- [x] 1.4 Make `@hosting.builder`, `@lander.cli` and the hosting tests take `@lander_core.AppName`, and re-export it as `@lander.AppName`; verify `mise run test` on all four targets and the native and js `@hosting.run` tests
+- [x] 1.3 Move `AppName`, its trait impls and its tests from `pkgs/lander/hosting/names.mbt` to core (part of a file, so `git blame -C -C` keeps its history); add `AppNameError` and `AppNameRule` (design D5); remove `InvalidAppName` from `HostError`; verify each `AppName` rule on both sides of its limit with `inspect` and `assert_eq` only, and that each rule gives its own `AppNameRule` case
+- [x] 1.4 Make `@hosting.builder`, `@lander.cli` and the hosting tests take `@lander_core.AppName`, and re-export it, `AppNameError` and `AppNameRule` from `@lander`; verify `mise run test` on all four targets and the native and js `@hosting.run` tests
 - [x] 1.5 Change the `AppName` scenario in `openspec/changes/add-host-lifecycle/specs/host-lifecycle/spec.md` (`HostError::InvalidAppName` becomes `AppNameError::InvalidAppName` with a rule) and the `AppName` rows in its design; verify `mise exec -- openspec validate --all --strict`
 - [x] 1.6 Make `check-formats-registry.mbtx` package and serve a list of candidate modules, and `check-console.mbtx` copy a list of framework modules into its isolated workspace, both with core and `pkgs/lander` for now, because `pkgs/lander` now imports core; verify `mise run check:formats-registry`, `mise run check:console` and `mise run test:scripts`
 - [x] 1.7 Write `pkgs/core/README.mbt.md` with a doc-test example that parses an application name and matches a failure by its rule; verify that `mise run test` compiles and runs it on all four targets

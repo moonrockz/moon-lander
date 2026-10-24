@@ -9,5 +9,6 @@ pub fn cli(
 }
 
 ///|
-/// The application name type of `cli`, from `moonrockz/moon-lander-core`.
-pub using @lander_core {type AppName}
+/// The application name type of `cli` and its parse error, from
+/// `moonrockz/moon-lander-core`.
+pub using @lander_core {type AppName, type AppNameError, type AppNameRule}

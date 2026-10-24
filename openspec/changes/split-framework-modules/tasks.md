@@ -68,8 +68,8 @@ Bead: lander-4us.40.6
 
 Bead: lander-4us.40.7
 
-- [ ] 7.1 Add the dependency-direction check of design D8 to `validate-packages.mbtx`, with script tests for an allowed import, an import against the direction and a core import; verify the "Import against the direction" and "Core imports a third-party module" scenarios and that `mise run validate` passes on the real workspace
-- [ ] 7.2 Add a test fixture to `versions.mbtx` with two sibling framework modules; verify the "Version drift" and "Set the version" scenarios
+- [x] 7.1 Add the dependency-direction check of design D8 to `validate-packages.mbtx`, with script tests for an allowed import, an import against the direction and a core import; verify the "Import against the direction" and "Core imports a third-party module" scenarios and that `mise run validate` passes on the real workspace
+- [x] 7.2 Add a test fixture to `versions.mbtx` with two sibling framework modules; verify the "Version drift" and "Set the version" scenarios
 - [ ] 7.3 Change `site/site.json` (`api` lists the five framework folders, and `packages` lists `core`, `config`, `mediator` and `hosting` from tasks 3.5, 5.2 and 6.2), `publish.mbtx` (the comment with the release order), the path filters in `.github/workflows/`, `README.md` and `docs/design/overview.md`; verify that `mise run build:site` passes, that the "API package index" scenario holds, that the config and mediator guide pages exist at their new URLs, and that `api:` links to old paths fail the build
 - [ ] 7.4 Change the "Publishing" section of AGENTS.md to name the five framework modules; verify that no file outside `openspec/changes/archive/` and the released sections of `CHANGELOG.md` names a `moonrockz/moon-lander/<package>` path
 - [ ] 7.5 Measure the CI time of `mise run check` before and after the split, and record it in the bead

@@ -12,7 +12,7 @@ pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
 pub fn[S] builder(@moon-lander-core.AppName, Array[String]) -> HostBuilder[S]
 
-pub fn[S] service(HostBuilder[S], &IntoServiceName, start? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
+pub fn[S] service(HostBuilder[S], &IntoServiceName, starting? : async (Context[S]) -> Unit, start? : async (Context[S]) -> Unit, started? : async (Context[S]) -> Unit, stopping? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit, stopped? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 // Errors
 pub(all) suberror HostError {

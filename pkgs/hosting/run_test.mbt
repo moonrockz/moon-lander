@@ -171,3 +171,55 @@ async test "the failures of an outcome are a copy" {
   @expect.expect(outcome.failures().length()).to_equal(0)
   @expect.expect(outcome.exit_code()).to_equal(@hosting.ExitCode::success())
 }
+
+///|
+async test "run groups all six hooks by phase and keeps the command state" {
+  let log = []
+  let mut builder : @hosting.HostBuilder[Ref[Int]] = @hosting.builder(@lander_core.AppName::parse("acme"), [])
+  for name in ["a", "b"] {
+    builder = builder |> @hosting.service(
+      name,
+      starting=ctx => log.push("\{name}.starting:\{ctx.services.val}"),
+      start=ctx => log.push("\{name}.start:\{ctx.services.val}"),
+      started=ctx => log.push("\{name}.started:\{ctx.services.val}"),
+      stopping=ctx => log.push("\{name}.stopping:\{ctx.services.val}"),
+      stop=ctx => log.push("\{name}.stop:\{ctx.services.val}"),
+      stopped=ctx => log.push("\{name}.stopped:\{ctx.services.val}"),
+    )
+  }
+  let outcome = builder |> @hosting.build(_ => Ref(0)) |> @hosting.run(ctx => {
+    log.push("command")
+    ctx.services.val = 3
+  })
+  @expect.expect(log).to_equal([
+    "a.starting:0", "b.starting:0", "a.start:0", "b.start:0", "a.started:0", "b.started:0",
+    "command", "b.stopping:3", "a.stopping:3", "b.stop:3", "a.stop:3", "b.stopped:3", "a.stopped:3",
+  ])
+  @expect.expect(outcome.exit_code()).to_equal(@hosting.ExitCode::success())
+}
+
+///|
+async test "run cleans up after starting and started failures and collects stop errors" {
+  for fail_starting in [true, false] {
+    let log = []
+    let outcome = @hosting.builder(@lander_core.AppName::parse("acme"), [])
+      |> @hosting.service("a", stopping=_ => log.push("a.stopping"),
+        stop=_ => { log.push("a.stop"); raise DiskFull },
+        stopped=_ => log.push("a.stopped"))
+      |> @hosting.service("b",
+        starting=_ => { log.push("b.starting"); if fail_starting { raise Unavailable("starting") } },
+        started=_ => { log.push("b.started"); raise Unavailable("started") },
+        stopping=_ => log.push("b.stopping"),
+        stop=_ => { log.push("b.stop"); raise DiskFull },
+        stopped=_ => log.push("b.stopped"))
+      |> @hosting.build(_ => ())
+      |> @hosting.run(_ => log.push("command"))
+    @expect.expect(log).to_equal(if fail_starting {
+      ["b.starting", "a.stopping", "a.stop", "a.stopped"]
+    } else {
+      ["b.starting", "b.started", "b.stopping", "a.stopping", "b.stop", "a.stop", "b.stopped", "a.stopped"]
+    })
+    @expect.expect(outcome.exit_code()).to_equal(@hosting.ExitCode::failure())
+    @expect.expect(outcome.failures().length()).to_equal(if fail_starting { 2 } else { 3 })
+  }
+}

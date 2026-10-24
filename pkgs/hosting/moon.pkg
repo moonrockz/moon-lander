@@ -15,6 +15,7 @@ import {
 
 import {
   "moonrockz/expect",
+  "moonbitlang/core/quickcheck",
 } for "wbtest"
 
 // Temporary until task group 13: only `run` reads the host and builds the

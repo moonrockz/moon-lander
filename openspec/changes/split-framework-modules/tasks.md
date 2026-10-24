@@ -25,10 +25,10 @@ Bead: lander-4us.40.1
 
 Bead: lander-4us.40.2
 
-- [ ] 2.1 Add `TimeLimit`, `TimeLimitError` and `TimeLimitRule` (design D6) with `millis`, `seconds`, `to_millis`, `Eq`, `Compare`, `Hash` and `Debug`; verify the "Time limit range" and "Time limit constructors" scenarios on all four targets, with values on each side of 1 and of the largest limit
-- [ ] 2.2 Add `TimeLimit::parse` with the grammar of design D6; verify every scenario of "Time limit text form" and "Time limit text errors" on all four targets, and that each rule gives its own `TimeLimitRule` case
-- [ ] 2.3 Add `Show` with the canonical text; verify the "Canonical text" scenario, and a `moonbitlang/core/quickcheck` property that parse of the text of any valid limit gives an equal limit (the property uses only `moonbitlang/core`)
-- [ ] 2.4 Add a `TimeLimit` section to `pkgs/core/README.mbt.md` with a doc-test example that parses `2m30s` and passes `to_millis()` to a function that takes `Int`; verify that `mise run test` runs it
+- [x] 2.1 Add `TimeLimit`, `TimeLimitError` and `TimeLimitRule` (design D6) with `millis`, `seconds`, `to_millis`, `Eq`, `Compare`, `Hash` and `Debug`; verify the "Time limit range" and "Time limit constructors" scenarios on all four targets, with values on each side of 1 and of the largest limit
+- [x] 2.2 Add `TimeLimit::parse` with the grammar of design D6; verify every scenario of "Time limit text form" and "Time limit text errors" on all four targets, and that each rule gives its own `TimeLimitRule` case
+- [x] 2.3 Add `Show` with the canonical text; verify the "Canonical text" scenario, and a `moonbitlang/core/quickcheck` property that parse of the text of any valid limit gives an equal limit (the property uses only `moonbitlang/core`)
+- [x] 2.4 Add a `TimeLimit` section to `pkgs/core/README.mbt.md` with a doc-test example that parses `2m30s` and passes `to_millis()` to a function that takes `Int`; verify that `mise run test` runs it
 
 ## 3. Configuration module
 

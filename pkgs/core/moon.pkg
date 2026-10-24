@@ -4,4 +4,5 @@ import {
 
 import {
   "moonrockz/moon-lander-core" @lander_core,
+  "moonbitlang/core/quickcheck",
 } for "test"

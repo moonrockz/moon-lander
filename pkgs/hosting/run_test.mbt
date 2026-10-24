@@ -223,3 +223,169 @@ async test "run cleans up after starting and started failures and collects stop 
     @expect.expect(outcome.failures().length()).to_equal(if fail_starting { 2 } else { 3 })
   }
 }
+
+///|
+async test "lifetime events and late registration run once in phase order" {
+  let events = []
+  let saved : Ref[@hosting.Lifetime?] = Ref(None)
+  let host = @hosting.builder(@lander_core.AppName::parse("events"), [])
+    |> @hosting.service("events", starting=ctx => {
+      saved.val = Some(ctx.lifetime)
+      ctx.lifetime.on_started(() => events.push("started"))
+      ctx.lifetime.on_stopping(() => {
+        events.push("stopping")
+        ctx.lifetime.on_stopping(() => events.push("late stopping"))
+      })
+      ctx.lifetime.on_stopped(() => events.push("stopped"))
+    }, stopping=_ => events.push("hook"))
+    |> @hosting.build(_ => ())
+  for _ in 0..<2 {
+    let result = @hosting.run(host, ctx => {
+      ctx.lifetime.on_started(() => events.push("late started"))
+      events.push("command")
+    })
+    @expect.expect(result.failures().length()).to_equal(0)
+    saved.val.unwrap().on_stopped(() => events.push("late stopped"))
+  }
+  @expect.expect(events).to_equal([
+    "started", "late started", "command", "stopping", "late stopping", "hook", "stopped", "late stopped",
+    "started", "late started", "command", "stopping", "late stopping", "hook", "stopped", "late stopped",
+  ])
+}
+
+///|
+async test "command stop and repeated requests keep the first code and reason" {
+  let reasons = []
+  let host = @hosting.builder(@lander_core.AppName::parse("stop"), [])
+    |> @hosting.service("stop", stopping=ctx => {
+      ctx.lifetime.stop_application(exit_code=@hosting.ExitCode::from_int(9))
+      reasons.push(ctx.lifetime.stop_reason() is Some(Requested))
+    }, stopped=ctx => reasons.push(ctx.lifetime.stop_reason() is Some(Requested)))
+    |> @hosting.build(_ => ())
+  let result = @hosting.run(host, ctx => {
+    ctx.lifetime.stop_application(exit_code=@hosting.ExitCode::from_int(4))
+    ctx.lifetime.stop_application(exit_code=@hosting.ExitCode::from_int(5))
+    @expect.expect(ctx.cancelled()).to_be_true()
+    @expect.expect(ctx.lifetime.stop_token().cancelled()).to_be_true()
+  })
+  @expect.expect(result.exit_code().to_int()).to_equal(4)
+  @expect.expect(result.failures().length()).to_equal(0)
+  @expect.expect(reasons).to_equal([true, true])
+}
+
+///|
+async test "stop during start finishes the hook and skips later starts and command" {
+  let events = []
+  let result = @hosting.builder(@lander_core.AppName::parse("start"), [])
+    |> @hosting.service("a", start=ctx => {
+      ctx.lifetime.stop_application()
+      @async.sleep(1)
+      events.push("a started")
+    }, stopping=ctx => {
+      @expect.expect(ctx.lifetime.stop_reason() is Some(Requested)).to_be_true()
+      events.push("a stopping")
+    })
+    |> @hosting.service("b", start=_ => events.push("b"))
+    |> @hosting.build(_ => ())
+    |> @hosting.run(_ => events.push("command"))
+  @expect.expect(events).to_equal(["a started", "a stopping"])
+  @expect.expect(result.exit_code().to_int()).to_equal(0)
+}
+
+///|
+async test "started handler can stop before the command" {
+  let events = []
+  let result = @hosting.builder(@lander_core.AppName::parse("event"), [])
+    |> @hosting.service("a", start=ctx => ctx.lifetime.on_started(() => ctx.lifetime.stop_application()),
+      stop=_ => events.push("stop"))
+    |> @hosting.build(_ => ())
+    |> @hosting.run(_ => events.push("command"))
+  @expect.expect(events).to_equal(["stop"])
+  @expect.expect(result.exit_code().to_int()).to_equal(0)
+}
+
+///|
+async test "a request after command failure preserves Failed for every stop hook" {
+  let reasons = []
+  let result = @hosting.builder(@lander_core.AppName::parse("failed"), [])
+    |> @hosting.service("a", stopping=ctx => {
+      reasons.push(ctx.lifetime.stop_reason() is Some(Failed(DiskFull)))
+      ctx.lifetime.stop_application()
+    }, stop=ctx => reasons.push(ctx.lifetime.stop_reason() is Some(Failed(DiskFull))),
+      stopped=ctx => reasons.push(ctx.lifetime.stop_reason() is Some(Failed(DiskFull))))
+    |> @hosting.build(_ => ())
+    |> @hosting.run(_ => raise DiskFull)
+  @expect.expect(reasons).to_equal([true, true, true])
+  @expect.expect(result.exit_code().to_int()).to_equal(1)
+  @expect.expect(result.failures().length()).to_equal(1)
+}
+
+///|
+async test "command polls context and token checks after an event handler asks to stop" {
+  for use_token in [false, true] {
+    let result = @hosting.builder(@lander_core.AppName::parse("poll"), [])
+      |> @hosting.build(_ => ())
+      |> @hosting.run(ctx => {
+        @expect.expect(ctx.cancelled()).to_be_false()
+        ctx.lifetime.on_started(() => ctx.lifetime.stop_application())
+        if use_token { ctx.lifetime.stop_token().check_cancelled() }
+        else { ctx.check_cancelled() }
+        fail("check must raise")
+      })
+    @expect.expect(result.exit_code().to_int()).to_equal(0)
+    @expect.expect(result.failures().length()).to_equal(0)
+  }
+}
+
+///|
+async test "stop cancels a sleeping command and finishes defers before stopping" {
+  let events = []
+  @async.with_task_group(group => {
+    let result = @hosting.builder(@lander_core.AppName::parse("wait"), [])
+      |> @hosting.service("a", stopping=ctx => {
+        @expect.expect(ctx.lifetime.stop_reason() is Some(Requested)).to_be_true()
+        @async.sleep(1)
+        events.push("stopping")
+      })
+      |> @hosting.build(_ => ())
+      |> @hosting.run(ctx => {
+        defer events.push("defer")
+        group.spawn_bg(() => {
+          @async.sleep(5)
+          ctx.lifetime.stop_application()
+        })
+        events.push("sleep")
+        @async.sleep(60000)
+        events.push("unexpected wake")
+      })
+    @expect.expect(result.exit_code().to_int()).to_equal(0)
+    @expect.expect(result.failures().length()).to_equal(0)
+  })
+  @expect.expect(events).to_equal(["sleep", "defer", "stopping"])
+}
+
+///|
+async test "stopping flushes all three records from the command services record" {
+  let flushed = []
+  let result = @hosting.builder(@lander_core.AppName::parse("buffer"), [])
+    |> @hosting.service("buffer", stopping=(ctx : @hosting.Context[Array[String]]) => {
+      @expect.expect(ctx.lifetime.stop_reason() is Some(Completed)).to_be_true()
+      for record in ctx.services { flushed.push(record) }
+      ctx.services.clear()
+    })
+    |> @hosting.build(_ => [])
+    |> @hosting.run(ctx => {
+      for record in ["one", "two", "three"] { ctx.services.push(record) }
+      ctx.lifetime.on_stopped(() => assert_eq(ctx.services.length(), 0) catch { _ => abort("buffer not flushed") })
+    })
+  @expect.expect(flushed).to_equal(["one", "two", "three"])
+  @expect.expect(result.exit_code().to_int()).to_equal(0)
+}
+
+///|
+async test "set_exit_code gives the application code after a clean command" {
+  let result = @hosting.builder(@lander_core.AppName::parse("code"), [])
+    |> @hosting.build(_ => ())
+    |> @hosting.run(ctx => ctx.lifetime.set_exit_code(@hosting.ExitCode::from_int(7)))
+  @expect.expect(result.exit_code().to_int()).to_equal(7)
+}

@@ -1,19 +1,9 @@
 ///|
-// No lifetime reader exists until group 4.
-// Remove when Lifetime reads reasons.
-#warnings("-6")
-priv enum StopReason {
-  Completed
-  Requested
-  StartFailed(Error)
-  Failed(Error)
-}
-
-///|
-// Group 4 connects lifetime stop sources. Remove when the driver constructs requests.
+// Group 11 connects signal requests. Remove when the console driver constructs Signal.
 #warnings("-6")
 priv enum StopRequest {
   Requested
+  Signal(SignalKind)
 }
 
 ///|
@@ -49,7 +39,7 @@ priv enum Action {
 } derive(Eq, Debug)
 
 ///|
-// wasm drivers arrive in group 11. Remove when they consume both steps.
+// wasm drivers arrive in group 13. Remove when they consume both steps.
 #warnings("-6")
 priv enum Step {
   Run(Pending, Action)
@@ -82,6 +72,7 @@ priv struct Engine {
   mut phase : EnginePhase
   mut reason : StopReason?
   mut requested_code : ExitCode?
+  mut signal : SignalKind?
   mut stop_requested : Bool
   mut timed_out : Bool
 }
@@ -107,7 +98,7 @@ fn[S] HostedService::hook(self : HostedService[S], phase : Phase) -> Hook[S]? {
 }
 
 ///|
-// The wasm drivers arrive in group 11. Remove when they call this method.
+// The wasm drivers arrive in group 13. Remove when they call this method.
 #warnings("-1")
 fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   let instructions = []
@@ -140,7 +131,7 @@ fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   instructions.push(Emit(Raise(Stopped)))
   let engine : Engine = {
     instructions, stop_at, stopped_at, started: Array::make(services.length(), false), failures: [], position: 0,
-    phase: Starting, reason: None, requested_code: None, stop_requested: false, timed_out: false,
+    phase: Starting, reason: None, requested_code: None, signal: None, stop_requested: false, timed_out: false,
   }
   engine.next()
 }
@@ -179,16 +170,26 @@ fn Engine::next(self : Engine) -> Step {
     failures: self.failures.copy(),
     reason: self.reason.unwrap_or(Completed),
     requested_code: self.requested_code,
+    signal: self.signal,
   }
   self.phase = Finished(outcome)
   Finish(outcome)
 }
 
 ///|
+// The embedded driver is added in group 13. Remove when it reports interrupted or failed actions.
+#warnings("-6")
+priv enum ActionResult {
+  Returned
+  Interrupted
+  Failed(Error)
+}
+
+///|
 priv enum Reply {
   Done
   Failed(Error)
-  StopRequested(StopRequest, ExitCode?)
+  StopRequested(StopRequest, ExitCode?, ActionResult, SignalKind?)
   TimedOut
 }
 
@@ -212,17 +213,21 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
         _ => ()
       }
     }
-    StopRequested(request, code) => {
+    StopRequested(request, code, result, observed_signal) => {
+      if result is Failed(_) && self.action is Raise(_) { abort("failed reply to a Raise step") }
+      if request is Signal(signal) { engine.signal = Some(signal) }
+      if observed_signal is Some(signal) { engine.signal = Some(signal) }
       if !engine.stop_requested {
         engine.stop_requested = true
         if engine.reason is None {
-          engine.reason = Some(match request { Requested => Requested })
+          engine.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind) })
         }
         engine.requested_code = code
       }
+      if result is Failed(error) { engine.failures.push(error) }
       if engine.phase is Starting {
         // The current hook succeeded. Consume its mark before skipping startup.
-        if engine.position < engine.instructions.length() &&
+        if result is Returned && engine.position < engine.instructions.length() &&
           engine.instructions[engine.position] is MarkStarted(reference) &&
           self.action is Hook(current, Starting | Start) && current == reference {
           engine.started[reference.index] = true
@@ -248,20 +253,20 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
 }
 
 ///|
-// The wasm drivers arrive in group 11. Remove when they call this method.
+// The wasm drivers arrive in group 13. Remove when they call this method.
 #warnings("-1")
 fn Pending::done(self : Pending) -> Step { self.respond(Done) }
 
 ///|
-// The wasm drivers arrive in group 11. Remove when they call this method.
+// The wasm drivers arrive in group 13. Remove when they call this method.
 #warnings("-1")
 fn Pending::failed(self : Pending, error : Error) -> Step { self.respond(Failed(error)) }
 
 ///|
-// Group 4 connects lifetime stop sources. Remove when the driver uses this reply.
+// The embedded driver is added in group 13. Remove when it replies to requests.
 #warnings("-1")
-fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?) -> Step {
-  self.respond(StopRequested(request, code))
+fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step {
+  self.respond(StopRequested(request, code, result, observed_signal))
 }
 
 ///|

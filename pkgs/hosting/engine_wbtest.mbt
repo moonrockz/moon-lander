@@ -367,6 +367,7 @@ priv struct EngineSnapshot {
   reason : StopReason?
   requested_code : ExitCode?
   stop_requested : Bool
+  signal : SignalKind?
   timed_out : Bool
   position : Int
   phase : EnginePhase
@@ -376,7 +377,7 @@ priv struct EngineSnapshot {
 ///|
 fn EngineSnapshot::take(engine : Engine) -> EngineSnapshot {
   { started: engine.started.copy(), reason: engine.reason,
-    requested_code: engine.requested_code, stop_requested: engine.stop_requested,
+    requested_code: engine.requested_code, signal: engine.signal, stop_requested: engine.stop_requested,
     timed_out: engine.timed_out, position: engine.position, phase: engine.phase,
     failures: engine.failures.copy() }
 }
@@ -387,6 +388,7 @@ fn EngineSnapshot::check(self : EngineSnapshot, engine : Engine) -> Unit raise {
   @expect.expect(physical_equal(engine.reason, self.reason)).to_be_true()
   @expect.expect(engine.requested_code).to_equal(self.requested_code)
   @expect.expect(engine.stop_requested).to_equal(self.stop_requested)
+  @expect.expect(engine.signal).to_equal(self.signal)
   @expect.expect(engine.timed_out).to_equal(self.timed_out)
   @expect.expect(engine.position).to_equal(self.position)
   @expect.expect(physical_equal(engine.phase, self.phase)).to_be_true()
@@ -500,4 +502,165 @@ test "panic failed on Raise Stopped is a driver fault" {
   guard command.done() is Run(stopping, _) else { fail("missing Stopping") }
   guard stopping.done() is Run(stopped, _) else { fail("missing Stopped") }
   ignore(stopped.failed(HookFailed(0)))
+}
+
+///|
+test "signal requests record identity after a reason without replacing reason or requested code" {
+  let first = ExitCode::from_int(4)
+  let second = ExitCode::from_int(9)
+  for signal in [SignalKind::Interrupt, Terminate, Quit] {
+    for failed in [false, true] {
+      let (_, result) = engine_trace([63], reply=(pending, action) => {
+        match action {
+          RunCommand => if failed { pending.failed(HookFailed(0)) }
+            else { pending.stop_requested(Requested, Some(first)) }
+          Hook(_, Stop) => pending.stop_requested(Signal(signal), Some(second))
+          _ => pending.done()
+        }
+      })
+      @expect.expect(result.signal).to_equal(Some(signal))
+      @expect.expect(if failed { result.reason is Failed(HookFailed(0)) } else { result.reason is Requested }).to_be_true()
+      @expect.expect(result.requested_code).to_equal(if failed { Some(second) } else { Some(first) })
+    }
+    let (_, result) = engine_trace([], reply=(pending, action) => {
+      if action == RunCommand { pending.stop_requested(Signal(signal), None) }
+      else { pending.done() }
+    })
+    @expect.expect(match result.reason { Signal(found) => found == signal; _ => false }).to_be_true()
+    @expect.expect(result.signal).to_equal(Some(signal))
+  }
+}
+
+///|
+test "request then failure counts failure and follows the failed-start marking rule" {
+  for target in [Phase::Starting, Start, Started] {
+    let (trace, result) = engine_trace([63, 63], reply=(pending, action) => {
+      if action == Hook(ServiceRef::{ index: 0 }, target) {
+        pending.stop_requested(Requested, None, result=Failed(HookFailed(0)))
+      } else { pending.done() }
+    })
+    @expect.expect(result.reason is Requested).to_be_true()
+    @expect.expect(result.failures().length()).to_equal(1)
+    @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
+    @expect.expect(trace.contains("0.Stop")).to_equal(target == Started)
+    @expect.expect(trace.contains("command")).to_be_false()
+  }
+}
+
+///|
+/// Extend the hook/failure laws with a request at any emitted step, including a
+/// request followed by failure. The model below has no engine instructions.
+test "law: requests from any step preserve cleanup and single-use reply effects" {
+  @expect.for_all((input : (Array[UInt], UInt, UInt)) => {
+    let masks = input.0.map(value => (value & 63).reinterpret_as_int())
+    let target = (input.1 % (masks.length() * 6 + 4).reinterpret_as_uint()).reinterpret_as_int()
+    let expected : Array[Action] = []
+    let started = Array::make(masks.length(), false)
+    let mut ended = false
+    let mut failures = 0
+    let emit = (action : Action) => {
+      let index = expected.length()
+      expected.push(action)
+      let request = index == target
+      let failure = match action {
+        Raise(_) => false
+        _ => ((input.2 >> (index % 32)) & 1) != 0
+      }
+      if failure { failures += 1 }
+      let interrupted = request && !failure && (input.1 & 0x80000000U) != 0 && !(action is Raise(_))
+      (request, failure, interrupted)
+    }
+    for phase_index, phase in [Phase::Starting, Start, Started] {
+      if ended { break }
+      for i, mask in masks {
+        let mut requested = false
+        if (mask & (1 << phase_index)) != 0 {
+          let (request, failure, interrupted) = emit(Hook(ServiceRef::{ index: i }, phase))
+          requested = request
+          if failure || interrupted { ended = true; break }
+        }
+        if (phase == Starting && (mask & 2) == 0) || (phase == Start && (mask & 2) != 0) { started[i] = true }
+        if requested { ended = true; break }
+      }
+    }
+    if !ended { let (request, _, _) = emit(Raise(Started)); ended = request }
+    if !ended { ignore(emit(RunCommand)) }
+    ignore(emit(Raise(Stopping)))
+    for phase_index, phase in [Phase::Stopping, Stop, Stopped] {
+      for i = masks.length() - 1; i >= 0; i = i - 1 {
+        if started[i] && (masks[i] & (8 << phase_index)) != 0 { ignore(emit(Hook(ServiceRef::{ index: i }, phase))) }
+      }
+    }
+    ignore(emit(Raise(Stopped)))
+    let actual = []
+    let tokens = []
+    let mut step = Engine::start(engine_services(masks))
+    let mut last : Engine? = None
+    while step is Run(pending, action) {
+      let index = actual.length()
+      actual.push(action)
+      let error : Error? = match action {
+        Raise(_) => None
+        _ => if ((input.2 >> (index % 32)) & 1) != 0 { Some(HookFailed(index)) } else { None }
+      }
+      let interrupted = (input.1 & 0x80000000U) != 0 && !(action is Raise(_))
+      step = if index == target {
+        pending.stop_requested(Requested, None, result=match error { Some(error) => Failed(error); None => if interrupted { Interrupted } else { Returned } })
+      } else if error is Some(error) { pending.failed(error) }
+      else { pending.done() }
+      tokens.push((pending, step))
+      last = Some(pending.engine)
+    }
+    @expect.expect(actual).to_equal(expected)
+    guard step is Finish(result) else { fail("expected Finish") }
+    @expect.expect(result.failures().length()).to_equal(failures)
+    @expect.expect(result.exit_code()).to_equal(if failures == 0 { ExitCode::success() } else { ExitCode::failure() })
+    let engine = last.unwrap()
+    let snapshot = EngineSnapshot::take(engine)
+    same_step(step, engine.next())
+    for (pending, cached) in tokens {
+      same_step(cached, pending.done())
+      same_step(cached, pending.failed(HookFailed(-1)))
+      same_step(cached, pending.stop_requested(Signal(Quit), Some(ExitCode::failure()), result=Failed(HookFailed(-1))))
+      same_step(cached, pending.timed_out())
+      snapshot.check(engine)
+    }
+  }, count=300, max_size=25, seed=7404)
+}
+
+///|
+test "an interrupted startup hook does not mark its service as started" {
+  for masks in [[57, 56], [63, 63]] {
+    for phase in [Phase::Starting, Start, Started] {
+      if masks[0] == 57 && phase != Starting { continue }
+      let (trace, result) = engine_trace(masks, reply=(pending, action) => {
+        if action == Hook(ServiceRef::{ index: 0 }, phase) {
+          pending.stop_requested(Requested, None, result=Interrupted)
+        } else { pending.done() }
+      })
+      @expect.expect(trace.contains("0.Stop")).to_equal(phase == Started)
+      @expect.expect(result.reason is Requested).to_be_true()
+      @expect.expect(result.failures().length()).to_equal(0)
+      @expect.expect(result.exit_code()).to_equal(ExitCode::success())
+    }
+  }
+}
+
+///|
+test "panic failed on Raise with a stop request is a driver fault" {
+  guard Engine::start(engine_services([])) is Run(pending, _) else { fail("missing Started") }
+  ignore(pending.stop_requested(Requested, None, result=Failed(HookFailed(0))))
+}
+
+///|
+test "a later signal observed in one reply keeps the first request reason and code" {
+  let code = ExitCode::from_int(4)
+  let (_, result) = engine_trace([], reply=(pending, action) => {
+    if action == RunCommand {
+      pending.stop_requested(Requested, Some(code), observed_signal=Quit)
+    } else { pending.done() }
+  })
+  @expect.expect(result.reason is Requested).to_be_true()
+  @expect.expect(result.signal).to_equal(Some(Quit))
+  @expect.expect(result.requested_code).to_equal(Some(code))
 }

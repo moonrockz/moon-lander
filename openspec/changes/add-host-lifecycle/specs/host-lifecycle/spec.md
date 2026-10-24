@@ -489,13 +489,18 @@ plain read that synchronous code can poll.
 
 ### Requirement: A raised stop is not a failure
 
-When the command raises `StopRequested`, the host SHALL treat the run as stopped, not
-as failed. The stop reason MUST stay the reason of the first stop request.
+When the command or a hosted-service hook raises `StopRequested`, the host SHALL
+treat the run as stopped, not as failed. The stop reason MUST stay the reason of the first stop request.
 
 #### Scenario: Command polls the check
 
 - **WHEN** a command calls `ctx.check_cancelled()` between work items, and the command calls `stop_application()` from an event handler
 - **THEN** the next check raises `StopRequested`, the stop phase runs, the stop reason is a requested stop, and the exit code is 0
+
+#### Scenario: Stop hook polls the check
+
+- **WHEN** a stopping hook calls `ctx.check_cancelled()` during a requested stop
+- **THEN** the hook ends, the remaining stop hooks run, the exit code is 0, and no failure is recorded
 
 ### Requirement: Command task cancellation on native and js
 

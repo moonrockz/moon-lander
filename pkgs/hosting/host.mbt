@@ -52,6 +52,8 @@ pub struct Context[S] {
   services : S
   /// The configuration of the run.
   config : @config.Config
+  /// The events, stop requests and cancellation checks of this run.
+  lifetime : Lifetime
 }
 
 ///|
@@ -156,6 +158,7 @@ pub struct RunOutcome {
   priv failures : Array[Error]
   priv reason : StopReason
   priv requested_code : ExitCode?
+  priv signal : SignalKind?
 }
 
 ///|

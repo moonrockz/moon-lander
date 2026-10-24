@@ -23,6 +23,8 @@ pub(all) suberror HostError {
 pub fn HostError::message(Self) -> String
 pub fn HostError::to_repr(Self) -> @debug.Repr
 
+pub(all) suberror StopRequested
+
 // Types and methods
 pub struct BuildContext {
   config : @moon-lander-config.Config
@@ -31,7 +33,10 @@ pub struct BuildContext {
 pub struct Context[S] {
   services : S
   config : @moon-lander-config.Config
+  lifetime : Lifetime
 }
+pub fn[S] Context::cancelled(Self[S]) -> Bool
+pub fn[S] Context::check_cancelled(Self[S]) -> Unit raise StopRequested
 
 pub struct ExitCode {
   // private fields
@@ -51,6 +56,17 @@ pub struct Host[S] {
 pub struct HostBuilder[S] {
   // private fields
 }
+
+pub struct Lifetime {
+  // private fields
+}
+pub fn Lifetime::on_started(Self, () -> Unit) -> Unit
+pub fn Lifetime::on_stopped(Self, () -> Unit) -> Unit
+pub fn Lifetime::on_stopping(Self, () -> Unit) -> Unit
+pub fn Lifetime::set_exit_code(Self, ExitCode) -> Unit
+pub fn Lifetime::stop_application(Self, exit_code? : ExitCode) -> Unit
+pub fn Lifetime::stop_reason(Self) -> StopReason?
+pub fn Lifetime::stop_token(Self) -> StopToken
 
 pub struct RunOutcome {
   // private fields
@@ -72,6 +88,30 @@ pub fn ServiceName::to_repr(Self) -> @debug.Repr
 pub fn ServiceName::to_string(Self) -> String
 pub impl Show for ServiceName
 pub impl IntoServiceName for ServiceName
+
+pub(all) enum SignalKind {
+  Interrupt
+  Terminate
+  Quit
+} derive(Eq, @debug.Debug)
+pub fn SignalKind::equal(Self, Self) -> Bool
+pub fn SignalKind::not_equal(Self, Self) -> Bool
+pub fn SignalKind::to_repr(Self) -> @debug.Repr
+
+pub(all) enum StopReason {
+  Completed
+  Requested
+  Signal(SignalKind)
+  Embedder
+  StartFailed(Error)
+  Failed(Error)
+}
+
+pub struct StopToken {
+  // private fields
+}
+pub fn StopToken::cancelled(Self) -> Bool
+pub fn StopToken::check_cancelled(Self) -> Unit raise StopRequested
 
 // Type aliases
 pub type Hook[S] = async (Context[S]) -> Unit

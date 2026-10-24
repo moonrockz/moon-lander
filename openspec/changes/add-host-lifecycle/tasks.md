@@ -49,12 +49,12 @@ Bead: lander-4us.5.3
 
 Bead: lander-4us.5.4
 
-- [ ] 4.1 Add `Lifetime` with `on_started`, `on_stopping`, `on_stopped`, late registration and `stop_reason`; verify tests for event order and late handlers
-- [ ] 4.2 Add `stop_application(exit_code?)`, `set_exit_code`, `StopToken`, `ctx.cancelled()`, `ctx.check_cancelled()` and `StopRequested`, with registered stop probes; verify tests for a stop from the command, from a hook during start, and repeated requests
-- [ ] 4.3 Treat a `StopRequested` raised by the command as a stop, not a failure; verify the exit code is not 1
-- [ ] 4.4 Cancel the command task on a stop request (native, js); verify that a command in `@async.sleep` ends with cancellation and that its `defer` block runs before the stop phase
-- [ ] 4.5 Verify that a stop hook sees the changes that the command made in `S`
-- [ ] 4.6 Document the lifetime, the cancellation checks, and the `@async.pause()` rule for long synchronous loops on js in the package README
+- [x] 4.1 Add `Lifetime` with `on_started`, `on_stopping`, `on_stopped`, late registration and `stop_reason`; verify tests for event order and late handlers
+- [x] 4.2 Add `stop_application(exit_code?)`, `set_exit_code`, `StopToken`, `ctx.cancelled()`, `ctx.check_cancelled()` and `StopRequested`, with registered stop probes; verify tests for a stop from the command, from a hook during start, and repeated requests
+- [x] 4.3 Treat a `StopRequested` raised by the command as a stop, not a failure; verify the exit code is not 1
+- [x] 4.4 Cancel the command task on a stop request (native, js); verify that a command in `@async.sleep` ends with cancellation and that its `defer` block runs before the stop phase
+- [x] 4.5 Verify that a stop hook sees the changes that the command made in `S`
+- [x] 4.6 Document the lifetime, the cancellation checks, and the `@async.pause()` rule for long synchronous loops on js in the package README
 
 ## 5. Exit codes and error reports
 

@@ -76,6 +76,7 @@ test "service names accept Unicode letters, marks, digits, _, - and ." {
     text in [
       "a", "Z", "db", "db.primary", "telemetry-flush", "cache_2", "données",
       "数据库", "डेटा", "Ωmega", "café", "console", "com10", "lpt", "con2",
+      "a\u{00B7}b", "a\u{203F}b", "a\u{FF3F}b", "a\u{30FB}b", "\u{216B}", "\u{2118}x",
     ] {
     @expect.expect(service_name_result(text)).to_equal("ok")
     @expect.expect(@hosting.ServiceName::parse(text).to_string()).to_equal(
@@ -89,7 +90,11 @@ test "service names must start with a letter" {
   @expect.expect(service_name_result("")).to_equal(
     "Invalid service name \"\": the name is empty",
   )
-  for text in [" db", "\tdb", "\u{00A0}db", ".db", "1db", "_db", "-db", "\u{0301}db"] {
+  for
+    text in [
+      " db", "\tdb", "\u{00A0}db", ".db", "1db", "_db", "-db", "\u{0301}db", "\u{3164}",
+      "\u{3164}db", "\u{200D}db",
+    ] {
     @expect.expect(service_name_result(text)).to_equal(
       "Invalid service name \{text.escape()}: the name must start with a letter",
     )
@@ -168,4 +173,26 @@ test "exit codes are in the range 0 to 255" {
     }
     @expect.expect(got).to_equal(code)
   }
+}
+
+///|
+test "service names have no invisible character" {
+  for
+    text in [
+      "d\u{200C}b", "d\u{200D}b", "db\u{FE0F}", "a\u{034F}", "a\u{3164}", "a\u{FFA0}",
+      "a\u{180B}", "a\u{17B4}", "a\u{E0100}",
+    ] {
+    @expect.expect(service_name_result(text).has_suffix("it is invisible")).to_equal(
+      true,
+    )
+  }
+}
+
+///|
+test "service name bytes count 4-byte characters" {
+  // `𠀀` (U+20000) is 4 bytes in UTF-8 and a surrogate pair in UTF-16.
+  @expect.expect(service_name_result("\u{20000}".repeat(32))).to_equal("ok")
+  @expect.expect(
+    service_name_result("\u{20000}".repeat(33)).contains("132 bytes in UTF-8"),
+  ).to_equal(true)
 }

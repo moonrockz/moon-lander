@@ -98,7 +98,7 @@ supply layered configuration. This change connects that configuration to a lifec
     `|> @lander.shutdown_timeout(ms)` change or turn off a default.
   - `|> @lander.run(command)` selects the console driver on native and js and the
     embedded driver on wasm and wasm-gc. The smallest program is
-    `@lander.cli(AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })`.
+    `"acme" |> AppName::parse |> @lander.cli(@env.args()) |> @lander.run(fn(ctx) { ... })`.
   - `@hosting.builder` is bare: it turns on none of these defaults. The Morphir preset
     builds on it.
   - The users of an application need no configuration file. A run with no file uses

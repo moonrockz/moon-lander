@@ -6,8 +6,9 @@ pub(all) suberror HostError {
   InvalidAppName(text~ : String, reason~ : String)
   /// The text is not a valid service name.
   InvalidServiceName(text~ : String, reason~ : String)
-  /// The builder already has a service with this name.
-  DuplicateService(name~ : ServiceName)
+  /// The builder already has the service `existing`, whose name equals `name`
+  /// or differs from it only in letter case.
+  DuplicateService(name~ : ServiceName, existing~ : ServiceName)
   /// The number is not in the exit code range 0 to 255.
   InvalidExitCode(code~ : Int)
 } derive(Debug)
@@ -23,8 +24,12 @@ pub fn HostError::message(self : HostError) -> String {
       "Invalid application name \{text.escape()}: \{reason}"
     InvalidServiceName(text~, reason~) =>
       "Invalid service name \{text.escape()}: \{reason}"
-    DuplicateService(name~) =>
-      "The host already has a service named \{name.to_string().escape()}"
+    DuplicateService(name~, existing~) =>
+      if name == existing {
+        "The host already has a service named \{name.to_string().escape()}"
+      } else {
+        "The host already has a service named \{existing.to_string().escape()}; \{name.to_string().escape()} differs from it only in letter case"
+      }
     InvalidExitCode(code~) =>
       "Invalid exit code \{code}: an exit code is in the range 0 to 255"
   }
@@ -83,10 +88,15 @@ pub extend AppName with Show::{output, to_string}
 /// The name of a hosted service. It is safe as one component of a file path on
 /// Linux, macOS and Windows:
 ///
-/// - It starts with a Unicode letter (`XID_Start`).
-/// - The other characters are Unicode letters, combining marks, digits and `_`
-///   (`XID_Continue`), `-` or `.`. So it has no path separator, no reserved
-///   punctuation, no whitespace and no control or direction character.
+/// - It starts with a character that Unicode allows at the start of an
+///   identifier (`XID_Start`: letters and letter numbers).
+/// - The other characters are identifier characters (`XID_Continue`: letters,
+///   combining marks, digits, `_` and a few connector characters such as `·`),
+///   `-` or `.`. So it has no path separator, no reserved punctuation, no
+///   whitespace and no control or direction character.
+/// - It has no invisible identifier character, such as a zero-width joiner, a
+///   variation selector or a Hangul filler. A name that looks blank or looks
+///   like another name cannot occur, and macOS HFS+ cannot ignore part of it.
 /// - It does not end with `.`, which Windows removes.
 /// - It is not a Windows device name such as `CON` or `com1`, also not before
 ///   an extension, as in `nul.log`.
@@ -122,7 +132,7 @@ pub fn ServiceName::parse(text : String) -> ServiceName raise HostError {
   guard text.iter().head() is Some(first) else {
     raise invalid("the name is empty")
   }
-  guard @xid.is_xid_start(first) else {
+  guard @xid.is_xid_start(first) && !is_invisible(first) else {
     raise invalid("the name must start with a letter")
   }
   let mut bytes = 0
@@ -131,6 +141,11 @@ pub fn ServiceName::parse(text : String) -> ServiceName raise HostError {
     guard @xid.is_xid_continue(char) || char == '-' || char == '.' else {
       raise invalid(
         "the character \{char.to_string().escape()} is not allowed; use letters, combining marks, digits, '_', '-' and '.'",
+      )
+    }
+    if is_invisible(char) {
+      raise invalid(
+        "the character \{char.to_string().escape()} is not allowed; it is invisible",
       )
     }
     bytes += utf8_length(char)
@@ -160,20 +175,63 @@ pub impl Show for ServiceName with output(self, logger) {
 pub extend ServiceName with Show::{output, to_string}
 
 ///|
-/// Whether two names give the same file on a file system that ignores case,
-/// as on Windows and macOS. Each character compares by its Unicode lowercase
-/// form.
-fn ServiceName::same_file(self : ServiceName, other : ServiceName) -> Bool {
-  lowercase(self.text) == lowercase(other.text)
+/// A value that gives a service name: a `ServiceName`, or a `String` that
+/// `ServiceName::parse` reads. So `service` takes either, and parses text at the
+/// boundary. After that step, the host holds only the `ServiceName`.
+pub trait IntoServiceName {
+  into_service_name(Self) -> ServiceName raise HostError
 }
 
 ///|
-fn lowercase(text : String) -> String {
+pub impl IntoServiceName for ServiceName with into_service_name(self) {
+  self
+}
+
+///|
+pub extend ServiceName with IntoServiceName::{into_service_name}
+
+///|
+pub impl IntoServiceName for String with into_service_name(self) {
+  ServiceName::parse(self)
+}
+
+///|
+/// Whether two names give the same file on a file system that ignores case:
+/// Windows compares names by their uppercase form, and macOS by case folding.
+fn ServiceName::same_file(self : ServiceName, other : ServiceName) -> Bool {
+  fold_case(self.text) == fold_case(other.text)
+}
+
+///|
+/// The lowercase of the uppercase of each character. Two names that differ only
+/// in letter case give the same text, also for pairs whose case mappings are
+/// not symmetric, such as `Σ`, `σ` and `ς`, `µ` and `μ`, or `ſ` and `s`.
+fn fold_case(text : String) -> String {
   let builder = StringBuilder()
   for char in text {
-    builder.write_string(@case_mapping.full_lowercase(char))
+    for upper in @case_mapping.full_uppercase(char) {
+      builder.write_string(@case_mapping.full_lowercase(upper))
+    }
   }
   builder.to_string()
+}
+
+///|
+/// Whether `char` is an identifier character that does not show: a Unicode
+/// default-ignorable code point that `XID_Continue` allows, or a Hangul filler.
+fn is_invisible(char : Char) -> Bool {
+  char
+  is (
+    '\u{034F}'
+    | '\u{115F}'..='\u{1160}'
+    | '\u{17B4}'..='\u{17B5}'
+    | '\u{180B}'..='\u{180F}'
+    | '\u{200C}'..='\u{200D}'
+    | '\u{3164}'
+    | '\u{FE00}'..='\u{FE0F}'
+    | '\u{FFA0}'
+    | '\u{E0100}'..='\u{E01EF}'
+  )
 }
 
 ///|

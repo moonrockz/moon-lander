@@ -90,15 +90,19 @@ pub fn[S] builder(name : AppName, args : Array[String]) -> HostBuilder[S] {
 /// has no `start` hook and no earlier `start` hook failed. Each service of a
 /// host has its own name: a second service whose name differs only in letter
 /// case raises `DuplicateService`, because the two names give one file on
-/// Windows and macOS.
+/// Windows and macOS. `name` is a `ServiceName`, or a `String` that the step
+/// parses; a bad name raises `InvalidServiceName`.
 pub fn[S] service(
   builder : HostBuilder[S],
-  name : ServiceName,
+  name : &IntoServiceName,
   start? : Hook[S],
   stop? : Hook[S],
 ) -> HostBuilder[S] raise HostError {
-  if builder.services.iter().any(service => service.name.same_file(name)) {
-    raise DuplicateService(name~)
+  let name = name.into_service_name()
+  for service in builder.services {
+    if service.name.same_file(name) {
+      raise DuplicateService(name~, existing=service.name)
+    }
   }
   let services = builder.services.copy()
   services.push({ name, start, stop })

@@ -32,6 +32,7 @@ Bead: lander-4us.5.2
 - [x] 2.3 Add a first `@hosting.run` (native, js) that builds `S`, runs `start`, the command and `stop`, and returns a `RunOutcome` with exit code 0 or 1; verify tests for a clean run and a failing command, also on the Windows leg
 - [x] 2.4 Add the `@lander.cli(name, args)` shortcut. Rename `pkgs/lander/README.md` to `README.mbt.md` and set `readme` in `pkgs/lander/moon.mod` to it. Add an example that builds a host (`cli`, `service`, `build`); verify that the example compiles as a doc test on all four targets, and that a native and js test runs the same host with `@hosting.run`
 - [x] 2.5 Add `AppName`, `ServiceName` and `ExitCode` with smart constructors, and `HostError` (design D17); make `@hosting.builder`, `@lander.cli` and `service` take the types, and make `service` reject a second service whose name differs only in letter case; verify each rule on both sides of its limit and the scenarios of "Parsed names and exit codes", "Name and exit code rules" and "Unique service names" on all four targets
+- [x] 2.6 Add the sealed trait `IntoServiceName` with implementations for `ServiceName` and `String`, and make `service` take `&IntoServiceName` and parse text at the step (design D17); verify the "Service name as text" scenario on all four targets
 
 ## 3. Pure phase engine and full hook order
 

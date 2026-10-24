@@ -148,7 +148,9 @@ each part itself and reproduces Morphir exactly. The batteries path is in D15.
 
 ```moonbit
 async fn main {
-  @hosting.builder(@hosting.AppName::parse("morphir"), @env.args())
+  "morphir"
+  |> @hosting.AppName::parse
+  |> @hosting.builder(@env.args())
   |> @hosting_argparse.command(fn(name) {
     @argparse.Command(name,
       options=[
@@ -174,7 +176,7 @@ async fn main {
   })
   |> @hosting.app_dirs()   // = @conventions.add(@conventions.app_dirs(name, prefix~)) with host values
   |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
-  |> @hosting.service(@hosting.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @hosting.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @hosting.shutdown_timeout(5_000)
   |> @hosting.build(fn(b) {
     App::{ logs: TelemetrySession::local(b.environment.content_root, ...), ... }
@@ -266,7 +268,7 @@ priv struct HostedService[S] {   // only `service` makes one (D17)
 pub type Hook[S] = async (Context[S]) -> Unit raise
 
 pub fn[S] service(
-  self : HostBuilder[S], name : ServiceName,
+  self : HostBuilder[S], name : &IntoServiceName,
   starting? : Hook[S], start? : Hook[S], started? : Hook[S],
   stopping? : Hook[S], stop? : Hook[S], stopped? : Hook[S],
 ) -> HostBuilder[S] raise HostError
@@ -281,9 +283,11 @@ pub fn[S] service(
 - Call (this change): a stop hook failure does not skip the next hooks. The host
   collects all failures.
 - Stop hooks read the reason with `ctx.lifetime.stop_reason()`.
-- Owner (2026-10-23, D17): each service of a host has its own `ServiceName`. A
-  second service with the same name raises `HostError::DuplicateService`, so a
-  builder never holds two services with one name.
+- Owner (2026-10-23, D17): each service of a host has its own `ServiceName`,
+  without regard to letter case. A second service whose name equals a name of the
+  builder, or differs from it only in letter case, raises
+  `HostError::DuplicateService(name~, existing~)`, so a builder never holds two
+  services that give one file.
 
 ### D5. Lifetime, stop requests and cancellation checks (Owner: .NET `IHostApplicationLifetime`; O1)
 
@@ -647,11 +651,11 @@ The parameter type is `&IntoEnvVars`. Probe results:
 - An empty `{}` is ambiguous. Use `Map([])`.
 
 ```moonbit
-let acme = @lander.AppName::parse("acme")
-@lander.cli(acme, ["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
-@lander.cli(acme, [], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
-@lander.cli(acme, [], env_vars=fixture)   // fixture : Json from @json.parse
-@lander.cli(acme, [], env_vars=Map([]))
+let acme = "acme" |> @lander.AppName::parse
+acme |> @lander.cli(["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
+acme |> @lander.cli([], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
+acme |> @lander.cli([], env_vars=fixture)   // fixture : Json from @json.parse
+acme |> @lander.cli([], env_vars=Map([]))
 ```
 
 JSON rules (Call):
@@ -691,7 +695,9 @@ The smallest program:
 
 ```moonbit
 fn main raise {
-  @lander.cli(@lander.AppName::parse("acme"), @env.args())
+  "acme"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.run(fn(ctx) { ... })
 }
 ```
@@ -700,10 +706,12 @@ A larger program in the one batteries style. It uses only `@lander` steps:
 
 ```moonbit
 fn main raise {
-  @lander.cli(@lander.AppName::parse("acme"), @env.args())
+  "acme"
+  |> @lander.AppName::parse
+  |> @lander.cli(@env.args())
   |> @lander.configure(fn(sources) { sources |> @config.defaults(Defaults::default()) })
   |> @lander.build(fn(b) { App::new(b.config) })
-  |> @lander.service(@lander.ServiceName::parse("telemetry"), stopping=fn(ctx) { ctx.services.logs.flush() })
+  |> @lander.service("telemetry", stopping=fn(ctx) { ctx.services.logs.flush() })
   |> @lander.shutdown_timeout(5_000)
   |> @lander.run(fn(ctx) { acme_command(ctx) })
 }
@@ -717,7 +725,7 @@ fn main raise {
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
   `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
-  `ServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
+  `ServiceName`, `IntoServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
   `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.
   So a batteries application writes only `@lander` steps. Probe (`moonc v0.10.15`,
@@ -786,10 +794,10 @@ impl @lander.Program for App with run(self, ctx) -> Unit raise {
 }
 
 // lambda form
-@lander.cli(@lander.AppName::parse("acme"), @env.args()) |> @lander.run(fn(ctx) { ... })
+"acme" |> @lander.AppName::parse |> @lander.cli(@env.args()) |> @lander.run(fn(ctx) { ... })
 
 // object form
-@lander.cli(@lander.AppName::parse("morphir"), @env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
+"morphir" |> @lander.AppName::parse |> @lander.cli(@env.args()) |> @lander.run_app(App::new)  // (BuildContext) -> App raise
 ```
 
 - `run_app(factory)` is `build(factory)` followed by
@@ -813,7 +821,7 @@ not check the rules again.
 | Value | Type | Rule | Group |
 | --- | --- | --- | --- |
 | Application name | `AppName::parse(text)` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
-| Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode letter; then letters, combining marks, digits, `_`, `-` and `.`; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
+| Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode identifier start character (`XID_Start`, letters and letter numbers); then identifier characters (`XID_Continue`: letters, combining marks, digits, `_` and a few connectors), `-` and `.`; no invisible character; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
 | Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
 | Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
 | Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
@@ -821,7 +829,19 @@ not check the rules again.
 | Shutdown timeout | A duration type in place of `ms : Int` (D6) | Not negative | 10 |
 
 - Owner: the caller parses, so `@lander.cli` and `@hosting.builder` take an
-  `AppName`, and `service` takes a `ServiceName`. A program parses its name in
+  `AppName`, and `service` takes a `ServiceName`. The name is the first argument,
+  so the text flows through the parse into the pipeline:
+  `"acme" |> @lander.AppName::parse |> @lander.cli(@env.args())` (Owner,
+  2026-10-24: the examples use this form).
+- Owner (2026-10-24): `service` takes `name : &IntoServiceName`, like
+  `IntoEnvVars` (D14): a `ServiceName`, or a `String` that the step parses with
+  `ServiceName::parse`. MoonBit has no overloading, so a sealed trait with two
+  implementations gives one step that takes both. The text is parsed at the step,
+  which already raises `HostError`, and the host holds only the `ServiceName`
+  after it. So `|> @hosting.service("db", start=...)` and
+  `|> @hosting.service(ServiceName::parse("db"), start=...)` give the same
+  service. `cli` and `builder` still take only an `AppName`, because they do not
+  raise. A program parses its name in
   `fn main raise`, or in an `async fn main`. A bad name in a synchronous `main`
   stops the program at start with the error and a stack trace (probe, `moonc
   v0.10.17`: abort, exit code 134). In an `async fn main` the `moonbitlang/async`
@@ -840,13 +860,20 @@ not check the rules again.
   properties `XID_Start` and `XID_Continue` from `moonbit-community/unicode-data`
   (`xid` and `case_mapping` packages), because `moonbitlang/core` has no Unicode
   category data. These exclude every separator, reserved punctuation, whitespace,
-  control and direction character. The rule also rejects a trailing `.` (Windows
+  control and direction character. `XID_Continue` also allows a few connector
+  characters such as `·` and `‿`, which are safe in a path. The parse rejects the
+  invisible identifier characters (the default-ignorable code points in
+  `XID_Continue`, such as U+200C, U+200D and the variation selectors, and the
+  Hangul fillers): macOS HFS+ ignores U+200C and U+200D in names, and a report
+  cannot show them. The rule also rejects a trailing `.` (Windows
   removes it), the Windows device names `CON`, `PRN`, `AUX`, `NUL`, `COM0` to
   `COM9` and `LPT0` to `LPT9` before any extension, and more than 128 UTF-8 bytes
   (a path component holds at most 255).
 - Owner (2026-10-23): two service names that differ only in letter case are
   duplicates in one host, because Windows and macOS give them one file. The
-  check compares the Unicode lowercase form.
+  check compares the lowercase of the uppercase of each character, so pairs whose
+  case mappings are not symmetric also match: `Σ`, `σ` and `ς`; `µ` and `μ`;
+  `ſ` and `s`; `ß` and `SS`.
 - Owner (2026-10-23): the parse does not normalize to NFC. A release-build probe
   measured the cost over the ASCII rule: the letter and case data add about 11 KB
   (wasm-gc), 29 KB (js) and 6 KB (native); NFC

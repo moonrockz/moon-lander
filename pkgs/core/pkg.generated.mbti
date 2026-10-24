@@ -14,6 +14,12 @@ pub suberror AppNameError {
 pub fn AppNameError::message(Self) -> String
 pub fn AppNameError::to_repr(Self) -> @debug.Repr
 
+pub suberror TimeLimitError {
+  InvalidTimeLimit(input~ : String, rule~ : TimeLimitRule)
+} derive(@debug.Debug)
+pub fn TimeLimitError::message(Self) -> String
+pub fn TimeLimitError::to_repr(Self) -> @debug.Repr
+
 // Types and methods
 pub struct AppName {
   // private fields
@@ -36,6 +42,43 @@ pub enum AppNameRule {
 pub fn AppNameRule::equal(Self, Self) -> Bool
 pub fn AppNameRule::not_equal(Self, Self) -> Bool
 pub fn AppNameRule::to_repr(Self) -> @debug.Repr
+
+pub struct TimeLimit {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn TimeLimit::compare(Self, Self) -> Int32
+pub fn TimeLimit::equal(Self, Self) -> Bool
+pub fn TimeLimit::hash(Self) -> Int32
+pub fn TimeLimit::hash_combine(Self, Hasher) -> Unit
+pub fn TimeLimit::millis(Int32) -> Self raise TimeLimitError
+pub fn TimeLimit::not_equal(Self, Self) -> Bool
+pub fn TimeLimit::op_ge(Self, Self) -> Bool
+pub fn TimeLimit::op_gt(Self, Self) -> Bool
+pub fn TimeLimit::op_le(Self, Self) -> Bool
+pub fn TimeLimit::op_lt(Self, Self) -> Bool
+pub fn TimeLimit::output(Self, &Logger) -> Unit
+pub fn TimeLimit::parse(String) -> Self raise TimeLimitError
+pub fn TimeLimit::seconds(Int32) -> Self raise TimeLimitError
+pub fn TimeLimit::to_millis(Self) -> Int32
+pub fn TimeLimit::to_repr(Self) -> @debug.Repr
+pub fn TimeLimit::to_string(Self) -> String
+pub impl Show for TimeLimit
+
+pub enum TimeLimitRule {
+  Empty
+  UnexpectedSpace
+  NotANumber
+  MissingUnit
+  UnknownUnit(String)
+  UnitsOutOfOrder
+  RepeatedUnit
+  NotWholeMilliseconds
+  NotPositive
+  AboveLargest
+} derive(Eq, @debug.Debug)
+pub fn TimeLimitRule::equal(Self, Self) -> Bool
+pub fn TimeLimitRule::not_equal(Self, Self) -> Bool
+pub fn TimeLimitRule::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

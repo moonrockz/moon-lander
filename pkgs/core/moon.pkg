@@ -1,7 +1,9 @@
 import {
+  "moonbitlang/core/bigint",
   "moonbitlang/core/debug",
 }
 
 import {
   "moonrockz/moon-lander-core" @lander_core,
+  "moonbitlang/core/quickcheck",
 } for "test"

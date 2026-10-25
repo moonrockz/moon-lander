@@ -219,5 +219,183 @@ async test "a signal before the command reply does not replace its first request
     })
   @expect.expect(result.reason is Requested).to_be_true()
   @expect.expect(result.signal).to_equal(Some(Quit))
-  @expect.expect(result.exit_code().to_int()).to_equal(4)
+  @expect.expect(result.exit_code().to_int()).to_equal(131)
+}
+
+///|
+async test "configuration factory failure gives 2 and runs no hook or command" {
+  let log = []
+  let host : HostBuilder[Unit] = builder(@lander_core.AppName::parse("config"), [])
+  let result = host
+    |> service("a", start=_ => log.push("start"), stop=_ => log.push("stop"))
+    |> build(_ => raise @config.FileNotFound(path="config.toml"))
+    |> run(_ => log.push("command"))
+  @expect.expect(result.exit_code().to_int()).to_equal(2)
+  @expect.expect(result.reason is StartFailed(@config.FileNotFound(path=_))).to_be_true()
+  @expect.expect(log).to_equal([])
+}
+
+///|
+async test "command binding and usage errors give 2 and still stop" {
+  for binding in [false, true] {
+    let log = []
+    let result = builder(@lander_core.AppName::parse("binding"), [])
+      |> service("a", stop=_ => log.push("stop"))
+      |> build(_ => ())
+      |> run(ctx => {
+        if binding { let value : String = @config.bind(ctx.config, "missing"); ignore(value) }
+        else { raise UsageError("bad argument") }
+      })
+    @expect.expect(result.exit_code().to_int()).to_equal(2)
+    @expect.expect(result.failures().length()).to_equal(1)
+    @expect.expect(log).to_equal(["stop"])
+  }
+}
+
+///|
+async test "custom async report replaces the default and receives failures in order with final code" {
+  for usage in [false, true] {
+    let seen = []
+    let mut replaced = 0
+    let result = builder(@lander_core.AppName::parse("reports"), [])
+      |> error_report((_, _) => replaced += 1)
+      |> error_report((error, code) => {
+        @async.sleep(1)
+        seen.push((report_text(@lander_core.AppName::parse("custom"), error), code.to_int()))
+      })
+      |> service("a", stop=_ => raise HookFailed(1), stopped=_ => raise HookFailed(2))
+      |> build(_ => ())
+      |> run(_ => { if usage { raise UsageError("bad option") } else { raise HookFailed(0) } })
+    let expected_code = if usage { 2 } else { 1 }
+    @expect.expect(result.exit_code().to_int()).to_equal(expected_code)
+    @expect.expect(replaced).to_equal(0)
+    @expect.expect(seen).to_equal(result.failures().map(error =>
+      (report_text(@lander_core.AppName::parse("custom"), error) catch { _ => abort("valid name") }, expected_code)))
+  }
+}
+
+///|
+async test "no report for clean application or signal outcomes including suppressed failures" {
+  for code in [0, 1, 2, 3, 130, 143, 131] {
+    let mut calls = 0
+    let result = builder(@lander_core.AppName::parse("silent"), [])
+      |> error_report((_, _) => calls += 1)
+      |> build(_ => ())
+      |> run(ctx => ctx.lifetime.set_exit_code(ExitCode::from_int(code)))
+    @expect.expect(result.exit_code().to_int()).to_equal(code)
+    @expect.expect(calls).to_equal(0)
+  }
+  for signal in [SignalKind::Interrupt, Terminate, Quit] {
+    let mut calls = 0
+    let result = builder(@lander_core.AppName::parse("signal"), [])
+      |> error_report((_, _) => calls += 1)
+      |> service("a", stop=ctx => ctx.lifetime.request_stop(Signal(signal), None))
+      |> build(_ => ())
+      |> run(ctx => { ctx.lifetime.set_exit_code(ExitCode::from_int(3)); raise UsageError("hidden") })
+    @expect.expect(result.exit_code()).to_equal(signal.exit_code())
+    @expect.expect(calls).to_equal(0)
+    @expect.expect(result.failures().length()).to_equal(1)
+  }
+}
+
+///|
+async test "application code uses chronological order across the first request and stop phase" {
+  for set_after in [false, true] {
+    let result = builder(@lander_core.AppName::parse("order"), [])
+      |> service("a", stop=ctx => {
+        if set_after { ctx.lifetime.set_exit_code(ExitCode::from_int(5)) }
+        ctx.lifetime.stop_application(exit_code=ExitCode::from_int(9))
+      })
+      |> build(_ => ())
+      |> run(ctx => {
+        ctx.lifetime.set_exit_code(ExitCode::from_int(3))
+        ctx.lifetime.stop_application(exit_code=ExitCode::from_int(4))
+      })
+    @expect.expect(result.exit_code().to_int()).to_equal(if set_after { 5 } else { 4 })
+  }
+}
+
+///|
+async test "signal after set_exit_code gives 130" {
+  let result = builder(@lander_core.AppName::parse("interrupt"), [])
+    |> build(_ => ())
+    |> run(ctx => {
+      ctx.lifetime.set_exit_code(ExitCode::from_int(3))
+      ctx.lifetime.request_stop(Signal(Interrupt), None)
+    })
+  @expect.expect(result.exit_code().to_int()).to_equal(130)
+}
+
+///|
+async test "concurrent failing runs can both write their default reports" {
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("concurrent"), [])
+    |> build(_ => ())
+  @async.with_task_group(group => {
+    let first = group.spawn(() => run(host, _ => raise UsageError("first")))
+    let second = group.spawn(() => run(host, _ => raise UsageError("second")))
+    @expect.expect(first.wait().exit_code().to_int()).to_equal(2)
+    @expect.expect(second.wait().exit_code().to_int()).to_equal(2)
+  })
+}
+
+///|
+async test "custom report also receives a failure before start" {
+  let seen = []
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("factory-report"), [])
+    |> error_report((error, code) => seen.push((error is UsageError("factory"), code)))
+    |> build(_ => raise UsageError("factory"))
+  let result = run(host, _ => fail("command must not run"))
+  @expect.expect(result.exit_code().to_int()).to_equal(2)
+  @expect.expect(seen).to_equal([(true, usage_exit_code())])
+}
+
+///|
+async test "a report error preserves the outcome and reports the next failure" {
+  for usage in [false, true] {
+    let seen = []
+    let result = builder(@lander_core.AppName::parse("report-error"), [])
+      |> error_report((error, code) => {
+        seen.push((report_text(@lander_core.AppName::parse("custom"), error), code.to_int()))
+        if seen.length() == 1 { fail("report broke") }
+      })
+      |> service("a", stop=_ => raise HookFailed(1))
+      |> build(_ => ())
+      |> run(_ => {
+        if usage { raise UsageError("bad option") }
+        else { raise HookFailed(0) }
+      })
+    let expected_code = if usage { 2 } else { 1 }
+    @expect.expect(result.exit_code().to_int()).to_equal(expected_code)
+    @expect.expect(result.failures().length()).to_equal(2)
+    @expect.expect(result.reason is Failed(_)).to_be_true()
+    @expect.expect(seen).to_equal(result.failures().map(error =>
+      (report_text(@lander_core.AppName::parse("custom"), error) catch { _ => abort("valid name") }, expected_code)))
+  }
+}
+
+///|
+async test "factory StopRequested gives a clean requested stop without hooks or reports" {
+  let log = []
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("factory-stop"), [])
+    |> error_report((_, _) => log.push("report"))
+    |> service("a", starting=_ => log.push("starting"), start=_ => log.push("start"),
+      started=_ => log.push("started"), stopping=_ => log.push("stopping"),
+      stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
+    |> build(_ => raise StopRequested::StopRequested)
+  let result = run(host, _ => log.push("command"))
+  @expect.expect(result.reason is Requested).to_be_true()
+  @expect.expect(result.exit_code()).to_equal(ExitCode::success())
+  @expect.expect(result.failures().length()).to_equal(0)
+  @expect.expect(result.requested_code).to_equal(None)
+  @expect.expect(result.signal).to_equal(None)
+  @expect.expect(log).to_equal([])
+}
+
+///|
+async test "default report preserves the message of fail" {
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("build"), []) |> build(_ => ())
+  let result = run(host, _ => fail("build.invalid_timeout"))
+  @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
+  @expect.expect(result.failures().length()).to_equal(1)
+  @expect.expect(report_text(host.name, result.failures()[0]).contains("build.invalid_timeout")).to_be_true()
 }

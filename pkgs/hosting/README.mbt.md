@@ -84,9 +84,10 @@ A command can use the same function to protect a critical part of its work.
 
 The first event that ends the run sets `stop_reason()`. Later requests keep that
 reason and the first request's optional code, so all stop hooks read one reason.
-`set_exit_code(code)` sets an application result without asking to stop. A raised
-failure still gives code 1. The driver returns `RunOutcome` without ending the
-process.
+`set_exit_code(code)` sets an application result without asking to stop.
+The last call to `set_exit_code` or the first request's explicit code wins. A
+signal or failure takes precedence over the application code. The driver returns
+`RunOutcome` without ending the process.
 
 ## Cancellation checks
 
@@ -128,5 +129,60 @@ test "a long command yields between batches" {
     }
   }
   ignore(command)
+}
+```
+
+## Exit codes and reports
+
+| Code | Cause |
+| --- | --- |
+| 0 | Clean run |
+| 1 | Unhandled factory, hook or command failure; stop failure or timeout |
+| 2 | Configuration or usage error in any phase |
+| 130 | Interrupt signal stop |
+| 143 | Terminate signal stop |
+| 131 | Quit signal stop |
+| n | Application code from `set_exit_code` or `stop_application(exit_code=...)` |
+
+Precedence is signal, configuration or usage error, unhandled failure, stop
+failure or timeout, application code, then 0. A later signal still sets the code
+and keeps the first stop reason. Later stop requests keep the first request's
+optional code. The last application code set by `set_exit_code` or the first
+request wins. `ExitCode::from_int` accepts 0 to 255.
+
+```mbt check
+///|
+test "application and signal codes" {
+  let command : @hosting.Hook[Unit] = ctx => {
+    ctx.lifetime.set_exit_code(@hosting.ExitCode::from_int(3))
+    ctx.lifetime.stop_application(exit_code=@hosting.ExitCode::from_int(4))
+  }
+  assert_eq(@hosting.SignalKind::Interrupt.exit_code().to_int(), 130)
+  ignore(command)
+}
+```
+
+For exit code 1 or 2, `run` writes one line per failure to standard error:
+`<application name>: <message>`. A run with no failures writes nothing, including
+an application code of 1 or 2. Other codes write nothing. `HostError`, `UsageError`
+and `ConfigError` use their `message()` text; other errors use their `Show` text.
+
+`error_report` replaces the default report. Its async callback gets each failure
+in occurrence order with the final `ExitCode`. It can write a custom format such
+as JSON. Each call to the builder step replaces the earlier report.
+
+```mbt check
+///|
+test "replace the failure report" {
+  let reports : Array[(String, @hosting.ExitCode)] = []
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.error_report((error, code) => {
+      reports.push((error.to_string(), code))
+    })
+    |> @hosting.build(_ => ())
+  let command : @hosting.Hook[Unit] = _ => raise @hosting.UsageError("expected a command")
+  ignore((host, command))
 }
 ```

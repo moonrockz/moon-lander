@@ -1,5 +1,5 @@
 ///|
-/// Test the host adapter on Node and Bun, reusing Moon's compiled test artifacts.
+/// Test the config and hosting adapters on Node and Bun, reusing Moon's compiled test artifacts.
 /// Usage: mise run test:node-adapter [-- node|bun].
 import {
   "moonbitlang/async@0.22.5",
@@ -37,16 +37,18 @@ async fn main {
       eprintln("Expected node or bun, got \{runtime}")
       @sys.exit(1)
     }
-    println("Testing config/host on \{runtime}")
-    let code = @process.run(
-      "moon",
-      ["test", "--deny-warn", "--target", "js", "pkgs/config/host"],
-      extra_env={ "MOON_NODE_OVERRIDE": runtime },
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
-    if code != 0 {
-      @sys.exit(if code > 0 { code } else { 1 })
+    for pkg in ["pkgs/config/host", "pkgs/hosting"] {
+      println("Testing config and hosting adapters: \{pkg} on \{runtime}")
+      let code = @process.run(
+        "moon",
+        ["test", "--deny-warn", "--target", "js", pkg],
+        extra_env={ "MOON_NODE_OVERRIDE": runtime },
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      )
+      if code != 0 {
+        @sys.exit(if code > 0 { code } else { 1 })
+      }
     }
     let code = @process.run(
       runtime,

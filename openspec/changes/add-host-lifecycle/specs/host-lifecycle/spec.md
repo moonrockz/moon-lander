@@ -489,7 +489,7 @@ plain read that synchronous code can poll.
 
 ### Requirement: A raised stop is not a failure
 
-When the command or a hosted-service hook raises `StopRequested`, the host SHALL
+When the command, the services factory or a hosted-service hook raises `StopRequested`, the host SHALL
 treat the run as stopped, not as failed. The stop reason MUST stay the reason of the first stop request.
 
 #### Scenario: Command polls the check

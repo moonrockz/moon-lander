@@ -33,7 +33,8 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   through nonzero exit codes. Exception: js file access in `moonrockz/moon-lander-config/host` uses the
   TypeScript adapter over `node:fs` in `pkgs/config/adapters/node/`, built with Bun
   through `scripts/build-node-adapter.mbtx`. Its test fixtures use a separate
-  TypeScript entry point and generated test file. The js signal listeners of
+  TypeScript entry point and generated test file. The js standard-error write of
+  the hosting error report and the js signal listeners of
   `moonrockz/moon-lander-hosting/console` use a TypeScript adapter over `node:*` in
   `pkgs/hosting/adapters/node/`, with the same rules, built by the same script as a
   second entry point.

@@ -60,9 +60,9 @@ Bead: lander-4us.5.4
 
 Bead: lander-4us.5.5
 
-- [ ] 5.1 Add `ExitCode`, `UsageError` and the precedence function as a pure function; verify a table test of all precedence pairs, with 130, 143 and 131
-- [ ] 5.2 Map `ConfigError` and `UsageError` to 2 and other errors to 1; verify tests with a configuration error before start and a binding error in the command
-- [ ] 5.3 Add the default standard-error report and `@hosting.error_report`; verify the report text and that a custom report replaces it
+- [x] 5.1 Add `ExitCode`, `UsageError` and the precedence function as a pure function; verify a table test of all precedence pairs, with 130, 143 and 131
+- [x] 5.2 Map `ConfigError` and `UsageError` to 2 and other errors to 1; verify tests with a configuration error before start and a binding error in the command
+- [x] 5.3 Add the default standard-error report and `@hosting.error_report`; verify the report text and that a custom report replaces it
 
 ## 6. Arguments first and standard flags
 

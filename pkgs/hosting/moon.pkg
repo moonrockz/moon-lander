@@ -3,6 +3,8 @@ import {
   "moonrockz/moon-lander-config" @config,
   "moonbitlang/core/debug",
   "moonbitlang/async",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/js_async",
   "moonbit-community/unicode-data/xid" @xid,
   "moonbit-community/unicode-data/case_mapping" @case_mapping,
 }
@@ -22,17 +24,19 @@ import {
 
 // Temporary until task group 13: only `run` reads the host and builds the
 // contexts and the outcome, and it exists on native and js. On wasm and wasm-gc
-// nothing reads them until `run_embedded`. On every target, the application
-// name and the arguments stay unread until groups 5, 6 and 8. Remove this line
-// when they are read. The pinned build system cannot condition imports by
-// target, so the library, test and wbtest imports of `moonbitlang/async` are unused on wasm and
-// wasm-gc (29); that part stays.
+// nothing reads them until `run_embedded`. Arguments stay unread until groups
+// 6 and 8; the native/js error report reads the application name. Remove the
+// field overrides when those fields are read. The pinned build system cannot
+// condition imports by target, so the async imports are unused on wasm and
+// wasm-gc (29); remove that part when the imports can be conditional.
 warnings = "-7-9-29"
 
 // `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not
 // have. Its tests are async tests, which wasm-gc cannot run.
 options(targets: {
   "run.mbt": ["native", "js"],
+  "report.js_wbtest.mbt": ["js"],
+  "node_fixture.generated.js_wbtest.mbt": ["js"],
   "run_test.mbt": ["native", "js"],
   "run_wbtest.mbt": ["native", "js"],
 })

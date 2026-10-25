@@ -325,7 +325,7 @@ pub(all) enum SignalKind { Interrupt; Terminate; Quit }
   signal arrived on every platform (D7).
 - Call (this change): `StopToken` holds the same check for code that does not get
   `Context[S]`, for example an evaluator.
-- Call (this change): when the command or a hook raises `StopRequested`, the host
+- Call (this change): when the command, the services factory or a hook raises `StopRequested`, the host
   treats it as a normal stop, not as a failure. The stop reason stays the reason of the first
   request. A service whose `starting` or `start` hook raises `StopRequested` does
   not count as started.

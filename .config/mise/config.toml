@@ -131,7 +131,7 @@ description = "Run native tests with zig as the C compiler"
 run = "moonx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/test.mbtx native"
 
 [tasks."test:node-adapter"]
-description = "Test the js host adapter on Node and Bun (args: node|bun)"
+description = "Test the js config and hosting adapters on Node and Bun (args: node|bun)"
 run = "moonx scripts/test-node-adapter.mbtx"
 
 [tasks."test:scripts"]

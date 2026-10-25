@@ -8,11 +8,23 @@ import {
 // Values
 
 // Errors
+pub suberror AbsolutePathError {
+  InvalidAbsolutePath(text~ : String, rule~ : AbsolutePathRule)
+} derive(@debug.Debug)
+pub fn AbsolutePathError::message(Self) -> String
+pub fn AbsolutePathError::to_repr(Self) -> @debug.Repr
+
 pub suberror AppNameError {
   InvalidAppName(text~ : String, rule~ : AppNameRule)
 } derive(@debug.Debug)
 pub fn AppNameError::message(Self) -> String
 pub fn AppNameError::to_repr(Self) -> @debug.Repr
+
+pub suberror EnvPrefixError {
+  InvalidEnvPrefix(text~ : String, rule~ : EnvPrefixRule)
+} derive(@debug.Debug)
+pub fn EnvPrefixError::message(Self) -> String
+pub fn EnvPrefixError::to_repr(Self) -> @debug.Repr
 
 pub suberror TimeLimitError {
   InvalidTimeLimit(input~ : String, rule~ : TimeLimitRule)
@@ -21,6 +33,27 @@ pub fn TimeLimitError::message(Self) -> String
 pub fn TimeLimitError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct AbsolutePath {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn AbsolutePath::equal(Self, Self) -> Bool
+pub fn AbsolutePath::not_equal(Self, Self) -> Bool
+pub fn AbsolutePath::output(Self, &Logger) -> Unit
+pub fn AbsolutePath::parse(String) -> Self raise AbsolutePathError
+pub fn AbsolutePath::root() -> Self
+pub fn AbsolutePath::to_repr(Self) -> @debug.Repr
+pub fn AbsolutePath::to_string(Self) -> String
+pub impl Show for AbsolutePath
+
+pub enum AbsolutePathRule {
+  Empty
+  NotAbsolute
+  MissingUncServerOrShare
+} derive(Eq, @debug.Debug)
+pub fn AbsolutePathRule::equal(Self, Self) -> Bool
+pub fn AbsolutePathRule::not_equal(Self, Self) -> Bool
+pub fn AbsolutePathRule::to_repr(Self) -> @debug.Repr
+
 pub struct AppName {
   // private fields
 } derive(Eq, Hash, @debug.Debug)
@@ -42,6 +75,30 @@ pub enum AppNameRule {
 pub fn AppNameRule::equal(Self, Self) -> Bool
 pub fn AppNameRule::not_equal(Self, Self) -> Bool
 pub fn AppNameRule::to_repr(Self) -> @debug.Repr
+
+pub struct EnvPrefix {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn EnvPrefix::equal(Self, Self) -> Bool
+pub fn EnvPrefix::from_app_name(AppName) -> Self
+pub fn EnvPrefix::hash(Self) -> Int32
+pub fn EnvPrefix::hash_combine(Self, Hasher) -> Unit
+pub fn EnvPrefix::not_equal(Self, Self) -> Bool
+pub fn EnvPrefix::output(Self, &Logger) -> Unit
+pub fn EnvPrefix::parse(String) -> Self raise EnvPrefixError
+pub fn EnvPrefix::to_repr(Self) -> @debug.Repr
+pub fn EnvPrefix::to_string(Self) -> String
+pub impl Show for EnvPrefix
+
+pub enum EnvPrefixRule {
+  Empty
+  LowerCaseLetter(Char)
+  FirstNotLetterOrUnderscore
+  CharNotAllowed(Char)
+} derive(Eq, @debug.Debug)
+pub fn EnvPrefixRule::equal(Self, Self) -> Bool
+pub fn EnvPrefixRule::not_equal(Self, Self) -> Bool
+pub fn EnvPrefixRule::to_repr(Self) -> @debug.Repr
 
 pub struct TimeLimit {
   // private fields

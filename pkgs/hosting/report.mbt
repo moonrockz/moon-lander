@@ -47,6 +47,7 @@ fn select_exit_code(signal : SignalKind?, failures : Array[Error], timed_out : B
 fn report_text(name : @lander_core.AppName, error : Error) -> String {
   let message = match error {
     HostError::_ as e => e.message()
+    WorkingDirectoryError::_ as e => e.message()
     UsageError::_ as e => e.message()
     ShutdownTimedOut::_ as e => e.message()
     @config.ConfigError::_ as e => e.message()

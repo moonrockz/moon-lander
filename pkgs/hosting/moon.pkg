@@ -3,6 +3,8 @@ import {
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/conventions",
   "moonbitlang/core/argparse",
+  "moonbitlang/core/env",
+  "moonbitlang/core/immut/sorted_map",
   "moonbitlang/core/debug",
   "moonbitlang/async",
   "moonbitlang/async/stdio",
@@ -20,6 +22,8 @@ import {
 
 import {
   "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
+  "moonrockz/moon-lander-config/parsers/toml",
+  "moonbitlang/core/json",
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
   "moonbitlang/async",
@@ -37,6 +41,10 @@ warnings = "-7-9-29"
 // `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not
 // have. Its tests are async tests, which wasm-gc cannot run.
 options(targets: {
+  "settings.process.mbt": ["native", "js"],
+  "settings.embedded.mbt": ["wasm", "wasm-gc"],
+  "settings.process_wbtest.mbt": ["native", "js"],
+  "settings.embedded_wbtest.mbt": ["wasm", "wasm-gc"],
   "run.mbt": ["native", "js"],
   "report.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],

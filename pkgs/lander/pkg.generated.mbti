@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub fn cli(@moon-lander-core.AppName, Array[String]) -> @moon-lander-hosting.HostBuilder[Unit]
+pub fn cli(@moon-lander-core.AppName, Array[String], env_vars? : &@moon-lander-hosting.IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : String) -> @moon-lander-hosting.HostBuilder[Unit]
 
 pub fn version() -> String
 

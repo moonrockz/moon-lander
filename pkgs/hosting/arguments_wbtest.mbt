@@ -1,4 +1,9 @@
 ///|
+fn[S] parse_test_arguments(host : Host[S]) -> ParsedArguments raise {
+  parse_arguments(host, env=resolve_settings(host).variables)
+}
+
+///|
 fn argument_host(argv : Array[String]) -> Host[Unit] raise {
   builder(@lander_core.AppName::parse("acme"), argv)
   |> @hosting_argparse.command(name => @argparse.Command(name,
@@ -14,7 +19,7 @@ test "the adapter keeps argparse error text and usage code" {
   let expected = @argparse.Command("acme").parse(argv=argv[:]) catch {
     error => error.to_string()
   } noraise { _ => fail("expected an argparse error") }
-  try parse_arguments(builder(@lander_core.AppName::parse("acme"), argv) |> build(_ => ())) catch {
+  try parse_test_arguments(builder(@lander_core.AppName::parse("acme"), argv) |> build(_ => ())) catch {
     UsageError(message) as error => {
       @expect.expect(message).to_equal(expected)
       @expect.expect(select_exit_code(None, [error], false, None)).to_equal(usage_exit_code())
@@ -27,15 +32,16 @@ test "the adapter keeps argparse error text and usage code" {
 test "an empty command uses the application name and rejects extra arguments" {
   let name = @lander_core.AppName::parse("bare")
   let host = builder(name, []) |> build(_ => ())
-  @expect.expect(parse_arguments(host).matches.subcommand is None).to_be_true()
-  try parse_arguments(builder(name, ["extra"]) |> build(_ => ())) catch {
+  @expect.expect(parse_test_arguments(host).matches.subcommand is None).to_be_true()
+  try parse_test_arguments(builder(name, ["extra"]) |> build(_ => ())) catch {
     UsageError(message) => @expect.expect(message.contains("Usage: bare")).to_be_true()
+    error => raise error
   } noraise { _ => fail("expected UsageError") }
 }
 
 ///|
 test "absent standard flags leave discovery at its defaults" {
-  @expect.expect(parse_arguments(argument_host([])).discovery_options).to_equal(@conventions.DiscoveryOptions::new())
+  @expect.expect(parse_test_arguments(argument_host([])).discovery_options).to_equal(@conventions.DiscoveryOptions::new())
 }
 
 ///|
@@ -48,13 +54,13 @@ test "each standard flag fills only its discovery field" {
     (["--project", "packages/core"], @conventions.DiscoveryOptions::new(project="packages/core")),
   ]
   for (argv, expected) in cases {
-    @expect.expect(parse_arguments(argument_host(argv)).discovery_options).to_equal(expected)
+    @expect.expect(parse_test_arguments(argument_host(argv)).discovery_options).to_equal(expected)
   }
 }
 
 ///|
 test "all standard flags are global through nested subcommands" {
-  let parsed = parse_arguments(argument_host(["build", "release", "--environment", "Staging", "--config", "app.toml", "--isolated", "--project", "core"]))
+  let parsed = parse_test_arguments(argument_host(["build", "release", "--environment", "Staging", "--config", "app.toml", "--isolated", "--project", "core"]))
   @expect.expect(parsed.discovery_options).to_equal(@conventions.DiscoveryOptions::new(environment="Staging", config=Explicit("app.toml"), isolated=true, project="core"))
   @expect.expect(parsed.matches.subcommand is Some(("build", _))).to_be_true()
 }
@@ -63,7 +69,7 @@ test "all standard flags are global through nested subcommands" {
 test "each empty or missing standard value is a usage error" {
   for flag in ["--environment", "--config", "--project"] {
     for argv in [[flag + "="], [flag, ""], [flag]] {
-      try parse_arguments(argument_host(argv)) catch {
+      try parse_test_arguments(argument_host(argv)) catch {
         UsageError(message) as error => {
           @expect.expect(message.contains(flag)).to_be_true()
           @expect.expect(select_exit_code(None, [error], false, None)).to_equal(usage_exit_code())
@@ -81,5 +87,5 @@ test "the command step preserves the earlier builder and the last command wins" 
   let third = second |> command(name => @argparse.Command(name))
   @expect.expect(first.make_command is None).to_be_true()
   @expect.expect(second.make_command is Some(_)).to_be_true()
-  @expect.expect(parse_arguments(third |> build(_ => ())).matches.subcommand is None).to_be_true()
+  @expect.expect(parse_test_arguments(third |> build(_ => ())).matches.subcommand is None).to_be_true()
 }

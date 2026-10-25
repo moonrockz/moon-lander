@@ -7,7 +7,12 @@
 /// for code 1 or 2, in failure order, through `error_report` or as
 /// `<name>: <message>` on standard error. Report errors do not change the outcome.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
-  let result = execute(host, command)
+  run_with_directory_reader(host, command)
+}
+
+///|
+async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory) -> RunOutcome {
+  let result = execute(host, command, read_directory~)
   @async.protect_from_cancel(() => {
     for error in result.failures {
       if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
@@ -24,16 +29,17 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
 }
 
 ///|
-async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
-  let parsed = parse_arguments(host) catch { err => return outcome(err) }
-  let config = @config.load(@config.builder(), @config.FileTree::new(complete=true)) catch {
+async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError) -> RunOutcome {
+  let settings = resolve_settings(host, read_directory~) catch { err => return outcome(err) }
+  let parsed = parse_arguments(host, env=settings.variables) catch { err => return outcome(err) }
+  let config = @config.load(configuration_builder(host, settings, parsed.discovery_options), @config.FileTree::new(complete=true)) catch {
     err => return outcome(err)
   }
   let config = match config {
     Done(config) => config
     Need(_) => abort("a complete file tree gives no file request")
   }
-  let services = (host.factory)({ config, args: parsed.matches }) catch {
+  let services = (host.factory)({ config, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }) catch {
     StopRequested => return {
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
@@ -43,7 +49,7 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
   let lifetime = Lifetime::new()
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let ctx : Context[S] = { services, config, lifetime, args: parsed.matches }
+  let ctx : Context[S] = { services, config, lifetime, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }
   let mut step = Engine::start(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }

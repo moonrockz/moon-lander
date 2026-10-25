@@ -399,3 +399,96 @@ async test "default report preserves the message of fail" {
   @expect.expect(result.failures().length()).to_equal(1)
   @expect.expect(report_text(host.name, result.failures()[0]).contains("build.invalid_timeout")).to_be_true()
 }
+
+///|
+async test "run shares resolved variables and directory with argparse factory hooks and command" {
+  let seen = []
+  let variables = { "ACME_B": "2", "ACME_ENVIRONMENT": "Staging", "HOME": "/home/test" }
+  let outcome = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_A": "1" },
+    working_dir=@lander_core.AbsolutePath::parse("/a"))
+    |> env_vars(variables) |> working_dir(@lander_core.AbsolutePath::parse("/b"))
+    |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("b", env="ACME_B")]))
+    |> service("observer", start=ctx => {
+      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      seen.push("start")
+    }, stop=ctx => {
+      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+      seen.push("stop")
+    })
+    |> build(ctx => {
+      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      assert_eq(ctx.args.values.get("b"), Some(["2"]))
+      assert_eq(@config.get_text(ctx.config, "b"), "2")
+      assert_true(ctx.config.get(@config.KeyPath::parse("a")) is None)
+      let changed = ctx.env_vars.add("ACME_B", "999")
+      assert_eq(changed.get("ACME_B"), Some("999"))
+      assert_eq(ctx.env_vars.get("ACME_B"), Some("2"))
+      seen.push("factory")
+    })
+    |> run(ctx => {
+      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      assert_eq(ctx.args.values.get("b"), Some(["2"]))
+      assert_eq(@config.get_text(ctx.config, "b"), "2")
+      seen.push("command")
+    })
+  assert_eq(outcome.exit_code().to_int(), 0)
+  assert_eq(seen, ["factory", "start", "command", "stop"])
+}
+
+///|
+async test "bad JSON variables and argv stop before factory or hooks" {
+  let mut ran = false
+  for (vars, argv) in [((["ACME_PORT"] : Json), []), (({} : Json), ["--unknown"])] {
+    let outcome = builder(@lander_core.AppName::parse("acme"), argv, env_vars=vars,
+      working_dir=@lander_core.AbsolutePath::root())
+      |> error_report((_, _) => ())
+      |> service("must-not-start", start=_ => { ran = true })
+      |> build(_ => { ran = true }) |> run(_ => { ran = true })
+    assert_eq(outcome.exit_code().to_int(), 2)
+    assert_true(outcome.failures()[0] is UsageError(_))
+    assert_true(!ran)
+  }
+}
+
+///|
+async test "a missing process directory reports code 1 before argparse factory hooks or command" {
+  let seen = []
+  let reports = []
+  let host = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_A": "1" })
+    |> command(name => { seen.push("parse"); @argparse.Command(name) })
+    |> error_report((error, code) => { reports.push((report_text(@lander_core.AppName::parse("acme"), error), code.to_int())) })
+    |> service("observer", start=_ => seen.push("start"), stop=_ => seen.push("stop"))
+    |> build(_ => seen.push("factory"))
+  let result = run_with_directory_reader(host, _ => seen.push("command"),
+    read_directory=() => process_directory_from(() => None))
+  assert_eq(result.exit_code().to_int(), 1)
+  assert_true(result.failures()[0] is MissingWorkingDirectory)
+  assert_eq(seen, [])
+  assert_eq(reports, [("acme: The process has no working directory", 1)])
+}
+
+///|
+async test "runs keep the builder and env_vars snapshots after caller map mutation" {
+  let vars = { "ACME_A": "1" }
+  let first = builder(@lander_core.AppName::parse("acme"), [], env_vars=vars,
+    working_dir=@lander_core.AbsolutePath::root())
+  vars["ACME_A"] = "2"
+  let second = first |> env_vars(vars)
+  vars["ACME_A"] = "3"
+  for (builder, expected) in [(first, "1"), (second, "2")] {
+    let host = builder |> build(ctx => {
+      assert_eq(ctx.env_vars.get("ACME_A"), Some(expected))
+      assert_eq(@config.get_text(ctx.config, "a"), expected)
+    })
+    for _ in 0..<2 {
+      let result = host |> run(ctx => {
+        assert_eq(ctx.env_vars.get("ACME_A"), Some(expected))
+        assert_eq(@config.get_text(ctx.config, "a"), expected)
+      })
+      assert_eq(result.exit_code().to_int(), 0)
+    }
+  }
+}

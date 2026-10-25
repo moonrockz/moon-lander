@@ -42,6 +42,10 @@ pub fn ExitCode::to_int(self : ExitCode) -> Int {
 pub struct BuildContext {
   /// The configuration of the run.
   config : @config.Config
+  /// The immutable variable snapshot of this run, in key order.
+  env_vars : @sorted_map.SortedMap[String, String]
+  /// The absolute working directory of this run.
+  working_dir : @lander_core.AbsolutePath
   /// The one argparse result of this run.
   args : @argparse.Matches
 }
@@ -54,6 +58,10 @@ pub struct Context[S] {
   services : S
   /// The configuration of the run.
   config : @config.Config
+  /// The immutable variable snapshot of this run, in key order.
+  env_vars : @sorted_map.SortedMap[String, String]
+  /// The absolute working directory of this run.
+  working_dir : @lander_core.AbsolutePath
   /// The events, stop requests and cancellation checks of this run.
   lifetime : Lifetime
   /// The one argparse result, shared with the factory and all hooks.
@@ -84,6 +92,13 @@ priv struct HostedService[S] {
 pub struct HostBuilder[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv prefix : @lander_core.EnvPrefix
+  priv variables : Result[@sorted_map.SortedMap[String, String], UsageError]?
+  priv directory : @lander_core.AbsolutePath?
+  priv environment : String?
+  priv reserved : Array[String]
+  priv skip_variables : Bool
+  priv use_app_dirs : Bool
   priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
   priv shutdown_timeout : @lander_core.TimeLimit
@@ -92,9 +107,21 @@ pub struct HostBuilder[S] {
 
 ///|
 /// Start a bare host builder with the application name and the command-line
-/// arguments. The builder adds no service or configuration source.
-pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
-  { name, args: args.copy(), make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+/// arguments. The builder adds the prefixed variable source, but no services.
+/// Omitted variables and directory come from the process on native and js,
+/// and from the empty set and `/` on wasm and wasm-gc, once per run.
+/// `environment` is a default name, raw text for now; a parsed
+/// environment-name type replaces it.
+pub fn[S] builder(
+  name : @lander_core.AppName,
+  args : Array[String],
+  env_vars? : &IntoEnvVars,
+  working_dir? : @lander_core.AbsolutePath,
+  environment? : String,
+) -> HostBuilder[S] {
+  { name, args: args.copy(), prefix: @lander_core.EnvPrefix::from_app_name(name),
+    variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, reserved: [],
+    skip_variables: false, use_app_dirs: false, make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
 }
 
 ///|
@@ -156,6 +183,13 @@ pub fn[S] service(
 pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv prefix : @lander_core.EnvPrefix
+  priv variables : Result[@sorted_map.SortedMap[String, String], UsageError]?
+  priv directory : @lander_core.AbsolutePath?
+  priv environment : String?
+  priv reserved : Array[String]
+  priv skip_variables : Bool
+  priv use_app_dirs : Bool
   priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
   priv shutdown_timeout : @lander_core.TimeLimit
@@ -173,6 +207,13 @@ pub fn[S] build(
   {
     name: builder.name,
     args: builder.args,
+    prefix: builder.prefix,
+    variables: builder.variables,
+    directory: builder.directory,
+    environment: builder.environment,
+    reserved: builder.reserved,
+    skip_variables: builder.skip_variables,
+    use_app_dirs: builder.use_app_dirs,
     make_command: builder.make_command,
     services: builder.services,
     factory,

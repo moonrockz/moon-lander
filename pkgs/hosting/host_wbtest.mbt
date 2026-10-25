@@ -4,6 +4,32 @@ fn[S] names(services : Array[HostedService[S]]) -> Array[String] {
 }
 
 ///|
+test "shutdown timeout defaults to the core 30 second limit and later steps replace it" {
+  let first : HostBuilder[Unit] = builder(@lander_core.AppName::parse("timeout"), [])
+  let second = first |> shutdown_timeout(@lander_core.TimeLimit::millis(1))
+  let third = second |> shutdown_timeout(@lander_core.TimeLimit::seconds(5))
+  @expect.expect((first |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::seconds(30))
+  @expect.expect((second |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::millis(1))
+  @expect.expect((third |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::seconds(5))
+  for value in [0, -1] {
+    try {
+      ignore(@lander_core.TimeLimit::millis(value))
+      fail("an invalid limit must not reach the builder")
+    } catch {
+      @lander_core.InvalidTimeLimit(rule=NotPositive, ..) => ()
+      error => raise error
+    }
+    try {
+      ignore(@lander_core.TimeLimit::seconds(value))
+      fail("an invalid limit must not reach the builder")
+    } catch {
+      @lander_core.InvalidTimeLimit(rule=NotPositive, ..) => ()
+      error => raise error
+    }
+  }
+}
+
+///|
 test "the host keeps the name, the arguments and the registration order" {
   let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), ["build", "--verbose"])
     |> service(ServiceName::parse("db"), start=_ => ())

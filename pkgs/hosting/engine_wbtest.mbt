@@ -216,6 +216,8 @@ test "engine table: timeout skips remaining stop hooks and preserves requested c
     @expect.expect(outcome.exit_code()).to_equal(ExitCode::failure())
     @expect.expect(outcome.requested_code).to_equal(Some(code))
     @expect.expect(outcome.reason is Requested).to_be_true()
+    @expect.expect(outcome.failures().length()).to_equal(1)
+    @expect.expect(outcome.failures()[0] is ShutdownTimedOut(limit) && limit == default_shutdown_timeout()).to_be_true()
   }
 }
 

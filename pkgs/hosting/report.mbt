@@ -10,6 +10,17 @@ pub fn UsageError::message(self : UsageError) -> String {
 }
 
 ///|
+/// The stop phase used its full time budget. Only the host makes this error.
+pub suberror ShutdownTimedOut { ShutdownTimedOut(@lander_core.TimeLimit) }
+
+///|
+/// Text for people that names the shutdown time limit.
+pub fn ShutdownTimedOut::message(self : ShutdownTimedOut) -> String {
+  let ShutdownTimedOut(limit) = self
+  "Shutdown timed out after \{limit}"
+}
+
+///|
 /// The portable process exit code for this signal.
 pub fn SignalKind::exit_code(self : SignalKind) -> ExitCode {
   { code: match self { Interrupt => 130; Terminate => 143; Quit => 131 } }
@@ -37,6 +48,7 @@ fn report_text(name : @lander_core.AppName, error : Error) -> String {
   let message = match error {
     HostError::_ as e => e.message()
     UsageError::_ as e => e.message()
+    ShutdownTimedOut::_ as e => e.message()
     @config.ConfigError::_ as e => e.message()
     e => e.to_string()
   }

@@ -80,14 +80,29 @@ pub struct HostBuilder[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
   priv report : ErrorReport?
+  priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
 }
 
 ///|
 /// Start a bare host builder with the application name and the command-line
-/// arguments. The builder turns on no default.
+/// arguments. The builder adds no service or configuration source.
 pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
-  { name, args: args.copy(), services: [], report: None }
+  { name, args: args.copy(), services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+}
+
+///|
+fn default_shutdown_timeout() -> @lander_core.TimeLimit {
+  @lander_core.TimeLimit::seconds(30) catch { _ => abort("30 seconds is a valid time limit") }
+}
+
+///|
+/// Set one time budget for the full stop phase, after the command task ends.
+/// The default is 30 seconds. A later step replaces an earlier value.
+/// Only the native and js drivers apply the limit. The wasm and wasm-gc
+/// drivers have no timers.
+pub fn[S] shutdown_timeout(builder : HostBuilder[S], limit : @lander_core.TimeLimit) -> HostBuilder[S] {
+  { ..builder, shutdown_timeout: limit }
 }
 
 ///|
@@ -133,6 +148,7 @@ pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
   priv report : ErrorReport?
+  priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise
 }
@@ -150,6 +166,7 @@ pub fn[S] build(
     services: builder.services,
     factory,
     report: builder.report,
+    shutdown_timeout: builder.shutdown_timeout,
   }
 }
 
@@ -172,8 +189,8 @@ pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
 }
 
 ///|
-/// Each failure of the factory, a hook or the command, in the order that it
-/// occurred. The array is a copy.
+/// Each failure of the factory, a hook or the command, and a shutdown timeout,
+/// in the order that it occurred. The array is a copy.
 pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
   self.failures.copy()
 }

@@ -1,12 +1,4 @@
-///|
-/// Fail when a target leg of the logging tests runs zero tests.
-///
-/// `moon test` exits with 0 when a package has no test entry for a target. The logging spec says
-/// that such a leg MUST NOT count as a pass, so this check runs each logging path for each target
-/// and requires a test count above zero. It follows `scripts/check-mediator.mbtx`.
-///
-/// Usage: `mise run check:logging [-- <target>...]`, or `moonx scripts/check-logging.mbtx`.
-/// With no target, it checks wasm, wasm-gc, js and native.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
@@ -15,6 +7,17 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Fail when a target leg of the logging tests runs zero tests.
+///
+/// `moon test` exits with 0 when a package has no test entry for a target. The logging spec says
+/// that such a leg MUST NOT count as a pass, so this check runs each logging path for each target
+/// and requires a test count above zero. It follows `scripts/check-mediator.mbtx`.
+///
+/// Usage: `mise run check:logging [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/check-logging.mbtx`.
+/// With no target, it checks wasm, wasm-gc, js and native.
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]

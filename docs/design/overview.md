@@ -313,24 +313,27 @@ gives the same result on all four targets.
 
 ## The framework modules
 
-The framework is five MoonBit modules. An application imports only the modules
+The framework is six MoonBit modules. An application imports only the modules
 that it uses. Each module imports only the modules below it. `AppName` and
-`TimeLimit` are in core, so all modules use the same rules for them. A program
-that uses only the mediator gets no configuration parser.
+`TimeLimit` are in core, so all modules use the same rules for them. The logging
+abstraction sits beside core, so each module above can take a `&Logger`. A
+program that uses only the mediator gets no configuration parser.
 
 ```text
 moonrockz/moon-lander-core          AppName, TimeLimit (MoonBit core only)
+moonrockz/moon-lander-logging       Logger, LogEvent (MoonBit core only)
      ↑               ↑
-moon-lander-config   moon-lander-mediator
+moon-lander-config   moon-lander-mediator   (core, logging)
      ↑
-moon-lander-hosting                 (core, config)
+moon-lander-hosting                 (core, logging, config)
      ↑
-moonrockz/moon-lander               @lander entry (all four)
+moonrockz/moon-lander               @lander entry (all five)
 ```
 
 | Module | Folder | Import as |
 | --- | --- | --- |
 | `moonrockz/moon-lander-core` | `pkgs/core` | `@lander_core` |
+| `moonrockz/moon-lander-logging` | `pkgs/logging` | `@logging` |
 | `moonrockz/moon-lander-config` | `pkgs/config` | `@config`, and `@conventions`, `@host`, `@browser`, `@formats` and `@toml` for its packages |
 | `moonrockz/moon-lander-mediator` | `pkgs/mediator` | `@mediator`, and `@mediator_async` for `async` |
 | `moonrockz/moon-lander-hosting` | `pkgs/hosting` | `@hosting`, and `@console` for `console` |

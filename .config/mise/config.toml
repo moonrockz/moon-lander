@@ -191,6 +191,10 @@ run = "moonx scripts/toolchain.mbtx scripts/check-config.mbtx"
 description = "Fail when a target leg of the mediator tests runs zero tests (args: targets; default: all four)"
 run = "moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx"
 
+[tasks."check:logging"]
+description = "Fail when a target leg of the logging tests runs zero tests (args: targets; default: all four)"
+run = "moonx scripts/toolchain.mbtx scripts/check-logging.mbtx"
+
 [tasks."check:formats"]
 description = "Verify linked formats, parser trimming and leak rejection on all four targets"
 run = "moonx scripts/toolchain.mbtx scripts/check-formats.mbtx --verify-failures"

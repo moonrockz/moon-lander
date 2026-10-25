@@ -2,6 +2,7 @@ members = [
   ".",
   "./apps/site",
   "./pkgs/core",
+  "./pkgs/logging",
   "./pkgs/config",
   "./pkgs/mediator",
   "./pkgs/hosting",

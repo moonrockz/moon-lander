@@ -1,0 +1,9 @@
+import {
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moonspec",
+  "moonrockz/moonspec/core" @moonspec_core,
+  "moonrockz/moonspec/runner",
+  "moonrockz/expect",
+  "moonbitlang/core/json",
+} for "wbtest"

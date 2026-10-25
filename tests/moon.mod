@@ -8,6 +8,7 @@ import {
   "moonrockz/moon-lander@0.3.0",
   "moonrockz/moon-lander-core@0.3.0",
   "moonrockz/moon-lander-config@0.3.0",
+  "moonrockz/moon-lander-logging@0.3.0",
   "moonrockz/moon-lander-mediator@0.3.0",
   "moonrockz/moon-lander-hosting@0.3.0",
   "moonrockz/openrpc@0.3.0",

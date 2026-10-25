@@ -76,6 +76,8 @@ jobs:
         run: mise run test -- ${{ matrix.target }}
       - name: Check that the mediator tests run on this target
         run: mise run check:mediator -- ${{ matrix.target }}
+      - name: Check that the logging tests run on this target
+        run: mise run check:logging -- ${{ matrix.target }}
       - name: Test the js host adapter on Bun
         if: matrix.target == 'js'
         run: mise run test:node-adapter -- bun

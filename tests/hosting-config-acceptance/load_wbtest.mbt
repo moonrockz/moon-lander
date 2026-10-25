@@ -25,7 +25,8 @@ async test "project selector chooses a path before a conflicting project name th
       |> @hosting.conventions(c => c |> @conventions.workspace())
       |> @hosting.build(b => { calls.val += 1; @config.get_text(b.config, "selected") })
       |> @hosting.run(ctx => assert_eq(ctx.services, selected))
-    assert_eq(result.exit_code().to_int(), 0)
+    assert_eq(result.exit_code().to_int(), 0,
+      msg="project \{selector}: " + result.failures().map(error => error.to_string()).join("\n"))
     assert_eq(calls.val, 1)
   }
 }
@@ -38,7 +39,8 @@ async test "ambiguous project name gives config code 2 before factory and hooks"
     |> @hosting.service("must-not-start", start=_ => calls.val += 1)
     |> @hosting.build(_ => calls.val += 1)
     |> @hosting.run(_ => calls.val += 1)
-  assert_eq(result.exit_code().to_int(), 2)
+  assert_eq(result.exit_code().to_int(), 2,
+    msg=result.failures().map(error => error.to_string()).join("\n"))
   assert_eq(calls.val, 0)
   guard result.failures() is [@config.AmbiguousProject(selector~, matches~)] else { fail("expected ambiguous project") }
   assert_eq(selector, "duplicate")

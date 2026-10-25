@@ -19,7 +19,8 @@ fn[S] configured_host(argv : Array[String], directory? : String = "workspace") -
 
 ///|
 async test "project selector chooses a path before a conflicting project name through disk load" {
-  // Do not search for an enclosing workspace outside this disk fixture.
+  // An unbounded search reaches the drive root and locked files on Windows CI.
+  // Keep this fixture bounded; lander-4us.45 tracks the discovery fix.
   let root = fixture("workspace").to_string()
   for (selector, selected) in [("packages/a", "a"), ("packages/a/", "a"), ("packages/c", "c")] {
     let calls = Ref(0)

@@ -234,8 +234,10 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
    (`@config.env_vars`, `@config.working_dir`).
 2. The host parses `args` one time with `moonbitlang/core/argparse`. An argparse
    error or a misused standard flag ends the run with `UsageError` and exit code 2,
-   before any file read. `--help` and `--version` end the process inside argparse with
-   code 0. Settings come first because the parse reads the variable set of the run.
+   before any file read. On native and js, `--help` and `--version` end the process
+   inside argparse with code 0. On wasm and wasm-gc, they return control to the
+   embedder (D6, "Help and version in the embedded driver"). Settings come first
+   because the parse reads the variable set of the run.
 3. The host finds the environment name for `HostEnvironment`: the `--environment`
    value, then `<PREFIX>_ENVIRONMENT` in the variable set of the run, then the builder
    default. This is the same order that conventions uses, so both give the same name.
@@ -439,6 +441,52 @@ Drivers run the steps:
   `false` inside).
 - Call (this change): wasm uses the embedded driver too, so a WASI runtime without the
   `moonbitlang/async` imports can run the host.
+- Call (group 13): the embedded driver is
+  `pub fn[S] run_embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> RunOutcome`,
+  synchronous, in `run.embedded.mbt` (wasm, wasm-gc). It uses the shared
+  `configuration_inputs`, `configuration_from_tree`, `finish_configuration` and
+  `outcome`, and the same reply rule after each step as `run` (one shared
+  `Lifetime::reply`). Each hook, the command and a custom report run through
+  `%async.run` inside `%async.capture_cancellation`. A probe of the pinned compiler
+  on both targets showed that `%async.run` returns at the first suspension, and that
+  a stored continuation can resume later outside it. So each step has its own open
+  flag and result cell, which the driver closes when `%async.run` returns: a late
+  resume cannot change a completed step or run.
+- Call (group 13): a hook or command that suspends fails with
+  `SuspendError::HookSuspended(service~, phase~)` or `CommandSuspended` (code 1), and
+  the engine failure and stop rules apply. The message names the hook and says that
+  hooks on wasm and wasm-gc must not wait. The public enum `HookPhase` names the
+  phase, because the engine `Phase` stays private. A cancellation that the closure
+  does not catch is a stop request, as in `run`.
+- Call (group 13): the embedder probe is a stop probe that maps `true` to the private
+  request `Embedder` and the reason `StopReason::Embedder`. The driver registers it
+  before the first hook. A probe stop before the first hook runs no hook.
+- Call (group 13): the default report writes `<name>: <message>` with core
+  `eprintln`, so the driver links no event loop. On wasm that is WASI standard
+  error. On wasm-gc, core has no standard-error channel, and `eprintln` writes to the
+  one output import of core. A wasm-gc embedder that needs a separate channel gives
+  `error_report`. A custom report that raises or suspends is ignored.
+- Owner (2026-10-25), Call (group 13): **Help and version in the embedded driver.**
+  `--help` and `--version` (and every other argparse help or version request, such as
+  `help <subcommand>` or `arg_required_else_help`) return control to the embedder.
+  The contract:
+  - Output: the driver writes the text that argparse renders, one time, to standard
+    output with `println`, the same text as on native and js.
+  - Result: `run_embedded` returns a `RunOutcome` with exit code 0, no failures and
+    the stop reason `Completed`.
+  - Order: the request ends the run after the argument parse and before the
+    configuration load. No file of the tree is read, and the services factory, the
+    lifetime and the hooks do not run.
+  - No exit: the driver calls no process exit and needs no exit import.
+  - Native and js keep the argparse behavior: print the text and end the process with
+    code 0.
+  - Parser: the driver uses one argparse parse of the same command. It does not read
+    argv itself and does not add a second parser. The pinned public
+    `Command::parse` catches the private help and version requests and exits, so the
+    driver needs a public entry point that returns them. Upstream request:
+    moonbitlang/core#4486, with `Command::try_parse(...) -> ParseOutcome` in
+    moonbitlang/core#4487 (bead `lander-4us.5.18`). Task 13.4 uses it when a pinned
+    MoonBit release has it. Group 13 does not land before task 13.4.
 - Call (this change): the shutdown timeout is one budget for the full stop phase. It
   starts when the command task has ended. Default 30 000 ms, as in .NET.
 - Owner (2026-10-24): the builder sets the shutdown timeout with

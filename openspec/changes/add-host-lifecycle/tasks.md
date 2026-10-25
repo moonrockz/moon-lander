@@ -142,9 +142,10 @@ Bead: lander-4us.5.12
 
 Bead: lander-4us.5.13
 
-- [ ] 13.1 Add `@hosting.run_embedded(command, stop_probe?)` that runs the engine and each hook through the `%async.run` intrinsic in one per-target file; verify a clean run and a failing command on wasm and wasm-gc
-- [ ] 13.2 Report a hook that suspends as a failure; verify the message and code 1
-- [ ] 13.3 Register the embedder probe as a stop probe; verify a polling command that stops when the probe reports a stop
+- [x] 13.1 Add `@hosting.run_embedded(command, stop_probe?)` that runs the engine and each hook through the `%async.run` intrinsic in one per-target file; verify a clean run and a failing command on wasm and wasm-gc
+- [x] 13.2 Report a hook that suspends as a failure; verify the message and code 1
+- [x] 13.3 Register the embedder probe as a stop probe; verify a polling command that stops when the probe reports a stop
+- [ ] 13.4 Return help and version requests to the embedder (design D6, "Help and version in the embedded driver"), through the non-exiting argparse entry point of moonbitlang/core#4486 when a pinned MoonBit release has it (bead lander-4us.5.18); verify the "Help and version on wasm and wasm-gc" scenarios on wasm and wasm-gc, and that no configuration file is read and no factory or hook runs
 
 ## 14. argparse overrides layer
 

@@ -43,6 +43,24 @@ file read or hosted-service hook.
 - **WHEN** the application registers the subcommand `build`, and the arguments are `build`
 - **THEN** the command finds the subcommand `build` in the parse result of its context
 
+### Requirement: Help and version on wasm and wasm-gc
+
+On wasm and wasm-gc, an argparse help or version request SHALL return control to the
+embedder. The embedded driver MUST write the help or version text to standard output
+one time, MUST return an outcome with exit code 0 and no failures, and MUST NOT end
+the process. No configuration file is read, and the services factory and hooks do not
+run.
+
+#### Scenario: Help in an embedded run
+
+- **WHEN** a wasm-gc embedder runs the host with the arguments `--help`
+- **THEN** standard output contains the help text, `run_embedded` returns an outcome with exit code 0, no configuration file is read, and no factory or hook runs
+
+#### Scenario: Version in an embedded run
+
+- **WHEN** a wasm embedder runs a host whose command has a version, with the arguments `--version`
+- **THEN** standard output contains the version text, and `run_embedded` returns to its caller with exit code 0
+
 ### Requirement: Standard flags
 
 The argparse adapter SHALL supply the standard flags `--environment <name>`,

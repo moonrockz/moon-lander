@@ -78,3 +78,25 @@ async test "the watcher ends with the run" {
   @async.sleep(200)
   @expect.expect(reads.val).to_equal(after_run)
 }
+
+///|
+async test "a signal before the first hook runs no start hook and gives its code" {
+  let log = []
+  let result = builder(@lander_core.AppName::parse("signals"), [])
+    |> service("a", start=_ => log.push("a.start"), stop=_ => log.push("a.stop"))
+    |> build(_ => ())
+    |> run(signals=SignalProbe::new(() => Some(Interrupt)), _ => log.push("command"))
+  @expect.expect(log).to_equal([])
+  @expect.expect(result.reason is Signal(Interrupt)).to_be_true()
+  @expect.expect(result.exit_code().to_int()).to_equal(130)
+}
+
+///|
+async test "a signal wins over a failure before the engine starts" {
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("signals"), [])
+    |> build(_ => raise HookFailed(0))
+  let result = host
+    |> run(signals=SignalProbe::new(() => Some(Terminate)), _ => fail("command must not run"))
+  @expect.expect(result.reason is StartFailed(HookFailed(0))).to_be_true()
+  @expect.expect(result.exit_code().to_int()).to_equal(143)
+}

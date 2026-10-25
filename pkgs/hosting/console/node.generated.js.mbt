@@ -76,6 +76,7 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|  // pkgs/hosting/adapters/node/signals.ts
   #|  var exports_signals = {};
   #|  __export(exports_signals, {
+  #|    exitAfter: () => exitAfter,
   #|    installSignals: () => installSignals,
   #|    setExitCode: () => setExitCode
   #|  });
@@ -114,6 +115,9 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|  }
   #|  function setExitCode(code) {
   #|    import_node_process.default.exitCode = code;
+  #|  }
+  #|  function exitAfter(code, ms) {
+  #|    setTimeout(() => import_node_process.default.exit(code), ms).unref();
   #|  }
   #|  return module.exports;
   #|}

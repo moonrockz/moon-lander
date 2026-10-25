@@ -56,3 +56,9 @@ export function installSignals(): SignalListeners {
 export function setExitCode(code: number): void {
   process.exitCode = code;
 }
+
+// End the process with `code` after `ms` milliseconds. The timer does not keep
+// the event loop open, so a process with no other work ends first, normally.
+export function exitAfter(code: number, ms: number): void {
+  setTimeout(() => process.exit(code), ms).unref();
+}

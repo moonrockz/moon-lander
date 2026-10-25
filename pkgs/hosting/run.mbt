@@ -39,14 +39,14 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 
 ///|
 async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError, signals? : SignalProbe) -> RunOutcome {
-  let inputs = configuration_inputs(host, read_directory~) catch { err => return outcome(err) }
-  let config = @host.load(inputs.sources) catch { err => return outcome(err) }
+  let inputs = configuration_inputs(host, read_directory~) catch { err => return with_signal(outcome(err), signals) }
+  let config = @host.load(inputs.sources) catch { err => return with_signal(outcome(err), signals) }
   let configured = finish_configuration(host, inputs, config) catch {
-    StopRequested => return {
+    StopRequested => return with_signal({
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
-    }
-    err => return outcome(err)
+    }, signals)
+    err => return with_signal(outcome(err), signals)
   }
   let ctx = configured.context
   let lifetime = ctx.lifetime
@@ -64,12 +64,24 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
 }
 
 ///|
+/// A signal that arrived before the engine started still selects the exit code.
+/// The reason stays the first event of the run.
+fn with_signal(result : RunOutcome, signals : SignalProbe?) -> RunOutcome {
+  guard signals is Some(probe) && (probe.request)() is Some(Signal(kind)) else { return result }
+  { ..result, signal: Some(kind), exit_code: kind.exit_code() }
+}
+
+///|
 async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : Hook[S]) -> RunOutcome {
   let ctx = configured.context
   let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
   let mut step = Engine::start(host.services)
+  // A probe stop that arrived during configuration loading runs no start hook.
+  if lifetime.probe_stop() && step is Run(pending, _) && lifetime.request is Some(request) {
+    step = pending.stop_requested(request, lifetime.requested_code, result=Interrupted, observed_signal?=lifetime.signal)
+  }
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)

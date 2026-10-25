@@ -25,3 +25,14 @@ fn kind_of_code(code : Int) -> @hosting.SignalKind? {
     _ => None
   }
 }
+
+///|
+/// The exit code of the process after a run. A signal that arrived after the
+/// last probe read of the run, for example during the stopped event, still
+/// selects the signal code, because a signal code comes first.
+fn process_exit_code(outcome : @hosting.RunOutcome, late : @hosting.SignalKind?) -> Int {
+  match late {
+    Some(kind) => kind.exit_code().to_int()
+    None => outcome.exit_code().to_int()
+  }
+}

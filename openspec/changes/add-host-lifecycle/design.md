@@ -473,7 +473,7 @@ same pattern as `signal.c` in `moonbitlang/async`. MoonBit calls it through
 - First signal: the handler stores the signal identity and sets an atomic stop flag.
   It does only async-signal-safe work.
 - Second signal: the handler ends the process at once from inside the handler, with
-  the exit code of the second signal (`_exit` on Linux and macOS, `ExitProcess` on
+  the exit code of the second signal (`_exit` on Linux and macOS, `TerminateProcess` on
   Windows). This works while the command runs synchronous code that never yields.
 - `ctx.cancelled()` reads the atomic flag through one extern call (D5). Synchronous
   code sees the first signal at its next check.
@@ -535,6 +535,19 @@ second entry point. MoonBit js externs call it.
 - At the end, the driver removes the listeners and sets `process.exitCode` to the
   exit code. It does not call `process.exit` on a graceful stop, because that can drop
   output that is still in a pipe.
+- Call (review of groups 11 and 12): after a graceful signal stop on js, the driver
+  sets `process.exitCode` and starts a 2 s timer that does not keep the event loop
+  open (`unref`) and then calls `process.exit(code)`. A process with no other work
+  ends first and keeps its piped output. A timer or socket that a service left
+  open cannot keep the process running after a signal, so the host ends the process
+  explicitly, as the spec "Exit codes" requires. A clean end only sets
+  `process.exitCode`.
+- Call (review of groups 11 and 12): a signal that arrives during configuration
+  loading or the services factory runs no start hook: the run replies to the first
+  engine step with the stop request without running it. When a failure before the
+  engine ends the run, a recorded signal still selects the signal exit code. A
+  signal that arrives after the last probe read of the run also selects the signal
+  code in both drivers.
 - Call (group 12): the listeners are the entry point `signals.ts` of the hosting
   node adapter. `build-node-adapter.mbtx` bundles it into the console package
   (`pkgs/hosting/console/node.generated.js.mbt`), because the generated factory of
@@ -1077,7 +1090,7 @@ not check the rules again.
   from a program. The spike finds what a CI runner allows and records any event that
   only a manual check covers.
 - [A signal handler must do only async-signal-safe work] → The handler stores two
-  atomic values and, on a second signal, calls `_exit` or `ExitProcess`. Nothing else.
+  atomic values and, on a second signal, calls `_exit` or `TerminateProcess`. Nothing else.
 - [The watcher task wakes every 50 ms] → Small cost, and only in the console driver.
   Synchronous checks read the flag directly, so they do not wait for the watcher.
 - [The `moonbitlang/async` runtime and the stub can both own a signal] → The driver

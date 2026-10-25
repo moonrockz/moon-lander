@@ -7,3 +7,8 @@
 async fn emit(line : String) -> Unit {
   println(line)
 }
+
+///|
+/// Start a timer that keeps the Node.js event loop open until the process ends.
+extern "js" fn leave_timer_open() -> Unit =
+  #|() => { setInterval(() => {}, 1000); }

@@ -51,10 +51,11 @@ fn Child::label(self : Child) -> String {
 priv enum Step {
   Await(String)
   Send(Int)
-  /// Two pending POSIX signals of one kind merge into one. A child that never
-  /// yields cannot write a line after the first signal, so the parent waits a
-  /// short time before it sends the second one.
-  Pause(Int)
+  /// Send the signal again every 100 ms until the child ends. Two pending
+  /// POSIX signals of one kind merge into one, and a child that never yields
+  /// cannot write a line after the first signal, so one more send is not
+  /// enough proof that the child got two signals.
+  SendUntilExit(Int)
 }
 
 ///|
@@ -70,6 +71,11 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
       }
       (args[0], ["\{file}:0-1"])
     }
+    // `moonbitlang/async` builds the environment of a child without the
+    // Windows per-drive entries (`=D:`). Node.js then cannot find the real path
+    // of a main script on that drive (`lstat 'D:'`), so it keeps the path as
+    // given. The flag has no other effect on this one-file program.
+    Js(runtime="node", program~) => ("node", ["--preserve-symlinks-main", program])
     Js(runtime~, program~) => (runtime, [program])
   }
   @async.with_timeout(20000, () => {
@@ -84,6 +90,7 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
       )
       writer.close()
       let output = StringBuilder()
+      let mut exit_code : Int? = None
       for step in steps {
         match step {
           Await(line) => {
@@ -96,11 +103,21 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
             let sent = send_signal(process.pid, kind)
             guard sent == 0 else { fail("sending kind \{kind} failed: \{sent}") }
           }
-          Pause(ms) => @async.sleep(ms)
+          SendUntilExit(kind) =>
+            while exit_code is None {
+              // A send can fail after the child ends and before the wait sees it.
+              ignore(send_signal(process.pid, kind))
+              @async.sleep(100)
+              exit_code = process.try_wait()
+            }
         }
       }
       output.write_string(reader.read_all().text())
-      (process.wait(), output.to_string().replace_all(old="\r\n", new="\n"))
+      let code = match exit_code {
+        Some(code) => code
+        None => process.wait()
+      }
+      (code, output.to_string().replace_all(old="\r\n", new="\n"))
     })
   })
 }
@@ -252,8 +269,7 @@ async test "a native loop with no check ends at the second signal" {
     let (code, output) = run_child(Native, "spin", [
       Await("ready"),
       Send(kind),
-      Pause(200),
-      Send(kind),
+      SendUntilExit(kind),
     ])
     // The command never yields, so the stop phase never starts.
     assert_absent(output, "hook=b.stopping")
@@ -272,5 +288,18 @@ async test "piped output is complete after a clean run and after a graceful sign
     let (code, output) = run_child(child, "output-after-signal", [Await("ready"), Send(kind)])
     assert_in_order(output, ["hook=a.stop"] + lines + ["end", "hook=b.stopped", "hook=a.stopped"])
     assert_eq(code, exit_code, msg=child.label())
+  }
+}
+
+///|
+/// A timer that a service leaves open must not keep a js process running
+/// after a graceful signal stop. A native process always ends through libc
+/// `exit`, so this test also runs the native child.
+async test "a timer left open does not keep the process running after a signal stop" {
+  for child in children(native=true) {
+    let (kind, name, exit_code) = sendable_kinds()[0]
+    let (code, output) = run_child(child, "linger", [Await("ready"), Send(kind)])
+    assert_in_order(output, ["reason=Signal(\{name})", "hook=a.stopped"])
+    assert_eq(code, exit_code, msg="\{child.label()}\n\{output}")
   }
 }

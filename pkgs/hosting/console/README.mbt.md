@@ -56,8 +56,11 @@ phase, the driver ends the process through libc `exit`.
 On js, Node.js and Bun call the listeners only when the JavaScript stack is empty.
 A long synchronous loop must call `@async.pause()` to let a listener run (see the
 `moonrockz/moon-lander-hosting` README). After the stop phase, the driver removes
-its listeners and sets `process.exitCode`. It does not call `process.exit`, so
-Node.js writes all output that is still in a pipe before the process ends.
+its listeners and sets `process.exitCode`. It does not call `process.exit` at
+once, so Node.js writes all output that is still in a pipe before the process
+ends. After a signal stop, a timer that does not keep the event loop open ends
+the process with `process.exit` 2 seconds later, if a timer or socket that a
+service left open still keeps it running.
 
 The handlers are global state. Run only one console host in a process. When the
 driver cannot install its handlers, `run` raises `SignalHandlersUnavailable` before

@@ -4,6 +4,7 @@ import {
 }
 
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonbitlang/async",
 } for "wbtest"
 

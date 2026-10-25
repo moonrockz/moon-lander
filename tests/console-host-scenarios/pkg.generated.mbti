@@ -19,6 +19,7 @@ pub(all) enum Scenario {
   SlowStop
   Output
   OutputAfterSignal
+  Linger
 }
 pub fn Scenario::parse(String) -> Self?
 

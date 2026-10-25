@@ -40,5 +40,5 @@ fn signal_kind() -> @hosting.SignalKind? {
 pub async fn[S] run(host : @hosting.Host[S], command : @hosting.Hook[S]) -> Unit {
   install()
   let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(signal_kind))
-  libc_exit(outcome.exit_code().to_int())
+  libc_exit(process_exit_code(outcome, signal_kind()))
 }

@@ -18,6 +18,8 @@ pub(all) enum Scenario {
   Output
   /// As `Wait`, and the `stop` hook of `a` writes `output_lines` lines.
   OutputAfterSignal
+  /// As `Wait`, and the `started` hook of `a` leaves a timer open on js.
+  Linger
 }
 
 ///|
@@ -31,6 +33,7 @@ pub fn Scenario::parse(text : String) -> Scenario? {
     "slow-stop" => Some(SlowStop)
     "output" => Some(Output)
     "output-after-signal" => Some(OutputAfterSignal)
+    "linger" => Some(Linger)
     _ => None
   }
 }
@@ -82,7 +85,12 @@ pub async fn run(scenario : Scenario) -> Unit {
       "a",
       starting=_ => emit("hook=a.starting"),
       start=_ => emit("hook=a.start"),
-      started=_ => emit("hook=a.started"),
+      started=_ => {
+        emit("hook=a.started")
+        if scenario is Linger {
+          leave_timer_open()
+        }
+      },
       stopping=ctx => {
         emit("hook=a.stopping")
         emit("reason=" + reason_text(ctx.lifetime.stop_reason()))
@@ -119,7 +127,7 @@ pub async fn run(scenario : Scenario) -> Unit {
     match scenario {
       Clean => emit("command")
       Output => write_output()
-      Wait | SlowStop | OutputAfterSignal => {
+      Wait | SlowStop | OutputAfterSignal | Linger => {
         emit("ready")
         @async.sleep(60000)
         emit("command must be cancelled")

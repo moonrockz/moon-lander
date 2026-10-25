@@ -63,7 +63,9 @@ static BOOL WINAPI moonlander_console_on_event(DWORD event) {
     return FALSE;
   }
   if (InterlockedCompareExchange(&moonlander_console_kind, kind, 0) != 0) {
-    ExitProcess((UINT)moonlander_console_exit_code(kind));
+    // As _exit on POSIX: no DLL detach and no C runtime cleanup, which could
+    // wait for a lock that the main thread holds.
+    TerminateProcess(GetCurrentProcess(), (UINT)moonlander_console_exit_code(kind));
   }
   if (event == CTRL_CLOSE_EVENT) {
     // Windows ends the process when this handler returns. Wait, so the stop

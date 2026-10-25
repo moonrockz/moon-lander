@@ -15,3 +15,14 @@ test "the install failure names the signal handlers" {
     "The console signal handlers cannot be installed",
   )
 }
+
+///|
+async test "a signal after the last probe read selects the signal exit code" {
+  let host : @hosting.Host[Unit] = @lander_core.AppName::parse("console")
+    |> @hosting.builder([])
+    |> @hosting.build(_ => ())
+  let outcome = @hosting.run(host, ctx => ctx.lifetime.set_exit_code(@hosting.ExitCode::from_int(3)))
+  assert_eq(process_exit_code(outcome, None), 3)
+  assert_eq(process_exit_code(outcome, Some(Quit)), 131)
+  assert_eq(process_exit_code(outcome, Some(Terminate)), 143)
+}

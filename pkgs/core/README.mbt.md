@@ -1,7 +1,7 @@
 # moonrockz/moon-lander-core
 
-Shared domain types of the Moon-Lander framework: the application name and the
-time limit. The other framework modules (`moon-lander-config`,
+Shared domain types of the Moon-Lander framework: the application name, variable
+prefix, absolute path and time limit. The other framework modules (`moon-lander-config`,
 `moon-lander-mediator`, `moon-lander-hosting` and `moon-lander`) import this
 module, so a type here has one set of rules for all of them. The module imports nothing except the MoonBit core library.
 
@@ -100,3 +100,26 @@ rule as a `TimeLimitRule` case:
 `to_string()` gives the canonical text, from hours to milliseconds with short
 units and no spaces, for example `1s500ms`. The parse reads it back to an equal
 limit.
+
+## Variable prefix and absolute path
+
+`EnvPrefix` starts with an ASCII letter or `_`, followed by ASCII letters,
+digits or `_`. Its parse error gives the input and an `EnvPrefixRule` case.
+Deriving a default prefix from an `AppName` cannot fail.
+
+`AbsolutePath` names a location without claiming that it exists. Both working
+directories and content roots use it. An empty or relative path raises
+`AbsolutePathError` with `Empty` or `NotAbsolute`. Windows drive and UNC roots
+are accepted, and Windows separators become `/` at the parse boundary.
+
+```mbt check
+///|
+test "derive a prefix and parse an absolute working directory" {
+  let name = @lander_core.AppName::parse("my-tool")
+  assert_eq(@lander_core.EnvPrefix::from_app_name(name).to_string(), "MY_TOOL")
+  assert_eq(@lander_core.EnvPrefix::parse("MT").to_string(), "MT")
+  let directory = @lander_core.AbsolutePath::parse("/work/repo")
+  assert_eq(directory.to_string(), "/work/repo")
+  assert_eq(@lander_core.AbsolutePath::root().to_string(), "/")
+}
+```

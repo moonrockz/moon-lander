@@ -151,3 +151,20 @@ the default implementation at build time, so unused parsers can be omitted.
 The [format selection guide](../config/formats/README.mbt.md) explains the language
 feature, shows the registration loop and a custom TOML/YAML implementation,
 and describes how the output-size and parser-marker checks verify trimming.
+
+Starting settings can supply the variable set and absolute working directory on
+any target. Later hosting steps replace them before the run. An environment name
+is a default, and group 8 adds its parsed type and bootstrap.
+
+```mbt check
+///|
+test "explicit starting settings" {
+  let host = @lander_core.AppName::parse("acme")
+    |> @lander.cli([], env_vars={ "ACME_PORT": "8080" },
+      working_dir=@lander_core.AbsolutePath::parse("/work"), environment="Staging")
+    |> @hosting.env_vars(({ "ACME_PORT": 9090, "ACME_DEBUG": true } : Json))
+    |> @hosting.working_dir(@lander_core.AbsolutePath::parse("/other"))
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```

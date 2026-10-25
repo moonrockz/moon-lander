@@ -78,14 +78,14 @@ Bead: lander-4us.5.6
 
 Bead: lander-4us.5.7
 
-- [ ] 7.1 Derive the prefix from the application name (upper case, `-` to `_`) and add `@hosting.env_prefix`; verify the default and the override
-- [ ] 7.2 Compose the core environment-variable source at priority 600 with reserved `<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and `@hosting.reserve_env` names; verify that reserved names do not become keys and the source report shows 600
-- [ ] 7.3 Add `@hosting.env_vars(vars)`, which replaces the variable set of the run, and `@hosting.skip_env_source()`, which skips only the `<PREFIX>_*` source (design D12); verify the "A later env_vars step replaces the set" scenario and a skipped source report on all four targets
-- [ ] 7.4 Add `@hosting.app_dirs()`, which gives the application name and the prefix to `@conventions.app_dirs`; verify `$<PREFIX>_HOME` and the variable source use one prefix
-- [ ] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli` and `@hosting.builder`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
-- [ ] 7.6 Add the trait `IntoEnvVars` with implementations for `Map[String, String]` and `Json` and the JSON rules of design D14; verify the "Map literal", "JSON fixture", "Mixed values", "Null value" and "Root that is not an object" scenarios on all four targets
-- [ ] 7.7 Add `EnvPrefix::parse` and the default prefix from an `AppName`, which cannot fail (design D17); make `@hosting.env_prefix` take an `EnvPrefix`; verify each rule on both sides of its limit on all four targets
-- [ ] 7.8 Use a path type for the working directory of the run in place of `String` (design D17); verify that an empty or relative path does not parse, on all four targets
+- [x] 7.1 Derive the prefix from the application name (upper case, `-` to `_`) and add `@hosting.env_prefix`; verify the default and the override
+- [x] 7.2 Compose the core environment-variable source at priority 600 with reserved `<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and `@hosting.reserve_env` names; verify that reserved names do not become keys and the source report shows 600
+- [x] 7.3 Add `@hosting.env_vars(vars)`, which replaces the variable set of the run, and `@hosting.skip_env_source()`, which skips only the `<PREFIX>_*` source (design D12); verify the "A later env_vars step replaces the set" scenario and a skipped source report on all four targets
+- [x] 7.4 Add `@hosting.app_dirs()`, which gives the application name and the prefix to `@conventions.app_dirs`; verify `$<PREFIX>_HOME` and the variable source use one prefix
+- [x] 7.5 Add the starting settings `env_vars?`, `working_dir?` and `environment?` to `@lander.cli` and `@hosting.builder`, `@hosting.working_dir(path)`, and run step 2 that fills only omitted values from `moonbitlang/core/env` on native and js (empty set and `/` on wasm and wasm-gc) and gives both values to the core builder; verify the three "Host starting settings" scenarios, "A later working_dir step", "Every reader sees one set" and "Starting environment is the default"
+- [x] 7.6 Add the trait `IntoEnvVars` with implementations for `Map[String, String]` and `Json` and the JSON rules of design D14; verify the "Map literal", "JSON fixture", "Mixed values", "Null value" and "Root that is not an object" scenarios on all four targets
+- [x] 7.7 Add `EnvPrefix::parse` and the default prefix from an `AppName`, which cannot fail (design D17); make `@hosting.env_prefix` take an `EnvPrefix`; verify each rule on both sides of its limit on all four targets
+- [x] 7.8 Use a path type for the working directory of the run in place of `String` (design D17); verify that an empty or relative path does not parse, on all four targets
 
 ## 8. Host environment
 

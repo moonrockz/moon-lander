@@ -25,15 +25,16 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
 
 ///|
 async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
-  let parsed = parse_arguments(host) catch { err => return outcome(err) }
-  let config = @config.load(@config.builder(), @config.FileTree::new(complete=true)) catch {
+  let settings = resolve_settings(host) catch { err => return outcome(err) }
+  let parsed = parse_arguments(host, env=settings.variables) catch { err => return outcome(err) }
+  let config = @config.load(configuration_builder(host, settings, parsed.discovery_options), @config.FileTree::new(complete=true)) catch {
     err => return outcome(err)
   }
   let config = match config {
     Done(config) => config
     Need(_) => abort("a complete file tree gives no file request")
   }
-  let services = (host.factory)({ config, args: parsed.matches }) catch {
+  let services = (host.factory)({ config, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }) catch {
     StopRequested => return {
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
@@ -43,7 +44,7 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
   let lifetime = Lifetime::new()
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let ctx : Context[S] = { services, config, lifetime, args: parsed.matches }
+  let ctx : Context[S] = { services, config, lifetime, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }
   let mut step = Engine::start(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }

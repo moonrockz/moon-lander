@@ -4,8 +4,8 @@ The host of a Moon-Lander application. A host builder holds the application
 name, the arguments, the hosted services and a services factory. `build` gives a
 `Host`, and `run` starts the services, runs the command and stops the services in
 a known order, with a clear exit code. Each run has a lifetime for events,
-stop requests and cancellation checks. The run parses arguments first, before
-configuration and hooks. Signal drivers and host configuration are later parts
+stop requests and cancellation checks. The run resolves its starting settings,
+then parses arguments before configuration and hooks. Signal drivers and host configuration are later parts
 of `add-host-lifecycle`.
 
 Import the root package with an explicit alias, because the module name has `-`
@@ -223,3 +223,42 @@ test "replace the failure report" {
   ignore((host, command))
 }
 ```
+
+## Starting settings and variables
+
+Each run uses one variable set and one absolute working directory. The builder
+accepts `env_vars`, `working_dir` and `environment` as starting settings. Omitted
+variables and directory come from the process on native and js, or the empty
+set and `/` on wasm and wasm-gc. Explicit values cause no process read.
+`environment` is a default name; group 8 adds its parsed type and bootstrap.
+
+A later `env_vars` or `working_dir` step replaces that setting. The factory,
+hooks and command read the final values through `env_vars` and `working_dir`
+on their contexts. Treat the variable snapshot as read-only.
+
+```mbt check
+///|
+test "set the variable prefix and starting settings" {
+  let host : @hosting.Host[Unit] = @lander_core.AppName::parse("my-tool")
+    |> @hosting.builder([], env_vars={ "MT_LOG__FORMAT": "json" },
+      working_dir=@lander_core.AbsolutePath::parse("/work"))
+    |> @hosting.env_prefix(@lander_core.EnvPrefix::parse("MT"))
+    |> @hosting.reserve_env(["MT_LOG_DIR"])
+    |> @hosting.app_dirs()
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```
+
+The prefix defaults to the application name in upper case, with `-` changed to
+`_`. The host adds a variable source at priority 600 and reserves
+`<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and the names from `reserve_env`.
+`app_dirs()` gives the same name and final prefix to conventions.
+`skip_env_source()` reports the source as skipped and keeps the variable set
+for argparse and all other readers.
+
+`env_vars` accepts a string map or a JSON object through `IntoEnvVars`. JSON
+strings stay as written; other values become JSON text, except `null`, which
+omits the variable. Nested objects stay whole and keys keep their spelling.
+A non-object root ends the run with `UsageError` and code 2 before any file
+read or hook.

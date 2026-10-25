@@ -222,15 +222,15 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
 
 ### D3. Run order (Owner: .NET model; Call (R7): argparse runs first)
 
-1. The host parses `args` one time with `moonbitlang/core/argparse`. An argparse
-   error or a misused standard flag ends the run with `UsageError` and exit code 2,
-   before any file read. `--help` and `--version` end the process inside argparse with
-   code 0.
-2. The host fixes the variable set and the working directory of the run (D13). It
+1. The host fixes the variable set and the working directory of the run (D13). It
    converts a given `IntoEnvVars` value (D14), and fills each omitted value from the
    process on native and js. A conversion error ends the run with `UsageError` and
    exit code 2, before any file read. The host gives both values to the core builder
    (`@config.env_vars`, `@config.working_dir`).
+2. The host parses `args` one time with `moonbitlang/core/argparse`. An argparse
+   error or a misused standard flag ends the run with `UsageError` and exit code 2,
+   before any file read. `--help` and `--version` end the process inside argparse with
+   code 0. Settings come first because the parse reads the variable set of the run.
 3. The host finds the environment name for `HostEnvironment`: the `--environment`
    value, then `<PREFIX>_ENVIRONMENT` in the variable set of the run, then the builder
    default. This is the same order that conventions uses, so both give the same name.
@@ -897,6 +897,8 @@ constructor, so a value that breaks its rules cannot exist. `AGENTS.md` (Domain
 types) holds the repository rule. The caller parses each value one time, where it
 is written. After the parse, the host takes the type, not the raw value, and does
 not check the rules again.
+
+`EnvPrefix` and `AbsolutePath` live in `moonrockz/moon-lander-core` so config and hosting share their rules.
 
 | Value | Type | Rule | Group |
 | --- | --- | --- | --- |

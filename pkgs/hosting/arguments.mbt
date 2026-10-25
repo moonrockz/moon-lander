@@ -7,16 +7,15 @@ priv struct ParsedArguments {
 
 ///|
 /// Parse once before the driver loads configuration or calls the factory.
-/// Give argparse an explicit empty variable set so parsing reads only argv.
-/// Group 7 passes the variable set of the run.
+/// The driver supplies the resolved variable snapshot, shared by all readers.
 // The wasm drivers that call this arrive in group 13.
 #warnings("-1")
-fn[S] parse_arguments(host : Host[S]) -> ParsedArguments raise UsageError {
+fn[S] parse_arguments(host : Host[S], env~ : Map[String, String]) -> ParsedArguments raise UsageError {
   let command = match host.make_command {
     Some(make) => make(host.name.to_string())
     None => @argparse.Command(host.name.to_string())
   }
-  let matches = command.parse(argv=host.args[:], env={}) catch {
+  let matches = command.parse(argv=host.args[:], env~) catch {
     error => raise UsageError(error.to_string())
   }
   let environment = standard_option(matches, "environment")
@@ -30,8 +29,8 @@ fn[S] parse_arguments(host : Host[S]) -> ParsedArguments raise UsageError {
 }
 
 ///|
-/// Empty standard values fail at the argument boundary. Environment names and
-/// paths stay raw until task groups 8 and 7 add their parsed types.
+/// Empty standard values fail at the argument boundary. Environment names
+/// stay raw until group 8. Config and project selectors keep conventions text.
 fn standard_option(matches : @argparse.Matches, id : String) -> String? raise UsageError {
   guard matches.values.get(id) is Some([.., value]) else { return None }
   if value.is_empty() { raise UsageError("--\{id} requires a non-empty value") }

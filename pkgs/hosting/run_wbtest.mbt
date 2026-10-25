@@ -399,3 +399,53 @@ async test "default report preserves the message of fail" {
   @expect.expect(result.failures().length()).to_equal(1)
   @expect.expect(report_text(host.name, result.failures()[0]).contains("build.invalid_timeout")).to_be_true()
 }
+
+///|
+async test "run shares resolved variables and directory with argparse factory hooks and command" {
+  let seen = []
+  let variables = { "ACME_B": "2", "ACME_ENVIRONMENT": "Staging", "HOME": "/home/test" }
+  let outcome = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_A": "1" },
+    working_dir=@lander_core.AbsolutePath::parse("/a"))
+    |> env_vars(variables) |> working_dir(@lander_core.AbsolutePath::parse("/b"))
+    |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("b", env="ACME_B")]))
+    |> service("observer", start=ctx => {
+      assert_eq(ctx.env_vars, variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      seen.push("start")
+    }, stop=ctx => {
+      assert_eq(ctx.env_vars, variables)
+      seen.push("stop")
+    })
+    |> build(ctx => {
+      assert_eq(ctx.env_vars, variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      assert_eq(ctx.args.values.get("b"), Some(["2"]))
+      assert_eq(@config.get_text(ctx.config, "b"), "2")
+      assert_true(ctx.config.get(@config.KeyPath::parse("a")) is None)
+      seen.push("factory")
+    })
+    |> run(ctx => {
+      assert_eq(ctx.env_vars, variables)
+      assert_eq(ctx.working_dir.to_string(), "/b")
+      assert_eq(ctx.args.values.get("b"), Some(["2"]))
+      assert_eq(@config.get_text(ctx.config, "b"), "2")
+      seen.push("command")
+    })
+  assert_eq(outcome.exit_code().to_int(), 0)
+  assert_eq(seen, ["factory", "start", "command", "stop"])
+}
+
+///|
+async test "bad JSON variables and argv stop before factory or hooks" {
+  let mut ran = false
+  for (vars, argv) in [((["ACME_PORT"] : Json), []), (({} : Json), ["--unknown"])] {
+    let outcome = builder(@lander_core.AppName::parse("acme"), argv, env_vars=vars,
+      working_dir=@lander_core.AbsolutePath::root())
+      |> error_report((_, _) => ())
+      |> service("must-not-start", start=_ => { ran = true })
+      |> build(_ => { ran = true }) |> run(_ => { ran = true })
+    assert_eq(outcome.exit_code().to_int(), 2)
+    assert_true(outcome.failures()[0] is UsageError(_))
+    assert_true(!ran)
+  }
+}

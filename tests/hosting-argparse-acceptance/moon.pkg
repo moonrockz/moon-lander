@@ -1,0 +1,20 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
+  "moonbitlang/core/argparse",
+  "moonrockz/expect",
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/core/env",
+} for "wbtest"
+
+// The driver uses the async runtime. Pure parsing tests in hosting run on all
+// four targets; driver acceptance tests run on native and js.
+supported_targets = "native+js"
+
+// `async/process` has no js process functions. Process-exit assertions run on
+// native; its import is unused on js. Remove when target imports are supported.
+warnings = "-29"

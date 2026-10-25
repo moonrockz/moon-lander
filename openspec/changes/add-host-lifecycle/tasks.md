@@ -68,12 +68,11 @@ Bead: lander-4us.5.5
 
 Bead: lander-4us.5.6
 
-- [ ] 6.1 Create `moonrockz/moon-lander-hosting/argparse` with `command(make, mappings?)`; make `run` parse `args` one time before any file read and put the result in `Context[S].args`; verify that an unknown option gives `UsageError` with the argparse message and code 2, and that no file read and no hook occur
-- [ ] 6.2 Parse with an empty command named after the application when no `command` step exists; verify an extra argument gives code 2
-- [ ] 6.3 Add `environment_option`, `config_option`, `isolated_flag` and `project_option`, and fill `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`); verify one test per flag and that no flag value becomes a configuration key
-- [ ] 6.4 Give a `UsageError` for an empty `--environment`, `--config` or `--project` value; verify code 2 and no hook run
-- [ ] 6.5 Verify that `--environment Staging` after a subcommand is accepted
-- [ ] 6.6 Verify an acceptance test in `tests/` where `--project` selects a member by path before name, and an ambiguous name gives code 2
+- [x] 6.1 Create `moonrockz/moon-lander-hosting/argparse` with `command(make, mappings?)`; make `run` parse `args` one time before any file read and put the result in `Context[S].args`; verify that an unknown option gives `UsageError` with the argparse message and code 2, and that no file read and no hook occur
+- [x] 6.2 Parse with an empty command named after the application when no `command` step exists; verify an extra argument gives code 2
+- [x] 6.3 Add `environment_option`, `config_option`, `isolated_flag` and `project_option`, and fill `DiscoveryOptions` (`environment`, `config`, `isolated`, `project`); verify one test per flag and that no flag value becomes a configuration key
+- [x] 6.4 Give a `UsageError` for an empty `--environment`, `--config` or `--project` value; verify code 2 and no hook run
+- [x] 6.5 Verify that `--environment Staging` after a subcommand is accepted
 
 ## 7. Application name, prefix and environment-variable source
 
@@ -107,6 +106,7 @@ Bead: lander-4us.5.9
 - [ ] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
 - [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
 - [ ] 9.5 Add `@hosting.shutdown_timeout_key(key : @config.KeyPath)` (design D6), read one time after the configuration load and before the factory through `FromConfig` for `TimeLimit`; verify the scenarios of "Shutdown timeout from a named key" on native and js
+- [ ] 9.6 Verify an acceptance test in `tests/` where `--project` selects a member by path before name, and an ambiguous name gives code 2, through the configuration load
 
 ## 10. Shutdown timeout
 

@@ -42,6 +42,11 @@ pub fn ExitCode::to_int(self : ExitCode) -> Int {
 pub struct BuildContext {
   /// The configuration of the run.
   config : @config.Config
+  /// The one argparse result of this run.
+  args : @argparse.Matches
+  /// The standard flags for configuration discovery. Environment names and
+  /// paths stay raw until task groups 8 and 7 add their parsed types.
+  discovery_options : @conventions.DiscoveryOptions
 }
 
 ///|
@@ -54,6 +59,8 @@ pub struct Context[S] {
   config : @config.Config
   /// The events, stop requests and cancellation checks of this run.
   lifetime : Lifetime
+  /// The one argparse result, shared with the factory and all hooks.
+  args : @argparse.Matches
 }
 
 ///|
@@ -79,6 +86,7 @@ priv struct HostedService[S] {
 pub struct HostBuilder[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
   priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
@@ -88,7 +96,7 @@ pub struct HostBuilder[S] {
 /// Start a bare host builder with the application name and the command-line
 /// arguments. The builder adds no service or configuration source.
 pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
-  { name, args: args.copy(), services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+  { name, args: args.copy(), make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
 }
 
 ///|
@@ -150,6 +158,7 @@ pub fn[S] service(
 pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
   priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
@@ -166,6 +175,7 @@ pub fn[S] build(
   {
     name: builder.name,
     args: builder.args,
+    make_command: builder.make_command,
     services: builder.services,
     factory,
     report: builder.report,

@@ -104,7 +104,7 @@ start.
 fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
   "acme"
   |> @lander.AppName::parse
-  |> @lander.cli(["greet"])
+  |> @lander.cli([])
   |> @hosting.service(
     "greeter",
     start=_ => log.push("greeter started"),

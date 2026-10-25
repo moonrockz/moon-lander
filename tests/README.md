@@ -14,6 +14,7 @@ configuration core, and the sync and async mediators.
 | `config-conventions-laws` | The same preset cases as snapshot tests | All four |
 | `config-fixture`, `config-parity` | Shared explicit builder and file tree; complete value, provenance and report observations compared by `mise run check:config` | All four |
 | `formats-default`, `formats-toml`, `formats-custom` | Default and overridden format sets, parser execution and linked output trimming | All four |
+| `hosting-argparse-acceptance` | Argument-first driver, standard discovery flags, shared matches and usage reports; native subprocess checks for help, version and standard error | JavaScript, native |
 | `mediator-acceptance` | Send, two separate senders, handler errors, publish order, one and two publish failures in one `PublishFailed`, log middleware, short-circuit, reply change, middleware order and context read; `mise run check:mediator` fails a target that runs zero of them | All four |
 | `mediator-async-acceptance` | One `async test` per `mediator-async` scenario: async send and errors, sequential and concurrent publish, caller cancellation, handler timeouts, the `timeout` middleware, middleware order, `finally_` on cancellation, context read and a wrapped core sender; `mise run check:mediator` fails a target that runs zero of them | wasm, JavaScript, native |
 | `formats-leaky` | Deliberately reachable YAML parser that `mise run check:formats` must reject | All four |

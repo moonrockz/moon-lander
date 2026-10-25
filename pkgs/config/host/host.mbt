@@ -2,6 +2,7 @@
 /// Load the configuration from the disk. This is the host side of the pure
 /// `@config.load`: it fills the inputs that the builder does not hold, then
 /// answers each file request until the load is done.
+/// Native and js only; on wasm and wasm-gc use @config.load(builder, tree) or @hosting.files(tree).
 ///
 /// - The variable set and the working directory of the builder win. Only when
 ///   the builder holds none does the adapter read the process environment or

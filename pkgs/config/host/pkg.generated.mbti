@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-config/host"
+
+import {
+  "moonrockz/moon-lander-config",
+}
+
+// Values
+pub async fn load(@moon-lander-config.ConfigBuilder) -> @moon-lander-config.Config
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

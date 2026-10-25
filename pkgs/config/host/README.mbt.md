@@ -3,7 +3,10 @@
 The `host` package (`@host`) loads configuration from the disk on the
 `native` and `js` targets. It fills the inputs that the builder does not hold,
 then answers the file requests from the pure `@config.load` until loading is done.
-The async `@host.load` API is the same on both targets.
+The async `@host.load` API is the same on both targets. The package is empty
+on wasm and wasm-gc so portable hosting can import it. Hosting calls `load`
+only from its native and js driver; wasm hosts load an injected `FileTree`
+through the pure configuration core.
 
 | Input | Where it comes from |
 | --- | --- |
@@ -29,6 +32,7 @@ a format that accepts its text. It runs as a doc test on native and js.
 
 ```mbt check
 ///|
+#cfg(any(target="native", target="js"))
 async test "read a file through the host adapter" {
   let format : @config.Format = {
     name: "module",

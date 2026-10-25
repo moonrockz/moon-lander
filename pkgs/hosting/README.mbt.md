@@ -5,8 +5,8 @@ name, the arguments, the hosted services and a services factory. `build` gives a
 `Host`, and `run` starts the services, runs the command and stops the services in
 a known order, with a clear exit code. Each run has a lifetime for events,
 stop requests and cancellation checks. The run resolves its starting settings,
-then parses arguments before configuration and hooks. Signal drivers and host configuration are later parts
-of `add-host-lifecycle`.
+then parses arguments, loads configuration, builds services and runs hooks.
+Signal drivers are later parts of `add-host-lifecycle`.
 
 Import the root package with an explicit alias, because the module name has `-`
 in it. The application name comes from `moonrockz/moon-lander-core`:
@@ -139,7 +139,14 @@ test "a long command yields between batches" {
 `shutdown_timeout(limit)` sets one budget for the full stop phase. The budget
 starts when the command task has ended. The default is 30 s, and a later step
 replaces an earlier value. Only native and js apply the limit. The wasm and
-wasm-gc drivers have no timer. The opt-in configuration key is planned.
+wasm-gc drivers have no timer.
+
+`shutdown_timeout_key(key)` opts in to an application-named `@config.KeyPath`.
+The host reads it once after loading and before the factory, through
+`FromConfig` for `TimeLimit`. A value such as `"100ms"` overrides the builder
+limit. An absent key keeps the builder limit, or the default 30 s. Invalid
+text or a number gives a configuration error with code 2 before the
+factory or any hook. The framework reserves no timeout key.
 
 At the limit, the host cancels the current hook, skips the remaining stop hooks,
 raises the stopped event and reports `ShutdownTimedOut`. A hook that protects
@@ -193,7 +200,7 @@ signal codes 130, 143 and 131. It reports other failures only for code 1 or 2.
 Reports follow failure order. The default report writes one line to standard
 error: `<application name>: <message>`. A run with no failures writes nothing,
 including an application code of 1 or 2. `HostError`, `WorkingDirectoryError`,
-`UsageError`, `ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
+`UsageError`, `FileTreeError`, `ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
 their `Show` text.
 
 `error_report` replaces the default report. Its async callback gets each reported
@@ -230,9 +237,10 @@ accepts `env_vars`, `working_dir` and `environment` as starting settings. Omitte
 variables and directory come from the process on native and js, or the empty
 set and `/` on wasm and wasm-gc. Explicit values cause no process read.
 `environment` is a parsed `@conventions.EnvironmentName` default and enables the
-environments part, as does `default_environment(name)`. Environment files need a
-primary part such as `app_dirs()`. Without it, the host gives a note and adds no
-file sources. A bare builder with no environment default adds no discovery
+environments part of the host-owned conventions set, as does
+`default_environment(name)`. Add `app_dirs()` or `conventions(f)` to supply that
+set. Without it, the host gives a note; conventions added inside `configure`
+keep their own environment settings. A bare builder with no environment default adds no discovery
 reports and gives no discovery behavior to `--config` or `--project`. Parse the name at the
 caller with `@conventions.EnvironmentName::parse`. The host takes the name from
 `--environment`, then `<PREFIX>_ENVIRONMENT` in the run snapshot, then the default.
@@ -297,3 +305,64 @@ test "reserve a full name before changing the prefix" {
   ignore(host)
 }
 ```
+
+## Configuration and services
+
+`configure(fn(sources) { ... })` adds formats and application sources through
+`@config.ConfigBuilder`. Callbacks run in registration order after starting
+settings, argument parsing and environment resolution. Sources merge in this
+order: configure-callback sources in order, the host-owned conventions set
+(System 100 through UserOverride 400), the `<PREFIX>_*` source at 600, then the
+argparse overrides at 700 (group 14). Core has no builder trait, so use
+`configure` for core steps.
+
+Core load requires priorities that do not go down. With `app_dirs()` or
+`conventions(f)`, a configure source must have priority 100 or less, such as
+defaults or an in-memory value at 0. Put a file at a higher priority in the
+conventions set, or leave out the host-owned set. A later change may order
+sources by priority.
+
+The run's variable set and working directory replace values that a callback
+sets; use `env_vars` or `working_dir` on the host builder.
+
+```mbt check
+///|
+test "configure application sources and conventions" {
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.configure(fn(sources) raise {
+      sources
+      |> @config.defaults({ "log": { "format": "text" } })
+      |> @conventions.add(@conventions.app_dirs("acme"))
+    })
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```
+
+A conventions set added inside `configure` keeps its own options. It does not
+receive the standard host flags `--environment`, `--config`, `--isolated` and
+`--project`. Use `app_dirs()` for the host-owned standard set and
+`conventions(fn(c) { ... })` to change it. These steps compose in pipeline
+order. A later `app_dirs()` replaces earlier convention parts. Without it,
+`conventions` starts from an empty base set with the final host name and prefix.
+The host-owned set receives the standard flags. For example,
+`conventions(c => c |> @conventions.workspace())` after `app_dirs()` enables
+workspace member selection with `--project`. With neither step, a bare host
+adds no discovery reports.
+
+Native and js call `@host.load` to answer file requests from disk, using the
+run's variable snapshot and working directory. They ignore `files(tree)`.
+On wasm and wasm-gc, `files(tree)` supplies the immutable snapshot to the pure
+`@config.load`. A complete tree gives the configuration. An incomplete tree
+raises `FileTreeError::IncompleteFileTree` with code 2 and preserves each
+requested path and request kind. Its report names every path. The embedded
+phase driver and its standard-error report arrive in task group 13.
+
+After loading, the factory runs once. Its `BuildContext` and every hook's and
+command's `Context[S]` share the final configuration, variable snapshot and
+working directory. Each hook, lifetime handler and command uses the same
+services record. Loading and timeout-decoding failures occur before the factory
+or any hook. The public argparse overrides layer at priority 700 arrives in
+task group 14.

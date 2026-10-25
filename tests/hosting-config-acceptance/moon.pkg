@@ -1,0 +1,16 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/parsers/toml",
+  "moonbitlang/core/argparse",
+  "moonbitlang/core/env",
+  "moonbitlang/core/debug",
+  "moonbitlang/async",
+} for "wbtest"
+
+// The disk driver needs the async runtime; injected-tree tests in hosting
+// cover wasm and wasm-gc through the same configuration/factory boundary.
+supported_targets = "native+js"

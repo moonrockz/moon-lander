@@ -132,7 +132,7 @@ test "bare builders add no file reports or config and project behavior" {
       assert_eq(config.reports().length(), 1)
       assert_true(config.reports()[0].kind is Environment)
       assert_eq(config.warnings(), if enabled {
-        [@config.Note(source="acme", message="environment files need a primary part such as app_dirs()")]
+        [@config.Note(source="acme", message="default_environment applies only to the host-owned conventions set; add app_dirs() or conventions(f)")]
       } else { [] })
     }
   }
@@ -145,6 +145,18 @@ test "a variable name with environment files off gives no option warning" {
   assert_eq(settings_config(host).warnings(), [])
   let flag = environment_builder(args=["--environment", "Staging"]) |> app_dirs() |> build(_ => ())
   assert_eq(settings_config(flag).warnings(), [@config.Note(source="acme", message="environments are off, so discovery ignores the environment option")])
+}
+
+///|
+test "default environment note distinguishes configure conventions from the host-owned set" {
+  let host = environment_builder()
+    |> configure(s => s |> @config.platform(Linux) |> @config.format(@toml.format())
+      |> @conventions.add(@conventions.app_dirs("acme")))
+    |> default_environment(@conventions.EnvironmentName::parse("Staging"))
+    |> build(_ => ())
+  assert_eq(settings_config(host).warnings(), [
+    @config.Note(source="acme", message="default_environment applies only to the host-owned conventions set; add app_dirs() or conventions(f)"),
+  ])
 }
 
 ///|

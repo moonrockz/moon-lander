@@ -19,3 +19,7 @@ repository = "https://github.com/moonrockz/moon-lander"
 license = "Apache-2.0"
 
 readme = "README.mbt.md"
+
+// The host adapter API exists only on native and js. Canonical interface
+// generation needs a backend where that package has code.
+preferred_target = "native"

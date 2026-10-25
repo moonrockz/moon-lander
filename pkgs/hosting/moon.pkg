@@ -2,6 +2,7 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/host",
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/immut/sorted_map",
@@ -18,6 +19,8 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/expect",
   "moonbitlang/async",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
 } for "test"
 
 import {
@@ -34,8 +37,8 @@ import {
 // nothing reads them until `run_embedded`; the native/js error report reads
 // the application name. Remove the
 // field overrides when those fields are read. The pinned build system cannot
-// condition imports by target, so the async imports are unused on wasm and
-// wasm-gc (29); remove that part when the imports can be conditional.
+// condition imports by target, so the async and config/host imports are unused
+// on wasm and wasm-gc (29); remove that part when the imports can be conditional.
 warnings = "-7-9-29"
 
 // `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not

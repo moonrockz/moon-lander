@@ -101,13 +101,13 @@ Bead: lander-4us.5.8
 
 Bead: lander-4us.5.9
 
-- [ ] 9.1 Add `@hosting.configure` over the `ConfigBuilder` pipeline, and the builder trait if core gives one; verify an example with `|> @conventions.add(@conventions.app_dirs("acme"))`
-- [ ] 9.2 Load through `@host.load(builder)` on native and js; verify the factory reads a merged value
-- [ ] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
-- [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
-- [ ] 9.5 Add `@hosting.shutdown_timeout_key(key : @config.KeyPath)` (design D6), read one time after the configuration load and before the factory through `FromConfig` for `TimeLimit`; verify the scenarios of "Shutdown timeout from a named key" on native and js
-- [ ] 9.6 Verify an acceptance test in `tests/` where `--project` selects a member by path before name, and an ambiguous name gives code 2, through the configuration load
-- [ ] 9.7 Verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`, through the configuration load
+- [x] 9.1 Add `@hosting.configure` over the `ConfigBuilder` pipeline, and the builder trait if core gives one; verify an example with `|> @conventions.add(@conventions.app_dirs("acme"))`
+- [x] 9.2 Load through `@host.load(builder)` on native and js; verify the factory reads a merged value
+- [x] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
+- [x] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
+- [x] 9.5 Add `@hosting.shutdown_timeout_key(key : @config.KeyPath)` (design D6), read one time after the configuration load and before the factory through `FromConfig` for `TimeLimit`; verify the scenarios of "Shutdown timeout from a named key" on native and js
+- [x] 9.6 Verify an acceptance test in `tests/` where `--project` selects a member by path before name, and an ambiguous name gives code 2, through the configuration load
+- [x] 9.7 Verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`, through the configuration load
 
 ## 10. Shutdown timeout
 

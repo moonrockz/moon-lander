@@ -30,28 +30,19 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 
 ///|
 async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError) -> RunOutcome {
-  let settings = resolve_settings(host, read_directory~) catch { err => return outcome(err) }
-  let parsed = parse_arguments(host, env=settings.variables) catch { err => return outcome(err) }
-  let environment = resolve_environment(host, settings, parsed.discovery_options) catch { err => return outcome(err) }
-  let options = environment_options(host, parsed.discovery_options, environment)
-  let config = @config.load(configuration_builder(host, settings, options), @config.FileTree::new(complete=true)) catch {
-    err => return outcome(err)
-  }
-  let config = match config {
-    Done(config) => config
-    Need(_) => abort("a complete file tree gives no file request")
-  }
-  let services = (host.factory)({ config, environment, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }) catch {
+  let inputs = configuration_inputs(host, read_directory~) catch { err => return outcome(err) }
+  let config = @host.load(inputs.sources) catch { err => return outcome(err) }
+  let configured = finish_configuration(host, inputs, config) catch {
     StopRequested => return {
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
     }
     err => return outcome(err)
   }
-  let lifetime = Lifetime::new()
+  let ctx = configured.context
+  let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let ctx : Context[S] = { services, config, environment, lifetime, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }
   let mut step = Engine::start(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
@@ -60,7 +51,7 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
   if @async.is_being_cancelled() { lifetime.stop_application() }
   @async.protect_from_cancel(() => {
     let mut interrupted = ActionResult::Interrupted
-    let completed = @async.with_timeout_opt(host.shutdown_timeout.to_millis(), () => {
+    let completed = @async.with_timeout_opt(configured.shutdown_timeout.to_millis(), () => {
       while step is Run(pending, action) {
         let result = perform_step(host, ctx, command, pending, action)
         // Keep the current token for timed_out, even if a hook absorbs cancellation.
@@ -73,7 +64,7 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
     })
     if completed is None && step is Run(pending, _) {
       ignore(lifetime.probe_stop())
-      step = pending.timed_out(limit=host.shutdown_timeout, observed_signal?=lifetime.signal, result=interrupted)
+      step = pending.timed_out(limit=configured.shutdown_timeout, observed_signal?=lifetime.signal, result=interrupted)
     }
     // The timeout reply skips hooks and leaves only the stopped event.
     while step is Run(pending, action) {
@@ -139,10 +130,4 @@ async fn[S] run_command(ctx : Context[S], command : Hook[S]) -> Unit {
       error => raise error
     }
   })
-}
-
-///|
-/// A configuration or factory failure before the engine starts.
-fn outcome(error : Error) -> RunOutcome {
-  { exit_code: select_exit_code(None, [error], false, None), timed_out: false, failures: [error], reason: StartFailed(error), requested_code: None, signal: None }
 }

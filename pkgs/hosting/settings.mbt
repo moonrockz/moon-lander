@@ -63,7 +63,7 @@ pub fn[S] skip_env_source(builder : HostBuilder[S]) -> HostBuilder[S] {
 ///|
 /// Enable application directory discovery with the final name and prefix.
 pub fn[S] app_dirs(builder : HostBuilder[S]) -> HostBuilder[S] {
-  { ..builder, use_app_dirs: true }
+  { ..builder, convention_steps: builder.convention_steps + [AppDirs] }
 }
 
 ///|
@@ -96,15 +96,26 @@ fn[S] resolve_settings(
 
 ///|
 /// Compose the same inputs for the core source and the conventions reader.
-// Group 9 replaces the complete empty tree in the driver with the real load.
 // The embedded driver arrives in group 13. Remove with that caller.
 #warnings("-1")
-fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> @config.ConfigBuilder {
+fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> @config.ConfigBuilder raise {
   let mut builder = @config.builder()
     |> @config.env_vars(Map::from_iter(settings.variables.iter()))
     |> @config.working_dir(settings.directory.to_string())
-  if host.use_app_dirs {
-    let conventions = @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
+  for configure in host.configure_sources {
+    builder = configure(builder)
+  }
+  // Run settings own these inputs, even when an application callback sets them.
+  builder = builder |> @config.env_vars(Map::from_iter(settings.variables.iter()))
+    |> @config.working_dir(settings.directory.to_string())
+  if !host.convention_steps.is_empty() {
+    let mut conventions = @conventions.base(host.name.to_string(), prefix=host.prefix.to_string())
+    for step in host.convention_steps {
+      conventions = match step {
+        AppDirs => @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
+        Transform(f) => f(conventions)
+      }
+    }
     let conventions = match host.environment {
       Some(name) => conventions |> @conventions.environments(default=name.to_string())
       None => conventions
@@ -114,7 +125,7 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
     builder = builder |> @config.provider({
       name: host.name.to_string(),
       expand: _ => Done({ sources: [], warnings: [
-        Note(source=host.name.to_string(), message="environment files need a primary part such as app_dirs()"),
+        Note(source=host.name.to_string(), message="default_environment applies only to the host-owned conventions set; add app_dirs() or conventions(f)"),
       ] }),
     })
   }

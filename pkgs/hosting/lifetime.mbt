@@ -98,6 +98,7 @@ fn Lifetime::request_stop(self : Lifetime, request : StopRequest, code : ExitCod
   if self.request is None {
     self.request = Some(request)
     self.requested_code = code
+    if code is Some(_) { self.exit_code = code }
     if self.reason is None {
       self.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind) })
     }
@@ -113,7 +114,8 @@ pub fn Lifetime::stop_application(self : Lifetime, exit_code? : ExitCode) -> Uni
 }
 
 ///|
-/// Set the application exit code. A failure still gives code 1.
+/// Set the application exit code. Signals and failures take precedence.
+/// The last set code or first request's explicit code wins.
 pub fn Lifetime::set_exit_code(self : Lifetime, code : ExitCode) -> Unit { self.exit_code = Some(code) }
 
 ///|

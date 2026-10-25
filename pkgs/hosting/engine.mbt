@@ -162,11 +162,8 @@ fn Engine::next(self : Engine) -> Step {
     }
   }
   let outcome : RunOutcome = {
-    exit_code: if !self.failures.is_empty() || self.timed_out {
-      ExitCode::failure()
-    } else {
-      self.requested_code.unwrap_or(ExitCode::success())
-    },
+    exit_code: select_exit_code(self.signal, self.failures, self.timed_out, self.requested_code),
+    timed_out: self.timed_out,
     failures: self.failures.copy(),
     reason: self.reason.unwrap_or(Completed),
     requested_code: self.requested_code,

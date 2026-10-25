@@ -519,6 +519,7 @@ test "signal requests record identity after a reason without replacing reason or
         }
       })
       @expect.expect(result.signal).to_equal(Some(signal))
+      @expect.expect(result.exit_code()).to_equal(signal.exit_code())
       @expect.expect(if failed { result.reason is Failed(HookFailed(0)) } else { result.reason is Requested }).to_be_true()
       @expect.expect(result.requested_code).to_equal(if failed { Some(second) } else { Some(first) })
     }
@@ -528,6 +529,7 @@ test "signal requests record identity after a reason without replacing reason or
     })
     @expect.expect(match result.reason { Signal(found) => found == signal; _ => false }).to_be_true()
     @expect.expect(result.signal).to_equal(Some(signal))
+      @expect.expect(result.exit_code()).to_equal(signal.exit_code())
   }
 }
 
@@ -680,5 +682,6 @@ test "a later signal observed in one reply keeps the first request reason and co
   })
   @expect.expect(result.reason is Requested).to_be_true()
   @expect.expect(result.signal).to_equal(Some(Quit))
+  @expect.expect(result.exit_code()).to_equal(SignalKind::Quit.exit_code())
   @expect.expect(result.requested_code).to_equal(Some(code))
 }

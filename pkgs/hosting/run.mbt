@@ -4,6 +4,22 @@
 /// Stop requests cancel the command task and its defers finish before shutdown.
 /// Shutdown runs protected from outside cancellation.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
+  let result = execute(host, command)
+  @async.protect_from_cancel(() => {
+    if result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
+      for error in result.failures {
+        match host.report {
+          Some(report) => report(error, result.exit_code)
+          None => write_report_line(report_text(host.name, error))
+        }
+      }
+    }
+  })
+  result
+}
+
+///|
+async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
   let config = @config.load(@config.builder(), @config.FileTree::new(complete=true)) catch {
     err => return outcome(err)
   }
@@ -31,9 +47,8 @@ pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
   })
   guard step is Finish(result) else { abort("the engine finishes after its last action") }
   lifetime.reason = Some(result.reason)
-  if result.failures.is_empty() && result.requested_code is None && lifetime.exit_code is Some(code) {
-    { ..result, exit_code: code }
-  } else { result }
+  { ..result, exit_code: select_exit_code(result.signal, result.failures, result.timed_out,
+      match lifetime.exit_code { Some(code) => Some(code); None => result.requested_code }) }
 }
 
 ///|
@@ -84,5 +99,5 @@ async fn[S] run_command(ctx : Context[S], command : Hook[S]) -> Unit {
 ///|
 /// A configuration or factory failure before the engine starts.
 fn outcome(error : Error) -> RunOutcome {
-  { exit_code: ExitCode::failure(), failures: [error], reason: StartFailed(error), requested_code: None, signal: None }
+  { exit_code: select_exit_code(None, [error], false, None), timed_out: false, failures: [error], reason: StartFailed(error), requested_code: None, signal: None }
 }

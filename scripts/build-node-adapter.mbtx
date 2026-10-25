@@ -73,7 +73,15 @@ async fn main {
     "pkgs/config/adapters/node/fixture.ts", "pkgs/config/host/node_fixture.generated.js_wbtest.mbt",
     "node_fixture", "NodeFixture",
   )
-  if !library || !fixture {
+  let hosting = bundle(
+    "pkgs/hosting/adapters/node/index.ts", "pkgs/hosting/node.generated.js.mbt",
+    "node_adapter", "NodeAdapter",
+  )
+  let hosting_fixture = bundle(
+    "pkgs/hosting/adapters/node/fixture.ts", "pkgs/hosting/node_fixture.generated.js_wbtest.mbt",
+    "node_fixture", "NodeFixture",
+  )
+  if !library || !fixture || !hosting || !hosting_fixture {
     @sys.exit(1)
   }
 }
@@ -85,10 +93,17 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
   defer @fs.rmdir(dir, recursive=true)
   @fs.mkdir("\{dir}/pkgs/config/adapters/node", recursive=true)
   @fs.mkdir("\{dir}/pkgs/config/host", recursive=true)
+  @fs.mkdir("\{dir}/pkgs/hosting/adapters/node", recursive=true)
   let entry = "\{dir}/pkgs/config/adapters/node/index.ts"
   @fs.write_file(entry, "export const value: number = 1;\n")
   @fs.write_file(
     "\{dir}/pkgs/config/adapters/node/fixture.ts",
+    "export const fixture = 1;\n",
+  )
+  let hosting_entry = "\{dir}/pkgs/hosting/adapters/node/index.ts"
+  @fs.write_file(hosting_entry, "export const value = 1;\n")
+  @fs.write_file(
+    "\{dir}/pkgs/hosting/adapters/node/fixture.ts",
     "export const fixture = 1;\n",
   )
   let (missing, _, _) = @process.collect_output(
@@ -116,4 +131,16 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
   assert_true(stale != 0, msg=out.text() + err.text())
   assert_true(err.text().contains("stale"), msg=err.text())
   assert_eq(@fs.read_file(generated).text(), before)
+  @fs.write_file(entry, "export const value: number = 1;\n")
+  let hosting_generated = "\{dir}/pkgs/hosting/node.generated.js.mbt"
+  let before = @fs.read_file(hosting_generated).text()
+  @fs.write_file(hosting_entry, "export const value = 2;\n")
+  let (stale, out, err) = @process.collect_output(
+    "moonx",
+    [script, "--check"],
+    cwd=dir,
+  )
+  assert_true(stale != 0, msg=out.text() + err.text())
+  assert_true(err.text().contains("stale"), msg=err.text())
+  assert_eq(@fs.read_file(hosting_generated).text(), before)
 }

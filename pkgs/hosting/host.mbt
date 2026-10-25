@@ -79,6 +79,7 @@ priv struct HostedService[S] {
 pub struct HostBuilder[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv report : ErrorReport?
   priv services : Array[HostedService[S]]
 }
 
@@ -86,7 +87,7 @@ pub struct HostBuilder[S] {
 /// Start a bare host builder with the application name and the command-line
 /// arguments. The builder turns on no default.
 pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
-  { name, args: args.copy(), services: [] }
+  { name, args: args.copy(), services: [], report: None }
 }
 
 ///|
@@ -131,6 +132,7 @@ pub fn[S] service(
 pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
+  priv report : ErrorReport?
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise
 }
@@ -147,6 +149,7 @@ pub fn[S] build(
     args: builder.args,
     services: builder.services,
     factory,
+    report: builder.report,
   }
 }
 
@@ -155,6 +158,7 @@ pub fn[S] build(
 /// outcome, so the exit code always agrees with the failures.
 pub struct RunOutcome {
   priv exit_code : ExitCode
+  priv timed_out : Bool
   priv failures : Array[Error]
   priv reason : StopReason
   priv requested_code : ExitCode?
@@ -162,7 +166,7 @@ pub struct RunOutcome {
 }
 
 ///|
-/// The requested code, or 0 for a clean run; 1 when a failure occurred.
+/// The code selected by signal, failure and application-code precedence.
 pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
   self.exit_code
 }
@@ -172,4 +176,16 @@ pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
 /// occurred. The array is a copy.
 pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
   self.failures.copy()
+}
+
+///|
+/// A replacement failure report. It may write asynchronously, and receives the
+/// final exit code with each failure, in occurrence order.
+pub type ErrorReport = async (Error, ExitCode) -> Unit
+
+///|
+/// Replace the default standard-error report. At the end of a run with code 1
+/// or 2, the driver calls this once per failure. Other codes call no report.
+pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {
+  { ..builder, report: Some(report) }
 }

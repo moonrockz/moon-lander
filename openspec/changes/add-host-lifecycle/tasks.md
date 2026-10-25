@@ -106,6 +106,7 @@ Bead: lander-4us.5.9
 - [ ] 9.2 Load through `@host.load(builder)` on native and js; verify the factory reads a merged value
 - [ ] 9.3 Add `@hosting.files(tree)` and load through `@config.load(builder, tree)` on wasm and wasm-gc; verify a complete tree and an incomplete tree (code 2, requested paths on standard error)
 - [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
+- [ ] 9.5 Add `@hosting.shutdown_timeout_key(key : @config.KeyPath)` (design D6), read one time after the configuration load and before the factory through `FromConfig` for `TimeLimit`; verify the scenarios of "Shutdown timeout from a named key" on native and js
 
 ## 10. Shutdown timeout
 

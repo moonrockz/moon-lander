@@ -104,7 +104,8 @@ only a means to this end.
 - No `BackgroundService` equivalent. A `start` hook must return. Long-running work is
   the command.
 - No concurrent service start (.NET `ServicesStartConcurrently`).
-- No shutdown timeout from configuration keys. Only the builder sets it.
+- No shutdown timeout key that the framework owns. An application can opt in to a
+  key that it names (D6).
 - No custom error-to-exit-code classifier. The application sets a code instead.
 
 ## Decisions
@@ -429,6 +430,18 @@ Drivers run the steps:
   `moonbitlang/async` imports can run the host.
 - Call (this change): the shutdown timeout is one budget for the full stop phase. It
   starts when the command task has ended. Default 30 000 ms, as in .NET.
+- Owner (2026-10-24): the builder sets the shutdown timeout with
+  `@hosting.shutdown_timeout(limit : TimeLimit)`. An application can also opt in to
+  a configuration key that it names, with
+  `@hosting.shutdown_timeout_key(key : @config.KeyPath)`, so an operator can change
+  the timeout without a rebuild (a file, a `<PREFIX>_*` variable or a mapped flag).
+  The framework reserves no key. A value at the key overrides the builder value;
+  with no value at the key, the builder value applies, and with neither, 30 s. The
+  host reads the key one time, after the configuration load and before the
+  services factory, through the `FromConfig` implementation of `TimeLimit` (text
+  such as `10s` or `2m30s`). A value that does not parse is a `ConfigError`: code 2,
+  and no hook runs. Group 9 adds the key step, because it needs the configuration
+  load.
 
 ### D7. Console driver (Owner: SIGINT, SIGTERM, SIGQUIT give a graceful stop; Owner: O1, O2, O3)
 

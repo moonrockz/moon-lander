@@ -541,6 +541,28 @@ stopped event, and report the timeout on standard error.
 - **WHEN** a SIGTERM starts the stop phase, and the shutdown timeout ends
 - **THEN** the exit code is 143
 
+### Requirement: Shutdown timeout from a named key
+
+The application MAY name a configuration key for the shutdown timeout. A value at
+that key MUST override the builder value. A value at that key that is not a valid
+time limit MUST end the run with a configuration error before any hosted-service
+hook runs.
+
+#### Scenario: Timeout from a named key
+
+- **WHEN** the builder sets the shutdown timeout to 30 seconds and names the key `app.shutdown_timeout`, and the configuration has `app.shutdown_timeout = "100ms"`
+- **THEN** the shutdown timeout of the run is 100 ms
+
+#### Scenario: Named key with no value
+
+- **WHEN** the builder names the key `app.shutdown_timeout`, sets no timeout, and the configuration has no value at that key
+- **THEN** the shutdown timeout of the run is 30 seconds
+
+#### Scenario: Invalid value at the named key
+
+- **WHEN** the builder names the key `app.shutdown_timeout`, and the configuration has `app.shutdown_timeout = "0s"`
+- **THEN** the exit code is 2, and no hosted-service hook runs
+
 ### Requirement: Console signals give a graceful stop
 
 On native and js, the console driver SHALL change each handled signal into a stop

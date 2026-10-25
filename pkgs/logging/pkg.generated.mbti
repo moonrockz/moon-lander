@@ -42,10 +42,11 @@ pub struct LogEvent {
   level : Level
   category : String?
   template : String
-  properties : Array[(String, Json)]
   error : Error?
+  // private fields
 }
 pub fn LogEvent::message(Self) -> String
+pub fn LogEvent::properties(Self) -> Array[(String, Json)]
 pub fn LogEvent::property(Self, String) -> Json?
 pub fn LogEvent::to_line(Self) -> String
 

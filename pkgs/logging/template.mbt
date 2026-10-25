@@ -64,13 +64,14 @@ fn is_hole_name_char(char : Char) -> Bool {
 
 ///|
 /// Pair the holes of `parts` with `args` in order. A hole with no argument gives
-/// no property, and an argument with no hole is dropped.
+/// no property, and an argument with no hole is dropped. Each value is a copy, so
+/// a later change to an argument does not change the event.
 fn bind_properties(parts : Array[Part], args : Array[Json]) -> Array[(String, Json)] {
   let properties = []
   for part in parts {
     guard part is Hole(name) else { continue }
     guard properties.length() < args.length() else { break }
-    properties.push((name, args[properties.length()]))
+    properties.push((name, copy_json(args[properties.length()])))
   }
   properties
 }
@@ -95,7 +96,7 @@ pub fn LogEvent::message(self : LogEvent) -> String {
     match part {
       Text(text) => out.write_string(text)
       Hole(name) =>
-        match self.property(name) {
+        match self.find(name) {
           Some(value) => out.write_string(render_value(value))
           None => out.write_string("{\{name}}")
         }

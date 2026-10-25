@@ -89,7 +89,7 @@ test "a template keeps its values as data" {
   logger.info("Loaded {Count} files from {Path}", [3, Json(path)])
   let event = memory.events()[0]
   assert_eq(event.template, "Loaded {Count} files from {Path}")
-  assert_eq(event.properties, [("Count", 3), ("Path", "src")])
+  assert_eq(event.properties(), [("Count", 3), ("Path", "src")])
   assert_eq(event.message(), "Loaded 3 files from src")
 }
 ```

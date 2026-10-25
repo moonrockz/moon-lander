@@ -103,7 +103,7 @@ test "with_category sets the category and keeps the other fields" {
   assert_eq(event.category, Some("morphir.build"))
   assert_eq(event.level, Information)
   assert_eq(event.template, "Loaded {Count} files")
-  assert_eq(event.properties, [("Count", 3)])
+  assert_eq(event.properties(), [("Count", 3)])
 }
 
 ///|

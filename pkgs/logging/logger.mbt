@@ -32,7 +32,7 @@ pub fn &Logger::write(
 ) -> Unit {
   guard self.enabled(level) else { return }
   let properties = bind_properties(parse_template(template), args)
-  self.log({ level, category: None, template, properties, error })
+  self.log({ level, category: None, template, props: properties, error })
 }
 
 ///|

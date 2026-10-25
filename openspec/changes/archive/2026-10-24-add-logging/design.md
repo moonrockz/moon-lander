@@ -127,17 +127,24 @@ pub struct LogEvent {
   level : Level
   category : String?
   template : String
-  properties : Array[(String, Json)]
+  priv props : Array[(String, Json)]
   error : Error?
 }
 ```
 
-The fields are read-only outside the package. `LogEvent::property(name)`
-gives the first value of a property by name, so a test or a backend does not
-search the array itself. A combinator that changes a
+The fields are read-only outside the package. A combinator that changes a
 field, such as the category wrapper, makes a new event with a struct update.
-`properties` is an ordered array, not a map, so the event keeps the hole order
-of the template (spec: Message template binding).
+The properties are an ordered array, not a map, so the event keeps the hole
+order of the template (spec: Message template binding).
+
+A read-only field does not make an `Array` or a `Json` array or object
+immutable, so the properties are a private field (review of #91). The bind step
+copies each argument deeply, and `LogEvent::properties()` and
+`LogEvent::property(name)` give deep copies. A caller that changes an argument
+after the call, a reader that changes what it read, and one backend of a
+fan-out cannot change the event that another code holds. The cost is one copy
+of each value at bind and at each read; the message render reads the private
+values without a copy.
 
 Property values are the core `Json` type. Alternatives considered:
 

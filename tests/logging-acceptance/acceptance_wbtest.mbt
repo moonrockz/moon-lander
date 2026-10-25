@@ -211,7 +211,7 @@ impl @moonspec.World for LoggingWorld with fn configure(self, setup) {
   })
   setup.then1("the event properties are {string}", (expected : String) => {
     let event = self.last_event()
-    let shown = event.properties.map(entry => "\{entry.0}=\{entry.1.stringify()}")
+    let shown = event.properties().map(entry => "\{entry.0}=\{entry.1.stringify()}")
     @expect.expect(shown.join(", ")).to_equal(expected)
   })
   setup.then1("the message is {string}", (expected : String) => {

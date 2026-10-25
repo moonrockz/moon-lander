@@ -76,7 +76,7 @@ test "error keeps the error value" {
   )
   let event = app.received[0]
   assert_eq(event.level, Error)
-  assert_eq(event.properties, [])
+  assert_eq(event.properties(), [])
   match event.error {
     Some(LoadFailed(path)) => assert_eq(path, "config.toml")
     _ => fail("the event does not hold the error")
@@ -109,6 +109,6 @@ test "library code gives the same event to each backend" {
   let from_memory = memory.events()[0]
   assert_eq(from_app.level, from_memory.level)
   assert_eq(from_app.template, from_memory.template)
-  assert_eq(from_app.properties, from_memory.properties)
+  assert_eq(from_app.properties(), from_memory.properties())
   assert_eq(from_app.category, from_memory.category)
 }

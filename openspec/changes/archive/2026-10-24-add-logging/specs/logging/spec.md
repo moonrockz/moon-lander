@@ -76,6 +76,14 @@ JSON values, not text.
 - **WHEN** code writes the template `"Saved {Order}"` with a JSON object argument that holds the fields `id` and `total`
 - **THEN** the event property `Order` is the same JSON object with both fields
 
+#### Scenario: A change to the read properties does not change the event
+- **WHEN** a reader of a kept event removes all its properties, and changes a JSON object in a property value
+- **THEN** the next read of the same event gives the original properties and the original message
+
+#### Scenario: A change to an argument does not change the event
+- **WHEN** code writes the template `"Saved {Items}"` with a JSON array argument `[1, 2]`, and then adds `3` to that array
+- **THEN** the message of the kept event is `"Saved [1,2]"`
+
 ### Requirement: Message template binding
 The package SHALL bind the positional arguments to the named holes of a template
 in order of appearance. A hole is a name in braces. A doubled brace (`{{` or `}}`)

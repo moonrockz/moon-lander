@@ -9,7 +9,7 @@ fn event_of(template : String, args : Array[Json]) -> @logging.LogEvent {
 ///|
 test "two holes bind in order" {
   let event = event_of("Loaded {Count} files from {Path}", [3, "src"])
-  assert_eq(event.properties, [("Count", 3), ("Path", "src")])
+  assert_eq(event.properties(), [("Count", 3), ("Path", "src")])
   assert_eq(event.message(), "Loaded 3 files from src")
 }
 
@@ -26,35 +26,35 @@ test "warning method binds its argument" {
 ///|
 test "escaped braces are not holes" {
   let event = event_of("Use {{Name}} for {Value}", [7])
-  assert_eq(event.properties, [("Value", 7)])
+  assert_eq(event.properties(), [("Value", 7)])
   assert_eq(event.message(), "Use {Name} for 7")
 }
 
 ///|
 test "a missing argument keeps the hole text" {
   let event = event_of("From {Path} to {Target}", ["a"])
-  assert_eq(event.properties, [("Path", "a")])
+  assert_eq(event.properties(), [("Path", "a")])
   assert_eq(event.message(), "From a to {Target}")
 }
 
 ///|
 test "an extra argument is dropped" {
   let event = event_of("Done {Count}", [1, 2])
-  assert_eq(event.properties, [("Count", 1)])
+  assert_eq(event.properties(), [("Count", 1)])
   assert_eq(event.message(), "Done 1")
 }
 
 ///|
 test "an unclosed brace is literal text" {
   let event = event_of("Value {Name", [5])
-  assert_eq(event.properties, [])
+  assert_eq(event.properties(), [])
   assert_eq(event.message(), "Value {Name")
 }
 
 ///|
 test "one name twice keeps both pairs and shows the first value" {
   let event = event_of("{Name} and {Name}", ["a", "b"])
-  assert_eq(event.properties, [("Name", "a"), ("Name", "b")])
+  assert_eq(event.properties(), [("Name", "a"), ("Name", "b")])
   assert_eq(event.message(), "a and a")
 }
 

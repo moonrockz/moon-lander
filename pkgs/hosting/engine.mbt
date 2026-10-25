@@ -1,6 +1,4 @@
 ///|
-// Group 11 connects signal requests. Remove when the console driver constructs Signal.
-#warnings("-6")
 priv enum StopRequest {
   Requested
   Signal(SignalKind)

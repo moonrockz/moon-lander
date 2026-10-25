@@ -180,7 +180,7 @@ description = "Check that the generated js host adapter is current"
 run = "moonx scripts/toolchain.mbtx scripts/build-node-adapter.mbtx --check"
 
 [tasks."check:console"]
-description = "Run the native console signal stub tests and a consumer outside the workspace (native only)"
+description = "Test the console drivers with native, Node.js and Bun children, and a consumer outside the workspace (args: --no-consumer)"
 run = "moonx scripts/toolchain.mbtx scripts/check-console.mbtx"
 
 [tasks."check:config"]

@@ -10,7 +10,7 @@
 
 // Signal kinds, shared with console.mbt: 0 none, 1 Interrupt, 2 Terminate,
 // 3 Quit.
-static int32_t moonlander_console_exit_code(int32_t kind) {
+int32_t moonlander_console_exit_code(int32_t kind) {
   switch (kind) {
   case 1:
     return 130;
@@ -23,25 +23,43 @@ static int32_t moonlander_console_exit_code(int32_t kind) {
   }
 }
 
+// The Windows console event numbers. They are fixed by the Windows API, so the
+// mapping below is the same function on every platform, and its unit test runs
+// on every platform.
+#define MOONLANDER_CTRL_C_EVENT 0
+#define MOONLANDER_CTRL_BREAK_EVENT 1
+#define MOONLANDER_CTRL_CLOSE_EVENT 2
+
+// The kind of a Windows console event, or 0 for an event that the driver does
+// not handle.
+int32_t moonlander_console_kind_of_event(int32_t event) {
+  switch (event) {
+  case MOONLANDER_CTRL_C_EVENT:
+    return 1;
+  case MOONLANDER_CTRL_CLOSE_EVENT:
+    return 2;
+  case MOONLANDER_CTRL_BREAK_EVENT:
+    return 3;
+  default:
+    return 0;
+  }
+}
+
 #ifdef _WIN32
 
 #include <windows.h>
 
+// The build fails if the Windows API numbers differ from the numbers above.
+typedef char moonlander_console_event_numbers[
+    (CTRL_C_EVENT == MOONLANDER_CTRL_C_EVENT &&
+     CTRL_BREAK_EVENT == MOONLANDER_CTRL_BREAK_EVENT &&
+     CTRL_CLOSE_EVENT == MOONLANDER_CTRL_CLOSE_EVENT) ? 1 : -1];
+
 static volatile LONG moonlander_console_kind = 0;
 
 static BOOL WINAPI moonlander_console_on_event(DWORD event) {
-  LONG kind;
-  switch (event) {
-  case CTRL_C_EVENT:
-    kind = 1;
-    break;
-  case CTRL_CLOSE_EVENT:
-    kind = 2;
-    break;
-  case CTRL_BREAK_EVENT:
-    kind = 3;
-    break;
-  default:
+  LONG kind = moonlander_console_kind_of_event((int32_t)event);
+  if (kind == 0) {
     return FALSE;
   }
   if (InterlockedCompareExchange(&moonlander_console_kind, kind, 0) != 0) {
@@ -66,16 +84,28 @@ int32_t moonlander_console_signal_kind(void) {
   return (int32_t)InterlockedCompareExchange(&moonlander_console_kind, 0, 0);
 }
 
+// The POSIX signal numbers are not used on Windows.
+int32_t moonlander_console_kind_of_signal(int32_t sig) {
+  (void)sig;
+  return 0;
+}
+
 #else
 
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
 
+// The kind of a POSIX signal, or 0 for a signal that the driver does not
+// handle.
+int32_t moonlander_console_kind_of_signal(int32_t sig) {
+  return sig == SIGINT ? 1 : sig == SIGTERM ? 2 : sig == SIGQUIT ? 3 : 0;
+}
+
 static volatile sig_atomic_t moonlander_console_kind = 0;
 
 static void moonlander_console_on_signal(int sig) {
-  int32_t kind = sig == SIGINT ? 1 : sig == SIGTERM ? 2 : sig == SIGQUIT ? 3 : 0;
+  int32_t kind = moonlander_console_kind_of_signal(sig);
   if (kind == 0) {
     return;
   }

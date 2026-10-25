@@ -11,7 +11,7 @@ import {
 ----
 
 ///|
-/// Test the config and hosting adapters on Node and Bun, reusing Moon's compiled test artifacts.
+/// Test the config, hosting and console adapters on Node and Bun, reusing Moon's compiled test artifacts.
 /// Usage: mise run test:node-adapter [-- node|bun].
 
 ///|
@@ -40,7 +40,7 @@ async fn main {
       eprintln("Expected node or bun, got \{runtime}")
       @sys.exit(1)
     }
-    for pkg in ["pkgs/config/host", "pkgs/hosting"] {
+    for pkg in ["pkgs/config/host", "pkgs/hosting", "pkgs/hosting/console"] {
       println("Testing config and hosting adapters: \{pkg} on \{runtime}")
       let code = @process.run(
         "moon",

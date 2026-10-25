@@ -3,20 +3,25 @@ import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
   "moonbitlang/core/string",
   "moonbitlang/x@0.5.5/sys",
 }
 ----
 
 ///|
-/// Check the native console signal stub (openspec add-host-lifecycle, task group 1).
+/// Check the console drivers (openspec add-host-lifecycle, task groups 1, 11 and 12).
 ///
-/// The check runs the `hosting/console` tests and the signal acceptance suite on native, and fails
-/// a leg that runs zero tests. It then copies the framework modules in `libraries` into a
-/// temporary workspace with a consumer module outside this workspace, and runs the same acceptance
-/// suite there, so the consumer's C compiler builds the stub from the package source.
+/// The check builds the js test program, then runs the `hosting/console` tests and the signal
+/// acceptance suite on native, and fails a leg that runs zero tests. The suite starts the test
+/// host as a native child and as a js child under each runtime in `js_runtimes`. The check then
+/// copies the framework modules in `libraries` into a temporary workspace with a consumer module
+/// outside this workspace, and runs the native part of the acceptance suite there, so the
+/// consumer's C compiler builds the stub from the package source. `--no-consumer` skips that part.
 ///
-/// Usage: `mise run check:console`, or `moonx scripts/toolchain.mbtx scripts/check-console.mbtx`. Native only.
+/// Usage: `mise run check:console [-- --no-consumer]`, or
+/// `moonx scripts/toolchain.mbtx scripts/check-console.mbtx`.
 
 ///|
 /// The native suites of the stub, relative to the workspace root.
@@ -27,6 +32,26 @@ let paths : Array[String] = [
 ///|
 /// The files of the acceptance suite that the consumer module reuses.
 let suite_files : Array[String] = ["moon.pkg", "send.c", "signal_wbtest.mbt"]
+
+///|
+/// The files of the test host scenarios that the consumer module reuses.
+let scenario_files : Array[String] = [
+  "moon.pkg", "scenarios.mbt", "emit.native.mbt", "emit.js.mbt",
+]
+
+///|
+/// The import path of the scenarios in this workspace and in the consumer module.
+let scenario_import : (String, String) = (
+  "moonrockz/moon-lander-tests/console-host-scenarios", "console-consumer/scenarios",
+)
+
+///|
+/// The js package that the acceptance suite starts under each runtime.
+let js_program : String = "tests/console-host-program"
+
+///|
+/// The js runtimes of the acceptance suite.
+let js_runtimes : String = "node,bun"
 
 ///|
 /// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
@@ -58,7 +83,7 @@ fn workspace_version(manifest : String) -> String? {
 /// The `moon.mod` of the consumer module. It depends on the copied framework module and on the
 /// pinned `moonbitlang/async`, as an application does.
 fn consumer_manifest(version : String) -> String {
-  "name = \"console-consumer\"\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander-hosting@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
+  "name = \"console-consumer\"\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander-core@\{version}\",\n  \"moonrockz/moon-lander-hosting@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
 }
 
 ///|
@@ -85,11 +110,13 @@ async fn native_tests(
   label : String,
   cwd : String,
   args : Array[String],
+  extra_env~ : Map[String, String] = {},
 ) -> Unit {
   let (code, out, err) = @process.collect_output(
     "moon",
     ["test", "--deny-warn", "--target", "native", ..args],
     cwd~,
+    extra_env~,
   )
   let output = out.text() + err.text()
   guard code == 0 else {
@@ -127,10 +154,39 @@ fn isolated_work() -> String {
 }
 
 ///|
+/// Build the js test program and give the path of its artifact.
+async fn build_js_program() -> String {
+  let (code, out, err) = @process.collect_output("moon", [
+    "run", "--build-only", "--deny-warn", "--target", "js", js_program,
+  ])
+  guard code == 0 else {
+    println(out.text() + err.text())
+    fail("❌ The js test program does not build")
+  }
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Expected one js build artifact, got " + out.text())
+  }
+  path
+}
+
+///|
 async fn main {
   let root = @fs.realpath(".")
+  let program = build_js_program()
+  let js_env = {
+    "LANDER_CONSOLE_JS_PROGRAM": program,
+    "LANDER_CONSOLE_JS_RUNTIMES": js_runtimes,
+  }
   for path in paths {
-    native_tests(path, root, [path])
+    native_tests(
+      "\{path} (native and js on \{js_runtimes})",
+      root,
+      [path],
+      extra_env=js_env,
+    )
+  }
+  if @env.args().contains("--no-consumer") {
+    return
   }
   guard workspace_version(@fs.read_file("moon.mod").text()) is Some(version) else {
     fail("moon.mod has no version")
@@ -146,7 +202,16 @@ async fn main {
   for file in suite_files {
     @fs.write_file(
       isolated + "/signals/" + file,
-      @fs.read_file("tests/console-signal-acceptance/" + file),
+      @fs.read_file("tests/console-signal-acceptance/" + file)
+      .text()
+      .replace_all(old=scenario_import.0, new=scenario_import.1),
+    )
+  }
+  @fs.mkdir(isolated + "/scenarios")
+  for file in scenario_files {
+    @fs.write_file(
+      isolated + "/scenarios/" + file,
+      @fs.read_file("tests/console-host-scenarios/" + file),
     )
   }
   native_tests("consumer module outside the workspace", isolated, [
@@ -175,6 +240,19 @@ test "the consumer depends on the framework version and the pinned async" {
   let manifest = consumer_manifest("0.3.0")
   assert_true(manifest.contains("\"moonrockz/moon-lander-hosting@0.3.0\""))
   assert_true(manifest.contains("\"moonbitlang/async@0.22.5\""))
+  assert_true(manifest.contains("\"moonrockz/moon-lander-core@0.3.0\""))
+}
+
+///|
+async test "the consumer copies every source file of the scenarios package" {
+  // Tests of task scripts run in the scripts folder.
+  let sources = @fs.readdir("../tests/console-host-scenarios").filter(name => {
+    name != "pkg.generated.mbti"
+  })
+  sources.sort()
+  let copied = scenario_files.copy()
+  copied.sort()
+  assert_eq(copied, sources)
 }
 
 ///|

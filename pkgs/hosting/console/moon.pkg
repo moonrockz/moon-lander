@@ -1,8 +1,33 @@
 import {
+  "moonrockz/moon-lander-hosting" @hosting,
   "moonbitlang/async/signal",
-  "moonbitlang/core/debug",
 }
 
-supported_targets = "native"
+import {
+  "moonbitlang/async",
+} for "wbtest"
 
-options("native-stub": [ "signal_stub.c" ])
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/console",
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonbitlang/async",
+} for "test"
+
+supported_targets = "native+js"
+
+// `moonbitlang/async/signal` is used only on native. The pinned build system
+// cannot condition imports by target, so it is unused on js (29). Remove when
+// the imports can be conditional.
+warnings = "-29"
+
+options(
+  "native-stub": [ "signal_stub.c" ],
+  targets: {
+    "console.native.mbt": ["native"],
+    "console.native_wbtest.mbt": ["native"],
+    "console.js.mbt": ["js"],
+    "console.js_wbtest.mbt": ["js"],
+    "node.generated.js.mbt": ["js"],
+  },
+)

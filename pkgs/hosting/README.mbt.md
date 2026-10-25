@@ -6,7 +6,8 @@ name, the arguments, the hosted services and a services factory. `build` gives a
 a known order, with a clear exit code. Each run has a lifetime for events,
 stop requests and cancellation checks. The run resolves its starting settings,
 then parses arguments, loads configuration, builds services and runs hooks.
-Signal drivers are later parts of `add-host-lifecycle`.
+The console driver in [`moonrockz/moon-lander-hosting/console`](console/README.mbt.md)
+changes console signals into a graceful stop and ends the process with the exit code.
 
 Import the root package with an explicit alias, because the module name has `-`
 in it. The application name comes from `moonrockz/moon-lander-core`:
@@ -43,9 +44,9 @@ test "build a host with one service" {
 
 | Package | Targets | Content |
 | --- | --- | --- |
-| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, `command`, hosted services, `Host[S]`, `run`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
+| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, `command`, hosted services, `Host[S]`, `run`, `SignalProbe`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
 | [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory and global standard discovery flags |
-| `moonrockz/moon-lander-hosting/console` (`@console`) | `native` | The C signal stub for SIGINT, SIGTERM and SIGQUIT, and the Windows console events |
+| [`moonrockz/moon-lander-hosting/console`](console/README.mbt.md) (`@console`) | `native`, `js` | The console driver `run`: signals, the second signal and the process exit. A C signal stub on native, Node.js listeners on js |
 
 The [`moonrockz/moon-lander` guide](../lander/README.mbt.md) shows the full
 pipeline, the name and exit-code rules, and `run`.
@@ -117,8 +118,23 @@ test "a command requests stop and polls its token" {
 On js, Node.js cannot deliver a signal listener while a synchronous loop keeps
 running. Long synchronous loops must call `@async.pause()` at intervals to give
 the event loop time to run the listener. A cancellation check alone does not
-yield. The console driver, a later part of `add-host-lifecycle`, will give native
-code signal probes to poll. A task cancellation takes effect at a suspension point.
+yield. On native, the console driver gives a signal probe that each check reads at
+once, also in a loop that never yields. A task cancellation takes effect at a
+suspension point.
+
+A console driver gives `run` a `SignalProbe`. The run registers it before the
+first hook, reads it in each cancellation check and every 50 ms, and changes the
+first signal into a stop request with the reason `Signal(kind)`:
+
+```mbt check
+///|
+test "a console driver gives the run a signal probe" {
+  let signal : Ref[@hosting.SignalKind?] = Ref(None)
+  // On native and js: @hosting.run(host, command, signals=probe)
+  let probe = @hosting.SignalProbe::new(() => signal.val)
+  ignore(probe)
+}
+```
 
 ```mbt check
 ///|

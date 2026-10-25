@@ -119,7 +119,7 @@ jobs:
         run: mise run check:openrpc-assets
       - name: Verify the isolated OpenRPC source consumer
         run: mise run check:openrpc
-      - name: Test the native console signal stub and a consumer outside the workspace
+      - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
       - name: Verify generated OpenRPC Unicode data
         run: mise run check:openrpc-unicode
@@ -198,6 +198,11 @@ jobs:
       - name: Verify format trimming and failure propagation
         if: matrix.target == 'native'
         run: mise run check:formats
+      # Real CTRL_BREAK_EVENT delivery to native, Node.js and Bun children. The isolated consumer
+      # copy runs on Linux and macOS only.
+      - name: Test the console drivers with native and js children
+        if: matrix.target == 'native'
+        run: mise run check:console -- --no-consumer
 
   # The core observation must also agree on every target on macOS.
   # Reuse the existing macOS setup and retain its Node/Bun adapter coverage.
@@ -219,7 +224,7 @@ jobs:
         run: mise run check:config
       - name: Verify format trimming and failure propagation
         run: mise run check:formats
-      - name: Test the native console signal stub and a consumer outside the workspace
+      - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
 
   # The docs site. It runs on each pull request with no path filter, because a path-filtered

@@ -6,13 +6,22 @@
 /// It reports each shutdown timeout for every exit code, and other failures only
 /// for code 1 or 2, in failure order, through `error_report` or as
 /// `<name>: <message>` on standard error. Report errors do not change the outcome.
-pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
-  run_with_directory_reader(host, command)
+///
+/// A console driver gives `signals`. The run registers the probe before the
+/// first hook, so each cancellation check reads it, and a watcher task reads it
+/// every 50 ms until the run ends. The first signal is a stop request with the
+/// reason `Signal(kind)`, and it cancels the command task.
+pub async fn[S] run(host : Host[S], command : Hook[S], signals? : SignalProbe) -> RunOutcome {
+  run_with_directory_reader(host, command, signals?)
 }
 
 ///|
-async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory) -> RunOutcome {
-  let result = execute(host, command, read_directory~)
+/// The time between two reads of the signal probe by the watcher task.
+let signal_watch_interval : Int = 50
+
+///|
+async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory, signals? : SignalProbe) -> RunOutcome {
+  let result = execute(host, command, read_directory~, signals?)
   @async.protect_from_cancel(() => {
     for error in result.failures {
       if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
@@ -29,7 +38,7 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 }
 
 ///|
-async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError) -> RunOutcome {
+async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError, signals? : SignalProbe) -> RunOutcome {
   let inputs = configuration_inputs(host, read_directory~) catch { err => return outcome(err) }
   let config = @host.load(inputs.sources) catch { err => return outcome(err) }
   let configured = finish_configuration(host, inputs, config) catch {
@@ -39,6 +48,23 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
     }
     err => return outcome(err)
   }
+  let ctx = configured.context
+  let lifetime = ctx.lifetime
+  guard signals is Some(probe) else { return run_engine(host, configured, command) }
+  lifetime.register_stop_probe(probe.request)
+  @async.with_task_group(group => {
+    group.spawn_bg(no_wait=true, () => {
+      while true {
+        @async.sleep(signal_watch_interval)
+        ignore(lifetime.probe_stop())
+      }
+    })
+    run_engine(host, configured, command)
+  })
+}
+
+///|
+async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : Hook[S]) -> RunOutcome {
   let ctx = configured.context
   let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled

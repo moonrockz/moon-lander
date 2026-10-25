@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/console-host-scenarios"
+
+// Values
+pub fn output_line(Int32) -> String
+
+pub let output_lines : Int32
+
+pub async fn run(Scenario) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum Scenario {
+  Clean
+  Wait
+  Poll
+  Spin
+  SlowStop
+  Output
+  OutputAfterSignal
+}
+pub fn Scenario::parse(String) -> Self?
+
+// Type aliases
+
+// Traits

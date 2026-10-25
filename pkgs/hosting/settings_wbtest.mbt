@@ -8,7 +8,8 @@ fn settings_host(vars : &IntoEnvVars, name? : String = "acme") -> Host[Unit] rai
 fn settings_config(host : Host[Unit], tree? : @config.FileTree = @config.FileTree::new(complete=true)) -> @config.Config raise {
   let settings = resolve_settings(host)
   let parsed = parse_arguments(host, env=settings.variables)
-  let builder = configuration_builder(host, settings, parsed.discovery_options)
+  let environment = resolve_environment(host, settings, parsed.discovery_options)
+  let builder = configuration_builder(host, settings, environment_options(parsed.discovery_options, environment))
     |> @config.platform(Linux) |> @config.format(@toml.format())
   guard @config.load(builder, tree) is Done(config) else { fail("expected a complete configuration") }
   config
@@ -161,9 +162,9 @@ test "skipped source reports skipped while conventions and argparse retain the s
 
 ///|
 test "starting environment remains a default for conventions" {
-  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), [], environment="Staging") |> build(_ => ())
-  assert_eq(host.environment, Some("Staging"))
-  let conventions = @conventions.base("acme") |> @conventions.environments(default=host.environment.unwrap())
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), [], environment=@conventions.EnvironmentName::parse("Staging")) |> build(_ => ())
+  assert_eq(host.environment, Some(@conventions.EnvironmentName::parse("Staging")))
+  let conventions = @conventions.base("acme") |> @conventions.environments(default=host.environment.unwrap().to_string())
   assert_eq(@conventions.environment_name(conventions, Map([])), Some("Staging"))
   assert_eq(@conventions.environment_name(conventions, { "ACME_ENVIRONMENT": "Production" }), Some("Production"))
 }
@@ -193,6 +194,9 @@ test "every composed reader sees one set including environment and HOME" {
     working_dir=@lander_core.AbsolutePath::parse("/w")) |> app_dirs() |> build(_ => ())
   let settings = resolve_settings(host, read_variables=() => abort("explicit set must win"))
   assert_eq(Map::from_iter(settings.variables.iter()), variables)
+  let parsed = parse_arguments(host, env=settings.variables)
+  let environment = resolve_environment(host, settings, parsed.discovery_options)
+  assert_eq(environment.environment_name.map(name => name.to_string()), Some("Staging"))
   assert_eq(@conventions.environment_name(@conventions.base("acme") |> @conventions.environments(), Map::from_iter(settings.variables.iter())), Some("Staging"))
   let config = settings_config(host)
   assert_eq(@config.get_text(config, "log.format"), "json")

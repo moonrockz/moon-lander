@@ -42,6 +42,8 @@ pub fn ExitCode::to_int(self : ExitCode) -> Int {
 pub struct BuildContext {
   /// The configuration of the run.
   config : @config.Config
+  /// The application name, resolved environment name and content root.
+  environment : HostEnvironment
   /// The immutable variable snapshot of this run, in key order.
   env_vars : @sorted_map.SortedMap[String, String]
   /// The absolute working directory of this run.
@@ -58,6 +60,8 @@ pub struct Context[S] {
   services : S
   /// The configuration of the run.
   config : @config.Config
+  /// The application name, resolved environment name and content root.
+  environment : HostEnvironment
   /// The immutable variable snapshot of this run, in key order.
   env_vars : @sorted_map.SortedMap[String, String]
   /// The absolute working directory of this run.
@@ -95,7 +99,8 @@ pub struct HostBuilder[S] {
   priv prefix : @lander_core.EnvPrefix
   priv variables : Result[@sorted_map.SortedMap[String, String], UsageError]?
   priv directory : @lander_core.AbsolutePath?
-  priv environment : String?
+  priv environment : @conventions.EnvironmentName?
+  priv root : @lander_core.AbsolutePath?
   priv reserved : Array[String]
   priv skip_variables : Bool
   priv use_app_dirs : Bool
@@ -110,17 +115,17 @@ pub struct HostBuilder[S] {
 /// arguments. The builder adds the prefixed variable source, but no services.
 /// Omitted variables and directory come from the process on native and js,
 /// and from the empty set and `/` on wasm and wasm-gc, once per run.
-/// `environment` is a default name, raw text for now; a parsed
-/// environment-name type replaces it.
+/// `environment` sets a default name and enables environment files. Parse it
+/// with `@conventions.EnvironmentName::parse` at the caller boundary.
 pub fn[S] builder(
   name : @lander_core.AppName,
   args : Array[String],
   env_vars? : &IntoEnvVars,
   working_dir? : @lander_core.AbsolutePath,
-  environment? : String,
+  environment? : @conventions.EnvironmentName,
 ) -> HostBuilder[S] {
   { name, args: args.copy(), prefix: @lander_core.EnvPrefix::from_app_name(name),
-    variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, reserved: [],
+    variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, root: None, reserved: [],
     skip_variables: false, use_app_dirs: false, make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
 }
 
@@ -186,7 +191,8 @@ pub struct Host[S] {
   priv prefix : @lander_core.EnvPrefix
   priv variables : Result[@sorted_map.SortedMap[String, String], UsageError]?
   priv directory : @lander_core.AbsolutePath?
-  priv environment : String?
+  priv environment : @conventions.EnvironmentName?
+  priv root : @lander_core.AbsolutePath?
   priv reserved : Array[String]
   priv skip_variables : Bool
   priv use_app_dirs : Bool
@@ -211,6 +217,7 @@ pub fn[S] build(
     variables: builder.variables,
     directory: builder.directory,
     environment: builder.environment,
+    root: builder.root,
     reserved: builder.reserved,
     skip_variables: builder.skip_variables,
     use_app_dirs: builder.use_app_dirs,

@@ -492,3 +492,47 @@ async test "runs keep the builder and env_vars snapshots after caller map mutati
     }
   }
 }
+
+///|
+async test "invalid environment names stop before factory hooks and command" {
+  for (args, vars) in [
+    (["--environment", "../x"], {}),
+    ([], { "ACME_ENVIRONMENT": "local" }),
+  ] {
+    let log = []
+    let result = environment_builder(args~, vars~)
+      |> error_report((_, _) => ())
+      |> service("observer", starting=_ => log.push("starting"), start=_ => log.push("start"),
+        started=_ => log.push("started"), stopping=_ => log.push("stopping"), stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
+      |> build(_ => { log.push("factory"); () })
+      |> run(_ => log.push("command"))
+    assert_eq(result.exit_code().to_int(), 2)
+    assert_eq(log, [])
+    assert_true(result.failures()[0] is @config.InvalidEnvironmentName(..))
+  }
+}
+
+///|
+async test "factory all six hooks and command see the same typed host environment" {
+  let environments = []
+  let record : Hook[HostEnvironment] = ctx => {
+    assert_eq(ctx.environment.application_name, ctx.services.application_name)
+    assert_eq(ctx.environment.environment_name, ctx.services.environment_name)
+    assert_eq(ctx.environment.content_root, ctx.services.content_root)
+    environments.push(ctx.environment.environment_name.unwrap().to_string())
+  }
+  let result = builder(@lander_core.AppName::parse("acme"), ["--environment", "Staging"], env_vars={ "ACME_ENVIRONMENT": "Production" }, working_dir=@lander_core.AbsolutePath::parse("/work/repo"))
+    |> command(name => @argparse.Command(name, options=[@hosting_argparse.environment_option()]))
+    |> content_root(@lander_core.AbsolutePath::parse("/content"))
+    |> service("observer", starting=record, start=record, started=record, stopping=record, stop=record, stopped=record)
+    |> build(b => {
+      assert_eq(b.environment.application_name.to_string(), "acme")
+      assert_true(b.environment.is_staging())
+      assert_eq(b.environment.content_root.to_string(), "/content")
+      assert_eq(b.working_dir.to_string(), "/work/repo")
+      b.environment
+    })
+    |> run(record)
+  assert_eq(result.exit_code(), ExitCode::success())
+  assert_eq(environments, ["Staging", "Staging", "Staging", "Staging", "Staging", "Staging", "Staging"])
+}

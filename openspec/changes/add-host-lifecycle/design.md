@@ -538,6 +538,8 @@ number, so no `ExitCode` value is out of range.
 
 ### D9. Host environment (Owner: .NET style; Call: `Option` name, opt-in)
 
+The D17 types replace the `String` fields in this sketch.
+
 ```moonbit
 pub struct HostEnvironment {
   application_name : String

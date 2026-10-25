@@ -103,10 +103,14 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
   let mut builder = @config.builder()
     |> @config.env_vars(Map::from_iter(settings.variables.iter()))
     |> @config.working_dir(settings.directory.to_string())
-  if host.use_app_dirs {
-    let conventions = @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
+  if host.use_app_dirs || host.environment is Some(_) {
+    let conventions = if host.use_app_dirs {
+      @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
+    } else {
+      @conventions.base(host.name.to_string(), prefix=host.prefix.to_string())
+    }
     let conventions = match host.environment {
-      Some(name) => conventions |> @conventions.environments(default=name)
+      Some(name) => conventions |> @conventions.environments(default=name.to_string())
       None => conventions
     }
     builder = builder |> @conventions.add(conventions, options~)

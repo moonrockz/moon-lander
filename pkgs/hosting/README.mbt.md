@@ -229,7 +229,18 @@ Each run uses one variable set and one absolute working directory. The builder
 accepts `env_vars`, `working_dir` and `environment` as starting settings. Omitted
 variables and directory come from the process on native and js, or the empty
 set and `/` on wasm and wasm-gc. Explicit values cause no process read.
-`environment` is a default name, raw text for now; a parsed environment-name type replaces it.
+`environment` is a parsed `@conventions.EnvironmentName` default and enables
+environment files, as does `default_environment(name)`. Parse the name at the
+caller with `@conventions.EnvironmentName::parse`. The host takes the name from
+`--environment`, then `<PREFIX>_ENVIRONMENT` in the run snapshot, then the default.
+An invalid name ends the run with code 2 before the factory or any hook.
+
+The factory, hooks and command read `environment.application_name`,
+`environment.environment_name` and `environment.content_root` on their contexts.
+The `is_environment(name)`, `is_development()`, `is_staging()` and
+`is_production()` checks ignore case. With no name, each check gives false.
+`content_root(path)` sets an absolute content root. Without it, the content root
+is the working directory of the run. Windows paths use `/` separators.
 
 A later `env_vars` or `working_dir` step replaces that setting. The factory,
 hooks and command read the final values through `env_vars` and `working_dir`

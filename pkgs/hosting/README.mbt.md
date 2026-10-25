@@ -5,8 +5,8 @@ name, the arguments, the hosted services and a services factory. `build` gives a
 `Host`, and `run` starts the services, runs the command and stops the services in
 a known order, with a clear exit code. Each run has a lifetime for events,
 stop requests and cancellation checks. The run resolves its starting settings,
-then parses arguments before configuration and hooks. Signal drivers and host configuration are later parts
-of `add-host-lifecycle`.
+then parses arguments, loads configuration, builds services and runs hooks.
+Signal drivers are later parts of `add-host-lifecycle`.
 
 Import the root package with an explicit alias, because the module name has `-`
 in it. The application name comes from `moonrockz/moon-lander-core`:
@@ -139,7 +139,14 @@ test "a long command yields between batches" {
 `shutdown_timeout(limit)` sets one budget for the full stop phase. The budget
 starts when the command task has ended. The default is 30 s, and a later step
 replaces an earlier value. Only native and js apply the limit. The wasm and
-wasm-gc drivers have no timer. The opt-in configuration key is planned.
+wasm-gc drivers have no timer.
+
+`shutdown_timeout_key(key)` opts in to an application-named `@config.KeyPath`.
+The host reads it once after loading and before the factory, through
+`FromConfig` for `TimeLimit`. A value such as `"100ms"` overrides the builder
+limit. An absent key keeps the builder limit, or the default 30 s. Invalid
+text or a number gives a configuration error with code 2 before the
+factory or any hook. The framework reserves no timeout key.
 
 At the limit, the host cancels the current hook, skips the remaining stop hooks,
 raises the stopped event and reports `ShutdownTimedOut`. A hook that protects
@@ -297,3 +304,52 @@ test "reserve a full name before changing the prefix" {
   ignore(host)
 }
 ```
+
+## Configuration and services
+
+`configure(fn(sources) { ... })` adds formats and application sources through
+`@config.ConfigBuilder`. Callbacks run in registration order after starting
+settings, argument parsing and environment resolution. The host then adds its
+conventions set and the prefixed variable source at priority 600. Core has no
+builder trait, so use `configure` for core steps.
+
+```mbt check
+///|
+test "configure application sources and conventions" {
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.configure(fn(sources) raise {
+      sources
+      |> @config.defaults({ "log": { "format": "text" } })
+      |> @conventions.add(@conventions.app_dirs("acme"))
+    })
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```
+
+A conventions set added inside `configure` keeps its own options. It does not
+receive the standard host flags `--environment`, `--config`, `--isolated` and
+`--project`. Use `app_dirs()` for the host-owned standard set and
+`conventions(fn(c) { ... })` to change it. These steps compose in pipeline
+order. A later `app_dirs()` replaces earlier convention parts. Without it,
+`conventions` starts from an empty base set with the final host name and prefix.
+The host-owned set receives the standard flags. For example,
+`conventions(c => c |> @conventions.workspace())` after `app_dirs()` enables
+workspace member selection with `--project`. With neither step, a bare host
+adds no discovery reports.
+
+Native and js call `@host.load` to answer file requests from disk, using the
+run's variable snapshot and working directory. They ignore `files(tree)`.
+On wasm and wasm-gc, `files(tree)` supplies the immutable snapshot to the pure
+`@config.load`. A complete tree gives the configuration. An incomplete tree
+raises a usage error with code 2 and names each requested path. The embedded
+phase driver and its standard-error report arrive in task group 13.
+
+After loading, the factory runs once. Its `BuildContext` and every hook's and
+command's `Context[S]` share the final configuration, variable snapshot and
+working directory. Each hook, lifetime handler and command uses the same
+services record. Loading and timeout-decoding failures occur before the factory
+or any hook. The public argparse overrides layer at priority 700 arrives in
+task group 14.

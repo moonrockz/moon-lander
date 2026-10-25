@@ -214,6 +214,11 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
   `ConfigBuilder` pipeline of `configuration-core`. If core gives a builder trait,
   `HostBuilder[S]` implements it, and the direct form `|> @config.defaults(...)` also
   works.
+- Call (2026-10-25): `@hosting.conventions(f)` transforms the host-owned
+  conventions set. It starts from an empty `base` set; `app_dirs()` replaces it
+  with the standard set using the final host name and prefix. Steps compose in
+  pipeline order. The host adds the final set with the run's `DiscoveryOptions`
+  and resolved environment name. A bare builder with neither step adds no reports.
 - Call (R1): on wasm and wasm-gc, the application gives the file snapshot with
   `|> @hosting.files(tree)`. On native and js, the host reads files itself.
 - Owner (2026-10-20): the variable set and the working directory of the run are
@@ -843,7 +848,8 @@ fn main raise {
   does not hold is a fault in the program: the run ends before any file read with
   exit code 1, and the report names the unknown name and the linked names.
 - Call (this change): `@lander.conventions(f)` takes
-  `(@conventions.Conventions) -> @conventions.Conventions`. `f` gets the default set
+  `(@conventions.Conventions) -> @conventions.Conventions` and is a thin wrapper
+  over `@hosting.conventions(f)`. `f` gets the default set
   `app_dirs(name, prefix~)`, so the name stays in `@lander.cli`. For example,
   `fn(c) { c |> @conventions.without(...) }` removes one part, and
   `fn(_) { @conventions.base("acme") |> ... }` replaces the set.

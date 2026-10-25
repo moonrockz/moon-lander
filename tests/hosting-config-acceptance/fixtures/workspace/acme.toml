@@ -1,0 +1,3 @@
+workspace.members = ["packages/*"]
+log.format = "text"
+file_only = true

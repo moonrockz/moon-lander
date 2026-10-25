@@ -2,6 +2,7 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/host",
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/immut/sorted_map",
@@ -18,6 +19,8 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/expect",
   "moonbitlang/async",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
 } for "test"
 
 import {

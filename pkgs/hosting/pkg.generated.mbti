@@ -19,7 +19,11 @@ pub fn[S] builder(@moon-lander-core.AppName, Array[String], env_vars? : &IntoEnv
 
 pub fn[S] command(HostBuilder[S], (String) -> @argparse.Command) -> HostBuilder[S]
 
+pub fn[S] configure(HostBuilder[S], (@moon-lander-config.ConfigBuilder) -> @moon-lander-config.ConfigBuilder raise) -> HostBuilder[S]
+
 pub fn[S] content_root(HostBuilder[S], @moon-lander-core.AbsolutePath) -> HostBuilder[S]
+
+pub fn[S] conventions(HostBuilder[S], (@conventions.Conventions) -> @conventions.Conventions) -> HostBuilder[S]
 
 pub fn[S] default_environment(HostBuilder[S], @conventions.EnvironmentName) -> HostBuilder[S]
 
@@ -29,11 +33,15 @@ pub fn[S] env_vars(HostBuilder[S], &IntoEnvVars) -> HostBuilder[S]
 
 pub fn[S] error_report(HostBuilder[S], async (Error, ExitCode) -> Unit) -> HostBuilder[S]
 
+pub fn[S] files(HostBuilder[S], @moon-lander-config.FileTree) -> HostBuilder[S]
+
 pub fn[S] reserve_env(HostBuilder[S], Array[String]) -> HostBuilder[S]
 
 pub fn[S] service(HostBuilder[S], &IntoServiceName, starting? : async (Context[S]) -> Unit, start? : async (Context[S]) -> Unit, started? : async (Context[S]) -> Unit, stopping? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit, stopped? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 pub fn[S] shutdown_timeout(HostBuilder[S], @moon-lander-core.TimeLimit) -> HostBuilder[S]
+
+pub fn[S] shutdown_timeout_key(HostBuilder[S], @moon-lander-config.KeyPath) -> HostBuilder[S]
 
 pub fn[S] skip_env_source(HostBuilder[S]) -> HostBuilder[S]
 

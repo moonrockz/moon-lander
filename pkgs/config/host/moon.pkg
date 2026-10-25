@@ -16,14 +16,19 @@ import {
   "moonrockz/expect",
 } for "test"
 
-// Wasm hosts inject a FileTree into the pure core.
-supported_targets = "native+js"
+// This package is empty on wasm and wasm-gc so portable hosting can import
+// it. Those drivers inject a FileTree into the pure core; only native and js
+// call this disk adapter.
 
 // The pinned build system cannot condition imports by target. Native fs and
-// os_error imports are unused on js; retain other warning checks.
+// os_error imports are unused on js; all adapter imports are unused in the
+// empty wasm packages. Remove when target-conditional imports are supported.
 warnings = "-29"
 
 options(targets: {
+  "host.mbt": ["native", "js"],
+  "host_wbtest.mbt": ["native", "js"],
+  "conventions_wbtest.mbt": ["native", "js"],
   "fixture.native_wbtest.mbt": ["native"],
   "fixture.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],

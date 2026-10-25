@@ -103,9 +103,12 @@ pub struct HostBuilder[S] {
   priv root : @lander_core.AbsolutePath?
   priv reserved : Array[String]
   priv skip_variables : Bool
-  priv use_app_dirs : Bool
+  priv convention_steps : Array[ConventionStep]
   priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
+  priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
+  priv file_tree : @config.FileTree
+  priv timeout_key : @config.KeyPath?
   priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
 }
@@ -127,7 +130,7 @@ pub fn[S] builder(
 ) -> HostBuilder[S] {
   { name, args: args.copy(), prefix: @lander_core.EnvPrefix::from_app_name(name),
     variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, root: None, reserved: [],
-    skip_variables: false, use_app_dirs: false, make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+    skip_variables: false, convention_steps: [], configure_sources: [], file_tree: @config.FileTree::new(), timeout_key: None, make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
 }
 
 ///|
@@ -196,9 +199,12 @@ pub struct Host[S] {
   priv root : @lander_core.AbsolutePath?
   priv reserved : Array[String]
   priv skip_variables : Bool
-  priv use_app_dirs : Bool
+  priv convention_steps : Array[ConventionStep]
   priv make_command : ((String) -> @argparse.Command)?
   priv report : ErrorReport?
+  priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
+  priv file_tree : @config.FileTree
+  priv timeout_key : @config.KeyPath?
   priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise
@@ -221,12 +227,15 @@ pub fn[S] build(
     root: builder.root,
     reserved: builder.reserved,
     skip_variables: builder.skip_variables,
-    use_app_dirs: builder.use_app_dirs,
+    convention_steps: builder.convention_steps,
     make_command: builder.make_command,
     services: builder.services,
     factory,
     report: builder.report,
     shutdown_timeout: builder.shutdown_timeout,
+    configure_sources: builder.configure_sources,
+    file_tree: builder.file_tree,
+    timeout_key: builder.timeout_key,
   }
 }
 

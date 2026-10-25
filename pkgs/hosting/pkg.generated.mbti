@@ -16,6 +16,8 @@ pub fn[S] error_report(HostBuilder[S], async (Error, ExitCode) -> Unit) -> HostB
 
 pub fn[S] service(HostBuilder[S], &IntoServiceName, starting? : async (Context[S]) -> Unit, start? : async (Context[S]) -> Unit, started? : async (Context[S]) -> Unit, stopping? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit, stopped? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
+pub fn[S] shutdown_timeout(HostBuilder[S], @moon-lander-core.TimeLimit) -> HostBuilder[S]
+
 // Errors
 pub(all) suberror HostError {
   InvalidServiceName(text~ : String, reason~ : String)
@@ -24,6 +26,11 @@ pub(all) suberror HostError {
 } derive(@debug.Debug)
 pub fn HostError::message(Self) -> String
 pub fn HostError::to_repr(Self) -> @debug.Repr
+
+pub suberror ShutdownTimedOut {
+  ShutdownTimedOut(@moon-lander-core.TimeLimit)
+}
+pub fn ShutdownTimedOut::message(Self) -> String
 
 pub(all) suberror StopRequested
 

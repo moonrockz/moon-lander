@@ -2,14 +2,15 @@
 /// Run the host without ending the process. Hooks share one context and services
 /// record. Start hooks run in registration order, stop hooks in reverse order.
 /// Stop requests cancel the command task and its defers finish before shutdown.
-/// Shutdown runs protected from outside cancellation.
-/// For code 1 or 2, it reports each failure through `error_report`, or writes
-/// `<name>: <message>` to standard error. Report errors do not change the outcome.
+/// Shutdown runs protected from outside cancellation, within one time budget.
+/// It reports each shutdown timeout for every exit code, and other failures only
+/// for code 1 or 2, in failure order, through `error_report` or as
+/// `<name>: <message>` on standard error. Report errors do not change the outcome.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
   let result = execute(host, command)
   @async.protect_from_cancel(() => {
-    if result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
-      for error in result.failures {
+    for error in result.failures {
+      if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
         try {
           match host.report {
             Some(report) => report(error, result.exit_code)
@@ -49,6 +50,23 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
   }
   if @async.is_being_cancelled() { lifetime.stop_application() }
   @async.protect_from_cancel(() => {
+    let mut interrupted = ActionResult::Interrupted
+    let completed = @async.with_timeout_opt(host.shutdown_timeout.to_millis(), () => {
+      while step is Run(pending, action) {
+        let result = perform_step(host, ctx, command, pending, action)
+        // Keep the current token for timed_out, even if a hook absorbs cancellation.
+        if @async.is_being_cancelled() {
+          interrupted = result.unwrap_or(Interrupted)
+          break
+        }
+        step = reply_step(ctx, pending, result)
+      }
+    })
+    if completed is None && step is Run(pending, _) {
+      ignore(lifetime.probe_stop())
+      step = pending.timed_out(limit=host.shutdown_timeout, observed_signal?=lifetime.signal, result=interrupted)
+    }
+    // The timeout reply skips hooks and leaves only the stopped event.
     while step is Run(pending, action) {
       step = run_step(host, ctx, command, pending, action)
     }
@@ -61,9 +79,14 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
 
 ///|
 async fn[S] run_step(host : Host[S], ctx : Context[S], command : Hook[S], pending : Pending, action : Action) -> Step {
+  reply_step(ctx, pending, perform_step(host, ctx, command, pending, action))
+}
+
+///|
+async fn[S] perform_step(host : Host[S], ctx : Context[S], command : Hook[S], pending : Pending, action : Action) -> ActionResult? {
   let lifetime = ctx.lifetime
   if pending.engine.reason is Some(reason) { lifetime.reason = Some(reason) }
-  let completed = @async.handle_cancellation(() => {
+  @async.handle_cancellation(() => {
     try {
       match action {
         Hook(reference, phase) => {
@@ -78,6 +101,11 @@ async fn[S] run_step(host : Host[S], ctx : Context[S], command : Hook[S], pendin
       error => Failed(error)
     }
   })
+}
+
+///|
+fn[S] reply_step(ctx : Context[S], pending : Pending, completed : ActionResult?) -> Step {
+  let lifetime = ctx.lifetime
   if completed is None { lifetime.stop_application() }
   ignore(lifetime.probe_stop())
   let result = completed.unwrap_or(Interrupted)

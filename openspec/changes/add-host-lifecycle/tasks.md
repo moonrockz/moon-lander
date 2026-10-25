@@ -112,9 +112,9 @@ Bead: lander-4us.5.9
 
 Bead: lander-4us.5.10
 
-- [ ] 10.1 Add `@hosting.shutdown_timeout(limit : TimeLimit)` (default `TimeLimit::seconds(30)`) and the bounded stop phase inside `protect_from_cancel`; verify on native and js that a slow `stop` is cancelled, later hooks are skipped, the stopped event occurs and the code is 1
-- [ ] 10.2 Verify that a stop phase after an outside cancel still runs all hooks and keeps its timeout
-- [ ] 10.3 Verify that the builder takes a `TimeLimit` from `moonrockz/moon-lander-core` and that the default is `TimeLimit::seconds(30)` (design D17); a negative or zero limit cannot exist, because `TimeLimit` rejects it
+- [x] 10.1 Add `@hosting.shutdown_timeout(limit : TimeLimit)` (default `TimeLimit::seconds(30)`) and the bounded stop phase inside `protect_from_cancel`; verify on native and js that a slow `stop` is cancelled, later hooks are skipped, the stopped event occurs and the code is 1
+- [x] 10.2 Verify that a stop phase after an outside cancel still runs all hooks and keeps its timeout
+- [x] 10.3 Verify that the builder takes a `TimeLimit` from `moonrockz/moon-lander-core` and that the default is `TimeLimit::seconds(30)` (design D17); a negative or zero limit cannot exist, because `TimeLimit` rejects it
 
 ## 11. Console driver on native with the C stub
 

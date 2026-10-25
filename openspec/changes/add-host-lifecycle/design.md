@@ -373,7 +373,7 @@ fn[S] Engine::start(services : Array[HostedService[S]]) -> Step
 fn Pending::done(self : Pending) -> Step
 fn Pending::failed(self : Pending, error : Error) -> Step
 fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step
-fn Pending::timed_out(self : Pending) -> Step
+fn Pending::timed_out(self : Pending, limit~ : @lander_core.TimeLimit, observed_signal? : SignalKind, result~ : ActionResult = Interrupted) -> Step
 ```
 
 A driver is one loop:
@@ -406,6 +406,7 @@ guard step is Finish(outcome)
   outside the stop phase is a driver fault: the engine aborts and names the phase.
   In the stop phase: the other stop hooks are skipped, the stopped event occurs,
   and the code is 1. Group 4 connects the stop sources and group 10 the timeout.
+  The timeout adds `ShutdownTimedOut(limit)` to the failures, after a failure of the current hook, and is reported for every exit code.
 - Call (this change): the started event is the last step of the start phase. A stop
   request in reply to `Raise(Started)` skips the command. A `failed` reply on any
   `Raise` step is a driver fault: the engine aborts, because event handlers cannot raise.

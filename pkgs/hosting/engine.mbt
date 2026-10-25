@@ -187,7 +187,7 @@ priv enum Reply {
   Done
   Failed(Error)
   StopRequested(StopRequest, ExitCode?, ActionResult, SignalKind?)
-  TimedOut
+  TimedOut(@lander_core.TimeLimit, SignalKind?, ActionResult)
 }
 
 ///|
@@ -232,14 +232,17 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
         engine.position = engine.stop_at
       }
     }
-    TimedOut => {
+    TimedOut(limit, observed_signal, result) => {
       match engine.phase {
         Starting => abort("timed_out outside the stop phase: Starting")
         Command => abort("timed_out outside the stop phase: Command")
         Finished(_) => abort("timed_out outside the stop phase: Finished")
         Stopping => ()
       }
+      if observed_signal is Some(signal) { engine.signal = Some(signal) }
+      if result is Failed(error) { engine.failures.push(error) }
       engine.timed_out = true
+      engine.failures.push(ShutdownTimedOut(limit))
       // A timeout while raising Stopped must not raise the event twice.
       engine.position = if engine.position > engine.stopped_at { engine.position } else { engine.stopped_at }
     }
@@ -267,6 +270,7 @@ fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCod
 }
 
 ///|
-// Group 10 connects the shutdown timer. Remove when the driver uses this reply.
+// Only `run` (native, js) calls this. wasm and wasm-gc have no timer, so it is
+// unused there. Remove when the build system can limit a function to targets.
 #warnings("-1")
-fn Pending::timed_out(self : Pending) -> Step { self.respond(TimedOut) }
+fn Pending::timed_out(self : Pending, limit~ : @lander_core.TimeLimit, observed_signal? : SignalKind, result~ : ActionResult = Interrupted) -> Step { self.respond(TimedOut(limit, observed_signal, result)) }

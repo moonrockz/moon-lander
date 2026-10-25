@@ -80,14 +80,32 @@ pub struct HostBuilder[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
   priv report : ErrorReport?
+  priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
 }
 
 ///|
 /// Start a bare host builder with the application name and the command-line
-/// arguments. The builder turns on no default.
+/// arguments. The builder adds no service or configuration source.
 pub fn[S] builder(name : @lander_core.AppName, args : Array[String]) -> HostBuilder[S] {
-  { name, args: args.copy(), services: [], report: None }
+  { name, args: args.copy(), services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+}
+
+///|
+fn default_shutdown_timeout() -> @lander_core.TimeLimit {
+  @lander_core.TimeLimit::seconds(30) catch { _ => abort("30 seconds is a valid time limit") }
+}
+
+///|
+/// Set one time budget for the full stop phase, after the command task ends.
+/// The default is 30 seconds. A later step replaces an earlier value.
+/// Only the native and js drivers apply the limit. The wasm and wasm-gc
+/// drivers have no timers.
+/// The host cancels the current hook at the limit. A hook that protects itself
+/// from cancellation, or does not yield, runs until it returns, and `run` waits
+/// for it.
+pub fn[S] shutdown_timeout(builder : HostBuilder[S], limit : @lander_core.TimeLimit) -> HostBuilder[S] {
+  { ..builder, shutdown_timeout: limit }
 }
 
 ///|
@@ -133,6 +151,7 @@ pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]
   priv report : ErrorReport?
+  priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise
 }
@@ -150,6 +169,7 @@ pub fn[S] build(
     services: builder.services,
     factory,
     report: builder.report,
+    shutdown_timeout: builder.shutdown_timeout,
   }
 }
 
@@ -172,8 +192,8 @@ pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
 }
 
 ///|
-/// Each failure of the factory, a hook or the command, in the order that it
-/// occurred. The array is a copy.
+/// Each failure of the factory, a hook or the command, and a shutdown timeout,
+/// in the order that it occurred. The array is a copy.
 pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
   self.failures.copy()
 }
@@ -181,13 +201,16 @@ pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
 ///|
 /// A replacement failure report. It may write asynchronously, and receives the
 /// final exit code with each failure, in occurrence order.
+/// Each shutdown timeout is reported for every exit code. Other failures are
+/// reported only for code 1 or 2.
 /// If a report raises, the driver ignores its error and reports the next failure.
 /// A report error cannot change the outcome or make `run` raise.
 pub type ErrorReport = async (Error, ExitCode) -> Unit
 
 ///|
-/// Replace the default standard-error report. At the end of a run with code 1
-/// or 2, the driver calls this once per failure. Other codes call no report.
+/// Replace the default standard-error report. At the end of a run, the driver
+/// calls this for each shutdown timeout for every exit code, and for each other
+/// failure only for code 1 or 2. Reports follow failure order.
 /// If a report raises, the driver ignores its error and reports the next failure.
 /// A report error cannot change the outcome or make `run` raise.
 pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {

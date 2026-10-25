@@ -1,17 +1,4 @@
-///|
-/// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
-///
-/// Usage: `mise run build:site [-- --main] [--tree <tree>]`, `mise run check:site [-- --tree <tree>]`,
-/// `mise run test:site [-- --tree <tree>]` and `mise run assemble:site`, or the same commands of
-/// `moonx scripts/site.mbtx`.
-/// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
-/// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
-/// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
-/// installs Chromium, and runs the browser smoke test against the built `_site/` (design D16).
-/// `--tree next` builds, checks or tests the `main` tree in `_site/next/`, and `--tree <minor>` the
-/// tree of the minor line of the root `moon.mod` in `_site/v/<minor>/` (design D22). `assemble` adds
-/// the release trees to a `next` build in `_site/` and writes the deployed site.
-/// Run it from the workspace root.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -21,9 +8,25 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
+----
 
 ///|
-let usage : String = "Usage: site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
+/// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
+///
+/// Usage: `mise run build:site [-- --main] [--tree <tree>]`, `mise run check:site [-- --tree <tree>]`,
+/// `mise run test:site [-- --tree <tree>]` and `mise run assemble:site`, or the same commands of
+/// `moonx scripts/toolchain.mbtx scripts/site.mbtx`.
+/// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
+/// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
+/// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
+/// installs Chromium, and runs the browser smoke test against the built `_site/` (design D16).
+/// `--tree next` builds, checks or tests the `main` tree in `_site/next/`, and `--tree <minor>` the
+/// tree of the minor line of the root `moon.mod` in `_site/v/<minor>/` (design D22). `assemble` adds
+/// the release trees to a `next` build in `_site/` and writes the deployed site.
+/// Run it from the workspace root.
+
+///|
+let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
 
 ///|
 /// The arguments without `--tree <tree>`, and the tree, or `None` without `--tree`.

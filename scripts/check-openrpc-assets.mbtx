@@ -1,5 +1,4 @@
-///|
-/// Verify frozen OpenRPC qualification assets without network access.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -8,6 +7,10 @@ import {
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Verify frozen OpenRPC qualification assets without network access.
 
 ///|
 fn manifest_entries(text : String) -> Result[Array[(String, String)], String] {

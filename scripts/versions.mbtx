@@ -1,3 +1,15 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+  "moonrockz/moonspec@0.11.0",
+  "moonrockz/expect@0.6.1",
+}
+----
+
 ///|
 /// Check or set one version across the workspace.
 ///
@@ -13,21 +25,12 @@
 /// `minor` prints the minor line of the root version, for example `0.2` for `0.2.1`. The docs site
 /// builds and packs the tree of this line (openspec add-docs-site, design D22).
 ///
-/// Usage: `mise run validate:versions`, or `moonx scripts/versions.mbtx check [X.Y.Z]`,
-/// `moonx scripts/versions.mbtx set X.Y.Z` or `moonx scripts/versions.mbtx minor`. The script exits
+/// Usage: `mise run validate:versions`, or `moonx scripts/toolchain.mbtx scripts/versions.mbtx check [X.Y.Z]`,
+/// `moonx scripts/toolchain.mbtx scripts/versions.mbtx set X.Y.Z` or `moonx scripts/toolchain.mbtx scripts/versions.mbtx minor`. The script exits
 /// with a non-zero code on failure.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-  "moonrockz/moonspec@0.11.0",
-  "moonrockz/expect@0.6.1",
-}
 
 ///|
-let usage : String = "Usage: versions.mbtx check [X.Y.Z] | set X.Y.Z | minor"
+let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/versions.mbtx check [X.Y.Z] | set X.Y.Z | minor"
 
 ///|
 /// The source files that hold a version string, with the text that comes right before the version.

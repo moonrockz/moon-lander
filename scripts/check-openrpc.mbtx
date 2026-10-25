@@ -1,11 +1,14 @@
-///|
-/// Verify a source-only isolated OpenRPC consumer. This is not registry proof.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/json" @core_json,
 }
+----
+
+///|
+/// Verify a source-only isolated OpenRPC consumer. This is not registry proof.
 
 ///|
 async fn copy_tree(source : String, destination : String) -> Unit {

@@ -1,6 +1,4 @@
-///|
-/// Install the pinned harness/engines, or serve and test the compiled fixture.
-/// Process and HTTP lifetimes are bounded by structured concurrency.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -11,6 +9,11 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
+
+///|
+/// Install the pinned harness/engines, or serve and test the compiled fixture.
+/// Process and HTTP lifetimes are bounded by structured concurrency.
 
 ///|
 let cli : String = "tests/browser/node_modules/@playwright/test/cli.js"
@@ -336,7 +339,7 @@ async fn main {
     }
     _ =>
       fail(
-        "Usage: browser.mbtx install [--with-deps] | test [--verify-failures]",
+        "Usage: moonx scripts/toolchain.mbtx scripts/browser.mbtx install [--with-deps] | test [--verify-failures]",
       )
   }
 }

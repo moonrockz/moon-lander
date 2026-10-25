@@ -1,14 +1,4 @@
-///|
-/// Install the git hooks with lefthook. The hooks are defined in `lefthook.yml`.
-///
-/// Usage: `mise run hooks:install`, or `moonx scripts/hooks-install.mbtx`. Idempotent: lefthook
-/// rewrites its hook files on every run. Skipped in CI.
-///
-/// A repository-local `core.hooksPath` makes git look away from `.git/hooks`, where lefthook
-/// writes. The setting belongs to another hooks tool (Husky, or custom hooks), so the script does
-/// not touch it: it stops and says how to migrate deliberately. A pre-push hook that the old
-/// `setup:hooks` task wrote is removed, because lefthook would otherwise keep it beside its own
-/// hook as `pre-push.old`.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -17,6 +7,19 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Install the git hooks with lefthook. The hooks are defined in `lefthook.yml`.
+///
+/// Usage: `mise run hooks:install`, or `moonx scripts/toolchain.mbtx scripts/hooks-install.mbtx`. Idempotent: lefthook
+/// rewrites its hook files on every run. Skipped in CI.
+///
+/// A repository-local `core.hooksPath` makes git look away from `.git/hooks`, where lefthook
+/// writes. The setting belongs to another hooks tool (Husky, or custom hooks), so the script does
+/// not touch it: it stops and says how to migrate deliberately. A pre-push hook that the old
+/// `setup:hooks` task wrote is removed, because lefthook would otherwise keep it beside its own
+/// hook as `pre-push.old`.
 
 ///|
 /// The marker line of the hook that the retired `setup:hooks` task wrote.

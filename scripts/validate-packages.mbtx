@@ -1,3 +1,11 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check that the package structure of the workspace is valid.
 ///
@@ -11,13 +19,8 @@
 /// A member is active when its line starts, after whitespace, with a quoted path (`"pkgs/x"` or
 /// `"./pkgs/x"`). A commented-out entry starts with `#`, so it does not count.
 ///
-/// Usage: `mise run validate:packages`, or `moonx scripts/validate-packages.mbtx`.
+/// Usage: `mise run validate:packages`, or `moonx scripts/toolchain.mbtx scripts/validate-packages.mbtx`.
 /// It exits with 0 when the structure is valid, else with 1.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 /// Directories whose children are workspace members.

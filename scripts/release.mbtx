@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Release workflow steps, adapted from Smithy's release flow.
 ///
@@ -7,13 +17,6 @@
 /// - `github X.Y.Z NOTES [ASSET...]` creates the GitHub release `vX.Y.Z` at the
 ///   checked out commit with the files `ASSET...`, such as the site asset
 ///   `site-X.Y.tar.gz`. When the release exists, it only attaches the files.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 priv enum Plan {
@@ -244,7 +247,7 @@ async fn main {
       run_github(version, notes, assets.to_owned())
     _ =>
       fail_with(
-        "Usage: release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES [ASSET...]",
+        "Usage: moonx scripts/toolchain.mbtx scripts/release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES [ASSET...]",
       )
   }
 }

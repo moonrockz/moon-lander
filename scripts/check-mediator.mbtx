@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Fail when a target leg of the mediator tests runs zero tests.
 ///
@@ -9,17 +20,9 @@
 /// Each path has its own target list. The core paths run on wasm, wasm-gc, js and native. The async
 /// paths run on wasm, js and native, because `moonbitlang/async` has no wasm-gc test entry.
 ///
-/// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/check-mediator.mbtx`.
+/// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx`.
 /// With no target, it checks wasm, wasm-gc, js and native. A path does not run on a target that is
 /// not in its list.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/core/env",
-  "moonbitlang/core/string",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]

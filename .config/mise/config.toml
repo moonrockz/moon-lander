@@ -37,82 +37,83 @@ zig = "0.17.0"
 # `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME=$(mise where http:moonbit) bash -s -- <version>`.
 
 [tools."http:moonbit"]
-version = "0.10.17+093cb8f9c"
+version = "0.10.17+d971670cd"
 bin_path = "bin"
 
 [tools."http:moonbit".platforms]
-linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-linux-x86_64.tar.gz" }
-linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-linux-aarch64.tar.gz" }
-macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-darwin-aarch64.tar.gz" }
-windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-windows-x86_64.zip", format = "zip" }
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
 # No Windows arm64 build is published; Windows on Arm runs the x64 build under emulation.
-windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2B093cb8f9c/moonbit-windows-x86_64.zip", format = "zip" }
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
 
 [env]
 _.path = ["./node_modules/.bin"]
 
-# Every task is a MoonBit script: `moonx scripts/<name>.mbtx`. Pass arguments after `--`.
+# Every task runs through toolchain.mbtx to keep nested moon/moonc/moonx calls on the mise pin,
+# even when the calling shell puts a global toolchain first on PATH. Pass arguments after `--`.
 
 [tasks.build]
 description = "Build all workspace members (args: targets, --release; default: wasm wasm-gc js native)"
-run = "moonx scripts/build.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/build.mbtx"
 
 [tasks."build:wasm"]
 description = "Build all workspace members for the wasm target"
-run = "moonx scripts/build.mbtx wasm"
+run = "moonx scripts/toolchain.mbtx scripts/build.mbtx wasm"
 
 [tasks."build:wasm-gc"]
 description = "Build all workspace members for the wasm-gc target"
-run = "moonx scripts/build.mbtx wasm-gc"
+run = "moonx scripts/toolchain.mbtx scripts/build.mbtx wasm-gc"
 
 [tasks."build:js"]
 description = "Build all workspace members for the js target"
-run = "moonx scripts/build.mbtx js"
+run = "moonx scripts/toolchain.mbtx scripts/build.mbtx js"
 
 [tasks."build:native"]
 description = "Build all workspace members for native in release mode"
-run = "moonx scripts/build.mbtx native --release"
+run = "moonx scripts/toolchain.mbtx scripts/build.mbtx native --release"
 
 [tasks."build:site"]
 description = "Build the docs site into _site/ (args: --main, --tree next|<minor>)"
-run = "moonx scripts/site.mbtx build"
+run = "moonx scripts/toolchain.mbtx scripts/site.mbtx build"
 
 [tasks."check:site"]
 description = "Check the built docs site in _site/, tree by tree when it is assembled (args: --tree next|<minor>)"
-run = "moonx scripts/site.mbtx check"
+run = "moonx scripts/toolchain.mbtx scripts/site.mbtx check"
 
 [tasks."test:site"]
 description = "Test the docs site packages and the highlight step, and run the browser smoke test on _site/ (args: --tree next|<minor>)"
-run = "moonx scripts/site.mbtx test"
+run = "moonx scripts/toolchain.mbtx scripts/site.mbtx test"
 
 [tasks."assemble:site"]
 description = "Add the release trees to the next build in _site/ and write the versioned site (needs gh; CI deploy)"
-run = "moonx scripts/site.mbtx assemble"
+run = "moonx scripts/toolchain.mbtx scripts/site.mbtx assemble"
 
 [tasks."dev:site"]
 description = "Build the docs site, serve it at http://127.0.0.1:4173/moon-lander/ and build again on change (args: --port <n>, --no-watch)"
 depends = ["build:site"]
-run = "moonx scripts/serve-site.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/serve-site.mbtx"
 
 [tasks.test]
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
-run = "moonx scripts/test.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/test.mbtx"
 
 [tasks.format]
 description = "Format MoonBit code"
-run = "moonx scripts/format.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/format.mbtx"
 
 [tasks.lint]
 description = "Run all lint tasks (YAML, MoonBit format and check)"
-run = "moonx scripts/lint.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/lint.mbtx"
 
 [tasks."lint:moonbit"]
 description = "Check MoonBit formatting and run moon check"
-run = "moonx scripts/lint-moonbit.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/lint-moonbit.mbtx"
 
 [tasks."lint:yaml"]
 description = "Lint YAML files with yamllint"
-run = "moonx scripts/lint-yaml.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
@@ -120,159 +121,159 @@ depends = ["validate:packages", "validate:versions"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
-run = "moonx scripts/validate-packages.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/validate-packages.mbtx"
 
 [tasks."validate:versions"]
 description = "Verify that every module and version string has the version of the root moon.mod"
-run = "moonx scripts/versions.mbtx check"
+run = "moonx scripts/toolchain.mbtx scripts/versions.mbtx check"
 
 [tasks."test:native-zig"]
 description = "Run native tests with zig as the C compiler"
-run = "moonx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/test.mbtx native"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/test.mbtx native"
 
 [tasks."test:node-adapter"]
 description = "Test the js config and hosting adapters on Node and Bun (args: node|bun)"
-run = "moonx scripts/test-node-adapter.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/test-node-adapter.mbtx"
 
 [tasks."test:scripts"]
 description = "Test the task scripts"
-run = "moonx scripts/test-scripts.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/test-scripts.mbtx"
 
 [tasks."build:browser-fixture"]
 description = "Generate the spike FFI and build the browser fixture"
-run = "moonx scripts/build-browser-fixture.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/build-browser-fixture.mbtx"
 
 [tasks."build:browser-adapter"]
 description = "Generate the production browser Web API adapter"
-run = "moonx scripts/build-browser-adapter.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/build-browser-adapter.mbtx"
 
 [tasks."check:browser-adapter"]
 description = "Check production browser adapter freshness without rewriting"
-run = "moonx scripts/build-browser-adapter.mbtx --check"
+run = "moonx scripts/toolchain.mbtx scripts/build-browser-adapter.mbtx --check"
 
 [tasks."check:browser-fixture"]
 description = "Check that the generated browser spike adapter is current"
-run = "moonx scripts/build-browser-fixture.mbtx --check"
+run = "moonx scripts/toolchain.mbtx scripts/build-browser-fixture.mbtx --check"
 
 [tasks."browsers:install"]
 description = "Install the locked browser harness and three engines (args: --with-deps on Linux)"
-run = "moonx scripts/browser.mbtx install"
+run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx install"
 
 [tasks."test:browser"]
 description = "Build once and test the fixture in Chromium, Firefox and WebKit"
-run = "moonx scripts/browser.mbtx test"
+run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx test"
 
 [tasks."test:browser-zig"]
 description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures)"
-run = "moonx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/browser.mbtx test"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/browser.mbtx test"
 
 [tasks."test:browser-failures"]
 description = "Prove browser assertion and missing-engine failures propagate"
-run = "moonx scripts/browser.mbtx test --verify-failures"
+run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx test --verify-failures"
 
 [tasks."build:node-adapter"]
 description = "Bundle the TypeScript js host adapter with Bun"
-run = "moonx scripts/build-node-adapter.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/build-node-adapter.mbtx"
 
 [tasks."check:node-adapter"]
 description = "Check that the generated js host adapter is current"
-run = "moonx scripts/build-node-adapter.mbtx --check"
+run = "moonx scripts/toolchain.mbtx scripts/build-node-adapter.mbtx --check"
 
 [tasks."check:console"]
 description = "Run the native console signal stub tests and a consumer outside the workspace (native only)"
-run = "moonx scripts/check-console.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-console.mbtx"
 
 [tasks."check:config"]
 description = "Compare configuration values, provenance and reports on all four targets"
-run = "moonx scripts/check-config.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-config.mbtx"
 
 [tasks."check:mediator"]
 description = "Fail when a target leg of the mediator tests runs zero tests (args: targets; default: all four)"
-run = "moonx scripts/check-mediator.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx"
 
 [tasks."check:formats"]
 description = "Verify linked formats, parser trimming and leak rejection on all four targets"
-run = "moonx scripts/check-formats.mbtx --verify-failures"
+run = "moonx scripts/toolchain.mbtx scripts/check-formats.mbtx --verify-failures"
 
 [tasks."check:formats-registry"]
 description = "Verify the packaged candidate through an isolated loopback registry consumer"
-run = "moonx scripts/check-formats-registry.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-formats-registry.mbtx"
 
 [tasks."check:formats-published"]
 description = "Release gate: verify the public registry candidate outside the workspace"
-run = "moonx scripts/check-formats-registry.mbtx --published"
+run = "moonx scripts/toolchain.mbtx scripts/check-formats-registry.mbtx --published"
 
 [tasks.check]
 description = "Run lint, validate, tests, task script tests and builds"
-run = "moonx scripts/check.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check.mbtx"
 
 [tasks."check:openrpc-assets"]
 description = "Verify frozen OpenRPC source digests and deliberate failure status"
-run = "moonx scripts/check-openrpc-assets.mbtx --verify-failures"
+run = "moonx scripts/toolchain.mbtx scripts/check-openrpc-assets.mbtx --verify-failures"
 
 [tasks."check:openrpc"]
 description = "Verify OpenRPC focused tests and an isolated source consumer on all four targets"
-run = "moonx scripts/check-openrpc.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-openrpc.mbtx"
 
 [tasks."release:plan"]
 description = "Decide whether a Release workflow run releases (CI)"
-run = "moonx scripts/release.mbtx plan"
+run = "moonx scripts/toolchain.mbtx scripts/release.mbtx plan"
 
 [tasks."release:credentials"]
 description = "Write mooncakes.io credentials from MOONCAKES_USER_TOKEN (CI only)"
-run = "moonx scripts/credentials.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/credentials.mbtx"
 
 [tasks."release:publish"]
 description = "Publish the public modules to mooncakes.io; already published versions count as done (CI only)"
-run = "moonx scripts/publish.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/publish.mbtx"
 
 [tasks."release:notes"]
 description = "Print the CHANGELOG.md section of a version (args: X.Y.Z)"
-run = "moonx scripts/release.mbtx notes"
+run = "moonx scripts/toolchain.mbtx scripts/release.mbtx notes"
 
 [tasks."release:github"]
 description = "Create the GitHub release vX.Y.Z unless it exists (args: X.Y.Z NOTES_FILE; CI only)"
-run = "moonx scripts/release.mbtx github"
+run = "moonx scripts/toolchain.mbtx scripts/release.mbtx github"
 
 [tasks."check:openrpc-registry"]
 description = "Verify the packaged OpenRPC candidate through an isolated loopback registry consumer"
-run = "moonx scripts/check-openrpc-registry.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/check-openrpc-registry.mbtx"
 
 [tasks."check:openrpc-published"]
 description = "Release gate: verify the published OpenRPC module outside the workspace (args: --checksum SHA-256)"
-run = "moonx scripts/check-openrpc-registry.mbtx --published"
+run = "moonx scripts/toolchain.mbtx scripts/check-openrpc-registry.mbtx --published"
 
 [tasks."qualify:openrpc"]
 description = "Qualify OpenRPC against the frozen corpus with independent Ajv and four targets"
-run = "moonx scripts/qualify-openrpc.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/qualify-openrpc.mbtx"
 
 [tasks."qualify:openrpc-failures"]
 description = "Prove that wrong expectations, broken references, altered assets and missing files fail qualification"
-run = "moonx scripts/qualify-openrpc.mbtx --verify-failures"
+run = "moonx scripts/toolchain.mbtx scripts/qualify-openrpc.mbtx --verify-failures"
 
 [tasks."build:openrpc-artifacts"]
 description = "Generate the pinned OpenRPC artifact metaschemas from frozen assets"
-run = "moonx scripts/generate-openrpc-artifacts.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-artifacts.mbtx"
 
 [tasks."check:openrpc-artifacts"]
 description = "Reject stale OpenRPC artifact metaschemas and license without rewriting"
-run = "moonx scripts/generate-openrpc-artifacts.mbtx --check"
+run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-artifacts.mbtx --check"
 
 [tasks."build:openrpc-unicode"]
 description = "Generate portable OpenRPC regex identifier tables from frozen Unicode data"
-run = "moonx scripts/generate-openrpc-unicode.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-unicode.mbtx"
 
 [tasks."check:openrpc-unicode"]
 description = "Reject stale OpenRPC Unicode tables and license without rewriting"
-run = "moonx scripts/generate-openrpc-unicode.mbtx --check"
+run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-unicode.mbtx --check"
 
 [tasks.clean]
 description = "Remove build artifacts"
-run = "moonx scripts/clean.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/clean.mbtx"
 
 [tasks."hooks:install"]
 description = "Install git hooks with lefthook"
-run = "moonx scripts/hooks-install.mbtx"
+run = "moonx scripts/toolchain.mbtx scripts/hooks-install.mbtx"
 
 [tasks.list-tasks]
 description = "List mise tasks"

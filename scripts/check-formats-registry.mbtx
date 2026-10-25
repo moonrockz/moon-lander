@@ -1,6 +1,4 @@
-///|
-/// Package the candidate and verify a consumer through a loopback registry.
-/// No workspace overrides, public uploads, credentials, or shared-cache writes.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -10,6 +8,11 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/crypto",
 }
+----
+
+///|
+/// Package the candidate and verify a consumer through a loopback registry.
+/// No workspace overrides, public uploads, credentials, or shared-cache writes.
 
 ///|
 /// The candidate modules, in dependency order: the folder and the module name.
@@ -97,13 +100,20 @@ async fn main {
     "\{dir}/consumer/moon.mod",
     "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
   )
-  let (code, toolchain, err) = @process.collect_output("mise", [
-    "where", "http:moonbit",
-  ])
-  guard code == 0 else { fail(err.text()) }
+  let toolchain = match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
+    Some(root) => root
+    None => {
+      // Standalone registry probes can run outside the wrapper; resolve the pin then.
+      let (code, out, err) = @process.collect_output("mise", [
+        "where", "http:moonbit",
+      ])
+      guard code == 0 else { fail(err.text()) }
+      @fs.realpath(out.text().trim())
+    }
+  }
   let consumer_env = {
     "MOON_HOME": isolated,
-    "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
+    "MOON_TOOLCHAIN_ROOT": toolchain,
     "MOON_DEP_CACHE": "\{dir}/dependencies",
     "MOON_BUILD_CACHE": "\{dir}/build-cache",
   }

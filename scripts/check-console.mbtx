@@ -1,3 +1,13 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check the native console signal stub (openspec add-host-lifecycle, task group 1).
 ///
@@ -6,14 +16,7 @@
 /// temporary workspace with a consumer module outside this workspace, and runs the same acceptance
 /// suite there, so the consumer's C compiler builds the stub from the package source.
 ///
-/// Usage: `mise run check:console`, or `moonx scripts/check-console.mbtx`. Native only.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/core/string",
-  "moonbitlang/x@0.5.5/sys",
-}
+/// Usage: `mise run check:console`, or `moonx scripts/toolchain.mbtx scripts/check-console.mbtx`. Native only.
 
 ///|
 /// The native suites of the stub, relative to the workspace root.

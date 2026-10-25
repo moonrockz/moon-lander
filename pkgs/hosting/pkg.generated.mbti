@@ -172,6 +172,11 @@ pub fn SignalKind::exit_code(Self) -> ExitCode
 pub fn SignalKind::not_equal(Self, Self) -> Bool
 pub fn SignalKind::to_repr(Self) -> @debug.Repr
 
+pub struct SignalProbe {
+  // private fields
+}
+pub fn SignalProbe::new(() -> SignalKind?) -> Self
+
 pub(all) enum StopReason {
   Completed
   Requested

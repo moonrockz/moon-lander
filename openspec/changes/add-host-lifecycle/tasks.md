@@ -121,22 +121,22 @@ Bead: lander-4us.5.10
 
 Bead: lander-4us.5.11
 
-- [ ] 11.1 Create `moonrockz/moon-lander-hosting/console` `run` for native over the spike stub: install handlers, register the flag as a stop probe, run a 50 ms watcher task that calls `stop_application` with `Signal(kind)`, and end the process with libc `exit(code)`
-- [ ] 11.2 Add a test program in `tests/` and native acceptance tests that send SIGINT, SIGTERM and SIGQUIT on Linux and macOS; verify codes 130, 143 and 131, the exact `SignalKind`, no core dump, and all stop hooks
-- [ ] 11.3 Add Windows acceptance tests that send each console event that task 1.2 found a CI runner can send to one child process (`CTRL_BREAK_EVENT` at least); verify its code (131 for `CTRL_BREAK_EVENT`) and the stop hooks. For each event that task 1.2 recorded as not sendable from a program (`CTRL_CLOSE_EVENT`, and `CTRL_C_EVENT` to one process group), verify the mapping and the code through a unit test of the handler logic, and record the manual check in the package README
-- [ ] 11.4 Verify that a second SIGINT during a slow stop hook ends the process at once with 130 and skips the remaining hooks
-- [ ] 11.5 Verify that a synchronous loop that polls `ctx.cancelled()` sees the first signal, and that a loop with no check ends at the second signal
-- [ ] 11.6 Document the Windows console-close time limit in the package README
+- [x] 11.1 Create `moonrockz/moon-lander-hosting/console` `run` for native over the spike stub: install handlers, register the flag as a stop probe, run a 50 ms watcher task that calls `stop_application` with `Signal(kind)`, and end the process with libc `exit(code)`
+- [x] 11.2 Add a test program in `tests/` and native acceptance tests that send SIGINT, SIGTERM and SIGQUIT on Linux and macOS; verify codes 130, 143 and 131, the exact `SignalKind`, no core dump, and all stop hooks
+- [x] 11.3 Add Windows acceptance tests that send each console event that task 1.2 found a CI runner can send to one child process (`CTRL_BREAK_EVENT` at least); verify its code (131 for `CTRL_BREAK_EVENT`) and the stop hooks. For each event that task 1.2 recorded as not sendable from a program (`CTRL_CLOSE_EVENT`, and `CTRL_C_EVENT` to one process group), verify the mapping and the code through a unit test of the handler logic, and record the manual check in the package README
+- [x] 11.4 Verify that a second SIGINT during a slow stop hook ends the process at once with 130 and skips the remaining hooks
+- [x] 11.5 Verify that a synchronous loop that polls `ctx.cancelled()` sees the first signal, and that a loop with no check ends at the second signal
+- [x] 11.6 Document the Windows console-close time limit in the package README
 
 ## 12. Console driver on js
 
 Bead: lander-4us.5.12
 
-- [ ] 12.1 Create the hosting node adapter `pkgs/hosting/adapters/node` as a second entry point of `build-node-adapter.mbtx` (AGENTS.md already allows it); add the signal functions to it (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
-- [ ] 12.2 Set `process.exitCode`, remove the listeners at the end, and call `process.exit(code)` on a second signal
-- [ ] 12.3 Add js acceptance tests that run the test program under the pinned Node.js and send signals; verify codes 130, 143 and 131, the full stop phase, and a second signal that exits at once, on Linux, macOS and Windows
-- [ ] 12.4 Verify that the bundle also runs the test program under Bun
-- [ ] 12.5 Verify that piped standard output is complete after a clean run and after a graceful signal stop
+- [x] 12.1 Create the hosting node adapter `pkgs/hosting/adapters/node` as a second entry point of `build-node-adapter.mbtx` (AGENTS.md already allows it); add the signal functions to it (`process.on` for SIGINT, SIGTERM, SIGQUIT on POSIX; SIGINT, SIGBREAK, SIGHUP on Windows), and the MoonBit js externs that call them
+- [x] 12.2 Set `process.exitCode`, remove the listeners at the end, and call `process.exit(code)` on a second signal
+- [x] 12.3 Add js acceptance tests that run the test program under the pinned Node.js and send signals; verify codes 130, 143 and 131, the full stop phase, and a second signal that exits at once, on Linux, macOS and Windows
+- [x] 12.4 Verify that the bundle also runs the test program under Bun
+- [x] 12.5 Verify that piped standard output is complete after a clean run and after a graceful signal stop
 
 ## 13. Embedded driver on wasm and wasm-gc
 

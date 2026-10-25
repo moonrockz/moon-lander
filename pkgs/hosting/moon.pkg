@@ -54,4 +54,5 @@ options(targets: {
   "run_test.mbt": ["native", "js"],
   "run_wbtest.mbt": ["native", "js"],
   "shutdown_timeout_wbtest.mbt": ["native", "js"],
+  "signals_wbtest.mbt": ["native", "js"],
 })

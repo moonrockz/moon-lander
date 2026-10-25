@@ -1,62 +1,38 @@
 ///|
-/// Which signal or console event asked the process to stop.
-pub(all) enum SignalKind {
-  /// SIGINT, or `CTRL_C_EVENT` on Windows.
-  Interrupt
-  /// SIGTERM, or `CTRL_CLOSE_EVENT` on Windows.
-  Terminate
-  /// SIGQUIT, or `CTRL_BREAK_EVENT` on Windows.
-  Quit
-} derive(Eq, Debug)
+/// A failure of the console driver before the host runs.
+pub suberror ConsoleError {
+  /// The driver cannot install its signal handlers or listeners.
+  SignalHandlersUnavailable
+}
 
 ///|
-pub extend SignalKind with Eq::{equal, not_equal}
-
-///|
-pub extend SignalKind with @debug.Debug::{to_repr}
-
-///|
-/// The exit code of a stop by this signal: 130, 143 or 131.
-pub fn SignalKind::exit_code(self : SignalKind) -> Int {
+/// Text for people that names the failure.
+pub fn ConsoleError::message(self : ConsoleError) -> String {
   match self {
-    Interrupt => 130
-    Terminate => 143
-    Quit => 131
+    SignalHandlersUnavailable => "The console signal handlers cannot be installed"
   }
 }
 
 ///|
-extern "C" fn stub_install() -> Int = "moonlander_console_install"
-
-///|
-extern "C" fn stub_signal_kind() -> Int = "moonlander_console_signal_kind"
-
-///|
-/// Turn off the signal handling of the `moonbitlang/async` runtime and install
-/// the console signal handlers. On Linux and macOS they handle SIGINT, SIGTERM
-/// and SIGQUIT; on Windows `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and
-/// `CTRL_CLOSE_EVENT`. The first signal sets the stop request. A second signal
-/// ends the process at once with its exit code. Gives `false` when the
-/// handlers cannot be installed.
-pub fn install() -> Bool {
-  @signal.set_global_cancellation_signals([])
-  stub_install() == 0
-}
-
-///|
-/// Whether a signal asked the process to stop. One read of a value that the
-/// signal handler sets, so synchronous code can call it often.
-pub fn stop_requested() -> Bool {
-  stub_signal_kind() != 0
-}
-
-///|
-/// The signal that asked the process to stop, or `None` before a signal.
-pub fn signal_kind() -> SignalKind? {
-  match stub_signal_kind() {
+/// The kind of a signal code from the native stub or the Node.js adapter:
+/// 1 Interrupt, 2 Terminate, 3 Quit. Any other code is no signal. This is the
+/// one place where a signal code becomes a `SignalKind`.
+fn kind_of_code(code : Int) -> @hosting.SignalKind? {
+  match code {
     1 => Some(Interrupt)
     2 => Some(Terminate)
     3 => Some(Quit)
     _ => None
+  }
+}
+
+///|
+/// The exit code of the process after a run. A signal that arrived after the
+/// last probe read of the run, for example during the stopped event, still
+/// selects the signal code, because a signal code comes first.
+fn process_exit_code(outcome : @hosting.RunOutcome, late : @hosting.SignalKind?) -> Int {
+  match late {
+    Some(kind) => kind.exit_code().to_int()
+    None => outcome.exit_code().to_int()
   }
 }

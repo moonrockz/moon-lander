@@ -6,13 +6,22 @@
 /// It reports each shutdown timeout for every exit code, and other failures only
 /// for code 1 or 2, in failure order, through `error_report` or as
 /// `<name>: <message>` on standard error. Report errors do not change the outcome.
-pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
-  run_with_directory_reader(host, command)
+///
+/// A console driver gives `signals`. The run registers the probe before the
+/// first hook, so each cancellation check reads it, and a watcher task reads it
+/// every 50 ms until the run ends. The first signal is a stop request with the
+/// reason `Signal(kind)`, and it cancels the command task.
+pub async fn[S] run(host : Host[S], command : Hook[S], signals? : SignalProbe) -> RunOutcome {
+  run_with_directory_reader(host, command, signals?)
 }
 
 ///|
-async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory) -> RunOutcome {
-  let result = execute(host, command, read_directory~)
+/// The time between two reads of the signal probe by the watcher task.
+let signal_watch_interval : Int = 50
+
+///|
+async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory, signals? : SignalProbe) -> RunOutcome {
+  let result = execute(host, command, read_directory~, signals?)
   @async.protect_from_cancel(() => {
     for error in result.failures {
       if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
@@ -29,21 +38,50 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 }
 
 ///|
-async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError) -> RunOutcome {
-  let inputs = configuration_inputs(host, read_directory~) catch { err => return outcome(err) }
-  let config = @host.load(inputs.sources) catch { err => return outcome(err) }
+async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError, signals? : SignalProbe) -> RunOutcome {
+  let inputs = configuration_inputs(host, read_directory~) catch { err => return with_signal(outcome(err), signals) }
+  let config = @host.load(inputs.sources) catch { err => return with_signal(outcome(err), signals) }
   let configured = finish_configuration(host, inputs, config) catch {
-    StopRequested => return {
+    StopRequested => return with_signal({
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
-    }
-    err => return outcome(err)
+    }, signals)
+    err => return with_signal(outcome(err), signals)
   }
+  let ctx = configured.context
+  let lifetime = ctx.lifetime
+  guard signals is Some(probe) else { return run_engine(host, configured, command) }
+  lifetime.register_stop_probe(probe.request)
+  @async.with_task_group(group => {
+    group.spawn_bg(no_wait=true, () => {
+      while true {
+        @async.sleep(signal_watch_interval)
+        ignore(lifetime.probe_stop())
+      }
+    })
+    run_engine(host, configured, command)
+  })
+}
+
+///|
+/// A signal that arrived before the engine started still selects the exit code.
+/// The reason stays the first event of the run.
+fn with_signal(result : RunOutcome, signals : SignalProbe?) -> RunOutcome {
+  guard signals is Some(probe) && (probe.request)() is Some(Signal(kind)) else { return result }
+  { ..result, signal: Some(kind), exit_code: kind.exit_code() }
+}
+
+///|
+async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : Hook[S]) -> RunOutcome {
   let ctx = configured.context
   let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
   let mut step = Engine::start(host.services)
+  // A probe stop that arrived during configuration loading runs no start hook.
+  if lifetime.probe_stop() && step is Run(pending, _) && lifetime.request is Some(request) {
+    step = pending.stop_requested(request, lifetime.requested_code, result=Interrupted, observed_signal?=lifetime.signal)
+  }
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)

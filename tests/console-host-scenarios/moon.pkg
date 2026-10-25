@@ -1,0 +1,19 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/console" @hosting_console,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonbitlang/async",
+  "moonbitlang/async/stdio",
+}
+
+supported_targets = "native+js"
+
+// `moonbitlang/async/stdio` writes the lines only on native. The pinned build
+// system cannot condition imports by target, so it is unused on js (29).
+// Remove when the imports can be conditional.
+warnings = "-29"
+
+options(targets: {
+  "emit.native.mbt": ["native"],
+  "emit.js.mbt": ["js"],
+})

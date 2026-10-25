@@ -473,13 +473,37 @@ same pattern as `signal.c` in `moonbitlang/async`. MoonBit calls it through
 - First signal: the handler stores the signal identity and sets an atomic stop flag.
   It does only async-signal-safe work.
 - Second signal: the handler ends the process at once from inside the handler, with
-  the exit code of the second signal (`_exit` on Linux and macOS, `ExitProcess` on
+  the exit code of the second signal (`_exit` on Linux and macOS, `TerminateProcess` on
   Windows). This works while the command runs synchronous code that never yields.
 - `ctx.cancelled()` reads the atomic flag through one extern call (D5). Synchronous
   code sees the first signal at its next check.
 - Call (this change): a watcher task polls the flag every 50 ms with `@async.sleep`.
-  When the flag is set, it calls `stop_application` with `Signal(kind)`. That cancels
+  When the flag is set, it makes a stop request with `Signal(kind)`. That cancels
   the command task at its next suspension point.
+- Call (group 11): the engine and the lifetime stay private, so the console package
+  gives `@hosting.run` a small typed bridge, not a probe or a stop request:
+
+  ```moonbit
+  pub struct SignalProbe { priv request : () -> StopRequest? }
+  pub fn SignalProbe::new(read : () -> SignalKind?) -> SignalProbe
+  pub async fn[S] run(host : Host[S], command : Hook[S], signals? : SignalProbe) -> RunOutcome
+  ```
+
+  With `signals`, `run` registers the probe as a stop probe after the services
+  factory and before the first hook, so each cancellation check reads the flag
+  through one extern call. It runs the 50 ms watcher as a `no_wait` task of a task
+  group around the start phase, the command and the stop phase. The group cancels
+  the watcher when the run ends, so no task keeps the process open. The watcher and
+  the checks share the one stop-request path of the lifetime (D5), so the first
+  signal sets the reason and a later signal still sets the signal exit code.
+- Call (group 11): the console package uses the one `@hosting.SignalKind`. The spike
+  type `@console.SignalKind` is removed. A signal code (1 Interrupt, 2 Terminate,
+  3 Quit) crosses only the C stub and Node.js adapter boundary, and one private
+  function of the console package changes it into a `SignalKind`.
+- Call (group 11): `@hosting_console.run(host, command)` is `async`. When the
+  handlers cannot be installed, it raises `ConsoleError::SignalHandlersUnavailable`
+  before it reads configuration or runs a hook. On js, the same error means that the
+  runtime has no Node.js `process`.
 - Call (this change): the driver makes sure that the `moonbitlang/async` runtime does
   not also handle these signals, through the public
   `@signal.set_global_cancellation_signals([])` of `moonbitlang/async/signal`. The
@@ -489,6 +513,11 @@ same pattern as `signal.c` in `moonbitlang/async`. MoonBit calls it through
   still applies (Platform limits, item 4).
 - After the stop phase, the driver ends the process explicitly with the exit code
   (D8) through libc `exit`, which flushes standard output.
+- Call (group 11): the C stub exports its pure event and signal mappings
+  (`moonlander_console_kind_of_event`, `moonlander_console_kind_of_signal`,
+  `moonlander_console_exit_code`), and the handlers call them. A native unit test
+  calls the same functions, so the mapping of `CTRL_C_EVENT` and `CTRL_CLOSE_EVENT`,
+  which a CI runner cannot send to one child, has a test on every platform.
 
 **js: the TypeScript adapter (Owner, O2).** The js console lifetime lives in a
 TypeScript adapter. Owner (2026-10-23, `split-framework-modules` D2): it is the
@@ -506,6 +535,32 @@ second entry point. MoonBit js externs call it.
 - At the end, the driver removes the listeners and sets `process.exitCode` to the
   exit code. It does not call `process.exit` on a graceful stop, because that can drop
   output that is still in a pipe.
+- Call (review of groups 11 and 12): after a graceful signal stop on js, the driver
+  sets `process.exitCode` and starts a 2 s timer that does not keep the event loop
+  open (`unref`) and then calls `process.exit(code)`. A process with no other work
+  ends first and keeps its piped output. A timer or socket that a service left
+  open cannot keep the process running after a signal, so the host ends the process
+  explicitly, as the spec "Exit codes" requires. A clean end only sets
+  `process.exitCode`.
+- Call (review of groups 11 and 12): a signal that arrives during configuration
+  loading or the services factory runs no start hook: the run replies to the first
+  engine step with the stop request without running it. When a failure before the
+  engine ends the run, a recorded signal still selects the signal exit code. A
+  signal that arrives after the last probe read of the run also selects the signal
+  code in both drivers.
+- Call (group 12): the listeners are the entry point `signals.ts` of the hosting
+  node adapter. `build-node-adapter.mbtx` bundles it into the console package
+  (`pkgs/hosting/console/node.generated.js.mbt`), because the generated factory of
+  `index.ts` is private to `@hosting`. The js driver gives `@hosting.run` the same
+  `SignalProbe` as native, so the listener only records the first kind and the
+  watcher makes the stop request.
+- Call (groups 11 and 12): `moonbitlang/async/process` has no js part, so a js
+  program cannot start or signal a child. The native acceptance suite
+  `tests/console-signal-acceptance` starts the test host as a native child and as a
+  js child (`tests/console-host-program`) under Node.js and Bun. On Windows it sends
+  a real `CTRL_BREAK_EVENT` to the process group of each child, which Node.js gives
+  as SIGBREAK. `mise run check:console` builds the js program and runs the suite on
+  Linux, macOS and Windows CI.
 - Synchronous code that does not yield cannot see a signal on js (Platform limits,
   item 3).
 
@@ -1035,7 +1090,7 @@ not check the rules again.
   from a program. The spike finds what a CI runner allows and records any event that
   only a manual check covers.
 - [A signal handler must do only async-signal-safe work] → The handler stores two
-  atomic values and, on a second signal, calls `_exit` or `ExitProcess`. Nothing else.
+  atomic values and, on a second signal, calls `_exit` or `TerminateProcess`. Nothing else.
 - [The watcher task wakes every 50 ms] → Small cost, and only in the console driver.
   Synchronous checks read the flag directly, so they do not wait for the watcher.
 - [The `moonbitlang/async` runtime and the stub can both own a signal] → The driver

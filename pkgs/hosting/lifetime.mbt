@@ -20,6 +20,21 @@ pub extend SignalKind with Eq::{equal, not_equal}
 pub extend SignalKind with @debug.Debug::{to_repr}
 
 ///|
+/// The signal read of a console driver. `run` reads it in each cancellation
+/// check and every 50 ms, and changes the first signal into a stop request
+/// with the reason `Signal(kind)`. The read must be cheap and must not raise.
+pub struct SignalProbe {
+  priv request : () -> StopRequest?
+}
+
+///|
+/// Make a probe from a read that gives the signal that asked the process to
+/// stop, or `None` before a signal.
+pub fn SignalProbe::new(read : () -> SignalKind?) -> SignalProbe {
+  { request: () => read().map(kind => StopRequest::Signal(kind)) }
+}
+
+///|
 /// A command or hook can raise this error to stop without a failure.
 pub(all) suberror StopRequested
 
@@ -132,8 +147,8 @@ pub struct StopToken { priv lifetime : Lifetime }
 pub fn Lifetime::stop_token(self : Lifetime) -> StopToken { { lifetime: self } }
 
 ///|
-// Console and embedder drivers register their probes in groups 11 and 13.
-// Remove the warning override when those drivers call this function.
+// Only `run` (native, js) registers a probe until the embedded driver of group
+// 13 registers its embedder probe. Remove the override then.
 #warnings("-1")
 fn Lifetime::register_stop_probe(self : Lifetime, probe : () -> StopRequest?) -> Unit {
   self.probes.push(probe)

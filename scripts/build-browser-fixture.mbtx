@@ -1,5 +1,4 @@
-///|
-/// Generate the spike FFI and compile the browser application once per suite.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -7,6 +6,10 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
+
+///|
+/// Generate the spike FFI and compile the browser application once per suite.
 
 ///|
 async fn command(args : Array[String]) -> Unit {

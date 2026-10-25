@@ -1,6 +1,4 @@
-///|
-/// Test the config and hosting adapters on Node and Bun, reusing Moon's compiled test artifacts.
-/// Usage: mise run test:node-adapter [-- node|bun].
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
@@ -10,6 +8,11 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Test the config and hosting adapters on Node and Bun, reusing Moon's compiled test artifacts.
+/// Usage: mise run test:node-adapter [-- node|bun].
 
 ///|
 async fn main {

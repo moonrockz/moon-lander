@@ -1,3 +1,14 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Check MoonBit formatting and run the type checker across the workspace.
 ///
@@ -5,11 +16,11 @@
 /// preferred target only, so it skips a package whose `supported_targets` excludes that target, such as
 /// a js-only package in a module that prefers native.
 ///
-/// The check also writes the `pkg.generated.mbti` interface of each package. The workspace checks
-/// these files in, so lint fails when the check leaves an interface that is untracked or that differs
+/// `moon info` writes the `pkg.generated.mbti` interface of each package. The workspace checks
+/// these files in, so lint fails when it leaves an interface that is untracked or that differs
 /// from the staged version. Stage or commit the written files and run lint again.
 ///
-/// Moon writes an interface only from the canonical backend of a module (`preferred-backend`, else
+/// `moon info` writes an interface only from the canonical backend of a module (`preferred-backend`, else
 /// `wasm`). A package that does not support that backend, such as a js-only package, gets no
 /// interface, so this check does not cover it.
 ///
@@ -19,14 +30,6 @@
 /// dependency output under `_build/` and `.mooncakes/` does not count: CI makes it again. The pre-commit hook uses `--staged`.
 ///
 /// Usage: `mise run lint:moonbit [-- --staged]`, or `moonx scripts/lint-moonbit.mbtx [--staged]`.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 async fn moon(args : Array[String]) -> Int32 {
@@ -138,6 +141,12 @@ async fn main {
     println("❌ moon check reported problems.")
     @sys.exit(if check > 0 { check } else { 1 })
   }
+  println("🔍 Generating canonical interfaces...")
+  let info = moon(["info"])
+  if info != 0 {
+    println("❌ moon info reported problems.")
+    @sys.exit(if info > 0 { info } else { 1 })
+  }
   println("🔍 Checking generated interfaces...")
   let stale = changed_interfaces()
   if !stale.is_empty() {
@@ -208,10 +217,14 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   git(["init", "-q"])
   git(["add", ".gitignore", "moon.mod", "lib/moon.pkg", "lib/lib.mbt"])
   git(["commit", "-q", "-m", "fixture"])
-  // The check writes the interface; an untracked interface fails.
+  // moon info writes the interface; an untracked interface fails.
   let (code, output) = lint()
   assert_true(code != 0, msg=output)
   assert_true(output.contains("lib/pkg.generated.mbti"), msg=output)
+  assert_true(
+    output.contains("These pkg.generated.mbti files are new or changed."),
+    msg=output,
+  )
   // A staged interface passes, so the pre-commit hook accepts it.
   git(["add", "lib/pkg.generated.mbti"])
   let (code, output) = lint()
@@ -226,6 +239,10 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   let (code, output) = lint()
   assert_true(code != 0, msg=output)
   assert_true(output.contains("lib/pkg.generated.mbti"), msg=output)
+  assert_true(
+    output.contains("These pkg.generated.mbti files are new or changed."),
+    msg=output,
+  )
 }
 
 ///|

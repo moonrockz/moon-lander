@@ -1,5 +1,4 @@
-///|
-/// Qualify the OpenRPC library against the frozen document corpus.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -7,6 +6,10 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
+
+///|
+/// Qualify the OpenRPC library against the frozen document corpus.
 
 ///|
 test "case manifests require complete, known and unique expectations" {

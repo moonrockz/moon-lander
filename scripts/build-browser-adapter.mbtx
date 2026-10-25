@@ -1,5 +1,4 @@
-///|
-/// Generate the production browser adapter without requiring a consumer build step.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -7,6 +6,10 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
+
+///|
+/// Generate the production browser adapter without requiring a consumer build step.
 
 ///|
 async fn command(args : Array[String]) -> Unit {

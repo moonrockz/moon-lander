@@ -1,7 +1,4 @@
-///|
-/// Remove build artifacts from the workspace.
-///
-/// Usage: `mise run clean`, or `moonx scripts/clean.mbtx`.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -9,6 +6,12 @@ import {
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Remove build artifacts from the workspace.
+///
+/// Usage: `mise run clean`, or `moonx scripts/clean.mbtx`.
 
 ///|
 async fn main {

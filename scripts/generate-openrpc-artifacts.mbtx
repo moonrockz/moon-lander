@@ -1,7 +1,4 @@
-///|
-/// Generate the pinned OpenRPC metaschemas used by the artifact facet. Only a
-/// closed draft-07 keyword subset is accepted, so the built-in evaluator
-/// interprets every retained keyword.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -10,6 +7,12 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.5/crypto",
 }
+----
+
+///|
+/// Generate the pinned OpenRPC metaschemas used by the artifact facet. Only a
+/// closed draft-07 keyword subset is accepted, so the built-in evaluator
+/// interprets every retained keyword.
 
 ///|
 let annotations : Array[String] = [

@@ -1,5 +1,4 @@
-///|
-/// Build real default/overridden applications and inspect their linked outputs.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -8,6 +7,10 @@ import {
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
 }
+----
+
+///|
+/// Build real default/overridden applications and inspect their linked outputs.
 
 ///|
 // These are real parser diagnostics, not strings added to make this check pass.

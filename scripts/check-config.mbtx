@@ -1,10 +1,13 @@
-///|
-/// Compare the complete pure-load observation across compiler targets.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/fs",
 }
+----
+
+///|
+/// Compare the complete pure-load observation across compiler targets.
 
 ///|
 async fn main {

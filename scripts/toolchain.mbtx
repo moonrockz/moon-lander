@@ -1,0 +1,130 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
+///|
+/// Launch a task with the mise toolchain, including every nested moon, moonc and moonx call.
+/// `mise exec` selects its top-level command explicitly but can preserve a shell's PATH entries
+/// ahead of tool directories. Prepend the resolved bin directory for the whole child process tree.
+struct Toolchain {
+  bin : String
+  windows : Bool
+}
+
+///|
+suberror ToolchainError {
+  ResolutionFailed(String)
+}
+
+///|
+async fn Toolchain::resolve() -> Toolchain {
+  let (code, out, err) = @process.collect_output("mise", [
+    "where", "http:moonbit",
+  ])
+  guard code == 0 else {
+    raise ResolutionFailed(
+      "Cannot resolve the pinned MoonBit toolchain: \{err.text()}",
+    )
+  }
+  let root = @fs.realpath(out.text().trim())
+  let bin = "\{root}/bin"
+  let windows = @fs.exists("\{bin}/moon.exe")
+  { bin, windows, }
+}
+
+///|
+fn Toolchain::moonx(self : Toolchain) -> String {
+  "\{self.bin}/moonx\{if self.windows { ".exe" } else { "" }}"
+}
+
+///|
+fn Toolchain::environment(self : Toolchain) -> Map[String, String] {
+  {
+    "PATH": self.bin +
+    (if self.windows { ";" } else { ":" }) +
+    @env.get_env_var("PATH").unwrap_or(""),
+    // Keep the compiler and core library with the selected moon, even with a custom MOON_HOME.
+    "MOON_TOOLCHAIN_ROOT": self.bin + "/..",
+  }
+}
+
+///|
+async fn main {
+  let toolchain = Toolchain::resolve()
+  let code = @process.run(
+    toolchain.moonx(),
+    @env.args()[1:].to_owned(),
+    extra_env=toolchain.environment(),
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(if code >= 0 { code } else { 1 })
+}
+
+///|
+async test "nested MoonBit commands ignore an earlier PATH toolchain" {
+  let toolchain = Toolchain::resolve()
+  let launcher = @fs.realpath("toolchain.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-toolchain")
+  defer @fs.rmdir(dir, recursive=true)
+  let shadow = "\{dir}/shadow"
+  @fs.mkdir(shadow)
+  let suffix = if toolchain.windows { ".exe" } else { "" }
+  for name in ["moon", "moonc", "moonx"] {
+    // If PATH leaks through, the OS rejects this executable and the nested call fails.
+    @fs.write_file(
+      "\{shadow}/\{name}\{suffix}",
+      "wrong toolchain",
+      permission=0o755,
+    )
+  }
+  let probe = "\{dir}/probe.mbtx"
+  let source =
+    #|----
+    #|import {
+    #|  "moonbitlang/async@0.22.5",
+    #|  "moonbitlang/async@0.22.5/process",
+    #|  "moonbitlang/core/env",
+    #|}
+    #|----
+    #|async fn main {
+    #|  for (command, args) in [("moon", ["version", "--all"]), ("moonc", ["-v"]), ("moonx", ["--version"])] {
+    #|    let (code, out, err) = @process.collect_output(command, args)
+    #|    assert_eq(code, 0, msg=out.text() + err.text())
+    #|    println(out.text())
+    #|  }
+    #|  assert_eq(@env.get_env_var("MOON_TOOLCHAIN_ROOT"), Some(@env.args()[1]))
+    #|}
+  @fs.write_file(probe, source)
+  let env = toolchain.environment()
+  env["PATH"] = shadow +
+    (if toolchain.windows { ";" } else { ":" }) +
+    @env.get_env_var("PATH").unwrap_or("")
+  // Prove the shadow commands fail before testing the repaired child environment.
+  let (unfixed, _, _) = @process.collect_output(
+    toolchain.moonx(),
+    [probe, toolchain.bin + "/.."],
+    extra_env=env,
+  )
+  assert_true(unfixed != 0)
+  let (code, out, err) = @process.collect_output(
+    toolchain.moonx(),
+    [launcher, probe, toolchain.bin + "/.."],
+    extra_env=env,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  // Child failures must keep their exit status through the launcher.
+  let (code, _, _) = @process.collect_output(
+    toolchain.moonx(),
+    [launcher, probe, "wrong root"],
+    extra_env=env,
+  )
+  assert_true(code != 0)
+}

@@ -1,6 +1,6 @@
 ///|
 /// The `package_data.json` of `moonrockz/notebooks`, written by `moon doc` in `pkgs/notebooks` with
-/// the pinned MoonBit toolchain 0.10.17+093cb8f9c (moon 0.1.20261021). Copy it again when the pin
+/// the pinned MoonBit toolchain 0.10.17+d971670cd (moon 0.1.20261023). Copy it again when the pin
 /// changes the format.
 let notebooks_package_data : String =
   #|{

@@ -1,5 +1,4 @@
-///|
-/// Generate frozen Unicode identifier ranges for the portable pattern checker.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -7,6 +6,10 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/crypto",
 }
+----
+
+///|
+/// Generate frozen Unicode identifier ranges for the portable pattern checker.
 
 ///|
 test "Unicode range input rejects malformed and overlapping property ranges" {

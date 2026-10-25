@@ -1,3 +1,15 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
 ///|
 /// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
 ///
@@ -12,15 +24,6 @@
 /// tree of the minor line of the root `moon.mod` in `_site/v/<minor>/` (design D22). `assemble` adds
 /// the release trees to a `next` build in `_site/` and writes the deployed site.
 /// Run it from the workspace root.
-import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/core/env",
-  "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/sys",
-}
 
 ///|
 let usage : String = "Usage: site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"

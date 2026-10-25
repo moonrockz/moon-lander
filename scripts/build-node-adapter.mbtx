@@ -1,6 +1,4 @@
-///|
-/// Bundle the Node adapter into an inline MoonBit JavaScript FFI factory.
-/// Usage: mise run build:node-adapter, or mise run check:node-adapter.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -8,6 +6,11 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Bundle the Node adapter into an inline MoonBit JavaScript FFI factory.
+/// Usage: mise run build:node-adapter, or mise run check:node-adapter.
 
 ///|
 async fn bundle(

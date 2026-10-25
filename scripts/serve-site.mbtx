@@ -1,14 +1,4 @@
-///|
-/// Serve the built docs site in `_site/` below its base path, as GitHub Pages does, and build it again
-/// after a source file changes.
-///
-/// Usage: `mise run dev:site`, or `moonx scripts/serve-site.mbtx [--port <n>] [--no-watch]`.
-/// The base path is the `base_path` of `site/site.json`. The default port is 4173.
-/// The rules: a path outside the base path redirects to the base path, a path that leaves the site
-/// directory gives 403, a directory serves its `index.html`, and a missing file gives 404.
-/// The watch polls the modification time of the site sources every 500 ms, because
-/// `moonbitlang/async` has no file watch API, and runs `moonx scripts/site.mbtx build` after a change.
-/// Run it from the workspace root.
+----
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
@@ -22,6 +12,19 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/x@0.5.5/sys",
 }
+----
+
+///|
+/// Serve the built docs site in `_site/` below its base path, as GitHub Pages does, and build it again
+/// after a source file changes.
+///
+/// Usage: `mise run dev:site`, or `moonx scripts/serve-site.mbtx [--port <n>] [--no-watch]`.
+/// The base path is the `base_path` of `site/site.json`. The default port is 4173.
+/// The rules: a path outside the base path redirects to the base path, a path that leaves the site
+/// directory gives 403, a directory serves its `index.html`, and a missing file gives 404.
+/// The watch polls the modification time of the site sources every 500 ms, because
+/// `moonbitlang/async` has no file watch API, and runs `moonx scripts/site.mbtx build` after a change.
+/// Run it from the workspace root.
 
 ///|
 let usage : String = "Usage: serve-site.mbtx [--port <n>] [--no-watch]"

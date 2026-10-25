@@ -12,7 +12,7 @@ import {
 /// the same release succeeds. Adapted from Smithy's release flow. Needs the
 /// credentials that `scripts/credentials.mbtx` writes.
 ///
-/// Usage: `mise run release:publish`, or `moonx scripts/publish.mbtx`.
+/// Usage: `mise run release:publish`, or `moonx scripts/toolchain.mbtx scripts/publish.mbtx`.
 
 ///|
 /// Public modules, in dependency order. The framework modules, the workspace

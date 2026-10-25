@@ -184,6 +184,9 @@ jobs:
         run: mise run build -- ${{ matrix.target }}
       - name: Test
         run: mise run test -- ${{ matrix.target }}
+      - name: Test the toolchain wrapper
+        if: matrix.target == 'native'
+        run: mise exec -- moonx scripts/toolchain.mbtx scripts/test-scripts.mbtx toolchain.mbtx
       - name: Test the js host adapter on Bun
         if: matrix.target == 'js'
         run: mise run test:node-adapter -- bun

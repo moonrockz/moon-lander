@@ -15,7 +15,7 @@ import {
 ///
 /// Usage: `mise run build:site [-- --main] [--tree <tree>]`, `mise run check:site [-- --tree <tree>]`,
 /// `mise run test:site [-- --tree <tree>]` and `mise run assemble:site`, or the same commands of
-/// `moonx scripts/site.mbtx`.
+/// `moonx scripts/toolchain.mbtx scripts/site.mbtx`.
 /// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
 /// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
 /// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
@@ -26,7 +26,7 @@ import {
 /// Run it from the workspace root.
 
 ///|
-let usage : String = "Usage: site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
+let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
 
 ///|
 /// The arguments without `--tree <tree>`, and the tree, or `None` without `--tree`.

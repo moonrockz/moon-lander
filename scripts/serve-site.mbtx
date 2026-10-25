@@ -18,7 +18,7 @@ import {
 /// Serve the built docs site in `_site/` below its base path, as GitHub Pages does, and build it again
 /// after a source file changes.
 ///
-/// Usage: `mise run dev:site`, or `moonx scripts/serve-site.mbtx [--port <n>] [--no-watch]`.
+/// Usage: `mise run dev:site`, or `moonx scripts/toolchain.mbtx scripts/serve-site.mbtx [--port <n>] [--no-watch]`.
 /// The base path is the `base_path` of `site/site.json`. The default port is 4173.
 /// The rules: a path outside the base path redirects to the base path, a path that leaves the site
 /// directory gives 403, a directory serves its `index.html`, and a missing file gives 404.
@@ -27,7 +27,7 @@ import {
 /// Run it from the workspace root.
 
 ///|
-let usage : String = "Usage: serve-site.mbtx [--port <n>] [--no-watch]"
+let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/serve-site.mbtx [--port <n>] [--no-watch]"
 
 ///|
 /// The built site, relative to the workspace root.

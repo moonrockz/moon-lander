@@ -11,7 +11,7 @@ import {
 ///|
 /// Remove build artifacts from the workspace.
 ///
-/// Usage: `mise run clean`, or `moonx scripts/clean.mbtx`.
+/// Usage: `mise run clean`, or `moonx scripts/toolchain.mbtx scripts/clean.mbtx`.
 
 ///|
 async fn main {

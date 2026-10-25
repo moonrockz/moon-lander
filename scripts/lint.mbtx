@@ -10,7 +10,7 @@ import {
 ///|
 /// Run every lint task: YAML, then MoonBit formatting and type checking.
 ///
-/// Usage: `mise run lint`, or `moonx scripts/lint.mbtx`.
+/// Usage: `mise run lint`, or `moonx scripts/toolchain.mbtx scripts/lint.mbtx`.
 
 ///|
 async fn main {

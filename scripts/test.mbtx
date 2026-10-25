@@ -12,7 +12,7 @@ import {
 ///|
 /// Run the tests of every workspace member for one or more targets.
 ///
-/// Usage: `mise run test [-- <target>...]`, or `moonx scripts/test.mbtx <target>...`.
+/// Usage: `mise run test [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/test.mbtx <target>...`.
 /// With no target, it tests wasm, wasm-gc, js and native.
 ///
 /// Run from the workspace root so Moon discovers all members and nested packages.

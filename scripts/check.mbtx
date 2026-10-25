@@ -10,7 +10,7 @@ import {
 ///|
 /// Run the full local gate: lint, validate, test, test:scripts, build.
 ///
-/// Usage: `mise run check`, or `moonx scripts/check.mbtx`.
+/// Usage: `mise run check`, or `moonx scripts/toolchain.mbtx scripts/check.mbtx`.
 
 ///|
 async fn main {

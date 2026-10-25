@@ -12,7 +12,7 @@ import {
 ///|
 /// Install the git hooks with lefthook. The hooks are defined in `lefthook.yml`.
 ///
-/// Usage: `mise run hooks:install`, or `moonx scripts/hooks-install.mbtx`. Idempotent: lefthook
+/// Usage: `mise run hooks:install`, or `moonx scripts/toolchain.mbtx scripts/hooks-install.mbtx`. Idempotent: lefthook
 /// rewrites its hook files on every run. Skipped in CI.
 ///
 /// A repository-local `core.hooksPath` makes git look away from `.git/hooks`, where lefthook

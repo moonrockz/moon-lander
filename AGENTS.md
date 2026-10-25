@@ -29,6 +29,8 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
 - Pin tools in `.config/mise/config.toml`. Run `mise trust` and `mise install`.
 - Write automation in `scripts/*.mbtx`, run with `moonx`, and expose it as mise
   tasks. Pin imports. Do not replace these tasks with shell or PowerShell scripts.
+  Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbtx scripts/<name>.mbtx`.
+  Each task bootstraps with `moonx` from PATH, so the global toolchain must accept the frontmatter import syntax; the wrapper puts the pin first for every nested call.
 - Use `moonbitlang/async` for process and filesystem operations. Propagate failures
   through nonzero exit codes. Exception: js file access in `moonrockz/moon-lander-config/host` uses the
   TypeScript adapter over `node:fs` in `pkgs/config/adapters/node/`, built with Bun

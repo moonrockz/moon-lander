@@ -29,7 +29,7 @@ import {
 /// the working tree equals the staged snapshot for every file the checks read. Ignored build and
 /// dependency output under `_build/` and `.mooncakes/` does not count: CI makes it again. The pre-commit hook uses `--staged`.
 ///
-/// Usage: `mise run lint:moonbit [-- --staged]`, or `moonx scripts/lint-moonbit.mbtx [--staged]`.
+/// Usage: `mise run lint:moonbit [-- --staged]`, or `moonx scripts/toolchain.mbtx scripts/lint-moonbit.mbtx [--staged]`.
 
 ///|
 async fn moon(args : Array[String]) -> Int32 {

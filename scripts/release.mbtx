@@ -247,7 +247,7 @@ async fn main {
       run_github(version, notes, assets.to_owned())
     _ =>
       fail_with(
-        "Usage: release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES [ASSET...]",
+        "Usage: moonx scripts/toolchain.mbtx scripts/release.mbtx plan | notes X.Y.Z | github X.Y.Z NOTES [ASSET...]",
       )
   }
 }

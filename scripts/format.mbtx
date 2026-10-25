@@ -11,7 +11,7 @@ import {
 ///|
 /// Format all MoonBit code in the workspace.
 ///
-/// Usage: `mise run format`, or `moonx scripts/format.mbtx`.
+/// Usage: `mise run format`, or `moonx scripts/toolchain.mbtx scripts/format.mbtx`.
 
 ///|
 async fn main {

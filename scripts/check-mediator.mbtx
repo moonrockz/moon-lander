@@ -20,7 +20,7 @@ import {
 /// Each path has its own target list. The core paths run on wasm, wasm-gc, js and native. The async
 /// paths run on wasm, js and native, because `moonbitlang/async` has no wasm-gc test entry.
 ///
-/// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/check-mediator.mbtx`.
+/// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx`.
 /// With no target, it checks wasm, wasm-gc, js and native. A path does not run on a target that is
 /// not in its list.
 

@@ -10,7 +10,7 @@ import {
 ///|
 /// Lint every YAML file in the repository with yamllint.
 ///
-/// Usage: `mise run lint:yaml`, or `moonx scripts/lint-yaml.mbtx`. The ignore list is in `.yamllint.yml`.
+/// Usage: `mise run lint:yaml`, or `moonx scripts/toolchain.mbtx scripts/lint-yaml.mbtx`. The ignore list is in `.yamllint.yml`.
 
 ///|
 async fn main {

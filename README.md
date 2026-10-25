@@ -54,6 +54,7 @@ Changes to behavior start as OpenSpec changes and are tracked in beads. See
 ## Tasks
 
 Tasks are MoonBit scripts under `scripts/`, run through `moonx` by mise.
+Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbtx scripts/<name>.mbtx`.
 
 | Command | Purpose |
 | --- | --- |

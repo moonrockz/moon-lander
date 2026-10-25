@@ -214,13 +214,20 @@ async fn main {
     user + "/.moon"
   })
   let isolated = "\{dir}/moon"
-  let (code, toolchain, err) = @process.collect_output("mise", [
-    "where", "http:moonbit",
-  ])
-  guard code == 0 else { fail(err.text()) }
+  let toolchain = match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
+    Some(root) => root
+    None => {
+      // Standalone registry probes can run outside the wrapper; resolve the pin then.
+      let (code, out, err) = @process.collect_output("mise", [
+        "where", "http:moonbit",
+      ])
+      guard code == 0 else { fail(err.text()) }
+      @fs.realpath(out.text().trim())
+    }
+  }
   let consumer_env = {
     "MOON_HOME": isolated,
-    "MOON_TOOLCHAIN_ROOT": toolchain.text().trim().to_owned(),
+    "MOON_TOOLCHAIN_ROOT": toolchain,
     "MOON_DEP_CACHE": "\{dir}/dependencies",
     "MOON_BUILD_CACHE": "\{dir}/build-cache",
   }

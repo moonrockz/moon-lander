@@ -125,7 +125,7 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
     builder = builder |> @config.provider({
       name: host.name.to_string(),
       expand: _ => Done({ sources: [], warnings: [
-        Note(source=host.name.to_string(), message="environment files need a primary part such as app_dirs()"),
+        Note(source=host.name.to_string(), message="default_environment applies only to the host-owned conventions set; add app_dirs() or conventions(f)"),
       ] }),
     })
   }

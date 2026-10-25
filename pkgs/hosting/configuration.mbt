@@ -16,9 +16,17 @@ pub fn[S] conventions(builder : HostBuilder[S], transform : (@conventions.Conven
 ///|
 /// Add application sources and formats to the core configuration pipeline.
 /// Callbacks run in registration order, after arguments and environment
-/// resolution and before the host adds its priority-600 variable source.
+/// resolution. Sources merge in this order: configure callbacks, the host-owned
+/// conventions set (System 100 through UserOverride 400), the <PREFIX>_* source
+/// at 600, then argparse overrides at 700 (group 14).
+/// Core load requires priorities that do not go down. With app_dirs() or
+/// conventions(f), configure sources must have priority 100 or less, such as
+/// defaults or an in-memory value at 0. Put a higher-priority file in the
+/// conventions set, or leave out the host-owned set.
 /// Conventions added here keep their own discovery options and do not see
 /// standard host flags. Use app_dirs() and conventions() for host-owned flag-aware discovery.
+/// The run's variable set and working directory replace values that a callback
+/// sets; use env_vars or working_dir on the host builder.
 /// A callback error ends the run before the factory or any hook.
 pub fn[S] configure(builder : HostBuilder[S], sources : (@config.ConfigBuilder) -> @config.ConfigBuilder raise) -> HostBuilder[S] {
   { ..builder, configure_sources: builder.configure_sources + [sources] }
@@ -69,12 +77,7 @@ fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.
 fn configuration_from_tree(sources : @config.ConfigBuilder, tree : @config.FileTree) -> @config.Config raise {
   match @config.load(sources, tree) {
     Done(config) => config
-    Need(requests) => {
-      let paths = requests.map(request => match request {
-        ListDir(path) | ReadFile(path) => path
-      })
-      raise UsageError("Incomplete configuration file tree; requested paths: " + paths.join(", "))
-    }
+    Need(requests) => raise IncompleteFileTree(requests~)
   }
 }
 
@@ -90,6 +93,7 @@ priv struct ConfiguredRun[S] {
 fn[S] finish_configuration(host : Host[S], inputs : ConfigurationInputs, config : @config.Config) -> ConfiguredRun[S] raise {
   let shutdown_timeout = match host.timeout_key {
     Some(key) => {
+      // Core has no bind by KeyPath yet; follow-up lander-4us.44.
       let limit : @lander_core.TimeLimit? = @config.bind_with(config, key.to_string())
       limit.unwrap_or(host.shutdown_timeout)
     }

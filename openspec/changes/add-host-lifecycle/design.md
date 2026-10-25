@@ -245,8 +245,13 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
    from the standard flags (D10), and gives it to the conventions parts.
 5. The host loads the configuration. Native and js: `@host.load(builder)`.
    wasm and wasm-gc: `@config.load(builder, tree)` with the tree from
-   `@hosting.files`. The merge order is the application sources, then the
-   environment variables (priority 600), then the argparse overrides (priority 700).
+   `@hosting.files`. The merge order is the configure-callback sources in order,
+   then the host-owned conventions set (System 100 through UserOverride 400),
+   then the `<PREFIX>_*` source at 600, then the argparse overrides at 700
+   (group 14). Core load requires priorities that do not go down. With
+   `app_dirs()` or `conventions(f)`, configure sources must have priority 100 or
+   less, such as defaults or an in-memory value at 0. A file at a higher priority
+   belongs in the conventions set, or the application leaves out the host-owned set.
    A `ConfigError` ends the run with exit code 2 before any hook.
 6. The host makes `HostEnvironment` and the factory builds `S`.
 7. Start phase, started event, command, stop phase, exit.

@@ -42,9 +42,48 @@ test "incomplete tree names every requested path and has usage code 2 before fac
     |> configure(s => s |> @config.format(@toml.format()) |> @config.file("/w/a.toml") |> @config.file("/w/b.toml"))
     |> files(@config.FileTree::new()) |> build(_ => { calls.val += 1 })
   try { ignore(injected_run(host)); fail("expected incomplete tree") } catch {
-    UsageError(message) as error => {
-      assert_true(message.contains("/w/a.toml"), msg=message)
-      assert_true(message.contains("/w/b.toml"), msg=message)
+    IncompleteFileTree(requests~) as error => {
+      assert_eq(requests, [@config.ReadFile("/w/a.toml"), @config.ReadFile("/w/b.toml")])
+      assert_eq(report_text(host.name, error), "acme: Incomplete configuration file tree; requested paths: /w/a.toml, /w/b.toml")
+      assert_eq(outcome(error).exit_code().to_int(), 2)
+    }
+    error => raise error
+  }
+  assert_eq(calls.val, 0)
+}
+
+///|
+test "incomplete app_dirs tree names the unlisted start directory before factory" {
+  let calls = Ref(0)
+  let host = builder(@lander_core.AppName::parse("acme"), [], env_vars=(Map([]) : Map[String, String]),
+      working_dir=@lander_core.AbsolutePath::parse("/w"))
+    |> configure(s => s |> @config.platform(Linux) |> @config.format(@toml.format()))
+    |> app_dirs() |> files(@config.FileTree::new()) |> build(_ => { calls.val += 1 })
+  try { ignore(injected_run(host)); fail("expected incomplete tree") } catch {
+    IncompleteFileTree(requests~) as error => {
+      assert_true(requests.contains(@config.ListDir("/w")))
+      assert_true(report_text(host.name, error).contains("/w"))
+      assert_eq(outcome(error).exit_code().to_int(), 2)
+    }
+    error => raise error
+  }
+  assert_eq(calls.val, 0)
+}
+
+///|
+test "configure file at 300 before host-owned conventions fails with SourceOrder" {
+  let calls = Ref(0)
+  let host = builder(@lander_core.AppName::parse("acme"), [], env_vars=(Map([]) : Map[String, String]),
+      working_dir=@lander_core.AbsolutePath::parse("/w"))
+    |> configure(s => s |> @config.platform(Linux) |> @config.format(@toml.format())
+      |> @config.file("/w/extra.toml"))
+    |> app_dirs() |> files(@config.FileTree::new(complete=true).with_file("/w/extra.toml", ""))
+    |> build(_ => { calls.val += 1 })
+  try { ignore(injected_run(host)); fail("expected source order failure") } catch {
+    @config.SourceOrder(previous~, previous_priority~, priority~, ..) as error => {
+      assert_eq(previous, "/w/extra.toml")
+      assert_eq(previous_priority, 300)
+      assert_eq(priority, 100)
       assert_eq(outcome(error).exit_code().to_int(), 2)
     }
     error => raise error

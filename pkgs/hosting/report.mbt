@@ -10,6 +10,23 @@ pub fn UsageError::message(self : UsageError) -> String {
 }
 
 ///|
+/// The injected configuration tree does not answer these file requests.
+/// Only the host makes this error; callers can inspect each request and path.
+pub suberror FileTreeError {
+  IncompleteFileTree(requests~ : Array[@config.FileRequest])
+}
+
+///|
+/// Text for people that names every requested path.
+pub fn FileTreeError::message(self : FileTreeError) -> String {
+  let IncompleteFileTree(requests~) = self
+  let paths = requests.map(request => match request {
+    ListDir(path) | ReadFile(path) => path
+  })
+  "Incomplete configuration file tree; requested paths: " + paths.join(", ")
+}
+
+///|
 /// The stop phase used its full time budget. Only the host makes this error.
 pub suberror ShutdownTimedOut { ShutdownTimedOut(@lander_core.TimeLimit) }
 
@@ -35,7 +52,7 @@ fn usage_exit_code() -> ExitCode { { code: 2 } }
 fn select_exit_code(signal : SignalKind?, failures : Array[Error], timed_out : Bool, application : ExitCode?) -> ExitCode {
   if signal is Some(kind) { return kind.exit_code() }
   for error in failures {
-    if error is (@config.ConfigError::_ | UsageError(_)) { return usage_exit_code() }
+    if error is (@config.ConfigError::_ | UsageError(_) | IncompleteFileTree(..)) { return usage_exit_code() }
   }
   if !failures.is_empty() || timed_out { return ExitCode::failure() }
   application.unwrap_or(ExitCode::success())
@@ -49,6 +66,7 @@ fn report_text(name : @lander_core.AppName, error : Error) -> String {
     HostError::_ as e => e.message()
     WorkingDirectoryError::_ as e => e.message()
     UsageError::_ as e => e.message()
+    FileTreeError::_ as e => e.message()
     ShutdownTimedOut::_ as e => e.message()
     @config.ConfigError::_ as e => e.message()
     e => e.to_string()

@@ -48,6 +48,11 @@ pub fn[S] skip_env_source(HostBuilder[S]) -> HostBuilder[S]
 pub fn[S] working_dir(HostBuilder[S], @moon-lander-core.AbsolutePath) -> HostBuilder[S]
 
 // Errors
+pub suberror FileTreeError {
+  IncompleteFileTree(requests~ : Array[@moon-lander-config.FileRequest])
+}
+pub fn FileTreeError::message(Self) -> String
+
 pub(all) suberror HostError {
   InvalidServiceName(text~ : String, reason~ : String)
   DuplicateService(name~ : ServiceName, existing~ : ServiceName)

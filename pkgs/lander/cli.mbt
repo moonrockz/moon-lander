@@ -2,7 +2,7 @@
 /// Start a host builder for the application `name` with the command-line
 /// arguments `args`. The services record is `Unit`.
 /// Explicit starting settings replace process inputs. `environment` is a
-/// default name and stays raw text until group 8 adds its parsed type.
+/// default name, raw text for now; a parsed environment-name type replaces it.
 pub fn cli(
   name : @lander_core.AppName,
   args : Array[String],

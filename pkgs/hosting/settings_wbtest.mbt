@@ -57,10 +57,10 @@ test "later variable and directory steps replace starting values without process
   let host = second |> build(_ => ())
   let settings = resolve_settings(host, read_variables=() => abort("no process variables"),
     read_directory=() => abort("no process directory"))
-  assert_eq(settings.variables, { "ACME_B": "2" })
+  assert_eq(Map::from_iter(settings.variables.iter()), { "ACME_B": "2" })
   assert_eq(settings.directory.to_string(), "/b")
   let core = configuration_builder(host, settings, @conventions.DiscoveryOptions::new())
-  assert_eq(core.given_env_vars(), Some(settings.variables))
+  assert_eq(core.given_env_vars(), Some(Map::from_iter(settings.variables.iter())))
   assert_eq(core.given_working_dir(), Some("/b"))
   assert_eq(settings_config(host).value(), @config.ConfigValue::from_json({ "b": 2 }))
   assert_eq(settings_config(first |> build(_ => ())).value(), @config.ConfigValue::from_json({ "a": 1 }))
@@ -74,10 +74,10 @@ test "each omitted setting is filled exactly once and explicit settings never re
   let mut variable_reads = 0
   let mut directory_reads = 0
   let read_variables = () => { variable_reads += 1; { "ACME_A": "1" } }
-  let read_directory = () => { directory_reads += 1; @lander_core.AbsolutePath::root() }
+  let read_directory : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = () => { directory_reads += 1; @lander_core.AbsolutePath::root() }
   let settings = resolve_settings(host, read_variables~, read_directory~)
   assert_eq((variable_reads, directory_reads), (1, 1))
-  assert_eq(settings.variables, { "ACME_A": "1" })
+  assert_eq(Map::from_iter(settings.variables.iter()), { "ACME_A": "1" })
   assert_eq(settings.directory.to_string(), "/")
   ignore(resolve_settings(builder(host.name, [], env_vars=(Map([]) : Map[String, String])) |> build(_ => ()), read_variables~, read_directory~))
   assert_eq((variable_reads, directory_reads), (1, 2))
@@ -104,7 +104,7 @@ test "JSON strings numbers booleans arrays objects null and keys follow D14" {
   }
   let host = settings_host(vars)
   let snapshot = resolve_settings(host).variables
-  assert_eq(snapshot, {
+  assert_eq(Map::from_iter(snapshot.iter()), {
     "ACME_PORT": "8080", "ACME_DEBUG": "true", "ACME_TAGS": "[\"a\",\"b\"]",
     "ACME_OBJECT": "{\"nested\":1}", "ACME_TEXT": "001", "Mixed_Key": "kept",
     "lower": "false", "fraction": "1.5",
@@ -152,8 +152,8 @@ test "skipped source reports skipped while conventions and argparse retain the s
   assert_true(config.reports().iter().any(r => r.kind is Environment && r.status is Skipped && r.priority == 600))
   assert_true(config.reports().iter().any(r => r.candidates.contains("/custom/acme.toml")))
   let vars = resolve_settings(host).variables
-  assert_eq(@conventions.environment_name(@conventions.base("acme") |> @conventions.environments(), vars), Some("Staging"))
-  let command_host = builder(host.name, [], env_vars=vars) |> skip_env_source()
+  assert_eq(@conventions.environment_name(@conventions.base("acme") |> @conventions.environments(), Map::from_iter(vars.iter())), Some("Staging"))
+  let command_host = builder(host.name, [], env_vars=Map::from_iter(vars.iter())) |> skip_env_source()
     |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("a", env="ACME_A")])) |> build(_ => ())
   let parsed = parse_arguments(command_host, env=resolve_settings(command_host).variables)
   assert_eq(parsed.matches.values.get("a"), Some(["1"]))
@@ -192,9 +192,64 @@ test "every composed reader sees one set including environment and HOME" {
   let host = builder(@lander_core.AppName::parse("acme"), [], env_vars=variables,
     working_dir=@lander_core.AbsolutePath::parse("/w")) |> app_dirs() |> build(_ => ())
   let settings = resolve_settings(host, read_variables=() => abort("explicit set must win"))
-  assert_eq(settings.variables, variables)
-  assert_eq(@conventions.environment_name(@conventions.base("acme") |> @conventions.environments(), settings.variables), Some("Staging"))
+  assert_eq(Map::from_iter(settings.variables.iter()), variables)
+  assert_eq(@conventions.environment_name(@conventions.base("acme") |> @conventions.environments(), Map::from_iter(settings.variables.iter())), Some("Staging"))
   let config = settings_config(host)
   assert_eq(@config.get_text(config, "log.format"), "json")
   assert_true(config.reports().iter().any(r => r.candidates.contains("/home/test/.acme/acme.toml")))
+}
+
+///|
+test "builder and variable steps snapshot caller maps and JSON objects" {
+  let vars = { "ACME_A": "1" }
+  let first = builder(@lander_core.AppName::parse("acme"), [], env_vars=vars,
+    working_dir=@lander_core.AbsolutePath::root())
+  vars["ACME_A"] = "2"
+  let second = first |> env_vars(vars)
+  vars["ACME_A"] = "3"
+  let first = first |> build(_ => ())
+  let second = second |> build(_ => ())
+  for _ in 0..<2 {
+    assert_eq(resolve_settings(first).variables.get("ACME_A"), Some("1"))
+    assert_eq(resolve_settings(second).variables.get("ACME_A"), Some("2"))
+    assert_eq(@config.get_text(settings_config(first), "a"), "1")
+    assert_eq(@config.get_text(settings_config(second), "a"), "2")
+  }
+  let json : Json = { "ACME_A": "4" }
+  guard json is Object(fields) else { fail("expected an object") }
+  let from_builder = builder(first.name, [], env_vars=json,
+    working_dir=@lander_core.AbsolutePath::root())
+  fields["ACME_A"] = "5"
+  let from_step = from_builder |> env_vars(json)
+  fields["ACME_A"] = "6"
+  assert_eq(resolve_settings(from_builder |> build(_ => ())).variables.get("ACME_A"), Some("4"))
+  assert_eq(resolve_settings(from_step |> build(_ => ())).variables.get("ACME_A"), Some("5"))
+}
+
+///|
+test "run snapshot is immutable in deterministic key order and config owns its copy" {
+  let host = settings_host({ "Z": "last", "ACME_A": "1", "A": "first" })
+  let settings = resolve_settings(host)
+  assert_eq(settings.variables.keys_as_iter().to_array(), ["A", "Z", "ACME_A"])
+  let changed = settings.variables.add("ACME_A", "2")
+  assert_eq(settings.variables.get("ACME_A"), Some("1"))
+  assert_eq(changed.get("ACME_A"), Some("2"))
+  let core = configuration_builder(host, settings, @conventions.DiscoveryOptions::new())
+  let copy = core.given_env_vars().unwrap()
+  copy["ACME_A"] = "3"
+  assert_eq(settings.variables.get("ACME_A"), Some("1"))
+  assert_eq(@config.get_text(settings_config(host), "a"), "1")
+}
+
+///|
+test "reserve_env uses full names and keeps them after a later prefix step" {
+  let host = builder(@lander_core.AppName::parse("my-tool"), [], env_vars={
+    "MT_TOKEN": "secret", "MT_OTHER": "visible", "MT_A": "1",
+  }, working_dir=@lander_core.AbsolutePath::root())
+    |> reserve_env(["mt_token", "MY_TOOL_OTHER", "A"])
+    |> env_prefix(@lander_core.EnvPrefix::parse("MT")) |> build(_ => ())
+  let config = settings_config(host)
+  assert_true(config.get(@config.KeyPath::parse("token")) is None)
+  assert_eq(@config.get_text(config, "other"), "visible")
+  assert_eq(@config.get_text(config, "a"), "1")
 }

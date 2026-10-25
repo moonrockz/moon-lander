@@ -5,6 +5,8 @@ pub enum AbsolutePathRule {
   Empty
   /// The path has no absolute root.
   NotAbsolute
+  /// A UNC root needs both a server and a share.
+  MissingUncServerOrShare
 } derive(Eq, Debug)
 
 ///|
@@ -30,12 +32,13 @@ pub fn AbsolutePathError::message(self : AbsolutePathError) -> String {
   let reason = match rule {
     Empty => "the path is empty"
     NotAbsolute => "the path must be absolute"
+    MissingUncServerOrShare => "a UNC root needs a server and a share"
   }
   "Invalid absolute path \{text.escape()}: \{reason}"
 }
 
 ///|
-/// An absolute location, with `/` separators on every target. A Windows drive
+/// An absolute location, with `/` separators for Windows forms. A Windows drive
 /// root and a UNC root are accepted too. This type suits both working
 /// directories and content roots without claiming that the location exists.
 pub struct AbsolutePath {
@@ -52,11 +55,19 @@ pub extend AbsolutePath with @debug.Debug::{to_repr}
 /// Parse at a path boundary, converting Windows separators once.
 pub fn AbsolutePath::parse(text : String) -> AbsolutePath raise AbsolutePathError {
   guard !text.is_empty() else { raise InvalidAbsolutePath(text~, rule=Empty) }
-  let normalized = text.replace_all(old="\\", new="/")
-  let chars = Array::from_iter(normalized.iter())
-  let drive = chars.length() >= 3 && is_ascii_letter(chars[0]) && chars[1] == ':' && chars[2] == '/'
+  let chars = Array::from_iter(text.iter())
+  let drive = chars.length() >= 3 && is_ascii_letter(chars[0]) && chars[1] == ':' && (chars[2] == '/' || chars[2] == '\\')
+  let normalized = if drive || text.has_prefix("\\\\") {
+    text.replace_all(old="\\", new="/")
+  } else { text }
   guard text.has_prefix("/") || text.has_prefix("\\\\") || drive else {
     raise InvalidAbsolutePath(text~, rule=NotAbsolute)
+  }
+  if normalized.has_prefix("//") {
+    let parts = normalized.split("/").to_array()
+    guard parts.length() >= 4 && !parts[2].is_empty() && !parts[3].is_empty() else {
+      raise InvalidAbsolutePath(text~, rule=MissingUncServerOrShare)
+    }
   }
   { text: normalized }
 }
@@ -68,7 +79,8 @@ pub fn AbsolutePath::root() -> AbsolutePath {
 }
 
 ///|
-/// The normalized path, which `parse` reads back to an equal path.
+/// The path with `/` separators for Windows forms; the text is kept as written.
+/// `parse` reads it back to an equal path.
 pub impl Show for AbsolutePath with output(self, logger) {
   logger.write_string(self.text)
 }

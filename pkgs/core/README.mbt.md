@@ -103,14 +103,18 @@ limit.
 
 ## Variable prefix and absolute path
 
-`EnvPrefix` starts with an ASCII letter or `_`, followed by ASCII letters,
+`EnvPrefix` starts with an upper-case ASCII letter or `_`, followed by upper-case ASCII letters,
 digits or `_`. Its parse error gives the input and an `EnvPrefixRule` case.
 Deriving a default prefix from an `AppName` cannot fail.
 
 `AbsolutePath` names a location without claiming that it exists. Both working
 directories and content roots use it. An empty or relative path raises
-`AbsolutePathError` with `Empty` or `NotAbsolute`. Windows drive and UNC roots
-are accepted, and Windows separators become `/` at the parse boundary.
+`AbsolutePathError` with `Empty` or `NotAbsolute`. Windows drive roots are accepted.
+UNC roots need a server and share; an incomplete root raises `MissingUncServerOrShare`.
+Windows separators become `/` only in drive and backslash UNC forms.
+In a path that starts with a single `/`, backslashes stay name characters.
+The text is kept as written, including `.`, `..` and trailing separators;
+equality compares the stored text.
 
 ```mbt check
 ///|

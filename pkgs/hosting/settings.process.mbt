@@ -6,8 +6,14 @@ fn process_variables() -> Map[String, String] {
 
 ///|
 /// The sole boundary for an omitted process working directory.
-fn process_directory() -> @lander_core.AbsolutePath {
-  @lander_core.AbsolutePath::parse(@env.current_dir().unwrap_or("/")) catch {
-    _ => abort("the process working directory is absolute")
+fn process_directory() -> @lander_core.AbsolutePath raise WorkingDirectoryError {
+  process_directory_from(@env.current_dir)
+}
+
+///|
+fn process_directory_from(read : () -> String?) -> @lander_core.AbsolutePath raise WorkingDirectoryError {
+  guard read() is Some(text) else { raise MissingWorkingDirectory }
+  @lander_core.AbsolutePath::parse(text) catch {
+    error => raise InvalidWorkingDirectory(error)
   }
 }

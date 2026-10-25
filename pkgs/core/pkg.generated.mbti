@@ -48,6 +48,7 @@ pub impl Show for AbsolutePath
 pub enum AbsolutePathRule {
   Empty
   NotAbsolute
+  MissingUncServerOrShare
 } derive(Eq, @debug.Debug)
 pub fn AbsolutePathRule::equal(Self, Self) -> Bool
 pub fn AbsolutePathRule::not_equal(Self, Self) -> Bool
@@ -91,6 +92,7 @@ pub impl Show for EnvPrefix
 
 pub enum EnvPrefixRule {
   Empty
+  LowerCaseLetter(Char)
   FirstNotLetterOrUnderscore
   CharNotAllowed(Char)
 } derive(Eq, @debug.Debug)

@@ -4,6 +4,7 @@ package "moonrockz/moon-lander-hosting"
 import {
   "moonbitlang/core/argparse",
   "moonbitlang/core/debug",
+  "moonbitlang/core/immut/sorted_map",
   "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-core",
 }
@@ -54,10 +55,17 @@ pub(all) suberror UsageError {
 }
 pub fn UsageError::message(Self) -> String
 
+pub suberror WorkingDirectoryError {
+  MissingWorkingDirectory
+  InvalidWorkingDirectory(@moon-lander-core.AbsolutePathError)
+} derive(@debug.Debug)
+pub fn WorkingDirectoryError::message(Self) -> String
+pub fn WorkingDirectoryError::to_repr(Self) -> @debug.Repr
+
 // Types and methods
 pub struct BuildContext {
   config : @moon-lander-config.Config
-  env_vars : Map[String, String]
+  env_vars : @sorted_map.SortedMap[String, String]
   working_dir : @moon-lander-core.AbsolutePath
   args : @argparse.Matches
 }
@@ -65,7 +73,7 @@ pub struct BuildContext {
 pub struct Context[S] {
   services : S
   config : @moon-lander-config.Config
-  env_vars : Map[String, String]
+  env_vars : @sorted_map.SortedMap[String, String]
   working_dir : @moon-lander-core.AbsolutePath
   lifetime : Lifetime
   args : @argparse.Matches

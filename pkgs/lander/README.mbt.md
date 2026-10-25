@@ -154,7 +154,7 @@ and describes how the output-size and parser-marker checks verify trimming.
 
 Starting settings can supply the variable set and absolute working directory on
 any target. Later hosting steps replace them before the run. An environment name
-is a default, and group 8 adds its parsed type and bootstrap.
+is a default, raw text for now; a parsed environment-name type replaces it.
 
 ```mbt check
 ///|
@@ -168,3 +168,8 @@ test "explicit starting settings" {
   ignore(host)
 }
 ```
+
+The factory and command contexts expose the run variable snapshot as an immutable
+`@immut/sorted_map.SortedMap[String, String]` in deterministic key order. Builder
+and `env_vars` steps snapshot their inputs when applied. A missing native or js
+process working directory ends the run with code 1 before any file read or hook.

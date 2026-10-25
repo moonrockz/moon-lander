@@ -1,6 +1,7 @@
 ///|
 /// A variable set supplied as a string map or a JSON object. Conversion runs
-/// before argument parsing or configuration I/O and gives an owned snapshot.
+/// at the builder step and gives an owned snapshot. The run raises any stored
+/// conversion error before argument parsing or configuration I/O.
 pub trait IntoEnvVars {
   into_env_vars(Self) -> Map[String, String] raise UsageError
 }
@@ -36,7 +37,7 @@ pub fn[S] env_prefix(builder : HostBuilder[S], prefix : @lander_core.EnvPrefix) 
 /// Replace the variable set for every reader. Conversion errors end the run
 /// with a usage error, before configuration I/O or hooks.
 pub fn[S] env_vars(builder : HostBuilder[S], vars : &IntoEnvVars) -> HostBuilder[S] {
-  { ..builder, variables: Some(vars) }
+  { ..builder, variables: Some(snapshot_variables(vars)) }
 }
 
 ///|
@@ -46,7 +47,9 @@ pub fn[S] working_dir(builder : HostBuilder[S], path : @lander_core.AbsolutePath
 }
 
 ///|
-/// Add variable names that the prefixed source must not turn into keys.
+/// Add full variable names that the source must not turn into keys. Names are
+/// compared after conversion to upper case, as in the variable source.
+/// A later `env_prefix` step does not change these names.
 pub fn[S] reserve_env(builder : HostBuilder[S], names : Array[String]) -> HostBuilder[S] {
   { ..builder, reserved: builder.reserved + names }
 }
@@ -65,7 +68,7 @@ pub fn[S] app_dirs(builder : HostBuilder[S]) -> HostBuilder[S] {
 
 ///|
 priv struct RunSettings {
-  variables : Map[String, String]
+  variables : @sorted_map.SortedMap[String, String]
   directory : @lander_core.AbsolutePath
 }
 
@@ -77,11 +80,12 @@ priv struct RunSettings {
 fn[S] resolve_settings(
   host : Host[S],
   read_variables? : () -> Map[String, String] = process_variables,
-  read_directory? : () -> @lander_core.AbsolutePath = process_directory,
-) -> RunSettings raise UsageError {
+  read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory,
+) -> RunSettings raise {
   let variables = match host.variables {
-    Some(vars) => vars.into_env_vars()
-    None => read_variables()
+    Some(Ok(vars)) => vars
+    Some(Err(error)) => raise error
+    None => @sorted_map.from_iter(read_variables().iter())
   }
   let directory = match host.directory {
     Some(path) => path
@@ -92,12 +96,12 @@ fn[S] resolve_settings(
 
 ///|
 /// Compose the same inputs for the core source and the conventions reader.
-/// Group 9 replaces the complete empty tree in the driver with the real load.
+// Group 9 replaces the complete empty tree in the driver with the real load.
 // The embedded driver arrives in group 13. Remove with that caller.
 #warnings("-1")
 fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> @config.ConfigBuilder {
   let mut builder = @config.builder()
-    |> @config.env_vars(settings.variables)
+    |> @config.env_vars(Map::from_iter(settings.variables.iter()))
     |> @config.working_dir(settings.directory.to_string())
   if host.use_app_dirs {
     let conventions = @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
@@ -110,4 +114,11 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
   let prefix = host.prefix.to_string()
   builder |> @config.env(prefix~, reserved=["\{prefix}_ENVIRONMENT", "\{prefix}_HOME"] + host.reserved,
     selection=if host.skip_variables { Skip } else { Discover })
+}
+
+///|
+// Store failure as data so a non-raising builder step defers the error to run.
+#warnings("-78")
+fn snapshot_variables(vars : &IntoEnvVars) -> Result[@sorted_map.SortedMap[String, String], UsageError] {
+  try { Ok(@sorted_map.from_iter(vars.into_env_vars().iter())) } catch { error => Err(error) }
 }

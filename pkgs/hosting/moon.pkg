@@ -4,6 +4,7 @@ import {
   "moonrockz/moon-lander-config/conventions",
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",
+  "moonbitlang/core/immut/sorted_map",
   "moonbitlang/core/debug",
   "moonbitlang/async",
   "moonbitlang/async/stdio",

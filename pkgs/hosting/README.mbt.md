@@ -139,8 +139,7 @@ test "a long command yields between batches" {
 `shutdown_timeout(limit)` sets one budget for the full stop phase. The budget
 starts when the command task has ended. The default is 30 s, and a later step
 replaces an earlier value. Only native and js apply the limit. The wasm and
-wasm-gc drivers have no timer. The opt-in configuration key comes with task
-group 9 of `add-host-lifecycle`.
+wasm-gc drivers have no timer. The opt-in configuration key is planned.
 
 At the limit, the host cancels the current hook, skips the remaining stop hooks,
 raises the stopped event and reports `ShutdownTimedOut`. A hook that protects
@@ -193,8 +192,8 @@ test "application and signal codes" {
 signal codes 130, 143 and 131. It reports other failures only for code 1 or 2.
 Reports follow failure order. The default report writes one line to standard
 error: `<application name>: <message>`. A run with no failures writes nothing,
-including an application code of 1 or 2. `HostError`, `UsageError`,
-`ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
+including an application code of 1 or 2. `HostError`, `WorkingDirectoryError`,
+`UsageError`, `ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
 their `Show` text.
 
 `error_report` replaces the default report. Its async callback gets each reported
@@ -230,11 +229,15 @@ Each run uses one variable set and one absolute working directory. The builder
 accepts `env_vars`, `working_dir` and `environment` as starting settings. Omitted
 variables and directory come from the process on native and js, or the empty
 set and `/` on wasm and wasm-gc. Explicit values cause no process read.
-`environment` is a default name; group 8 adds its parsed type and bootstrap.
+`environment` is a default name, raw text for now; a parsed environment-name type replaces it.
 
 A later `env_vars` or `working_dir` step replaces that setting. The factory,
 hooks and command read the final values through `env_vars` and `working_dir`
-on their contexts. Treat the variable snapshot as read-only.
+on their contexts. The variable snapshot is an immutable
+`@immut/sorted_map.SortedMap[String, String]` in deterministic key order.
+Each builder step snapshots its input, so later changes to a caller map or
+JSON object do not change the host. A missing process working directory ends
+the run with `WorkingDirectoryError` and code 1 before any file read or hook.
 
 ```mbt check
 ///|
@@ -251,7 +254,8 @@ test "set the variable prefix and starting settings" {
 ```
 
 The prefix defaults to the application name in upper case, with `-` changed to
-`_`. The host adds a variable source at priority 600 and reserves
+`_`. An explicit prefix accepts only upper-case ASCII letters, digits and `_`,
+starting with an upper-case letter or `_`. The host adds a variable source at priority 600 and reserves
 `<PREFIX>_ENVIRONMENT`, `<PREFIX>_HOME` and the names from `reserve_env`.
 `app_dirs()` gives the same name and final prefix to conventions.
 `skip_env_source()` reports the source as skipped and keeps the variable set
@@ -262,3 +266,20 @@ strings stay as written; other values become JSON text, except `null`, which
 omits the variable. Nested objects stay whole and keys keep their spelling.
 A non-object root ends the run with `UsageError` and code 2 before any file
 read or hook.
+
+`reserve_env` takes full variable names. The source compares names after it
+converts each name to upper case. A later `env_prefix` step keeps these names as given; it
+does not join them to the new prefix. For example, reserve `MT_TOKEN` when the
+final prefix is `MT`:
+
+```mbt check
+///|
+test "reserve a full name before changing the prefix" {
+  let host : @hosting.Host[Unit] = @lander_core.AppName::parse("my-tool")
+    |> @hosting.builder([], env_vars={ "MT_TOKEN": "secret" })
+    |> @hosting.reserve_env(["MT_TOKEN"])
+    |> @hosting.env_prefix(@lander_core.EnvPrefix::parse("MT"))
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```

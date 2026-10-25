@@ -1,5 +1,5 @@
 ///|
-fn[S] parse_test_arguments(host : Host[S]) -> ParsedArguments raise UsageError {
+fn[S] parse_test_arguments(host : Host[S]) -> ParsedArguments raise {
   parse_arguments(host, env=resolve_settings(host).variables)
 }
 
@@ -35,6 +35,7 @@ test "an empty command uses the application name and rejects extra arguments" {
   @expect.expect(parse_test_arguments(host).matches.subcommand is None).to_be_true()
   try parse_test_arguments(builder(name, ["extra"]) |> build(_ => ())) catch {
     UsageError(message) => @expect.expect(message.contains("Usage: bare")).to_be_true()
+    error => raise error
   } noraise { _ => fail("expected UsageError") }
 }
 

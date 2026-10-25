@@ -1,6 +1,10 @@
 ///|
 test "absolute paths accept roots and normalize Windows separators" {
   for (text, expected) in [
+    ("/tmp/a\\b", "/tmp/a\\b"), ("/\\x", "/\\x"),
+    ("C:\\w", "C:/w"), ("C:/w\\x", "C:/w/x"),
+    ("\\\\server\\share\\x", "//server/share/x"),
+    ("/w/", "/w/"), ("/a/./b", "/a/./b"), ("//s/h/", "//s/h/"),
     ("/", "/"), ("/w", "/w"), ("/a/../b", "/a/../b"),
     ("C:/", "C:/"), ("z:/work", "z:/work"), ("C:\\work\\repo", "C:/work/repo"),
     ("\\\\server\\share", "//server/share"),
@@ -28,5 +32,21 @@ test "absolute path rules reject empty and relative paths" {
         assert_true(error.message().contains(text.escape()))
       }
     } noraise { _ => fail("expected a path error") }
+  }
+}
+
+///|
+test "UNC roots need a server and share" {
+  for text in ["//", "\\\\", "//server", "//server/", "//server//x", "///share", "\\\\server"] {
+    try { ignore(@lander_core.AbsolutePath::parse(text)) } catch {
+      InvalidAbsolutePath(text=found, rule=MissingUncServerOrShare) as error => {
+        assert_eq(found, text)
+        assert_true(error.message().contains(text.escape()))
+      }
+      error => raise error
+    } noraise { _ => fail("expected a UNC root error") }
+  }
+  for text in ["//s/h", "//server/share", "\\\\s\\h"] {
+    ignore(@lander_core.AbsolutePath::parse(text))
   }
 }

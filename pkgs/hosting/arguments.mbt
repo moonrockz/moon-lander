@@ -10,12 +10,12 @@ priv struct ParsedArguments {
 /// The driver supplies the resolved variable snapshot, shared by all readers.
 // The wasm drivers that call this arrive in group 13.
 #warnings("-1")
-fn[S] parse_arguments(host : Host[S], env~ : Map[String, String]) -> ParsedArguments raise UsageError {
+fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, String]) -> ParsedArguments raise UsageError {
   let command = match host.make_command {
     Some(make) => make(host.name.to_string())
     None => @argparse.Command(host.name.to_string())
   }
-  let matches = command.parse(argv=host.args[:], env~) catch {
+  let matches = command.parse(argv=host.args[:], env=Map::from_iter(env.iter())) catch {
     error => raise UsageError(error.to_string())
   }
   let environment = standard_option(matches, "environment")
@@ -29,8 +29,9 @@ fn[S] parse_arguments(host : Host[S], env~ : Map[String, String]) -> ParsedArgum
 }
 
 ///|
-/// Empty standard values fail at the argument boundary. Environment names
-/// stay raw until group 8. Config and project selectors keep conventions text.
+/// Empty standard values fail at the argument boundary. Environment names stay
+/// raw text for now; a parsed environment-name type replaces it. Config and
+/// project selectors keep conventions text.
 fn standard_option(matches : @argparse.Matches, id : String) -> String? raise UsageError {
   guard matches.values.get(id) is Some([.., value]) else { return None }
   if value.is_empty() { raise UsageError("--\{id} requires a non-empty value") }
@@ -39,7 +40,7 @@ fn standard_option(matches : @argparse.Matches, id : String) -> String? raise Us
 
 ///|
 /// Set the command factory. The run gives it the application name and parses
-/// its command once, before configuration and hooks. Group 14 adds mappings.
+/// its command once, before configuration and hooks.
 pub fn[S] command(builder : HostBuilder[S], make : (String) -> @argparse.Command) -> HostBuilder[S] {
   { ..builder, make_command: Some(make) }
 }

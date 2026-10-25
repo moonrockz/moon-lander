@@ -220,10 +220,10 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
   host starting settings (D13). The application gives them to `@lander.cli` or
   `@hosting.builder`, or with later steps. Each omitted value comes from the process on native and js.
 
-### D3. Run order (Owner: .NET model; Call (R7): argparse runs first)
+### D3. Run order (Owner: .NET model; Call (R7): argparse runs before any file read)
 
 1. The host fixes the variable set and the working directory of the run (D13). It
-   converts a given `IntoEnvVars` value (D14), and fills each omitted value from the
+   uses the conversion result stored at the builder step (D14), and fills each omitted value from the
    process on native and js. A conversion error ends the run with `UsageError` and
    exit code 2, before any file read. The host gives both values to the core builder
    (`@config.env_vars`, `@config.working_dir`).
@@ -666,7 +666,7 @@ pub fn cli(
   name : @lander_core.AppName,
   args : Array[String],
   env_vars? : &@hosting.IntoEnvVars,
-  working_dir? : String,
+  working_dir? : @lander_core.AbsolutePath,
   environment? : String,
 ) -> @hosting.HostBuilder[Unit]
 
@@ -675,12 +675,13 @@ pub fn[S] builder(
   name : @lander_core.AppName,
   args : Array[String],
   env_vars? : &IntoEnvVars,
-  working_dir? : String,
+  working_dir? : @lander_core.AbsolutePath,
   environment? : String,
 ) -> HostBuilder[S]
 
 pub fn[S] env_vars(self : HostBuilder[S], vars : &IntoEnvVars) -> HostBuilder[S]
-pub fn[S] working_dir(self : HostBuilder[S], path : String) -> HostBuilder[S]
+pub fn[S] env_prefix(self : HostBuilder[S], prefix : @lander_core.EnvPrefix) -> HostBuilder[S]
+pub fn[S] working_dir(self : HostBuilder[S], path : @lander_core.AbsolutePath) -> HostBuilder[S]
 ```
 
 - Owner: each run has one starting variable set and one working directory. Nothing
@@ -689,7 +690,7 @@ pub fn[S] working_dir(self : HostBuilder[S], path : String) -> HostBuilder[S]
 - Owner: on native and js, an omitted `env_vars` or `working_dir` comes from the
   process through `moonbitlang/core/env`. Call: on wasm and wasm-gc, an omitted
   `env_vars` is the empty set and an omitted `working_dir` is `/`.
-- Call (this change): the host fills omitted values one time, in run step 2 (D3), and
+- Call (this change): the host fills omitted values one time, in run step 1 (D3), and
   only for values that no step gave. Explicit values therefore give no process read,
   and the same inputs give the same result on every target.
 - Call: an explicit `environment?` is the builder default name, the same as
@@ -707,15 +708,23 @@ pub fn[S] working_dir(self : HostBuilder[S], path : String) -> HostBuilder[S]
   the working directory.
 - Owner: `BuildContext.env_vars`, `BuildContext.working_dir`, `Context[S].env_vars`
   and `Context[S].working_dir` show the values. `env_vars` is an immutable
-  `Map[String, String]`: the host makes it one time and never changes it.
+  `@immut/sorted_map.SortedMap[String, String]` from `moonbitlang/core`: the host
+  makes it one time per run in deterministic key order and never changes it.
+  Config and argparse get map copies at their boundaries.
+- Call: on native and js, a missing process working directory ends the run with
+  read-only `WorkingDirectoryError::MissingWorkingDirectory` and code 1 through
+  the normal error report, before any file read or hook.
 - Call (O3): the working directory uses `/` as the separator on every platform. The
-  host converts a Windows process working directory at the boundary.
+  host converts a Windows process working directory at the boundary. Only drive
+  and backslash UNC forms convert `\` to `/`. POSIX backslashes stay name characters.
+  The path text keeps `.`, `..` and trailing separators; UNC roots need a server
+  and a share.
 
 ### D14. Variable set from a map or JSON (Owner idea; Call on shape, verified with a `moonc v0.10.15` probe)
 
 ```moonbit
 pub trait IntoEnvVars {
-  into_env_vars(Self) -> Map[String, String] raise
+  into_env_vars(Self) -> Map[String, String] raise UsageError
 }
 pub impl IntoEnvVars for Map[String, String]
 pub impl IntoEnvVars for Json
@@ -731,11 +740,15 @@ The parameter type is `&IntoEnvVars`. Probe results:
 
 ```moonbit
 let acme = "acme" |> @lander.AppName::parse
-acme |> @lander.cli(["build"], env_vars={ "HOME": "/home/test" }, working_dir="/w")
+acme |> @lander.cli(["build"], env_vars={ "HOME": "/home/test" }, working_dir=@lander_core.AbsolutePath::parse("/w"))
 acme |> @lander.cli([], env_vars=({ "ACME_PORT": 8080, "ACME_DEBUG": true } : Json))
 acme |> @lander.cli([], env_vars=fixture)   // fixture : Json from @json.parse
 acme |> @lander.cli([], env_vars=Map([]))
 ```
+
+The builder and `env_vars` step snapshot the conversion result when applied,
+including a conversion error. The run raises a stored error in step 1. Later
+changes to the caller map or JSON object cannot change the host.
 
 JSON rules (Call):
 
@@ -905,9 +918,9 @@ not check the rules again.
 | Application name | `AppName::parse(text)`, in `moonrockz/moon-lander-core` since `split-framework-modules` | Starts with an ASCII letter; then only ASCII letters, digits, `-` and `_` | 2 |
 | Service name | `ServiceName::parse(text)` | Safe as one file path component: starts with a Unicode identifier start character (`XID_Start`, letters and letter numbers); then identifier characters (`XID_Continue`: letters, combining marks, digits, `_` and a few connectors), `-` and `.`; no invisible character; does not end with `.`; is not a Windows device name such as `CON` or `com1`; at most 128 bytes in UTF-8. Unique in one host without regard to letter case. | 2 |
 | Exit code | `ExitCode::from_int(code)`, `ExitCode::success()`, `ExitCode::failure()` | 0 to 255 | 2 |
-| Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an ASCII letter or `_`; then only ASCII letters, digits and `_` | 7 |
+| Variable prefix | `EnvPrefix::parse(text)`; `AppName` gives the default prefix and cannot fail | Starts with an upper-case ASCII letter or `_`; then only upper-case ASCII letters, digits and `_` | 7 |
 | Environment name | A parsed type in place of `String` (D3, D9, D13) | The name rules of `configuration-conventions` | 8 |
-| Working directory and content root | A path type with `/` separators (D9, D13) | Not empty; absolute | 7, 8 |
+| Working directory and content root | `AbsolutePath` with `/` separators for Windows forms (D9, D13) | Not empty; absolute; a UNC root has a server and share; keep path text as written | 7, 8 |
 | Shutdown timeout | `TimeLimit` from `moonrockz/moon-lander-core` (Owner, 2026-10-23; `split-framework-modules`) | 1 ms to the largest `Int` in milliseconds | 10 |
 
 - Owner: the caller parses, so `@lander.cli` and `@hosting.builder` take an
@@ -1023,10 +1036,8 @@ not check the rules again.
   one console host runs per process.
 - [A cancelled command can leave partial output] → `defer` and `protect_from_cancel`
   are the tools. The stop hooks see the same state (D1).
-- [An argparse option with an environment source reads the process environment
-  inside argparse, not the variable set of the run] → The standard flags have no
-  environment source. Document that an application option with one breaks the
-  "no process read" rule for explicit runs.
+- [Solved: an argparse option with an environment source could read process
+  variables] → The host supplies a map copy of the run snapshot to argparse.
 - [`@lander.run` calls the hidden `moonbitlang/async` entry `run_async_main`, which
   its source marks "do not call directly"] → Keep the call in the native and js file
   of `@lander.run`. A task verifies it. Fallback: on native and js, `@lander.run` is

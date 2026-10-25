@@ -37,9 +37,9 @@ supply layered configuration. This change connects that configuration to a lifec
   - `Host[S]` and `Context[S]`. The application defines a typed services record `S`.
     The host builds `S` once. Each command, hook and event handler gets the same
     `Context[S]`. There is no dependency-injection container.
-  - A fixed run order. The host parses the arguments first with
-    `moonbitlang/core/argparse`. Then it fixes the variable set and the working
-    directory, finds the environment name, loads the
+  - A fixed run order. The host fixes the variable set and the working
+    directory, then parses the arguments with `moonbitlang/core/argparse`
+    before configuration. It finds the environment name, loads the
     configuration through `@host.load` of `moonrockz/moon-lander-config/host` (native, js) or `@config.load` over an
     injected `FileTree` (wasm, wasm-gc, `|> @hosting.files(tree)`), and builds `S`.
   - The environment-variable source. The host adds it with the prefix (default: the

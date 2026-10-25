@@ -3,9 +3,11 @@
 pub enum EnvPrefixRule {
   /// The prefix is empty.
   Empty
-  /// The first character is not an ASCII letter or underscore.
+  /// A lower-case ASCII letter is not allowed.
+  LowerCaseLetter(Char)
+  /// The first character is not an upper-case ASCII letter or underscore.
   FirstNotLetterOrUnderscore
-  /// The prefix holds a character that is not an ASCII letter, an ASCII digit,
+  /// The prefix holds a character that is not an upper-case ASCII letter, an ASCII digit,
   /// or `_`.
   CharNotAllowed(Char)
 } derive(Eq, Debug)
@@ -33,16 +35,17 @@ pub fn EnvPrefixError::message(self : EnvPrefixError) -> String {
   let InvalidEnvPrefix(text~, rule~) = self
   let reason = match rule {
     Empty => "the prefix is empty"
-    FirstNotLetterOrUnderscore => "the prefix must start with an ASCII letter or underscore"
+    LowerCaseLetter(char) => "the lower-case letter \{char} is not allowed"
+    FirstNotLetterOrUnderscore => "the prefix must start with an upper-case ASCII letter or underscore"
     CharNotAllowed(char) =>
-      "the character \{char.to_string().escape()} is not allowed; use ASCII letters, digits and '_'"
+      "the character \{char.to_string().escape()} is not allowed; use upper-case ASCII letters, digits and '_'"
   }
   "Invalid environment-variable prefix \{text.escape()}: \{reason}"
 }
 
 ///|
-/// A variable prefix starting with an ASCII letter or underscore, followed
-/// by ASCII letters, digits and underscores.
+/// A variable prefix starting with an upper-case ASCII letter or underscore, followed
+/// by upper-case ASCII letters, digits and underscores.
 pub struct EnvPrefix {
   priv text : String
 } derive(Eq, Hash, Debug)
@@ -61,6 +64,11 @@ pub extend EnvPrefix with @debug.Debug::{to_repr}
 pub fn EnvPrefix::parse(text : String) -> EnvPrefix raise EnvPrefixError {
   guard text.iter().head() is Some(first) else {
     raise InvalidEnvPrefix(text~, rule=Empty)
+  }
+  for char in text {
+    if char >= 'a' && char <= 'z' {
+      raise InvalidEnvPrefix(text~, rule=LowerCaseLetter(char))
+    }
   }
   guard is_ascii_letter(first) || first == '_' else {
     raise InvalidEnvPrefix(text~, rule=FirstNotLetterOrUnderscore)

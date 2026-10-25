@@ -25,13 +25,13 @@ host MUST NOT use a dependency-injection container.
 - **WHEN** an overrides source sets `log.format = "json"` and the services factory reads `log.format`
 - **THEN** the factory gets the value `"json"`
 
-### Requirement: Arguments are parsed first
+### Requirement: Arguments are parsed before configuration
 
-The host SHALL parse the arguments one time with `moonbitlang/core/argparse` before
-it reads a configuration file or a variable for configuration. The command MUST get
-the parse result through its context. When argparse cannot parse the arguments, the
-host MUST write the argparse message to standard error and MUST end with exit code 2.
-No configuration file read and no hosted-service hook MUST occur before that exit.
+The host SHALL resolve starting settings, then parse arguments once with
+`moonbitlang/core/argparse` before configuration. Argparse MUST use the run variable
+set. The command MUST get the result through its context. A parse error MUST report
+the argparse message on standard error and end with code 2 before any configuration
+file read or hosted-service hook.
 
 #### Scenario: Unknown option
 
@@ -235,7 +235,7 @@ the prefix to the conventions parts.
 
 #### Scenario: Prefix override
 
-- **WHEN** the application name is `my-tool`, the pipeline contains `@hosting.env_prefix("MT")`, and `MT_LOG__FORMAT=json` exists
+- **WHEN** the application name is `my-tool`, the pipeline contains `@hosting.env_prefix(@lander_core.EnvPrefix::parse("MT"))`, and `MT_LOG__FORMAT=json` exists
 - **THEN** the configuration holds `log.format = "json"`
 
 ### Requirement: Environment-variable source
@@ -275,6 +275,11 @@ process environment or the process working directory.
 - **WHEN** a native or js application omits `env_vars` and `working_dir`, starts in `/work/repo`, and the process holds `ACME_LOG__FORMAT=json`
 - **THEN** the working directory is `/work/repo`, and the configuration holds `log.format = "json"`
 
+#### Scenario: Missing process working directory
+
+- **WHEN** a native or js application omits `working_dir`, and the process has no working directory
+- **THEN** the run reports `WorkingDirectoryError::MissingWorkingDirectory` through the normal report with code 1 before any file read or hook
+
 #### Scenario: Omitted settings on wasm
 
 - **WHEN** a wasm-gc application omits `env_vars` and `working_dir`
@@ -291,9 +296,14 @@ the build MUST win.
 - **WHEN** `@lander.cli` gets `env_vars` with `ACME_A=1`, and a later step `@hosting.env_vars` gives `ACME_B=2`
 - **THEN** the configuration holds `b = 2`, does not hold `a`, and `ctx.env_vars` holds only `ACME_B`
 
+#### Scenario: Caller changes a supplied variable map
+
+- **WHEN** an application gives a map to the builder or `env_vars` step and then changes the map
+- **THEN** the run uses the snapshot taken at that step
+
 #### Scenario: A later working_dir step
 
-- **WHEN** `@lander.cli` gets `working_dir` `/a`, and a later step `@hosting.working_dir("/b")` follows
+- **WHEN** `@lander.cli` gets `working_dir` `/a`, and a later step `@hosting.working_dir(@lander_core.AbsolutePath::parse("/b"))` follows
 - **THEN** walk-up discovery starts at `/b`, and `ctx.working_dir` is `/b`
 
 ### Requirement: One variable set and one working directory per run
@@ -302,7 +312,9 @@ The variable set of the run SHALL feed the environment-variable source, the
 environment-name bootstrap, the conventions directory resolution and the core
 `config/host` adapter. Walk-up discovery MUST start at the working directory of the
 run. `BuildContext` and `Context[S]` MUST give both values as `env_vars` and
-`working_dir`. The host MUST NOT change them after the run starts.
+`working_dir`. The public variable snapshot MUST be an immutable
+`@immut/sorted_map.SortedMap[String, String]` in key order. The host MUST NOT
+change them after the run starts.
 
 #### Scenario: Every reader sees one set
 
@@ -312,7 +324,7 @@ run. `BuildContext` and `Context[S]` MUST give both values as `env_vars` and
 ### Requirement: Variable set from a map or JSON
 
 The `hosting` package SHALL give the trait `IntoEnvVars` with the method
-`into_env_vars(Self) -> Map[String, String] raise`, and implementations for
+`into_env_vars(Self) -> Map[String, String] raise UsageError`, and implementations for
 `Map[String, String]` and `Json`. The `env_vars` arguments MUST take `&IntoEnvVars`.
 
 #### Scenario: Map literal

@@ -13,16 +13,20 @@ fn prefix_rule(text : String) -> @lander_core.EnvPrefixRule? raise {
 
 ///|
 test "prefix boundary rules" {
-  for text in ["a", "z", "A", "Z", "_", "_0", "a9", "MY_TOOL"] {
+  for text in ["A", "Z", "_", "_0", "A0", "Z9", "MY_TOOL"] {
     assert_eq(prefix_rule(text), None)
     assert_eq(@lander_core.EnvPrefix::parse(text).to_string(), text)
   }
+  for char in ['a', 'z'] {
+    assert_true(prefix_rule("\{char}") is Some(LowerCaseLetter(found)) && found == char)
+    assert_true(prefix_rule("A\{char}") is Some(LowerCaseLetter(found)) && found == char)
+  }
   assert_true(prefix_rule("") is Some(Empty))
   for char in ['@', '[', '`', '{', '^', '0', '9', '-', 'é', ' '] {
-    assert_true(prefix_rule("\{char}tool") is Some(FirstNotLetterOrUnderscore))
+    assert_true(prefix_rule("\{char}TOOL") is Some(FirstNotLetterOrUnderscore))
   }
   for char in ['/', ':', '-', '^', '`', '@', '[', '{', ' ', '\\', 'é', '\n'] {
-    assert_true(prefix_rule("a\{char}") is Some(CharNotAllowed(found)) && found == char)
+    assert_true(prefix_rule("A\{char}") is Some(CharNotAllowed(found)) && found == char)
   }
 }
 
@@ -37,7 +41,7 @@ test "default prefix cannot fail" {
 
 ///|
 test "prefix errors describe the input and rule" {
-  for text in ["", "9A", "A-"] {
+  for text in ["", "9A", "A-", "a"] {
     try { ignore(@lander_core.EnvPrefix::parse(text)) } catch {
       error => assert_true(error.message().contains(text.escape()))
     } noraise { _ => fail("expected a prefix error") }

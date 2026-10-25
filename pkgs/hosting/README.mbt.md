@@ -4,8 +4,9 @@ The host of a Moon-Lander application. A host builder holds the application
 name, the arguments, the hosted services and a services factory. `build` gives a
 `Host`, and `run` starts the services, runs the command and stops the services in
 a known order, with a clear exit code. Each run has a lifetime for events,
-stop requests and cancellation checks. Arguments, signals and host configuration
-are later parts of `add-host-lifecycle`.
+stop requests and cancellation checks. The run parses arguments first, before
+configuration and hooks. Signal drivers and host configuration are later parts
+of `add-host-lifecycle`.
 
 Import the root package with an explicit alias, because the module name has `-`
 in it. The application name comes from `moonrockz/moon-lander-core`:
@@ -42,7 +43,8 @@ test "build a host with one service" {
 
 | Package | Targets | Content |
 | --- | --- | --- |
-| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, hosted services, `Host[S]`, `run`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
+| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, `command`, hosted services, `Host[S]`, `run`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
+| [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory and global standard discovery flags |
 | `moonrockz/moon-lander-hosting/console` (`@console`) | `native` | The C signal stub for SIGINT, SIGTERM and SIGQUIT, and the Windows console events |
 
 The [`moonrockz/moon-lander` guide](../lander/README.mbt.md) shows the full

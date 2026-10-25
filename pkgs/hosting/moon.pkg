@@ -1,6 +1,8 @@
 import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/conventions",
+  "moonbitlang/core/argparse",
   "moonbitlang/core/debug",
   "moonbitlang/async",
   "moonbitlang/async/stdio",
@@ -17,6 +19,7 @@ import {
 } for "test"
 
 import {
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
   "moonbitlang/async",
@@ -24,8 +27,8 @@ import {
 
 // Temporary until task group 13: only `run` reads the host and builds the
 // contexts and the outcome, and it exists on native and js. On wasm and wasm-gc
-// nothing reads them until `run_embedded`. Arguments stay unread until groups
-// 6 and 8; the native/js error report reads the application name. Remove the
+// nothing reads them until `run_embedded`; the native/js error report reads
+// the application name. Remove the
 // field overrides when those fields are read. The pinned build system cannot
 // condition imports by target, so the async imports are unused on wasm and
 // wasm-gc (29); remove that part when the imports can be conditional.

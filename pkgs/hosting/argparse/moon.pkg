@@ -1,0 +1,10 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonbitlang/core/argparse" @core_argparse,
+}
+
+
+import {
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
+  "moonrockz/moon-lander-core" @lander_core,
+} for "test"

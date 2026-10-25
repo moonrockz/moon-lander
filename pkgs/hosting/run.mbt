@@ -32,14 +32,16 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError) -> RunOutcome {
   let settings = resolve_settings(host, read_directory~) catch { err => return outcome(err) }
   let parsed = parse_arguments(host, env=settings.variables) catch { err => return outcome(err) }
-  let config = @config.load(configuration_builder(host, settings, parsed.discovery_options), @config.FileTree::new(complete=true)) catch {
+  let environment = resolve_environment(host, settings, parsed.discovery_options) catch { err => return outcome(err) }
+  let options = environment_options(host, parsed.discovery_options, environment)
+  let config = @config.load(configuration_builder(host, settings, options), @config.FileTree::new(complete=true)) catch {
     err => return outcome(err)
   }
   let config = match config {
     Done(config) => config
     Need(_) => abort("a complete file tree gives no file request")
   }
-  let services = (host.factory)({ config, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }) catch {
+  let services = (host.factory)({ config, environment, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }) catch {
     StopRequested => return {
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,
@@ -49,7 +51,7 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
   let lifetime = Lifetime::new()
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let ctx : Context[S] = { services, config, lifetime, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }
+  let ctx : Context[S] = { services, config, environment, lifetime, args: parsed.matches, env_vars: settings.variables, working_dir: settings.directory }
   let mut step = Engine::start(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }

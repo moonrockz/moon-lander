@@ -6,6 +6,7 @@ import {
   "moonbitlang/core/debug",
   "moonbitlang/core/immut/sorted_map",
   "moonrockz/moon-lander-config",
+  "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-core",
 }
 
@@ -14,9 +15,13 @@ pub fn[S] app_dirs(HostBuilder[S]) -> HostBuilder[S]
 
 pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
-pub fn[S] builder(@moon-lander-core.AppName, Array[String], env_vars? : &IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : String) -> HostBuilder[S]
+pub fn[S] builder(@moon-lander-core.AppName, Array[String], env_vars? : &IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : @conventions.EnvironmentName) -> HostBuilder[S]
 
 pub fn[S] command(HostBuilder[S], (String) -> @argparse.Command) -> HostBuilder[S]
+
+pub fn[S] content_root(HostBuilder[S], @moon-lander-core.AbsolutePath) -> HostBuilder[S]
+
+pub fn[S] default_environment(HostBuilder[S], @conventions.EnvironmentName) -> HostBuilder[S]
 
 pub fn[S] env_prefix(HostBuilder[S], @moon-lander-core.EnvPrefix) -> HostBuilder[S]
 
@@ -65,6 +70,7 @@ pub fn WorkingDirectoryError::to_repr(Self) -> @debug.Repr
 // Types and methods
 pub struct BuildContext {
   config : @moon-lander-config.Config
+  environment : HostEnvironment
   env_vars : @sorted_map.SortedMap[String, String]
   working_dir : @moon-lander-core.AbsolutePath
   args : @argparse.Matches
@@ -73,6 +79,7 @@ pub struct BuildContext {
 pub struct Context[S] {
   services : S
   config : @moon-lander-config.Config
+  environment : HostEnvironment
   env_vars : @sorted_map.SortedMap[String, String]
   working_dir : @moon-lander-core.AbsolutePath
   lifetime : Lifetime
@@ -99,6 +106,16 @@ pub struct Host[S] {
 pub struct HostBuilder[S] {
   // private fields
 }
+
+pub struct HostEnvironment {
+  application_name : @moon-lander-core.AppName
+  environment_name : @conventions.EnvironmentName?
+  content_root : @moon-lander-core.AbsolutePath
+}
+pub fn HostEnvironment::is_development(Self) -> Bool
+pub fn HostEnvironment::is_environment(Self, @conventions.EnvironmentName) -> Bool
+pub fn HostEnvironment::is_production(Self) -> Bool
+pub fn HostEnvironment::is_staging(Self) -> Bool
 
 pub struct Lifetime {
   // private fields

@@ -2,12 +2,13 @@
 package "moonrockz/moon-lander"
 
 import {
+  "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-core",
   "moonrockz/moon-lander-hosting",
 }
 
 // Values
-pub fn cli(@moon-lander-core.AppName, Array[String], env_vars? : &@moon-lander-hosting.IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : String) -> @moon-lander-hosting.HostBuilder[Unit]
+pub fn cli(@moon-lander-core.AppName, Array[String], env_vars? : &@moon-lander-hosting.IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : @conventions.EnvironmentName) -> @moon-lander-hosting.HostBuilder[Unit]
 
 pub fn version() -> String
 
@@ -21,5 +22,7 @@ pub using @moon-lander-core {type AppName}
 pub using @moon-lander-core {type AppNameError}
 
 pub using @moon-lander-core {type AppNameRule}
+
+pub using @conventions {type EnvironmentName}
 
 // Traits

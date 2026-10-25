@@ -29,9 +29,9 @@ fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, Strin
 }
 
 ///|
-/// Empty standard values fail at the argument boundary. Environment names stay
-/// raw text for now; a parsed environment-name type replaces it. Config and
-/// project selectors keep conventions text.
+/// Empty standard values fail at the argument boundary. The host resolves and
+/// parses the environment name next. Config and project selectors keep
+/// conventions text.
 fn standard_option(matches : @argparse.Matches, id : String) -> String? raise UsageError {
   guard matches.values.get(id) is Some([.., value]) else { return None }
   if value.is_empty() { raise UsageError("--\{id} requires a non-empty value") }

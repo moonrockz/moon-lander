@@ -106,10 +106,17 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
   if host.use_app_dirs {
     let conventions = @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
     let conventions = match host.environment {
-      Some(name) => conventions |> @conventions.environments(default=name)
+      Some(name) => conventions |> @conventions.environments(default=name.to_string())
       None => conventions
     }
     builder = builder |> @conventions.add(conventions, options~)
+  } else if host.environment is Some(_) {
+    builder = builder |> @config.provider({
+      name: host.name.to_string(),
+      expand: _ => Done({ sources: [], warnings: [
+        Note(source=host.name.to_string(), message="environment files need a primary part such as app_dirs()"),
+      ] }),
+    })
   }
   let prefix = host.prefix.to_string()
   builder |> @config.env(prefix~, reserved=["\{prefix}_ENVIRONMENT", "\{prefix}_HOME"] + host.reserved,

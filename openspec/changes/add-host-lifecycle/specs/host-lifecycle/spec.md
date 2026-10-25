@@ -94,7 +94,8 @@ The host SHALL give a host environment that holds the application name, an optio
 environment name, and the content root. The application name MUST be the name given
 to `@lander.cli` or `@hosting.builder`. The content root MUST be the value the builder sets.
 Without that value, it MUST be the working directory of the run. The content root MUST
-use `/` as the separator on every platform.
+use `/` as the separator on every platform. Environment files need a primary part
+such as `app_dirs()`.
 
 #### Scenario: No environment name
 
@@ -103,8 +104,8 @@ use `/` as the separator on every platform.
 
 #### Scenario: Builder default
 
-- **WHEN** the builder pipeline contains `@hosting.default_environment("Production")` and no flag or variable sets a name
-- **THEN** the environment name is `Some("Production")`, and environment files are enabled
+- **WHEN** the builder pipeline contains `@hosting.default_environment(@conventions.EnvironmentName::parse("Production"))` and no flag or variable sets a name
+- **THEN** the environment name is `Some("Production")`, and the environments part is enabled
 
 #### Scenario: Content root on native
 
@@ -131,7 +132,7 @@ before any hosted-service hook.
 
 #### Scenario: Starting environment is the default
 
-- **WHEN** the application calls `"acme" |> AppName::parse |> @lander.cli(args, environment="Production")`, and the variable set holds `ACME_ENVIRONMENT=Staging`
+- **WHEN** the application calls `"acme" |> AppName::parse |> @lander.cli(args, environment=@lander.EnvironmentName::parse("Production"))`, and the variable set holds `ACME_ENVIRONMENT=Staging`
 - **THEN** the environment name is `Some("Staging")`, and without that variable it is `Some("Production")`
 
 #### Scenario: Invalid name

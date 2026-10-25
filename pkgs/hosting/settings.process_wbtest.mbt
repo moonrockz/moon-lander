@@ -4,6 +4,8 @@ test "omitted native and js settings come from core env" {
   let settings = resolve_settings(host)
   assert_eq(Map::from_iter(settings.variables.iter()), @env.get_env_vars())
   assert_eq(settings.directory, @lander_core.AbsolutePath::parse(@env.current_dir().unwrap()))
+  let parsed = parse_arguments(host, env=settings.variables)
+  assert_eq(resolve_environment(host, settings, parsed.discovery_options).content_root, settings.directory)
 }
 
 ///|

@@ -91,11 +91,11 @@ Bead: lander-4us.5.7
 
 Bead: lander-4us.5.8
 
-- [ ] 8.1 Add `HostEnvironment` with `is_environment`, `is_development`, `is_staging`, `is_production`; verify tests with `None` and with mixed-case names
-- [ ] 8.2 Resolve the name from `--environment`, `<PREFIX>_ENVIRONMENT` and `default_environment`, and check it with the conventions name rules; verify the resolution-order tests and that an invalid name gives code 2 with no hook run
-- [ ] 8.3 Make `@hosting.default_environment` also enable environment files; verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`
-- [ ] 8.4 Set the content root (builder value, else the working directory of the run) with `/` separators; verify one test per target group and one Windows test
-- [ ] 8.5 Use a parsed environment-name type in `HostEnvironment`, `default_environment` and the starting setting `environment?` in place of `String` (design D17); verify that a name that breaks the conventions name rules cannot make a value
+- [x] 8.1 Add `HostEnvironment` with `is_environment`, `is_development`, `is_staging`, `is_production`; verify tests with `None` and with mixed-case names
+- [x] 8.2 Resolve the name from `--environment`, `<PREFIX>_ENVIRONMENT` and `default_environment`, and check it with the conventions name rules; verify the resolution-order tests and that an invalid name gives code 2 with no hook run
+- [x] 8.3 Make `@hosting.default_environment` also enable environment files; verify that the default enables environment files and the resolved name reaches the conventions input in a composition test
+- [x] 8.4 Set the content root (builder value, else the working directory of the run) with `/` separators; verify one test per target group and one Windows test
+- [x] 8.5 Use a parsed environment-name type in `HostEnvironment`, `default_environment` and the starting setting `environment?` in place of `String` (design D17); verify that a name that breaks the conventions name rules cannot make a value
 
 ## 9. Configuration load and services factory
 
@@ -107,6 +107,7 @@ Bead: lander-4us.5.9
 - [ ] 9.4 Add `BuildContext` and `Context[S]` with `config`, `env_vars` and `working_dir`; verify that the factory runs one time and that hooks and the command get the same `S`, `env_vars` and `working_dir`
 - [ ] 9.5 Add `@hosting.shutdown_timeout_key(key : @config.KeyPath)` (design D6), read one time after the configuration load and before the factory through `FromConfig` for `TimeLimit`; verify the scenarios of "Shutdown timeout from a named key" on native and js
 - [ ] 9.6 Verify an acceptance test in `tests/` where `--project` selects a member by path before name, and an ambiguous name gives code 2, through the configuration load
+- [ ] 9.7 Verify an acceptance test in `tests/` where `acme.Staging.toml` loads with `--environment Staging`, through the configuration load
 
 ## 10. Shutdown timeout
 

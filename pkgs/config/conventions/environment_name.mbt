@@ -14,9 +14,10 @@ pub extend EnvironmentName with @debug.Debug::{to_repr}
 
 ///|
 /// Parse an environment name. A broken rule raises `InvalidEnvironmentName`
-/// with the input and the reason.
-pub fn EnvironmentName::parse(text : String) -> EnvironmentName raise @config.ConfigError {
-  check_environment_name(text, source="EnvironmentName::parse")
+/// with the input and the reason. `source` names the input boundary and defaults
+/// to `the builder default` for names parsed by the caller.
+pub fn EnvironmentName::parse(text : String, source? : String = "the builder default") -> EnvironmentName raise @config.ConfigError {
+  check_environment_name(text, source~)
   { text, }
 }
 

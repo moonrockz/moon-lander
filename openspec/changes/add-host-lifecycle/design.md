@@ -538,7 +538,7 @@ number, so no `ExitCode` value is out of range.
 
 ### D9. Host environment (Owner: .NET style; Call: `Option` name, opt-in)
 
-The D17 types replace the `String` fields in this sketch.
+The D17 types replace the `String` fields and the `is_environment` parameter in this sketch.
 
 ```moonbit
 pub struct HostEnvironment {
@@ -553,8 +553,9 @@ pub fn HostEnvironment::is_production(self : HostEnvironment) -> Bool
 ```
 
 - Call: no default name.
-- Call (R8): `|> @hosting.default_environment("Production")` sets the default and
-  also enables environment files. `|> @conventions.environments()` enables the files
+- Call (R8): `|> @hosting.default_environment(@conventions.EnvironmentName::parse("Production"))` sets the default and
+  also enables the environments part. Environment files need a primary part such
+  as `app_dirs()`. `|> @conventions.environments()` enables the files
   without a default.
 - Owner (2026-10-20): under `@lander`, environment-file discovery is on with no
   default name, so files load only when the run has a name. `|> @lander.no_environments()`
@@ -661,6 +662,8 @@ The root package defines `command` because it needs the private builder fields; 
   `$<PREFIX>_HOME` and the variable source use one prefix.
 
 ### D13. Host starting settings (Owner (2026-10-20): like .NET `HostApplicationBuilderSettings`)
+
+The starting setting `environment?` takes an `EnvironmentName` (D17).
 
 ```moonbit
 // @lander: the batteries-included entry (D15)
@@ -819,7 +822,8 @@ fn main raise {
   re-exports are `service`, `configure`, `env_prefix`, `reserve_env`,
   `skip_env_source`, `env_vars`, `working_dir`, `default_environment`, `files`,
   `error_report` and `shutdown_timeout` from `@hosting`, the types `AppName`,
-  `AppNameError` and `AppNameRule` from `moonrockz/moon-lander-core`, the types
+  `AppNameError` and `AppNameRule` from `moonrockz/moon-lander-core`,
+  `EnvironmentName` from `moonrockz/moon-lander-config/conventions`, the types
   `ServiceName`, `IntoServiceName`, `ExitCode` and `HostError` from `@hosting` (D17), and `command` and
   `map` from `hosting/argparse`. A step with batteries behavior is a thin wrapper: `cli`,
   `formats`, `conventions`, `no_standard_flags`, `no_environments`, `build` and `run`.

@@ -500,14 +500,17 @@ async test "invalid environment names stop before factory hooks and command" {
     ([], { "ACME_ENVIRONMENT": "local" }),
   ] {
     let log = []
+    let mut reports = 0
     let result = environment_builder(args~, vars~)
-      |> error_report((_, _) => ())
+      |> error_report((_, _) => reports = reports + 1)
       |> service("observer", starting=_ => log.push("starting"), start=_ => log.push("start"),
         started=_ => log.push("started"), stopping=_ => log.push("stopping"), stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
       |> build(_ => { log.push("factory"); () })
       |> run(_ => log.push("command"))
     assert_eq(result.exit_code().to_int(), 2)
     assert_eq(log, [])
+    assert_eq(reports, 1)
+    assert_eq(result.failures().length(), 1)
     assert_true(result.failures()[0] is @config.InvalidEnvironmentName(..))
   }
 }

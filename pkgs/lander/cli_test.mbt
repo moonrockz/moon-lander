@@ -8,7 +8,7 @@ async test "the acme host runs the command between start and stop" {
 
 ///|
 async test "cli starting environment is a typed default below the run variable" {
-  let production = @conventions.EnvironmentName::parse("Production")
+  let production = @lander.EnvironmentName::parse("Production")
   for (vars, expected) in [({ "ACME_ENVIRONMENT": "Staging" }, "Staging"), ({}, "Production")] {
     let names = []
     let result = @lander.cli(@lander.AppName::parse("acme"), [], env_vars=vars,

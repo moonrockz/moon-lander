@@ -59,3 +59,16 @@ test "environment names preserve text and equality is exact" {
   assert_eq(name, @conventions.EnvironmentName::parse(name.to_string()))
   assert_true(name != @conventions.EnvironmentName::parse("staging"))
 }
+
+///|
+test "parse errors name the input source including a builder default" {
+  for source in [Some("--environment"), Some("ACME_ENVIRONMENT"), None] {
+    try { ignore(@conventions.EnvironmentName::parse("local", source?)) } catch {
+      @config.InvalidEnvironmentName(name~, reason~) => {
+        assert_eq(name, "local")
+        assert_eq(reason, "the name is reserved (from \{source.unwrap_or("the builder default")})")
+      }
+      error => raise error
+    } noraise { _ => fail("expected InvalidEnvironmentName") }
+  }
+}

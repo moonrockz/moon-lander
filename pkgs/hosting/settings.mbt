@@ -103,17 +103,20 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
   let mut builder = @config.builder()
     |> @config.env_vars(Map::from_iter(settings.variables.iter()))
     |> @config.working_dir(settings.directory.to_string())
-  if host.use_app_dirs || host.environment is Some(_) {
-    let conventions = if host.use_app_dirs {
-      @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
-    } else {
-      @conventions.base(host.name.to_string(), prefix=host.prefix.to_string())
-    }
+  if host.use_app_dirs {
+    let conventions = @conventions.app_dirs(host.name.to_string(), prefix=host.prefix.to_string())
     let conventions = match host.environment {
       Some(name) => conventions |> @conventions.environments(default=name.to_string())
       None => conventions
     }
     builder = builder |> @conventions.add(conventions, options~)
+  } else if host.environment is Some(_) {
+    builder = builder |> @config.provider({
+      name: host.name.to_string(),
+      expand: _ => Done({ sources: [], warnings: [
+        Note(source=host.name.to_string(), message="environment files need a primary part such as app_dirs()"),
+      ] }),
+    })
   }
   let prefix = host.prefix.to_string()
   builder |> @config.env(prefix~, reserved=["\{prefix}_ENVIRONMENT", "\{prefix}_HOME"] + host.reserved,

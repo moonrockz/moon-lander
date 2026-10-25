@@ -154,9 +154,10 @@ and describes how the output-size and parser-marker checks verify trimming.
 
 Starting settings can supply the variable set and absolute working directory on
 any target. Later hosting steps replace them before the run. An environment name
-is a parsed `@conventions.EnvironmentName` default. Parse it with
-`@conventions.EnvironmentName::parse`. A flag or the run's prefixed environment
-variable takes precedence. The factory and command read the resolved name
+is a parsed `@lander.EnvironmentName` default. Parse it with
+`@lander.EnvironmentName::parse`. A flag or the run's prefixed environment
+variable takes precedence. The default enables the environments part. Files need
+a primary part such as `@hosting.app_dirs()`. The factory and command read the resolved name
 through `environment.environment_name` on their contexts.
 
 ```mbt check
@@ -164,7 +165,7 @@ through `environment.environment_name` on their contexts.
 test "explicit starting settings" {
   let host = @lander_core.AppName::parse("acme")
     |> @lander.cli([], env_vars={ "ACME_PORT": "8080" },
-      working_dir=@lander_core.AbsolutePath::parse("/work"), environment=@conventions.EnvironmentName::parse("Staging"))
+      working_dir=@lander_core.AbsolutePath::parse("/work"), environment=@lander.EnvironmentName::parse("Staging"))
     |> @hosting.env_vars(({ "ACME_PORT": 9090, "ACME_DEBUG": true } : Json))
     |> @hosting.working_dir(@lander_core.AbsolutePath::parse("/other"))
     |> @hosting.build(_ => ())

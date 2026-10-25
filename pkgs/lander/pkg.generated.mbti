@@ -23,4 +23,6 @@ pub using @moon-lander-core {type AppNameError}
 
 pub using @moon-lander-core {type AppNameRule}
 
+pub using @conventions {type EnvironmentName}
+
 // Traits

@@ -44,7 +44,8 @@ fn HostEnvironment::has_name(self : HostEnvironment, name : String) -> Bool {
 }
 
 ///|
-/// Set the default environment and enable environment files. The flag and the
+/// Set the default environment and enable the environments part. Environment
+/// files need a primary part such as `app_dirs()`. The flag and the
 /// run's prefixed variable still take precedence. A later step replaces the
 /// default. Parse the name with `@conventions.EnvironmentName::parse`.
 pub fn[S] default_environment(builder : HostBuilder[S], name : @conventions.EnvironmentName) -> HostBuilder[S] {
@@ -67,12 +68,12 @@ pub fn[S] content_root(builder : HostBuilder[S], path : @lander_core.AbsolutePat
 fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> HostEnvironment raise @config.ConfigError {
   let variable = "\{host.prefix}_ENVIRONMENT"
   let raw = match (options.environment, settings.variables.get(variable)) {
-    (Some(name), _) => Some(name)
-    (None, Some(name)) if !name.is_empty() => Some(name)
+    (Some(name), _) => Some((name, "--environment"))
+    (None, Some(name)) if !name.is_empty() => Some((name, variable))
     _ => None
   }
   let environment_name = match raw {
-    Some(text) => Some(@conventions.EnvironmentName::parse(text))
+    Some((text, source)) => Some(@conventions.EnvironmentName::parse(text, source~))
     None => host.environment
   }
   { application_name: host.name, environment_name,
@@ -83,6 +84,10 @@ fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @con
 /// Convert the resolved name to text only at the conventions input boundary.
 // The embedded driver arrives in group 13. Remove with that caller.
 #warnings("-1")
-fn environment_options(options : @conventions.DiscoveryOptions, environment : HostEnvironment) -> @conventions.DiscoveryOptions {
-  { ..options, environment: environment.environment_name.map(name => name.to_string()) }
+fn[S] environment_options(host : Host[S], options : @conventions.DiscoveryOptions, environment : HostEnvironment) -> @conventions.DiscoveryOptions {
+  if host.environment is Some(_) {
+    { ..options, environment: environment.environment_name.map(name => name.to_string()) }
+  } else {
+    options
+  }
 }

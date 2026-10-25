@@ -229,8 +229,11 @@ Each run uses one variable set and one absolute working directory. The builder
 accepts `env_vars`, `working_dir` and `environment` as starting settings. Omitted
 variables and directory come from the process on native and js, or the empty
 set and `/` on wasm and wasm-gc. Explicit values cause no process read.
-`environment` is a parsed `@conventions.EnvironmentName` default and enables
-environment files, as does `default_environment(name)`. Parse the name at the
+`environment` is a parsed `@conventions.EnvironmentName` default and enables the
+environments part, as does `default_environment(name)`. Environment files need a
+primary part such as `app_dirs()`. Without it, the host gives a note and adds no
+file sources. A bare builder with no environment default adds no discovery
+reports and gives no discovery behavior to `--config` or `--project`. Parse the name at the
 caller with `@conventions.EnvironmentName::parse`. The host takes the name from
 `--environment`, then `<PREFIX>_ENVIRONMENT` in the run snapshot, then the default.
 An invalid name ends the run with code 2 before the factory or any hook.

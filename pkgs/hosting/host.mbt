@@ -115,7 +115,8 @@ pub struct HostBuilder[S] {
 /// arguments. The builder adds the prefixed variable source, but no services.
 /// Omitted variables and directory come from the process on native and js,
 /// and from the empty set and `/` on wasm and wasm-gc, once per run.
-/// `environment` sets a default name and enables environment files. Parse it
+/// `environment` sets a default name and enables the environments part.
+/// Environment files need a primary part such as `app_dirs()`. Parse the name
 /// with `@conventions.EnvironmentName::parse` at the caller boundary.
 pub fn[S] builder(
   name : @lander_core.AppName,

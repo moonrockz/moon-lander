@@ -53,7 +53,7 @@ test "flag then run variable then starting default resolve before discovery" {
     let parsed = parse_arguments(host, env=settings.variables)
     let environment = resolve_environment(host, settings, parsed.discovery_options)
     assert_eq(environment.environment_name.map(name => name.to_string()), Some(expected))
-    assert_eq(environment_options(parsed.discovery_options, environment).environment, Some(expected))
+    assert_eq(environment_options(host, parsed.discovery_options, environment).environment, Some(expected))
   }
 }
 
@@ -115,4 +115,51 @@ test "content root defaults to working directory and later typed steps replace i
   assert_eq(environment_of(third |> build(_ => ())).content_root.to_string(), "C:/work/repo")
   let windows = first |> working_dir(@lander_core.AbsolutePath::parse("C:\\work\\repo"))
   assert_eq(environment_of(windows |> build(_ => ())).content_root.to_string(), "C:/work/repo")
+}
+
+///|
+test "bare builders add no file reports or config and project behavior" {
+  let production = @conventions.EnvironmentName::parse("Production")
+  let bare = environment_builder()
+  let starting = builder(@lander_core.AppName::parse("acme"), [], env_vars=({} : Map[String, String]),
+    working_dir=@lander_core.AbsolutePath::parse("/work/repo"), environment=production)
+  for (builder, enabled) in [(bare, false), (bare |> default_environment(production), true), (starting, true)] {
+    let host = builder |> build(_ => ())
+    let settings = resolve_settings(host)
+    for options in [@conventions.DiscoveryOptions::new(), @conventions.DiscoveryOptions::new(config=Explicit("/missing.toml"), project="missing")] {
+      let builder = configuration_builder(host, settings, options) |> @config.format(@toml.format())
+      guard @config.load(builder, @config.FileTree::new(complete=true)) is Done(config) else { fail("unexpected file request") }
+      assert_eq(config.reports().length(), 1)
+      assert_true(config.reports()[0].kind is Environment)
+      assert_eq(config.warnings(), if enabled {
+        [@config.Note(source="acme", message="environment files need a primary part such as app_dirs()")]
+      } else { [] })
+    }
+  }
+}
+
+///|
+test "a variable name with environment files off gives no option warning" {
+  let host = environment_builder(vars={ "ACME_ENVIRONMENT": "Staging" }) |> app_dirs() |> build(_ => ())
+  assert_true(environment_of(host).is_staging())
+  assert_eq(settings_config(host).warnings(), [])
+  let flag = environment_builder(args=["--environment", "Staging"]) |> app_dirs() |> build(_ => ())
+  assert_eq(settings_config(flag).warnings(), [@config.Note(source="acme", message="environments are off, so discovery ignores the environment option")])
+}
+
+///|
+test "invalid environment reasons identify the flag and the final variable name" {
+  for (args, vars, source) in [
+    (["--environment", "local"], {}, "--environment"),
+    ([], { "TOOL_ENVIRONMENT": "local" }, "TOOL_ENVIRONMENT"),
+  ] {
+    let host = environment_builder(args~, vars~) |> env_prefix(@lander_core.EnvPrefix::parse("TOOL")) |> build(_ => ())
+    try { ignore(environment_of(host)) } catch {
+      @config.InvalidEnvironmentName(name~, reason~) => {
+        assert_eq(name, "local")
+        assert_eq(reason, "the name is reserved (from \{source})")
+      }
+      error => raise error
+    } noraise { _ => fail("expected InvalidEnvironmentName") }
+  }
 }

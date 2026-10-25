@@ -33,7 +33,7 @@ async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @
   let settings = resolve_settings(host, read_directory~) catch { err => return outcome(err) }
   let parsed = parse_arguments(host, env=settings.variables) catch { err => return outcome(err) }
   let environment = resolve_environment(host, settings, parsed.discovery_options) catch { err => return outcome(err) }
-  let options = environment_options(parsed.discovery_options, environment)
+  let options = environment_options(host, parsed.discovery_options, environment)
   let config = @config.load(configuration_builder(host, settings, options), @config.FileTree::new(complete=true)) catch {
     err => return outcome(err)
   }

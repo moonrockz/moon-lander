@@ -70,7 +70,7 @@ pub struct EnvironmentName {
 pub fn EnvironmentName::equal(Self, Self) -> Bool
 pub fn EnvironmentName::not_equal(Self, Self) -> Bool
 pub fn EnvironmentName::output(Self, &Logger) -> Unit
-pub fn EnvironmentName::parse(String) -> Self raise @moon-lander-config.ConfigError
+pub fn EnvironmentName::parse(String, source? : String) -> Self raise @moon-lander-config.ConfigError
 pub fn EnvironmentName::to_repr(Self) -> @debug.Repr
 pub fn EnvironmentName::to_string(Self) -> String
 pub impl Show for EnvironmentName

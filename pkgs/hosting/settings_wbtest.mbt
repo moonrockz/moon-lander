@@ -9,7 +9,7 @@ fn settings_config(host : Host[Unit], tree? : @config.FileTree = @config.FileTre
   let settings = resolve_settings(host)
   let parsed = parse_arguments(host, env=settings.variables)
   let environment = resolve_environment(host, settings, parsed.discovery_options)
-  let builder = configuration_builder(host, settings, environment_options(parsed.discovery_options, environment))
+  let builder = configuration_builder(host, settings, environment_options(host, parsed.discovery_options, environment))
     |> @config.platform(Linux) |> @config.format(@toml.format())
   guard @config.load(builder, tree) is Done(config) else { fail("expected a complete configuration") }
   config

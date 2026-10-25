@@ -19,10 +19,12 @@ fn[S] configured_host(argv : Array[String], directory? : String = "workspace") -
 
 ///|
 async test "project selector chooses a path before a conflicting project name through disk load" {
+  // Do not search for an enclosing workspace outside this disk fixture.
+  let root = fixture("workspace").to_string()
   for (selector, selected) in [("packages/a", "a"), ("packages/a/", "a"), ("packages/c", "c")] {
     let calls = Ref(0)
     let result = configured_host(["--project", selector])
-      |> @hosting.conventions(c => c |> @conventions.workspace())
+      |> @hosting.conventions(c => c |> @conventions.workspace() |> @conventions.boundary(root))
       |> @hosting.build(b => { calls.val += 1; @config.get_text(b.config, "selected") })
       |> @hosting.run(ctx => assert_eq(ctx.services, selected))
     assert_eq(result.exit_code().to_int(), 0,
@@ -33,9 +35,10 @@ async test "project selector chooses a path before a conflicting project name th
 
 ///|
 async test "ambiguous project name gives config code 2 before factory and hooks" {
+  let root = fixture("workspace").to_string()
   let calls = Ref(0)
   let result = configured_host(["--project", "duplicate"])
-    |> @hosting.conventions(c => c |> @conventions.workspace())
+    |> @hosting.conventions(c => c |> @conventions.workspace() |> @conventions.boundary(root))
     |> @hosting.service("must-not-start", start=_ => calls.val += 1)
     |> @hosting.build(_ => calls.val += 1)
     |> @hosting.run(_ => calls.val += 1)

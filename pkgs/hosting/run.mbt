@@ -3,15 +3,19 @@
 /// record. Start hooks run in registration order, stop hooks in reverse order.
 /// Stop requests cancel the command task and its defers finish before shutdown.
 /// Shutdown runs protected from outside cancellation.
+/// For code 1 or 2, it reports each failure through `error_report`, or writes
+/// `<name>: <message>` to standard error. Report errors do not change the outcome.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
   let result = execute(host, command)
   @async.protect_from_cancel(() => {
     if result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
       for error in result.failures {
-        match host.report {
-          Some(report) => report(error, result.exit_code)
-          None => write_report_line(report_text(host.name, error))
-        }
+        try {
+          match host.report {
+            Some(report) => report(error, result.exit_code)
+            None => write_report_line(report_text(host.name, error))
+          }
+        } catch { _ => () }
       }
     }
   })
@@ -28,6 +32,10 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
     Need(_) => abort("a complete file tree gives no file request")
   }
   let services = (host.factory)({ config, }) catch {
+    StopRequested => return {
+      exit_code: ExitCode::success(), timed_out: false, failures: [],
+      reason: Requested, requested_code: None, signal: None,
+    }
     err => return outcome(err)
   }
   let lifetime = Lifetime::new()

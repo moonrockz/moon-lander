@@ -181,11 +181,15 @@ pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
 ///|
 /// A replacement failure report. It may write asynchronously, and receives the
 /// final exit code with each failure, in occurrence order.
+/// If a report raises, the driver ignores its error and reports the next failure.
+/// A report error cannot change the outcome or make `run` raise.
 pub type ErrorReport = async (Error, ExitCode) -> Unit
 
 ///|
 /// Replace the default standard-error report. At the end of a run with code 1
 /// or 2, the driver calls this once per failure. Other codes call no report.
+/// If a report raises, the driver ignores its error and reports the next failure.
+/// A report error cannot change the outcome or make `run` raise.
 pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {
   { ..builder, report: Some(report) }
 }

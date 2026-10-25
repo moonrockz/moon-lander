@@ -35,7 +35,6 @@ warnings = "-7-9-29"
 // have. Its tests are async tests, which wasm-gc cannot run.
 options(targets: {
   "run.mbt": ["native", "js"],
-  "report_native.mbt": ["native"],
   "report.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],
   "run_test.mbt": ["native", "js"],

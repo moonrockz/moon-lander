@@ -350,6 +350,48 @@ async test "custom report also receives a failure before start" {
 }
 
 ///|
+async test "a report error preserves the outcome and reports the next failure" {
+  for usage in [false, true] {
+    let seen = []
+    let result = builder(@lander_core.AppName::parse("report-error"), [])
+      |> error_report((error, code) => {
+        seen.push((report_text(@lander_core.AppName::parse("custom"), error), code.to_int()))
+        if seen.length() == 1 { fail("report broke") }
+      })
+      |> service("a", stop=_ => raise HookFailed(1))
+      |> build(_ => ())
+      |> run(_ => {
+        if usage { raise UsageError("bad option") }
+        else { raise HookFailed(0) }
+      })
+    let expected_code = if usage { 2 } else { 1 }
+    @expect.expect(result.exit_code().to_int()).to_equal(expected_code)
+    @expect.expect(result.failures().length()).to_equal(2)
+    @expect.expect(result.reason is Failed(_)).to_be_true()
+    @expect.expect(seen).to_equal(result.failures().map(error =>
+      (report_text(@lander_core.AppName::parse("custom"), error) catch { _ => abort("valid name") }, expected_code)))
+  }
+}
+
+///|
+async test "factory StopRequested gives a clean requested stop without hooks or reports" {
+  let log = []
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("factory-stop"), [])
+    |> error_report((_, _) => log.push("report"))
+    |> service("a", starting=_ => log.push("starting"), start=_ => log.push("start"),
+      started=_ => log.push("started"), stopping=_ => log.push("stopping"),
+      stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
+    |> build(_ => raise StopRequested::StopRequested)
+  let result = run(host, _ => log.push("command"))
+  @expect.expect(result.reason is Requested).to_be_true()
+  @expect.expect(result.exit_code()).to_equal(ExitCode::success())
+  @expect.expect(result.failures().length()).to_equal(0)
+  @expect.expect(result.requested_code).to_equal(None)
+  @expect.expect(result.signal).to_equal(None)
+  @expect.expect(log).to_equal([])
+}
+
+///|
 async test "default report preserves the message of fail" {
   let host : Host[Unit] = builder(@lander_core.AppName::parse("build"), []) |> build(_ => ())
   let result = run(host, _ => fail("build.invalid_timeout"))

@@ -138,7 +138,13 @@ async test "nested MoonBit commands ignore an earlier PATH toolchain" {
     #|----
     #|async fn main {
     #|  for (command, args) in [("moon", ["version", "--all"]), ("moonc", ["-v"]), ("moonx", ["--version"])] {
-    #|    let (code, out, err) = @process.collect_output(command, args)
+    #|    // CreateProcessW searches moonrun's own directory before PATH on Windows.
+    #|    // Use cmd for this fixture so both controls exercise the child's PATH.
+    #|    let (code, out, err) = if @env.get_env_var("OS") == Some("Windows_NT") {
+    #|      @process.collect_output("cmd.exe", ["/d", "/c", command] + args)
+    #|    } else {
+    #|      @process.collect_output(command, args)
+    #|    }
     #|    assert_eq(code, 0, msg=out.text() + err.text())
     #|    println(out.text())
     #|  }

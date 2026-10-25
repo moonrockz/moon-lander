@@ -1,0 +1,74 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-logging"
+
+import {
+  "moonbitlang/core/builtin",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn fan_out(Array[&Logger]) -> &Logger
+
+pub fn min_level(&Logger, Level) -> &Logger
+
+pub fn null_logger() -> &Logger
+
+pub fn with_category(&Logger, String) -> &Logger
+
+// Errors
+
+// Types and methods
+pub(all) enum Level {
+  Trace
+  Debug
+  Information
+  Warning
+  Error
+  Critical
+} derive(Compare, Eq, @debug.Debug)
+pub fn Level::compare(Self, Self) -> Int32
+pub fn Level::equal(Self, Self) -> Bool
+pub fn Level::not_equal(Self, Self) -> Bool
+pub fn Level::op_ge(Self, Self) -> Bool
+pub fn Level::op_gt(Self, Self) -> Bool
+pub fn Level::op_le(Self, Self) -> Bool
+pub fn Level::op_lt(Self, Self) -> Bool
+pub fn Level::output(Self, &@builtin.Logger) -> Unit
+pub fn Level::to_repr(Self) -> @debug.Repr
+pub fn Level::to_string(Self) -> String
+pub impl Show for Level
+
+pub struct LogEvent {
+  level : Level
+  category : String?
+  template : String
+  properties : Array[(String, Json)]
+  error : Error?
+}
+pub fn LogEvent::message(Self) -> String
+pub fn LogEvent::property(Self, String) -> Json?
+pub fn LogEvent::to_line(Self) -> String
+
+pub struct MemoryLogger {
+  // private fields
+}
+pub fn MemoryLogger::enabled(Self, Level) -> Bool
+pub fn MemoryLogger::events(Self) -> Array[LogEvent]
+pub fn MemoryLogger::log(Self, LogEvent) -> Unit
+pub fn MemoryLogger::new() -> Self
+pub impl Logger for MemoryLogger
+
+// Type aliases
+
+// Traits
+pub(open) trait Logger {
+  fn enabled(Self, Level) -> Bool = _
+  fn log(Self, LogEvent) -> Unit
+}
+pub fn &Logger::critical(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::debug(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::error(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::info(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::trace(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::warn(Self, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::write(Self, Level, String, Array[Json], error? : Error) -> Unit

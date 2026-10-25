@@ -39,27 +39,30 @@ let docs_tool : String = "apps/site"
 /// module can import. The order is the dependency direction, from the bottom up.
 let framework : Array[(String, String, Array[String])] = [
   ("pkgs/core", "moonrockz/moon-lander-core", []),
+  ("pkgs/logging", "moonrockz/moon-lander-logging", []),
   (
     "pkgs/config",
     "moonrockz/moon-lander-config",
-    ["moonrockz/moon-lander-core"],
+    ["moonrockz/moon-lander-core", "moonrockz/moon-lander-logging"],
   ),
   (
     "pkgs/mediator",
     "moonrockz/moon-lander-mediator",
-    ["moonrockz/moon-lander-core"],
+    ["moonrockz/moon-lander-core", "moonrockz/moon-lander-logging"],
   ),
   (
     "pkgs/hosting",
     "moonrockz/moon-lander-hosting",
-    ["moonrockz/moon-lander-core", "moonrockz/moon-lander-config"],
+    [
+      "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
+    ],
   ),
   (
     "pkgs/lander",
     "moonrockz/moon-lander",
     [
-      "moonrockz/moon-lander-core", "moonrockz/moon-lander-config", "moonrockz/moon-lander-mediator",
-      "moonrockz/moon-lander-hosting",
+      "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
+      "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-hosting",
     ],
   ),
 ]
@@ -169,7 +172,7 @@ fn ui_import_errors(path : String, manifest : String) -> Array[String] {
 
 ///|
 /// One error for each import of the framework member at `path` that breaks the dependency
-/// direction: core imports a module, or a framework module imports a framework module that
+/// direction: core or logging imports a module, or a framework module imports a framework module that
 /// is not below it. A member that is not a framework module gives no error.
 fn dependency_errors(path : String, manifest : String) -> Array[String] {
   guard framework.search_by(entry => entry.0 == path) is Some(index) else {
@@ -383,6 +386,54 @@ test "core imports no module" {
 }
 
 ///|
+test "logging imports no module" {
+  assert_eq(
+    dependency_errors(
+      "pkgs/logging",
+      (
+        #|import {
+        #|  "moonrockz/moon-lander-core@0.3.0",
+        #|}
+      ),
+    ),
+    [
+      "pkgs/logging imports moonrockz/moon-lander-core; moonrockz/moon-lander-logging imports no module except moonbitlang/core",
+    ],
+  )
+  assert_eq(
+    dependency_errors(
+      "pkgs/logging",
+      (
+        #|import {
+        #|  "moonbitlang/async@0.22.5",
+        #|}
+      ),
+    ),
+    [
+      "pkgs/logging imports moonbitlang/async; moonrockz/moon-lander-logging imports no module except moonbitlang/core",
+    ],
+  )
+  assert_eq(
+    dependency_errors(
+      "pkgs/logging", "name = \"moonrockz/moon-lander-logging\"\n",
+    ),
+    [],
+  )
+}
+
+///|
+test "each module above the bottom can import logging" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-core@0.3.0",
+    #|  "moonrockz/moon-lander-logging@0.3.0",
+    #|}
+  for path in ["pkgs/config", "pkgs/mediator", "pkgs/hosting", "pkgs/lander"] {
+    assert_eq(dependency_errors(path, manifest), [])
+  }
+}
+
+///|
 test "a module outside the framework gives no dependency error" {
   let manifest =
     #|import {
@@ -438,7 +489,8 @@ test "the module name of a moon.mod" {
 ///|
 test "each framework module folder is a member with its module name" {
   let active = [
-    "pkgs/core", "pkgs/config", "pkgs/mediator", "pkgs/hosting", "pkgs/lander",
+    "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/hosting",
+    "pkgs/lander",
   ]
   let names : Map[String, String] = Map([])
   for entry in framework {
@@ -457,6 +509,15 @@ test "each framework module folder is a member with its module name" {
     ),
     [
       "pkgs/mediator is a framework module folder but not an active member of moon.work",
+    ],
+  )
+  assert_eq(
+    framework_member_errors(
+      active.filter(path => path != "pkgs/logging"),
+      names,
+    ),
+    [
+      "pkgs/logging is a framework module folder but not an active member of moon.work",
     ],
   )
 }

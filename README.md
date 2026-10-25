@@ -68,6 +68,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
+| `mise run check:logging` | Fail when the logging package or its acceptance suite runs zero tests on a target |
 | `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
@@ -107,6 +108,10 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
+- `pkgs/logging/` contains
+  [`moonrockz/moon-lander-logging`](pkgs/logging/README.mbt.md), imported as
+  `@logging`: the bring-your-own `Logger` trait, structured log events with
+  message templates, and the built-in loggers.
 - `pkgs/config/` contains
   [`moonrockz/moon-lander-config`](pkgs/config/README.mbt.md), imported as
   `@config`. The configuration core is the module root. `parsers/<name>` holds

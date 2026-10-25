@@ -110,8 +110,8 @@ skill. Report these as problems:
 
 ## Publishing
 
-The framework is five modules: `moonrockz/moon-lander-core`,
-`moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
+The framework is six modules: `moonrockz/moon-lander-core`,
+`moonrockz/moon-lander-logging`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
 `moonrockz/moon-lander-hosting` and the umbrella `moonrockz/moon-lander`. Each imports only
 the modules below it (`mise run validate` checks this). The module names are
 provisional. There is no CLI yet.

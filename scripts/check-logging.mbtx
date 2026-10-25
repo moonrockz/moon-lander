@@ -1,0 +1,174 @@
+///|
+/// Fail when a target leg of the logging tests runs zero tests.
+///
+/// `moon test` exits with 0 when a package has no test entry for a target. The logging spec says
+/// that such a leg MUST NOT count as a pass, so this check runs each logging path for each target
+/// and requires a test count above zero. It follows `scripts/check-mediator.mbtx`.
+///
+/// Usage: `mise run check:logging [-- <target>...]`, or `moonx scripts/check-logging.mbtx`.
+/// With no target, it checks wasm, wasm-gc, js and native.
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// The root package of the logging module and its acceptance suite, relative to the workspace
+/// root. Each supports all four targets.
+let paths : Array[String] = ["pkgs/logging", "tests/logging-acceptance"]
+
+///|
+/// The `(path, target)` legs to run for `targets`, target by target, in path order.
+fn legs(targets : Array[String]) -> Array[(String, String)] {
+  let result = []
+  for target in targets {
+    for path in paths {
+      result.push((path, target))
+    }
+  }
+  result
+}
+
+///|
+/// The targets in `targets` that are not wasm, wasm-gc, js or native. A misspelled target would
+/// give zero legs, and zero legs must not count as a pass.
+fn unknown_targets(targets : Array[String]) -> Array[String] {
+  targets.filter(target => !all_targets.contains(target))
+}
+
+///|
+/// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
+/// the output has no such line.
+fn test_count(output : String) -> Int32? {
+  let mut count = None
+  for line in output.split("\n") {
+    let line = line.trim(chars=" \t\r")
+    guard line.strip_prefix("Total tests: ") is Some(rest) else { continue }
+    guard rest.split(",").next() is Some(number) else { continue }
+    count = Some(@string.parse_int(number) catch { _ => continue })
+  }
+  count
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].filter(arg => !arg.has_prefix("--"))
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  let unknown = unknown_targets(targets)
+  guard unknown.is_empty() else {
+    println(
+      "❌ Unknown target: \{unknown.join(", ")}. Use wasm, wasm-gc, js or native.",
+    )
+    @sys.exit(1)
+  }
+  for leg in legs(targets) {
+    let (path, target) = leg
+    let (code, out, err) = @process.collect_output("moon", [
+      "test", "--deny-warn", "--target", target, path,
+    ])
+    let output = out.text() + err.text()
+    guard code == 0 else {
+      println(output)
+      println("❌ The logging tests failed: \{path} on \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+    match test_count(output) {
+      Some(count) if count > 0 =>
+        println("✅ \{path} on \{target}: \{count} tests")
+      Some(_) | None => {
+        println(output)
+        println("❌ \{path} on \{target} ran zero tests")
+        @sys.exit(1)
+      }
+    }
+  }
+}
+
+///|
+test "legs give both paths on each target" {
+  assert_eq(legs(all_targets).length(), 8)
+  assert_eq(legs(["wasm-gc"]), [
+    ("pkgs/logging", "wasm-gc"),
+    ("tests/logging-acceptance", "wasm-gc"),
+  ])
+}
+
+///|
+test "unknown_targets names each target that is not known" {
+  assert_eq(unknown_targets(all_targets), [])
+  assert_eq(unknown_targets(["js", "jss"]), ["jss"])
+}
+
+///|
+test "test_count reads the last total line" {
+  assert_eq(
+    test_count(
+      "Total tests: 2, passed: 2, failed: 0.\r\nTotal tests: 7, passed: 7, failed: 0.\r\n",
+    ),
+    Some(7),
+  )
+  assert_eq(
+    test_count(
+      "Warning: no test entry found.\nTotal tests: 0, passed: 0, failed: 0.\n",
+    ),
+    Some(0),
+  )
+  assert_eq(test_count("Finished. moon: no work to do\n"), None)
+}
+
+///|
+async test "a leg that runs zero tests fails the check" {
+  let script = @fs.realpath("check-logging.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-logging")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  for path in ["pkgs", "pkgs/logging", "tests", "tests/logging-acceptance"] {
+    @fs.mkdir("\{dir}/\{path}")
+  }
+  @fs.write_file("\{dir}/pkgs/logging/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/pkgs/logging/logging_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
+  @fs.write_file("\{dir}/tests/logging-acceptance/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/tests/logging-acceptance/core.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(
+    output.contains("tests/logging-acceptance on wasm ran zero tests"),
+    msg=output,
+  )
+  @fs.write_file(
+    "\{dir}/tests/logging-acceptance/core_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_eq(code, 0, msg=output)
+  assert_true(
+    output.contains("tests/logging-acceptance on wasm: 1 tests"),
+    msg=output,
+  )
+}

@@ -17,17 +17,21 @@ test "build a command with global standard flags" {
 }
 ```
 
-The four standard flags are opt-in on the bare builder. They are global, so they
-can follow a subcommand. The factory reads the parsed flags in `BuildContext.args`
-and the discovery inputs in `BuildContext.discovery_options`. Hooks and the
-command read the same parse result in `Context.args`. Standard flag values do not
-become configuration keys.
+The four standard flags are opt-in on the bare builder. Add them to the root
+command. They are global, so they can follow a subcommand. A standard flag added
+only to a subcommand is not read by the host. The factory reads the parsed flags
+in `BuildContext.args`. Hooks and the command read the same parse result in
+`Context.args`. Standard flag values do not become configuration keys. The run
+keeps the discovery inputs in its private parsed-arguments state for group 9.
 
 An argparse error or an empty standard option value gives `UsageError` and code 2.
+A command-definition fault, such as a duplicate id, also gives `UsageError` and
+code 2 because core argparse does not distinguish it from a user error without
+matching message text.
 With no command step, an empty command named after the application rejects every
-extra argument. Argparse handles `--help` and `--version` itself and exits with
-code 0 before configuration or hooks. A version requires the command's `version`
-argument.
+extra argument. On native and js, argparse handles `--help` and `--version` itself
+and ends the process with code 0 before configuration or hooks. Group 13 decides
+the embedded behavior. A version requires the command's `version` argument.
 
 Task group 14 adds option mappings. Configuration loading through discovery and
 project selection follows in task group 9.

@@ -15,6 +15,7 @@ async test "helper for argparse process exit and standard error" {
     |> @hosting.run(_ => println("unexpected command"))
   // A usage error returns to its embedder; help and version exit in argparse.
   assert_eq(outcome.exit_code().to_int(), 2)
+  println("code=\{outcome.exit_code().to_int()}")
 }
 
 ///|
@@ -37,8 +38,13 @@ async test "help and version exit with 0 before services and usage errors write 
     assert_eq(code, 0, msg=out.text() + err.text())
     let output = if mode == "unknown" { err.text() } else { out.text() }
     assert_true(output.contains(text), msg=output)
-    if mode == "unknown" { assert_true(output.contains("acme: error:"), msg=output) }
-    else { assert_eq(err.text(), "") }
+    if mode == "unknown" {
+      assert_true(output.contains("acme: error:"), msg=output)
+      assert_true(out.text().contains("code=2"), msg=out.text())
+    } else {
+      assert_eq(err.text(), "")
+      assert_false(out.text().contains("\"type\":\"result\""), msg=out.text())
+    }
     assert_false(out.text().contains("unexpected"), msg=out.text())
     assert_false(err.text().contains("unexpected factory"), msg=err.text())
   }

@@ -5,7 +5,6 @@ import {
   "moonbitlang/core/argparse",
   "moonbitlang/core/debug",
   "moonrockz/moon-lander-config",
-  "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-core",
 }
 
@@ -47,7 +46,6 @@ pub fn UsageError::message(Self) -> String
 pub struct BuildContext {
   config : @moon-lander-config.Config
   args : @argparse.Matches
-  discovery_options : @conventions.DiscoveryOptions
 }
 
 pub struct Context[S] {

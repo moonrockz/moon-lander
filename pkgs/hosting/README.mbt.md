@@ -43,7 +43,7 @@ test "build a host with one service" {
 
 | Package | Targets | Content |
 | --- | --- | --- |
-| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, hosted services, `Host[S]`, `run`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
+| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, `command`, hosted services, `Host[S]`, `run`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
 | [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory and global standard discovery flags |
 | `moonrockz/moon-lander-hosting/console` (`@console`) | `native` | The C signal stub for SIGINT, SIGTERM and SIGQUIT, and the Windows console events |
 

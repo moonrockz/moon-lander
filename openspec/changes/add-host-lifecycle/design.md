@@ -613,8 +613,11 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   selected subcommand path. The application dispatches the subcommand itself.
 - Call (this change): argparse errors are private types. The host wraps every parse
   error into `UsageError` with the argparse message.
+  A command-definition fault also gives `UsageError` and code 2 because core argparse does not distinguish it from a user error without matching message text.
 
 ### D11. Package layout (Call: shared names)
+
+The root package defines `command` because it needs the private builder fields; `hosting/argparse` re-exports it with `pub using`.
 
 | Package | Targets | Contents |
 | --- | --- | --- |

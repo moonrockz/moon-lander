@@ -8,6 +8,7 @@ priv struct ParsedArguments {
 ///|
 /// Parse once before the driver loads configuration or calls the factory.
 /// Give argparse an explicit empty variable set so parsing reads only argv.
+/// Group 7 passes the variable set of the run.
 // The wasm drivers that call this arrive in group 13.
 #warnings("-1")
 fn[S] parse_arguments(host : Host[S]) -> ParsedArguments raise UsageError {

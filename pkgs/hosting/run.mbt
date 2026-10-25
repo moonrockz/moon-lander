@@ -33,7 +33,7 @@ async fn[S] execute(host : Host[S], command : Hook[S]) -> RunOutcome {
     Done(config) => config
     Need(_) => abort("a complete file tree gives no file request")
   }
-  let services = (host.factory)({ config, args: parsed.matches, discovery_options: parsed.discovery_options }) catch {
+  let services = (host.factory)({ config, args: parsed.matches }) catch {
     StopRequested => return {
       exit_code: ExitCode::success(), timed_out: false, failures: [],
       reason: Requested, requested_code: None, signal: None,

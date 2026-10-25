@@ -97,6 +97,8 @@ first, so the text can flow through the parse into the pipeline, as in
 `main` can raise, `fn main raise { ... }`, lets a bad name stop the program at
 start.
 
+With no `command` step the host accepts no arguments.
+
 ```mbt check
 ///|
 /// The host of the application `acme`. Its one service writes each hook call
@@ -131,6 +133,7 @@ runs the `start` hooks in registration order, runs the command, and runs the
 | --- | --- |
 | All hooks and the command succeed | 0 |
 | The factory, a hook or the command raises an error | 1, and `failures` holds each error |
+| An argument that the command does not define | 2, `UsageError` |
 
 A failed `start` hook skips the command and the other `start` hooks. The
 services that started still get their `stop` hooks. The test `cli_test.mbt`

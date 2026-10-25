@@ -71,11 +71,9 @@ async test "the factory hooks and command share one parse result and the command
 }
 
 ///|
-async test "standard flags reach discovery and never become configuration keys" {
-  let expected = @conventions.DiscoveryOptions::new(environment="Staging", config=Explicit("../configs/project.yaml"), isolated=true, project="packages/core")
+async test "standard flags never become configuration keys" {
   let outcome = application(["build", "--environment", "Staging", "--config", "../configs/project.yaml", "--isolated", "--project", "packages/core"])
     |> @hosting.build(ctx => {
-      @expect.expect(ctx.discovery_options).to_equal(expected)
       @expect.expect(ctx.args.subcommand is Some(("build", _))).to_be_true()
       for key in ["environment", "config", "isolated", "project"] {
         @expect.expect(ctx.config.get(@config.KeyPath::parse(key)) is None).to_be_true()

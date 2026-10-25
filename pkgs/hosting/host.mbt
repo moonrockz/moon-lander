@@ -44,9 +44,6 @@ pub struct BuildContext {
   config : @config.Config
   /// The one argparse result of this run.
   args : @argparse.Matches
-  /// The standard flags for configuration discovery. Environment names and
-  /// paths stay raw until task groups 8 and 7 add their parsed types.
-  discovery_options : @conventions.DiscoveryOptions
 }
 
 ///|
@@ -60,6 +57,7 @@ pub struct Context[S] {
   /// The events, stop requests and cancellation checks of this run.
   lifetime : Lifetime
   /// The one argparse result, shared with the factory and all hooks.
+  /// Do not change it; every hook and the command read the same value.
   args : @argparse.Matches
 }
 

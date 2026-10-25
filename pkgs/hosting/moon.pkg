@@ -32,23 +32,22 @@ import {
   "moonbitlang/async",
 } for "wbtest"
 
-// Temporary until task group 13: only `run` reads the host and builds the
-// contexts and the outcome, and it exists on native and js. On wasm and wasm-gc
-// nothing reads them until `run_embedded`; the native/js error report reads
-// the application name. Remove the
-// field overrides when those fields are read. The pinned build system cannot
-// condition imports by target, so the async and config/host imports are unused
-// on wasm and wasm-gc (29); remove that part when the imports can be conditional.
-warnings = "-7-9-29"
+// The pinned build system cannot condition imports by target, so the async and
+// config/host imports are unused on wasm and wasm-gc (29). Remove the override
+// when the imports can be conditional.
+warnings = "-29"
 
 // `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not
-// have. Its tests are async tests, which wasm-gc cannot run.
+// have. Its tests are async tests, which wasm-gc cannot run. `run_embedded`
+// replaces it on wasm and wasm-gc.
 options(targets: {
   "settings.process.mbt": ["native", "js"],
   "settings.embedded.mbt": ["wasm", "wasm-gc"],
   "settings.process_wbtest.mbt": ["native", "js"],
   "settings.embedded_wbtest.mbt": ["wasm", "wasm-gc"],
   "run.mbt": ["native", "js"],
+  "run.embedded.mbt": ["wasm", "wasm-gc"],
+  "run.embedded_wbtest.mbt": ["wasm", "wasm-gc"],
   "report.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],
   "run_test.mbt": ["native", "js"],

@@ -75,8 +75,6 @@ priv struct RunSettings {
 ///|
 /// Fill only absent inputs, once. Injectable process readers let portable tests
 /// prove that explicit settings never read either process input.
-// The embedded driver arrives in group 13. Remove with that caller.
-#warnings("-1")
 fn[S] resolve_settings(
   host : Host[S],
   read_variables? : () -> Map[String, String] = process_variables,
@@ -96,8 +94,6 @@ fn[S] resolve_settings(
 
 ///|
 /// Compose the same inputs for the core source and the conventions reader.
-// The embedded driver arrives in group 13. Remove with that caller.
-#warnings("-1")
 fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> @config.ConfigBuilder raise {
   let mut builder = @config.builder()
     |> @config.env_vars(Map::from_iter(settings.variables.iter()))

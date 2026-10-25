@@ -189,6 +189,9 @@ pub fn[S] service(
 ///|
 /// A host that is ready to run. `build` does no I/O, so the same host can run
 /// more than one time.
+// Only `run_embedded` (wasm, wasm-gc) reads `file_tree`; native and js read
+// disk. Remove when the build system can limit a field read to targets.
+#warnings("-7")
 pub struct Host[S] {
   priv name : @lander_core.AppName
   priv args : Array[String]

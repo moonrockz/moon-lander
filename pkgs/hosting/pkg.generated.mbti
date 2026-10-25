@@ -37,6 +37,8 @@ pub fn[S] files(HostBuilder[S], @moon-lander-config.FileTree) -> HostBuilder[S]
 
 pub fn[S] reserve_env(HostBuilder[S], Array[String]) -> HostBuilder[S]
 
+pub fn[S] run_embedded(Host[S], async (Context[S]) -> Unit, stop_probe? : () -> Bool) -> RunOutcome
+
 pub fn[S] service(HostBuilder[S], &IntoServiceName, starting? : async (Context[S]) -> Unit, start? : async (Context[S]) -> Unit, started? : async (Context[S]) -> Unit, stopping? : async (Context[S]) -> Unit, stop? : async (Context[S]) -> Unit, stopped? : async (Context[S]) -> Unit) -> HostBuilder[S] raise HostError
 
 pub fn[S] shutdown_timeout(HostBuilder[S], @moon-lander-core.TimeLimit) -> HostBuilder[S]
@@ -67,6 +69,12 @@ pub suberror ShutdownTimedOut {
 pub fn ShutdownTimedOut::message(Self) -> String
 
 pub(all) suberror StopRequested
+
+pub suberror SuspendError {
+  HookSuspended(service~ : ServiceName, phase~ : HookPhase)
+  CommandSuspended
+}
+pub fn SuspendError::message(Self) -> String
 
 pub(all) suberror UsageError {
   UsageError(String)
@@ -111,6 +119,21 @@ pub fn ExitCode::not_equal(Self, Self) -> Bool
 pub fn ExitCode::success() -> Self
 pub fn ExitCode::to_int(Self) -> Int32
 pub fn ExitCode::to_repr(Self) -> @debug.Repr
+
+pub(all) enum HookPhase {
+  Starting
+  Start
+  Started
+  Stopping
+  Stop
+  Stopped
+} derive(Eq, @debug.Debug)
+pub fn HookPhase::equal(Self, Self) -> Bool
+pub fn HookPhase::not_equal(Self, Self) -> Bool
+pub fn HookPhase::output(Self, &Logger) -> Unit
+pub fn HookPhase::to_repr(Self) -> @debug.Repr
+pub fn HookPhase::to_string(Self) -> String
+pub impl Show for HookPhase
 
 pub struct Host[S] {
   // private fields

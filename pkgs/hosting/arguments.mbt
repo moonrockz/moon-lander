@@ -8,8 +8,6 @@ priv struct ParsedArguments {
 ///|
 /// Parse once before the driver loads configuration or calls the factory.
 /// The driver supplies the resolved variable snapshot, shared by all readers.
-// The wasm drivers that call this arrive in group 13.
-#warnings("-1")
 fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, String]) -> ParsedArguments raise UsageError {
   let command = match host.make_command {
     Some(make) => make(host.name.to_string())

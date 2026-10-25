@@ -78,10 +78,7 @@ async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : 
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
   let mut step = Engine::start(host.services)
-  // A probe stop that arrived during configuration loading runs no start hook.
-  if lifetime.probe_stop() && step is Run(pending, _) && lifetime.request is Some(request) {
-    step = pending.stop_requested(request, lifetime.requested_code, result=Interrupted, observed_signal?=lifetime.signal)
-  }
+  step = lifetime.skip_first_if_stopped(step)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)
@@ -143,16 +140,8 @@ async fn[S] perform_step(host : Host[S], ctx : Context[S], command : Hook[S], pe
 
 ///|
 fn[S] reply_step(ctx : Context[S], pending : Pending, completed : ActionResult?) -> Step {
-  let lifetime = ctx.lifetime
-  if completed is None { lifetime.stop_application() }
-  ignore(lifetime.probe_stop())
-  let result = completed.unwrap_or(Interrupted)
-  let next = if lifetime.request is Some(request) {
-    pending.stop_requested(request, lifetime.requested_code, result~, observed_signal?=lifetime.signal)
-  } else if result is Failed(error) { pending.failed(error) }
-  else { pending.done() }
-  if pending.engine.reason is Some(reason) { lifetime.reason = Some(reason) }
-  next
+  if completed is None { ctx.lifetime.stop_application() }
+  ctx.lifetime.reply(pending, completed.unwrap_or(Interrupted))
 }
 
 ///|

@@ -1,7 +1,11 @@
 ///|
+// Only the wasm and wasm-gc driver makes Embedder, so native and js never
+// construct it (6). Remove when the build system can limit a constructor to targets.
+#warnings("-6")
 priv enum StopRequest {
   Requested
   Signal(SignalKind)
+  Embedder
 }
 
 ///|
@@ -37,8 +41,6 @@ priv enum Action {
 } derive(Eq, Debug)
 
 ///|
-// wasm drivers arrive in group 13. Remove when they consume both steps.
-#warnings("-6")
 priv enum Step {
   Run(Pending, Action)
   Finish(RunOutcome)
@@ -96,8 +98,6 @@ fn[S] HostedService::hook(self : HostedService[S], phase : Phase) -> Hook[S]? {
 }
 
 ///|
-// The wasm drivers arrive in group 13. Remove when they call this method.
-#warnings("-1")
 fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   let instructions = []
   for phase in [Phase::Starting, Start, Started] {
@@ -172,8 +172,6 @@ fn Engine::next(self : Engine) -> Step {
 }
 
 ///|
-// The embedded driver is added in group 13. Remove when it reports interrupted or failed actions.
-#warnings("-6")
 priv enum ActionResult {
   Returned
   Interrupted
@@ -215,7 +213,7 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
       if !engine.stop_requested {
         engine.stop_requested = true
         if engine.reason is None {
-          engine.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind) })
+          engine.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind); Embedder => Embedder })
         }
         engine.requested_code = code
       }
@@ -251,18 +249,12 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
 }
 
 ///|
-// The wasm drivers arrive in group 13. Remove when they call this method.
-#warnings("-1")
 fn Pending::done(self : Pending) -> Step { self.respond(Done) }
 
 ///|
-// The wasm drivers arrive in group 13. Remove when they call this method.
-#warnings("-1")
 fn Pending::failed(self : Pending, error : Error) -> Step { self.respond(Failed(error)) }
 
 ///|
-// The embedded driver is added in group 13. Remove when it replies to requests.
-#warnings("-1")
 fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step {
   self.respond(StopRequested(request, code, result, observed_signal))
 }

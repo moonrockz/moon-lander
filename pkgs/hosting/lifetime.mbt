@@ -23,6 +23,9 @@ pub extend SignalKind with @debug.Debug::{to_repr}
 /// The signal read of a console driver. `run` reads it in each cancellation
 /// check and every 50 ms, and changes the first signal into a stop request
 /// with the reason `Signal(kind)`. The read must be cheap and must not raise.
+// Only `run` (native, js) reads the probe; wasm and wasm-gc have no signals (7).
+// Remove when the build system can limit a field read to targets.
+#warnings("-7")
 pub struct SignalProbe {
   priv request : () -> StopRequest?
 }
@@ -78,8 +81,6 @@ pub struct Lifetime {
 }
 
 ///|
-// The embedded driver is added in group 13. Remove when it creates a lifetime.
-#warnings("-1")
 fn Lifetime::new() -> Lifetime {
   { started: EventHandlers::new(), stopping: EventHandlers::new(), stopped: EventHandlers::new(),
     reason: None, request: None, signal: None, requested_code: None, exit_code: None, probes: [], task_cancelled: Ref(() => false), cancel_command: Ref(None) }
@@ -98,8 +99,6 @@ pub fn Lifetime::on_stopping(self : Lifetime, handler : () -> Unit) -> Unit { se
 pub fn Lifetime::on_stopped(self : Lifetime, handler : () -> Unit) -> Unit { self.stopped.register(handler) }
 
 ///|
-// The embedded driver is added in group 13. Remove when it raises events.
-#warnings("-1")
 fn Lifetime::raise_event(self : Lifetime, event : Event) -> Unit {
   match event {
     Started => self.started.raise_event()
@@ -115,7 +114,7 @@ fn Lifetime::request_stop(self : Lifetime, request : StopRequest, code : ExitCod
     self.requested_code = code
     if code is Some(_) { self.exit_code = code }
     if self.reason is None {
-      self.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind) })
+      self.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind); Embedder => Embedder })
     }
   }
   if request is Signal(signal) { self.signal = Some(signal) }
@@ -147,9 +146,6 @@ pub struct StopToken { priv lifetime : Lifetime }
 pub fn Lifetime::stop_token(self : Lifetime) -> StopToken { { lifetime: self } }
 
 ///|
-// Only `run` (native, js) registers a probe until the embedded driver of group
-// 13 registers its embedder probe. Remove the override then.
-#warnings("-1")
 fn Lifetime::register_stop_probe(self : Lifetime, probe : () -> StopRequest?) -> Unit {
   self.probes.push(probe)
 }
@@ -190,4 +186,25 @@ pub fn StopToken::cancelled(self : StopToken) -> Bool {
 ///|
 fn Lifetime::cancelled(self : Lifetime) -> Bool {
   self.probe_stop() || (self.task_cancelled.val)()
+}
+
+///|
+/// The reply of a driver after one step: read the probes, then reply with the
+/// first stop request, the failure or done. Both drivers use this rule.
+fn Lifetime::reply(self : Lifetime, pending : Pending, result : ActionResult) -> Step {
+  ignore(self.probe_stop())
+  let next = if self.request is Some(request) {
+    pending.stop_requested(request, self.requested_code, result~, observed_signal?=self.signal)
+  } else if result is Failed(error) { pending.failed(error) }
+  else { pending.done() }
+  if pending.engine.reason is Some(reason) { self.reason = Some(reason) }
+  next
+}
+
+///|
+/// A probe stop that arrived during configuration loading or the services
+/// factory runs no start hook: reply to the first step without running it.
+fn Lifetime::skip_first_if_stopped(self : Lifetime, step : Step) -> Step {
+  guard self.probe_stop() && step is Run(pending, _) && self.request is Some(request) else { return step }
+  pending.stop_requested(request, self.requested_code, result=Interrupted, observed_signal?=self.signal)
 }

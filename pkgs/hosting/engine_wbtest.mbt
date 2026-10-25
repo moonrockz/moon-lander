@@ -202,7 +202,7 @@ test "engine table: timeout skips remaining stop hooks and preserves requested c
     let code = ExitCode::from_int(4)
     let (trace, outcome) = engine_trace([63, 63], reply=(pending, action) => {
       if action == RunCommand { pending.stop_requested(Requested, Some(code)) }
-      else if action == target { pending.timed_out() }
+      else if action == target { pending.timed_out(limit=default_shutdown_timeout()) }
       else { pending.done() }
     })
     let (clean, _) = engine_trace([63, 63])
@@ -219,6 +219,22 @@ test "engine table: timeout skips remaining stop hooks and preserves requested c
     @expect.expect(outcome.failures().length()).to_equal(1)
     @expect.expect(outcome.failures()[0] is ShutdownTimedOut(limit) && limit == default_shutdown_timeout()).to_be_true()
   }
+}
+
+///|
+test "engine law: timeout records the current failure before the limit and keeps a signal code" {
+  let limit = @lander_core.TimeLimit::millis(1000)
+  let error : Error = HookFailed(7)
+  let (_, result) = engine_trace([63], reply=(pending, action) => {
+    if action == Hook(ServiceRef::{ index: 0 }, Stop) {
+      pending.timed_out(limit~, observed_signal=Terminate, result=Failed(error))
+    } else { pending.done() }
+  })
+  @expect.expect(result.failures().length()).to_equal(2)
+  @expect.expect(physical_equal(result.failures()[0], error)).to_be_true()
+  @expect.expect(result.failures()[1] is ShutdownTimedOut(actual) && actual == limit).to_be_true()
+  @expect.expect(result.timed_out).to_be_true()
+  @expect.expect(result.exit_code().to_int()).to_equal(143)
 }
 
 ///|
@@ -319,7 +335,7 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
         same_step(step, pending.done())
         same_step(step, pending.failed(HookFailed(-2)))
         same_step(step, pending.stop_requested(Requested, Some(ExitCode::failure())))
-        same_step(step, pending.timed_out())
+        same_step(step, pending.timed_out(limit=default_shutdown_timeout()))
         snapshot.check(engine)
         tokens.push((pending, step))
       }
@@ -336,7 +352,7 @@ test "law: random hooks and failures preserve cleanup, Finish and token replies"
         same_step(cached, pending.done())
         same_step(cached, pending.failed(HookFailed(-2)))
         same_step(cached, pending.stop_requested(Requested, Some(ExitCode::failure())))
-        same_step(cached, pending.timed_out())
+        same_step(cached, pending.timed_out(limit=default_shutdown_timeout()))
         snapshot.check(engine)
       }
       same_step(step, engine.next())
@@ -473,14 +489,14 @@ test "started event stop request skips command" {
 ///|
 test "panic timed_out in Starting is a driver fault" {
   guard Engine::start(engine_services([2])) is Run(pending, _) else { fail("missing start") }
-  ignore(pending.timed_out())
+  ignore(pending.timed_out(limit=default_shutdown_timeout()))
 }
 
 ///|
 test "panic timed_out in Command is a driver fault" {
   guard Engine::start(engine_services([])) is Run(started, _) else { fail("missing Started") }
   guard started.done() is Run(command, _) else { fail("missing command") }
-  ignore(command.timed_out())
+  ignore(command.timed_out(limit=default_shutdown_timeout()))
 }
 
 ///|
@@ -644,7 +660,7 @@ test "law: requests from any step preserve cleanup and single-use reply effects"
       same_step(cached, pending.done())
       same_step(cached, pending.failed(HookFailed(-1)))
       same_step(cached, pending.stop_requested(Signal(Quit), Some(ExitCode::failure()), result=Failed(HookFailed(-1))))
-      same_step(cached, pending.timed_out())
+      same_step(cached, pending.timed_out(limit=default_shutdown_timeout()))
       snapshot.check(engine)
     }
   }, count=300, max_size=25, seed=7404)

@@ -270,6 +270,7 @@ fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCod
 }
 
 ///|
-// The wasm drivers arrive in group 13. Remove when they use this reply.
+// Only `run` (native, js) calls this. wasm and wasm-gc have no timer, so it is
+// unused there. Remove when the build system can limit a function to targets.
 #warnings("-1")
-fn Pending::timed_out(self : Pending, limit~ : @lander_core.TimeLimit = default_shutdown_timeout(), observed_signal? : SignalKind, result~ : ActionResult = Interrupted) -> Step { self.respond(TimedOut(limit, observed_signal, result)) }
+fn Pending::timed_out(self : Pending, limit~ : @lander_core.TimeLimit, observed_signal? : SignalKind, result~ : ActionResult = Interrupted) -> Step { self.respond(TimedOut(limit, observed_signal, result)) }

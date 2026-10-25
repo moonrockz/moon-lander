@@ -132,12 +132,17 @@ async test "outside cancellation preserves all stop hooks and their timeout" {
 }
 
 ///|
-async test "timeout after a terminate signal keeps code 143 and suppresses reports" {
+async test "timeout after a terminate signal keeps code 143 and reports the timeout" {
   let log = []
+  let reports = []
+  let limit = @lander_core.TimeLimit::millis(20)
   let result = builder(@lander_core.AppName::parse("signal-timeout"), [])
-    |> shutdown_timeout(@lander_core.TimeLimit::millis(20))
+    |> shutdown_timeout(limit)
     |> service("a", stop=_ => { defer log.push("cancelled"); @async.sleep(10000) })
-    |> error_report((_, _) => log.push("must not report"))
+    |> error_report((error, code) => {
+      log.push("report")
+      reports.push((error, code))
+    })
     |> build(_ => ())
     |> run(ctx => {
       ctx.lifetime.on_stopped(() => log.push("event.stopped"))
@@ -147,7 +152,55 @@ async test "timeout after a terminate signal keeps code 143 and suppresses repor
   @expect.expect(result.exit_code().to_int()).to_equal(143)
   @expect.expect(result.timed_out).to_be_true()
   @expect.expect(result.failures().length()).to_equal(1)
-  @expect.expect(log).to_equal(["cancelled", "event.stopped"])
+  @expect.expect(log).to_equal(["cancelled", "event.stopped", "report"])
+  @expect.expect(reports.length()).to_equal(1)
+  @expect.expect(reports[0].0 is ShutdownTimedOut(actual) && actual == limit).to_be_true()
+  @expect.expect(reports[0].1.to_int()).to_equal(143)
+}
+
+///|
+async test "outside cancellation during a stop hook preserves the full stop phase" {
+  let log = []
+  let completed = @async.with_timeout_opt(50, () => {
+    let result = builder(@lander_core.AppName::parse("cancel-during-stop"), [])
+      |> shutdown_timeout(@lander_core.TimeLimit::millis(1000))
+      |> service("a", stop=_ => log.push("a.stop"))
+      |> service("b", stop=_ => {
+        log.push("b.stop.started")
+        @async.sleep(200)
+        log.push("b.stop")
+      })
+      |> build(_ => ())
+      |> run(_ => ())
+    @expect.expect(result.exit_code()).to_equal(ExitCode::success())
+    @expect.expect(result.timed_out).to_be_false()
+    @expect.expect(result.failures().length()).to_equal(0)
+    log.push("outcome")
+  })
+  @expect.expect(completed is None).to_be_true()
+  @expect.expect(log).to_equal(["b.stop.started", "b.stop", "a.stop", "outcome"])
+}
+
+///|
+async test "signal codes report only the timeout among multiple failures" {
+  for signal in [SignalKind::Interrupt, Terminate, Quit] {
+    let reports = []
+    let limit = @lander_core.TimeLimit::millis(20)
+    let result = builder(@lander_core.AppName::parse("signal-failures"), [])
+      |> shutdown_timeout(limit)
+      |> service("a", stop=_ => @async.sleep(10000))
+      |> error_report((error, code) => reports.push((error, code)))
+      |> build(_ => ())
+      |> run(ctx => {
+        ctx.lifetime.request_stop(Signal(signal), None)
+        raise UsageError("command usage")
+      })
+    @expect.expect(result.failures().length()).to_equal(2)
+    @expect.expect(result.exit_code()).to_equal(signal.exit_code())
+    @expect.expect(reports.length()).to_equal(1)
+    @expect.expect(reports[0].0 is ShutdownTimedOut(actual) && actual == limit).to_be_true()
+    @expect.expect(reports[0].1).to_equal(signal.exit_code())
+  }
 }
 
 ///|

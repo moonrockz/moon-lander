@@ -101,6 +101,9 @@ fn default_shutdown_timeout() -> @lander_core.TimeLimit {
 /// The default is 30 seconds. A later step replaces an earlier value.
 /// Only the native and js drivers apply the limit. The wasm and wasm-gc
 /// drivers have no timers.
+/// The host cancels the current hook at the limit. A hook that protects itself
+/// from cancellation, or does not yield, runs until it returns, and `run` waits
+/// for it.
 pub fn[S] shutdown_timeout(builder : HostBuilder[S], limit : @lander_core.TimeLimit) -> HostBuilder[S] {
   { ..builder, shutdown_timeout: limit }
 }
@@ -198,13 +201,16 @@ pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {
 ///|
 /// A replacement failure report. It may write asynchronously, and receives the
 /// final exit code with each failure, in occurrence order.
+/// Each shutdown timeout is reported for every exit code. Other failures are
+/// reported only for code 1 or 2.
 /// If a report raises, the driver ignores its error and reports the next failure.
 /// A report error cannot change the outcome or make `run` raise.
 pub type ErrorReport = async (Error, ExitCode) -> Unit
 
 ///|
-/// Replace the default standard-error report. At the end of a run with code 1
-/// or 2, the driver calls this once per failure. Other codes call no report.
+/// Replace the default standard-error report. At the end of a run, the driver
+/// calls this for each shutdown timeout for every exit code, and for each other
+/// failure only for code 1 or 2. Reports follow failure order.
 /// If a report raises, the driver ignores its error and reports the next failure.
 /// A report error cannot change the outcome or make `run` raise.
 pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {

@@ -132,6 +132,31 @@ test "a long command yields between batches" {
 }
 ```
 
+## Shutdown timeout
+
+`shutdown_timeout(limit)` sets one budget for the full stop phase. The budget
+starts when the command task has ended. The default is 30 s, and a later step
+replaces an earlier value. Only native and js apply the limit. The wasm and
+wasm-gc drivers have no timer. The opt-in configuration key comes with task
+group 9 of `add-host-lifecycle`.
+
+At the limit, the host cancels the current hook, skips the remaining stop hooks,
+raises the stopped event and reports `ShutdownTimedOut`. A hook that protects
+itself from cancellation, or does not yield, runs until it returns, and `run`
+waits for it.
+
+```mbt check
+///|
+test "set the shutdown timeout" {
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.shutdown_timeout(@lander_core.TimeLimit::seconds(5))
+    |> @hosting.build(_ => ())
+  ignore(host)
+}
+```
+
 ## Exit codes and reports
 
 | Code | Cause |
@@ -162,14 +187,18 @@ test "application and signal codes" {
 }
 ```
 
-For exit code 1 or 2, `run` writes one line per failure to standard error:
-`<application name>: <message>`. A run with no failures writes nothing, including
-an application code of 1 or 2. Other codes write nothing. `HostError`, `UsageError`
-and `ConfigError` use their `message()` text; other errors use their `Show` text.
+`run` reports each `ShutdownTimedOut` failure for every exit code, including
+signal codes 130, 143 and 131. It reports other failures only for code 1 or 2.
+Reports follow failure order. The default report writes one line to standard
+error: `<application name>: <message>`. A run with no failures writes nothing,
+including an application code of 1 or 2. `HostError`, `UsageError`,
+`ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
+their `Show` text.
 
-`error_report` replaces the default report. Its async callback gets each failure
-in occurrence order with the final `ExitCode`. It can write a custom format such
-as JSON. Each call to the builder step replaces the earlier report.
+`error_report` replaces the default report. Its async callback gets each reported
+failure in occurrence order with the final `ExitCode`, under the same rules.
+It can write a custom format such as JSON. Each call to the builder step replaces
+the earlier report.
 
 ```mbt check
 ///|
@@ -179,7 +208,13 @@ test "replace the failure report" {
     |> @lander_core.AppName::parse
     |> @hosting.builder([])
     |> @hosting.error_report((error, code) => {
-      reports.push((error.to_string(), code))
+      let message = match error {
+        @hosting.HostError::_ as e => e.message()
+        @hosting.UsageError::_ as e => e.message()
+        @hosting.ShutdownTimedOut::_ as e => e.message()
+        _ => error.to_string()
+      }
+      reports.push((message, code))
     })
     |> @hosting.build(_ => ())
   let command : @hosting.Hook[Unit] = _ => raise @hosting.UsageError("expected a command")

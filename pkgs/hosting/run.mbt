@@ -3,13 +3,14 @@
 /// record. Start hooks run in registration order, stop hooks in reverse order.
 /// Stop requests cancel the command task and its defers finish before shutdown.
 /// Shutdown runs protected from outside cancellation, within one time budget.
-/// For code 1 or 2, it reports each failure through `error_report`, or writes
-/// `<name>: <message>` to standard error. Report errors do not change the outcome.
+/// It reports each shutdown timeout for every exit code, and other failures only
+/// for code 1 or 2, in failure order, through `error_report` or as
+/// `<name>: <message>` on standard error. Report errors do not change the outcome.
 pub async fn[S] run(host : Host[S], command : Hook[S]) -> RunOutcome {
   let result = execute(host, command)
   @async.protect_from_cancel(() => {
-    if result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
-      for error in result.failures {
+    for error in result.failures {
+      if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
         try {
           match host.report {
             Some(report) => report(error, result.exit_code)

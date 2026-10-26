@@ -120,10 +120,10 @@ ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross -- --json
 
 The JSON report (`schema_version: 1`) has a status, and findings with stable
 codes and next steps. Status `error` exits with 1. In a next step, replace
-`zig-cross` with `mise run doctor:zig-cross --` or with
-`moonx moonrockz/zig-cross@<version>`, and replace example paths such as
-`fixtures/consumer` with a program of this workspace, such as
-`tests/formats-default`.
+`zig-cross` with `mise exec -- moonx scripts/toolchain.mbtx moonrockz/zig-cross@<version>`
+(for `zig-cross doctor <args>`, `mise run doctor:zig-cross -- <args>` is
+enough). Replace example paths such as `fixtures/consumer` with a program of
+this workspace, such as `tests/formats-default`.
 
 `mise run build:cross` runs doctor, stops on status `error`, and then builds
 these plans. It checks the header of each executable. It does not run them.
@@ -146,9 +146,10 @@ What a Linux machine can and cannot do, with zig-cross `0.3.0`, MoonBit
 
 `moonbitlang/async` does not cross-build to Darwin or Windows in either runtime.
 Its own C files need `sys/vnode.h` from the macOS SDK and MSVC. The hosting and
-configuration host packages use it, so their native tests run on macOS and
-Windows CI machines with the native compiler of each OS. That is the recovery
-that doctor gives for excluded APIs.
+configuration host packages use it, so CI runs them natively with the compiler
+of each OS: on macOS, the native legs of `check:console`, `check:config` and
+`check:formats`; on Windows, also `mise run test -- native`. That is the
+recovery that doctor gives for excluded APIs.
 
 Before you add a program to `sync_programs`, run
 `ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross` and
@@ -156,7 +157,8 @@ Before you add a program to `sync_programs`, run
 mode or the CI cross-build job, run doctor on Linux and macOS. Record the codes
 in the pull request. Change the pin in `scripts/cross-build.mbtx`,
 `.config/mise/config.toml` and this file together; `mise run test:scripts` fails
-when they differ.
+when a `moonrockz/zig-cross@<version>` reference differs from the pin of the
+script. Also update the assessed versions above.
 
 ## Layout and current scope
 

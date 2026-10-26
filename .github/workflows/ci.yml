@@ -105,6 +105,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run doctor and cross-build four targets
         run: mise run build:cross
+      - name: Keep the doctor reports of a failed cross-build
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zig-cross-doctor
+          path: _build/cross/doctor-*.json
+          if-no-files-found: ignore
 
   test-scripts:
     name: Test task scripts

@@ -40,9 +40,10 @@ import {
 let zig_cross : String = "moonrockz/zig-cross@0.3.0"
 
 ///|
-/// The executables that fit the synchronous runtime. None of them imports `moonbitlang/async`,
-/// directly or through a dependency. Each one ran on darwin-arm64 and darwin-x64 with output
-/// identical to a native macOS build (zig-cross 0.3.0, MoonBit 0.10.17+d971670cd, Zig 0.17.0).
+/// The executables that fit the synchronous runtime: none of them uses `moonbitlang/async`.
+/// `main` checks only their own imports; an indirect use fails later, in the sync build. Each
+/// one, except `tests/formats-leaky`, ran on darwin-arm64 and darwin-x64 with output identical to
+/// a native macOS build (zig-cross 0.3.0, MoonBit 0.10.17+d971670cd, Zig 0.17.0).
 let sync_programs : Array[String] = [
   "tests/browser-parity-reference", "tests/config-parity", "tests/formats-custom",
   "tests/formats-default", "tests/formats-leaky", "tests/formats-toml", "tests/openrpc-consumer",
@@ -135,13 +136,16 @@ enum DoctorStatus {
 /// The parts of a `zig-cross doctor --json` report (schema version 1) that a plan uses.
 struct DoctorReport {
   status : DoctorStatus
-  runtime_mode : String
+  /// The runtime that doctor assessed, or `None` when the report has no known runtime mode.
+  runtime : Runtime?
   findings : Array[Finding]
 } derive(Debug)
 
 ///|
 struct Finding {
   code : String
+  /// Printed only. zig-cross can add severities in schema version 1; 0.3.0 also gives
+  /// `unverified`.
   severity : String
   targets : Array[String]
   message : String
@@ -181,9 +185,12 @@ fn DoctorReport::parse(text : String) -> DoctorReport raise DoctorError {
     { "status": "ok", .. } => Healthy
     _ => raise InvalidReport("The doctor report has no known status")
   }
-  let runtime_mode = match json {
-    { "environment": { "runtime_mode": String(mode), .. }, .. } => mode
-    _ => ""
+  let runtime = match json {
+    { "environment": { "runtime_mode": String(mode), .. }, .. } =>
+      Some(Runtime::parse(mode)) catch {
+        _ => None
+      }
+    _ => None
   }
   let findings = match json {
     { "findings": Array(items), .. } =>
@@ -216,17 +223,20 @@ fn DoctorReport::parse(text : String) -> DoctorReport raise DoctorError {
       })
     _ => []
   }
-  { status, runtime_mode, findings, }
+  { status, runtime, findings, }
 }
 
 ///|
-/// One line for each finding: `[CODE] severity (targets)`.
-fn DoctorReport::summary(self : DoctorReport) -> String {
-  self.findings
-  .map(finding => {
-    "[\{finding.code}] \{finding.severity} (\{finding.targets.join(", ")})"
-  })
-  .join("\n")
+/// The finding and its next steps: `[CODE] severity (targets): message`, then one
+/// `  Next: step` line for each step.
+fn Finding::describe(self : Finding) -> String {
+  let lines = [
+    "[\{self.code}] \{self.severity} (\{self.targets.join(", ")}): \{self.message}",
+  ]
+  for step in self.next_steps {
+    lines.push("  Next: \{step}")
+  }
+  lines.join("\n")
 }
 
 ///|
@@ -250,16 +260,24 @@ fn zig_cross_pins(text : String) -> Array[String] {
   let pins = []
   for part in text.split(prefix).drop(1) {
     let version = part.to_owned()
+    // A version starts with a digit and holds digits, letters, `.`, `-` and `+` (semver).
+    guard version.length() > 0 && version[0] >= '0' && version[0] <= '9' else {
+      continue
+    }
     let mut end = 0
     while end < version.length() {
       let c = version[end]
-      guard (c >= '0' && c <= '9') || c == '.' else { break }
+      guard (c >= '0' && c <= '9') ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        c == '.' ||
+        c == '-' ||
+        c == '+' else {
+        break
+      }
       end += 1
     }
-    let number = version[:end].trim_end(chars=".").to_owned()
-    if !number.is_empty() {
-      pins.push(prefix + number)
-    }
+    pins.push(prefix + version[:end].trim_end(chars=".").to_owned())
   }
   pins
 }
@@ -300,14 +318,17 @@ async fn doctor(runtime : Runtime) -> Unit {
   println(
     "🩺 zig-cross doctor, \{runtime.name()} runtime, \{targets.join(" ")}: \{report.codes().join(" ")}",
   )
-  guard report.status != Blocked && report.runtime_mode == runtime.name() else {
+  guard report.runtime == Some(runtime) else {
+    eprintln(err.text())
+    eprintln(
+      "❌ zig-cross doctor did not assess the \{runtime.name()} runtime. Read _build/cross/doctor-\{runtime.name()}.json.",
+    )
+    @sys.exit(1)
+  }
+  guard report.status != Blocked else {
+    eprintln(err.text())
     for finding in report.findings {
-      eprintln(
-        "[\{finding.code}] \{finding.severity} (\{finding.targets.join(", ")}): \{finding.message}",
-      )
-      for step in finding.next_steps {
-        eprintln("  Next: \{step}")
-      }
+      eprintln(finding.describe())
     }
     eprintln(
       "❌ zig-cross doctor reports a blocker for the \{runtime.name()} plan. Read _build/cross/doctor-\{runtime.name()}.json before you change the plan.",
@@ -382,16 +403,34 @@ let full_report : String =
 test "a doctor report gives its status, runtime and findings" {
   let report = DoctorReport::parse(full_report)
   assert_eq(report.status, Warning)
-  assert_eq(report.runtime_mode, "full")
+  assert_eq(report.runtime, Some(Full))
   assert_eq(report.codes(), ["ZC_LINUX_NAME_MAX"])
   assert_eq(report.findings[0].targets, ["linux-x64"])
   assert_eq(report.findings[0].next_steps, [
     "zig-cross build linux-x64 -- <package-path>",
   ])
   assert_eq(
-    report.summary(),
-    "[ZC_LINUX_NAME_MAX] warning (linux-x64)\n[ZC_LINUX_NAME_MAX] warning (linux-arm64)",
+    report.findings[0].describe(),
+    "[ZC_LINUX_NAME_MAX] warning (linux-x64): m\n  Next: zig-cross build linux-x64 -- <package-path>",
   )
+  assert_eq(
+    report.findings[1].describe(),
+    "[ZC_LINUX_NAME_MAX] warning (linux-arm64): m",
+  )
+}
+
+///|
+test "a report without a known runtime mode has no runtime" {
+  for
+    text in [
+      "{\"schema_version\":1,\"status\":\"ok\",\"findings\":[]}", "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"turbo\"},\"status\":\"ok\"}",
+    ] {
+    assert_eq(DoctorReport::parse(text).runtime, None, msg=text)
+  }
+  let sync = DoctorReport::parse(
+    "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"sync\"},\"status\":\"warning\"}",
+  )
+  assert_eq(sync.runtime, Some(Sync))
 }
 
 ///|
@@ -463,6 +502,12 @@ test "zig_cross_pins reads each reference" {
   )
   assert_eq(zig_cross_pins("no reference"), [])
   assert_eq(zig_cross_pins("moonx moonrockz/zig-cross@<version> doctor"), [])
+  assert_eq(
+    zig_cross_pins(
+      "moonrockz/zig-cross@0.4.0-rc.1 and \"moonrockz/zig-cross@1.0.0+build.5\"",
+    ),
+    ["moonrockz/zig-cross@0.4.0-rc.1", "moonrockz/zig-cross@1.0.0+build.5"],
+  )
 }
 
 ///|

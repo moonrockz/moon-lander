@@ -32,7 +32,9 @@ priv struct ServiceRef {
 } derive(Eq, Debug)
 
 ///|
-// Eq and Debug support white-box laws only. Remove when a driver uses them.
+// Debug supports white-box tests only, and only `run` (native, js) compares
+// actions with Eq, so wasm and wasm-gc do not use it. Remove when the build
+// system can limit derived methods to tests and targets.
 #warnings("-1")
 priv enum Action {
   Hook(ServiceRef, Phase)

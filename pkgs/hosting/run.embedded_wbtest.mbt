@@ -302,8 +302,11 @@ test "an incomplete injected tree gives 2 and names the paths before the factory
   assert_true(result.failures is [IncompleteFileTree(..)])
   assert_eq(calls, [])
   assert_eq(lines.length(), 1)
-  assert_true(lines[0].has_prefix("acme: Incomplete configuration file tree; requested paths: "))
-  assert_true(lines[0].contains("/"))
+  guard result.failures is [IncompleteFileTree(requests~)] else { fail("expected one incomplete tree") }
+  let paths = requests.map(request => match request { ListDir(path) | ReadFile(path) => path })
+  assert_true(paths.length() > 0)
+  // The report names every requested path, in request order.
+  assert_eq(lines[0], "acme: Incomplete configuration file tree; requested paths: " + paths.join(", "))
 }
 
 ///|

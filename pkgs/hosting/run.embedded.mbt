@@ -50,6 +50,10 @@ fn run_to_completion(work : async () -> Unit) -> Completion {
 /// wasm to WASI standard error, on wasm-gc to the only output channel of core.
 /// A replacement `error_report` must not suspend; the driver ignores a report
 /// that raises or suspends.
+/// A continuation that the embedder keeps and resumes after its step ended
+/// cannot change the result of that step. It still runs with the context of
+/// the run, so it can make a stop request while the run is in progress. Do not
+/// keep continuations of hooks or the command.
 pub fn[S] run_embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> RunOutcome {
   run_embedded_with_writer(host, command, stop_probe?, write_line=line => eprintln(line))
 }
@@ -71,8 +75,9 @@ fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : 
 ///|
 fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bool)?) -> RunOutcome {
   let inputs = configuration_inputs(host) catch { err => return outcome(err) }
-  // A later help or version request returns here with code 0, before
-  // configuration, the factory and the hooks.
+  // Task 13.4: a help or version request will return here with code 0,
+  // before configuration, the factory and the hooks. Today the pinned argparse
+  // ends the process inside `parse_arguments`.
   let config = configuration_from_tree(inputs.sources, host.file_tree) catch { err => return outcome(err) }
   let configured = finish_configuration(host, inputs, config) catch {
     StopRequested => return {

@@ -235,8 +235,9 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
 2. The host parses `args` one time with `moonbitlang/core/argparse`. An argparse
    error or a misused standard flag ends the run with `UsageError` and exit code 2,
    before any file read. On native and js, `--help` and `--version` end the process
-   inside argparse with code 0. On wasm and wasm-gc, they return control to the
-   embedder (D6, "Help and version in the embedded driver"). Settings come first
+   with code 0: inside argparse until task 13.4, then through the console driver. On
+   wasm and wasm-gc, they return control to the embedder (D6, "Help and version in
+   the embedded driver"). Settings come first
    because the parse reads the variable set of the run.
 3. The host finds the environment name for `HostEnvironment`: the `--environment`
    value, then `<PREFIX>_ENVIRONMENT` in the variable set of the run, then the builder
@@ -473,13 +474,20 @@ Drivers run the steps:
   - Output: the driver writes the text that argparse renders, one time, to standard
     output with `println`, the same text as on native and js.
   - Result: `run_embedded` returns a `RunOutcome` with exit code 0, no failures and
-    the stop reason `Completed`.
+    the stop reason `Requested`, the same reason as a services factory that raises
+    `StopRequested`, which also ends the run before any hook.
   - Order: the request ends the run after the argument parse and before the
     configuration load. No file of the tree is read, and the services factory, the
     lifetime and the hooks do not run.
-  - No exit: the driver calls no process exit and needs no exit import.
-  - Native and js keep the argparse behavior: print the text and end the process with
-    code 0.
+  - No exit: the driver calls no process exit, and the built wasm and wasm-gc modules
+    have no exit import (`proc_exit`, `__moonbit_sys_unstable.exit`). Today
+    `Command::parse` links that import into every host, also when no argument asks for
+    help.
+  - Call (review of group 13): `run` on native and js uses the same entry point, so
+    the host has one parse path. `run` writes the text and returns the same outcome,
+    and `run` still does not end the process. The console driver then ends the
+    process with code 0 (native) or sets `process.exitCode` (js), which keeps help
+    text that is still in a pipe.
   - Parser: the driver uses one argparse parse of the same command. It does not read
     argv itself and does not add a second parser. The pinned public
     `Command::parse` catches the private help and version requests and exits, so the

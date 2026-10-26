@@ -179,8 +179,8 @@ enum DoctorStatus {
 /// The parts of a `zig-cross doctor --json` report (schema version 1) that a plan uses.
 struct DoctorReport {
   status : DoctorStatus
-  /// The runtime that doctor assessed, or `None` when the report has no known runtime mode.
-  runtime : Runtime?
+  /// The runtime that doctor assessed (`environment.runtime_mode`).
+  runtime : Runtime
   findings : Array[Finding]
 } derive(Debug)
 
@@ -213,7 +213,7 @@ fn strings(values : Array[Json]) -> Array[String] {
 
 ///|
 /// Read a doctor report. Fail when it is not JSON, has a schema version other than 1, or has no
-/// known status.
+/// known status or runtime mode.
 fn DoctorReport::parse(text : String) -> DoctorReport raise DoctorError {
   let json = @json.parse(text) catch {
     error => raise InvalidReport("The doctor output is not JSON: \{error}")
@@ -229,11 +229,9 @@ fn DoctorReport::parse(text : String) -> DoctorReport raise DoctorError {
     _ => raise InvalidReport("The doctor report has no known status")
   }
   let runtime = match json {
-    { "environment": { "runtime_mode": String(mode), .. }, .. } =>
-      Some(Runtime::parse(mode)) catch {
-        _ => None
-      }
-    _ => None
+    { "environment": { "runtime_mode": "full", .. }, .. } => Full
+    { "environment": { "runtime_mode": "sync", .. }, .. } => Sync
+    _ => raise InvalidReport("The doctor report has no known runtime mode")
   }
   let findings = match json {
     { "findings": Array(items), .. } =>
@@ -361,7 +359,7 @@ async fn doctor(runtime : Runtime, targets : Array[Target]) -> Unit {
   println(
     "🩺 zig-cross doctor, \{runtime.name()} runtime, \{targets.join(" ")}: \{report.codes().join(" ")}",
   )
-  guard report.runtime == Some(runtime) else {
+  guard report.runtime == runtime else {
     eprintln(err.text())
     eprintln(
       "❌ zig-cross doctor did not assess the \{runtime.name()} runtime. Read _build/cross/doctor-\{runtime.name()}.json.",
@@ -440,7 +438,7 @@ let full_report : String =
 test "a doctor report gives its status, runtime and findings" {
   let report = DoctorReport::parse(full_report)
   assert_eq(report.status, Warning)
-  assert_eq(report.runtime, Some(Full))
+  assert_eq(report.runtime, Full)
   assert_eq(report.codes(), ["ZC_LINUX_NAME_MAX"])
   assert_eq(report.findings[0].targets, ["linux-x64"])
   assert_eq(report.findings[0].next_steps, [
@@ -457,17 +455,27 @@ test "a doctor report gives its status, runtime and findings" {
 }
 
 ///|
-test "a report without a known runtime mode has no runtime" {
+
+///|
+/// A minimal doctor report with a status and a runtime mode.
+fn report_json(status : String, mode : String) -> String {
+  "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"\{mode}\"},\"status\":\"\{status}\",\"findings\":[]}"
+}
+
+///|
+test "each runtime mode is read, and a missing or unknown mode fails" {
+  assert_eq(DoctorReport::parse(report_json("ok", "full")).runtime, Full)
+  assert_eq(DoctorReport::parse(report_json("warning", "sync")).runtime, Sync)
   for
     text in [
-      "{\"schema_version\":1,\"status\":\"ok\",\"findings\":[]}", "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"turbo\"},\"status\":\"ok\"}",
+      "{\"schema_version\":1,\"status\":\"ok\",\"findings\":[]}",
+      report_json("ok", "turbo"),
+      report_json("ok", "Full"),
+      report_json("ok", ""),
     ] {
-    assert_eq(DoctorReport::parse(text).runtime, None, msg=text)
+    let failed = Ok(DoctorReport::parse(text)) catch { error => Err(error) }
+    assert_true(failed is Err(InvalidReport(_)), msg=text)
   }
-  let sync = DoctorReport::parse(
-    "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"sync\"},\"status\":\"warning\"}",
-  )
-  assert_eq(sync.runtime, Some(Sync))
 }
 
 ///|
@@ -479,16 +487,10 @@ test "each doctor status is read, and an unknown status fails" {
       ("unknown", Unknown),
       ("ok", Healthy),
     ] {
-    let report = DoctorReport::parse(
-      "{\"schema_version\":1,\"status\":\"\{text}\",\"findings\":[]}",
-    )
+    let report = DoctorReport::parse(report_json(text, "full"))
     assert_eq(report.status, status)
   }
-  let failed = Ok(
-    DoctorReport::parse(
-      "{\"schema_version\":1,\"status\":\"fine\",\"findings\":[]}",
-    ),
-  ) catch {
+  let failed = Ok(DoctorReport::parse(report_json("fine", "full"))) catch {
     error => Err(error)
   }
   assert_true(failed is Err(InvalidReport(_)))

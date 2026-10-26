@@ -45,6 +45,14 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   no signal identity and no handler that runs during code that never yields. The
   stub does only async-signal-safe work. All other process and filesystem work stays
   with `moonbitlang/async`.
+- Consult `zig-cross` doctor before you change the zig-cross pin, `ZIG_CROSS_RUNTIME`,
+  `sync_programs` in `scripts/cross-build.mbtx` or a cross-build CI job:
+  `mise run doctor:zig-cross` (add `-- --json` for the `schema_version: 1` report), on
+  each host OS that the change affects. Use the finding codes and `next_steps`, check
+  them against the real programs, and record them in the pull request. The sync runtime
+  excludes `moonbitlang/async`, so hosting and the config host keep their native macOS
+  and Windows CI legs. A cross-built Windows program is not proof of runtime behavior.
+  See "Cross-builds with zig-cross" in `README.md`.
 - Browser Web API calls may use TypeScript in `pkgs/config/adapters/browser/`,
   bundled with the pinned Bun browser target through moonx. The unpublished
   feasibility fixture and Playwright tests live under `tests/`; HTTP serving,
@@ -83,7 +91,8 @@ unrepresentable.
 
 Run `mise run check` after changes. It runs lint, workspace and version validation,
 tests for `wasm`, `wasm-gc`, `js`, and `native`, task script tests, and builds.
-Run `mise run test:native-zig` when changing native toolchain integration.
+Run `mise run test:native-zig` and `mise run build:cross` when changing native toolchain
+integration.
 Install Lefthook with `mise run hooks:install`. Run `mise run format` before
 committing MoonBit changes. Commit the `pkg.generated.mbti` files that `mise run lint`
 writes; lint fails when one is new or changed and not staged. Use Conventional Commits

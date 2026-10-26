@@ -4,6 +4,8 @@ import {
   "moonbitlang/async",
 }
 
-supported_targets = "js"
+// Native lets `mise run build:cross` link hosting, the console signal stub and
+// moonbitlang/async for linux-x64 and linux-arm64.
+supported_targets = "native+js"
 
 options("is-main": true)

@@ -99,8 +99,70 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |
 | `mise run build:browser-adapter` | Generate the production browser Web API adapter |
 | `mise run check:browser-adapter` | Reject stale production browser FFI without rewriting it |
-| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.1.2` |
+| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.3.0` |
+| `mise run doctor:zig-cross` | Diagnose zig-cross targets without building (args: targets, `--json`) |
+| `mise run build:cross` | Run doctor, then cross-build Linux arm64, macOS and Windows programs (args: plans `full`, `sync` or target names) |
 | `mise run clean` | Remove build artifacts |
+
+## Cross-builds with zig-cross
+
+`moonrockz/zig-cross` compiles MoonBit native code with Zig. The tasks use it
+through `moonx` at the pin in `.config/mise/config.toml`; do not copy its
+wrappers. It runs on Linux and macOS, not on Windows.
+
+Run doctor first. It reads the toolchain and the selected runtime, and does not
+build anything:
+
+```shell
+mise run doctor:zig-cross -- linux-x64 darwin-arm64 windows-x64
+ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross -- --json
+```
+
+The JSON report (`schema_version: 1`) has a status, and findings with stable
+codes and next steps. Status `error` exits with 1. In a next step, replace
+`zig-cross` with `mise exec -- moonx scripts/toolchain.mbtx moonrockz/zig-cross@<version>`
+(for `zig-cross doctor <args>`, `mise run doctor:zig-cross -- <args>` is
+enough). Replace example paths such as `fixtures/consumer` with a program of
+this workspace, such as `tests/formats-default`.
+
+`mise run build:cross` runs doctor, stops on status `error`, and then builds
+these plans. It checks the header of each executable. It does not run them.
+Arguments select plans (`full`, `sync`) or single targets (`darwin-x64`). CI
+runs `mise run build:cross -- linux-arm64 darwin-x64`: the targets that no CI
+machine builds. The macOS and Windows jobs build `darwin-arm64` and
+`windows-x64` natively, and run the programs.
+
+| Plan | Runtime | Targets | Programs |
+| --- | --- | --- | --- |
+| `full` | full (default) | `linux-arm64` | `full_programs`: `tests/console-host-program` (hosting, the console signal stub and `moonbitlang/async`) and the sync programs |
+| `sync` | experimental `ZIG_CROSS_RUNTIME=sync` | `darwin-arm64`, `darwin-x64`, `windows-x64` | Only the programs in `sync_programs` of `scripts/cross-build.mbtx` |
+
+What a Linux machine can and cannot do, with zig-cross `0.3.0`, MoonBit
+`0.10.17+d971670cd` and Zig `0.17.0`:
+
+| Code | What doctor reports | Result for Moon-Lander |
+| --- | --- | --- |
+| `ZC_LINUX_NAME_MAX` | Linux targets get `-include limits.h` | Linux x64 and arm64 build with the full runtime, also `moonbitlang/async` and the hosting signal stub. The plan builds only arm64, because the Linux x64 jobs already build and run x64 with gcc and with zig |
+| `ZC_DARWIN_VNODE_HEADER` | The full runtime needs the macOS SDK; on Linux this is an error | Use the sync runtime, or build on macOS |
+| `ZC_WINDOWS_MSVC_RUNTIME` | The full runtime needs MSVC | Use the sync runtime, or build on Windows |
+| `ZC_COMPATIBILITY_MODE` | Sync runtime selected; no event loop, async file system, network, processes, TLS, thread pools or watchers | Programs that do not import `moonbitlang/async` link for Darwin and Windows |
+| `ZC_WINDOWS_OSSTRING` | A cross-built Windows program can read arguments, environment variables and paths wrongly | Do not ship or trust a cross-built Windows program ([moon#2320](https://github.com/moonbitlang/moon/issues/2320)) |
+
+`moonbitlang/async` does not cross-build to Darwin or Windows in either runtime.
+Its own C files need `sys/vnode.h` from the macOS SDK and MSVC. The hosting and
+configuration host packages use it, so CI runs them natively with the compiler
+of each OS: on macOS, the native legs of `check:console`, `check:config` and
+`check:formats`; on Windows, also `mise run test -- native`. That is the
+recovery that doctor gives for excluded APIs.
+
+Before you add a program to `sync_programs`, run
+`ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross` and
+`mise run build:cross -- sync`. Before you change the zig-cross pin, a runtime
+mode or the CI cross-build job, run doctor on Linux and macOS. Record the codes
+in the pull request. Change the pin in `scripts/cross-build.mbtx`,
+`.config/mise/config.toml` and this file together; `mise run test:scripts` fails
+when a `moonrockz/zig-cross@<version>` reference differs from the pin of the
+script. Also update the assessed versions above.
 
 ## Layout and current scope
 
@@ -146,8 +208,9 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 - `openspec/` holds the requirements (`specs/`) and the changes in progress
   (`changes/`). The hosting and configuration framework is proposed there.
 - `.config/mise/config.toml` pins the tools and declares tasks.
-- `.github/workflows/ci.yml` checks lint, validation, builds, tests, and task scripts.
-  The `ci-ok` job is the aggregate check for branch protection.
+- `.github/workflows/ci.yml` checks lint, validation, builds, tests, task scripts,
+  zig builds and cross-builds. The `ci-ok` job is the aggregate check for branch
+  protection.
 
 The application model, command and service lifecycle, and CLI are proposed in
 `openspec/changes/` and are not implemented yet. The configuration file host

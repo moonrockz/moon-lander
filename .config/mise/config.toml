@@ -127,9 +127,19 @@ run = "moonx scripts/toolchain.mbtx scripts/validate-packages.mbtx"
 description = "Verify that every module and version string has the version of the root moon.mod"
 run = "moonx scripts/toolchain.mbtx scripts/versions.mbtx check"
 
+# zig-cross runs on Linux and macOS only. Run doctor:zig-cross before you change the zig-cross pin, a
+# runtime mode (ZIG_CROSS_RUNTIME) or a cross-build CI step; the pin is checked by scripts/cross-build.mbtx.
 [tasks."test:native-zig"]
 description = "Run native tests with zig as the C compiler"
-run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/test.mbtx native"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 exec host -- moonx scripts/test.mbtx native"
+
+[tasks."doctor:zig-cross"]
+description = "Diagnose zig-cross targets without building (args: targets, --json; set ZIG_CROSS_RUNTIME=sync for sync)"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 doctor"
+
+[tasks."build:cross"]
+description = "Run doctor, then cross-build Linux arm64 (full runtime) and Darwin and Windows (sync runtime) programs (args: full, sync or target names)"
+run = "moonx scripts/toolchain.mbtx scripts/cross-build.mbtx"
 
 [tasks."test:node-adapter"]
 description = "Test the js config and hosting adapters on Node and Bun (args: node|bun)"
@@ -165,7 +175,7 @@ run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx test"
 
 [tasks."test:browser-zig"]
 description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures)"
-run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.1.2 exec host -- moonx scripts/browser.mbtx test"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 exec host -- moonx scripts/browser.mbtx test"
 
 [tasks."test:browser-failures"]
 description = "Prove browser assertion and missing-engine failures propagate"

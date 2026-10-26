@@ -1,0 +1,601 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
+///|
+/// Cross-build the native programs for four targets from one Linux or macOS machine with
+/// `moonrockz/zig-cross`.
+///
+/// Each plan first runs `zig-cross doctor --json` for its targets and runtime. A report with
+/// status `error` stops the plan before it builds; the findings and their next steps go to the
+/// output, and the report goes to `_build/cross/doctor-<runtime>.json`. Then the plan runs
+/// `zig-cross build`, which checks the header of each executable.
+///
+/// - `full`: the full MoonBit runtime for `linux-arm64`, for `full_programs`: the hosting program
+///   with the console signal stub and `moonbitlang/async`, and the sync programs. CI already builds
+///   and runs x64 Linux with gcc and with zig, so this plan does not build `linux-x64`.
+/// - `sync`: the experimental synchronous runtime (`ZIG_CROSS_RUNTIME=sync`) for `darwin-arm64`,
+///   `darwin-x64` and `windows-x64`, for `sync_programs` only.
+///
+/// This is a compile, link and header check. It does not run the programs, and it does not
+/// replace the native test legs on macOS and Windows. Do not ship a cross-built Windows program:
+/// the core library follows the build host (`ZC_WINDOWS_OSSTRING`). `moonbitlang/async` cannot
+/// cross-build to Darwin or Windows in either runtime: its C files need the macOS SDK header
+/// `sys/vnode.h` and MSVC. Build those programs on the target OS with its native compiler.
+///
+/// Usage: `mise run build:cross [-- <plan or target>...]`, or
+/// `moonx scripts/toolchain.mbtx scripts/cross-build.mbtx`. A plan name (`full`, `sync`) selects all
+/// targets of that plan; a target name (`linux-arm64`, `darwin-x64`, ...) selects one target of its
+/// plan. With no argument, it runs both plans for all their targets.
+
+///|
+/// The zig-cross release. Change it here, in `.config/mise/config.toml` and in `README.md`; a
+/// test of this script fails when they differ.
+let zig_cross : String = "moonrockz/zig-cross@0.3.0"
+
+///|
+/// The executables that fit the synchronous runtime: none of them uses `moonbitlang/async`.
+/// `main` checks only their own imports; an indirect use fails later, in the sync build. Each
+/// one, except `tests/formats-leaky`, ran on darwin-arm64 and darwin-x64 with output identical to
+/// a native macOS build (zig-cross 0.3.0, MoonBit 0.10.17+d971670cd, Zig 0.17.0).
+let sync_programs : Array[String] = [
+  "tests/browser-parity-reference", "tests/config-parity", "tests/formats-custom",
+  "tests/formats-default", "tests/formats-leaky", "tests/formats-toml", "tests/openrpc-consumer",
+]
+
+///|
+/// The executables of the full plan: the sync programs and the console host program, which links
+/// hosting, the console signal stub and `moonbitlang/async`. The docs site tools are not framework
+/// code, and they took most of the build time, so the plan does not build them.
+let full_programs : Array[String] = ["tests/console-host-program"] +
+  sync_programs
+
+///|
+/// A zig-cross target, without `host`.
+enum Target {
+  LinuxArm64
+  DarwinArm64
+  DarwinX64
+  WindowsX64
+} derive(Eq, Debug)
+
+///|
+fn Target::name(self : Target) -> String {
+  match self {
+    LinuxArm64 => "linux-arm64"
+    DarwinArm64 => "darwin-arm64"
+    DarwinX64 => "darwin-x64"
+    WindowsX64 => "windows-x64"
+  }
+}
+
+///|
+/// The MoonBit runtime that zig-cross compiles, set by `ZIG_CROSS_RUNTIME`.
+enum Runtime {
+  Full
+  Sync
+} derive(Eq, Debug)
+
+///|
+suberror PlanError {
+  UnknownPlan(String)
+}
+
+///|
+/// Read a target name from the command line.
+fn Target::parse(text : String) -> Target raise PlanError {
+  match text {
+    "linux-arm64" => LinuxArm64
+    "darwin-arm64" => DarwinArm64
+    "darwin-x64" => DarwinX64
+    "windows-x64" => WindowsX64
+    _ =>
+      raise UnknownPlan(
+        "Unknown plan or target '\{text}'. Use full, sync, linux-arm64, darwin-arm64, darwin-x64 or windows-x64.",
+      )
+  }
+}
+
+///|
+/// The plans and targets that the command line selects, in plan order and in the target order
+/// of each plan. No argument selects every target of both plans.
+fn select(
+  args : Array[String],
+) -> Array[(Runtime, Array[Target])] raise PlanError {
+  let selected : Array[Target] = []
+  for arg in args {
+    let targets = match arg {
+      "full" | "sync" => Runtime::parse(arg).targets()
+      _ => [Target::parse(arg)]
+    }
+    selected.append(targets)
+  }
+  let plans = []
+  for runtime in [Full, Sync] {
+    let targets = runtime
+      .targets()
+      .filter(target => args.is_empty() || selected.contains(target))
+    if !targets.is_empty() {
+      plans.push((runtime, targets))
+    }
+  }
+  plans
+}
+
+///|
+/// Read a plan name from the command line: `full` or `sync`.
+fn Runtime::parse(text : String) -> Runtime raise PlanError {
+  match text {
+    "full" => Full
+    "sync" => Sync
+    _ => raise UnknownPlan("Unknown plan '\{text}'. Use full or sync.")
+  }
+}
+
+///|
+fn Runtime::name(self : Runtime) -> String {
+  match self {
+    Full => "full"
+    Sync => "sync"
+  }
+}
+
+///|
+/// The targets of the plan of a runtime.
+fn Runtime::targets(self : Runtime) -> Array[Target] {
+  match self {
+    Full => [LinuxArm64]
+    Sync => [DarwinArm64, DarwinX64, WindowsX64]
+  }
+}
+
+///|
+/// The package paths of the plan of a runtime.
+fn Runtime::paths(self : Runtime) -> Array[String] {
+  match self {
+    Full => full_programs
+    Sync => sync_programs
+  }
+}
+
+///|
+/// The overall status of a doctor report, in precedence order.
+enum DoctorStatus {
+  Blocked // "error"
+  Warning
+  Unknown
+  Healthy // "ok"
+} derive(Eq, Debug)
+
+///|
+/// The parts of a `zig-cross doctor --json` report (schema version 1) that a plan uses.
+struct DoctorReport {
+  status : DoctorStatus
+  /// The runtime that doctor assessed (`environment.runtime_mode`).
+  runtime : Runtime
+  findings : Array[Finding]
+} derive(Debug)
+
+///|
+struct Finding {
+  code : String
+  /// Printed only. zig-cross can add severities in schema version 1; 0.3.0 also gives
+  /// `unverified`.
+  severity : String
+  targets : Array[String]
+  message : String
+  next_steps : Array[String]
+} derive(Debug)
+
+///|
+suberror DoctorError {
+  InvalidReport(String)
+}
+
+///|
+fn strings(values : Array[Json]) -> Array[String] {
+  values.filter_map(value => {
+    if value is String(text) {
+      Some(text)
+    } else {
+      None
+    }
+  })
+}
+
+///|
+/// Read a doctor report. Fail when it is not JSON, has a schema version other than 1, or has no
+/// known status or runtime mode.
+fn DoctorReport::parse(text : String) -> DoctorReport raise DoctorError {
+  let json = @json.parse(text) catch {
+    error => raise InvalidReport("The doctor output is not JSON: \{error}")
+  }
+  guard json is { "schema_version": Number(version, ..), .. } && version == 1 else {
+    raise InvalidReport("The doctor report does not have schema_version 1")
+  }
+  let status = match json {
+    { "status": "error", .. } => Blocked
+    { "status": "warning", .. } => Warning
+    { "status": "unknown", .. } => Unknown
+    { "status": "ok", .. } => Healthy
+    _ => raise InvalidReport("The doctor report has no known status")
+  }
+  let runtime = match json {
+    { "environment": { "runtime_mode": "full", .. }, .. } => Full
+    { "environment": { "runtime_mode": "sync", .. }, .. } => Sync
+    _ => raise InvalidReport("The doctor report has no known runtime mode")
+  }
+  let findings = match json {
+    { "findings": Array(items), .. } =>
+      items.filter_map(item => {
+        guard item is { "code": String(code), "severity": String(severity), .. } else {
+          return None
+        }
+        let targets = if item is { "targets": Array(names), .. } {
+          strings(names)
+        } else {
+          []
+        }
+        let message = if item is { "message": String(text), .. } {
+          text
+        } else {
+          ""
+        }
+        let next_steps = if item is { "next_steps": Array(steps), .. } {
+          steps.filter_map(step => {
+            if step is { "command": String(command), .. } {
+              Some(command)
+            } else {
+              None
+            }
+          })
+        } else {
+          []
+        }
+        Some({ code, severity, targets, message, next_steps, })
+      })
+    _ => []
+  }
+  { status, runtime, findings, }
+}
+
+///|
+/// The finding and its next steps: `[CODE] severity (targets): message`, then one
+/// `  Next: step` line for each step.
+fn Finding::describe(self : Finding) -> String {
+  let lines = [
+    "[\{self.code}] \{self.severity} (\{self.targets.join(", ")}): \{self.message}",
+  ]
+  for step in self.next_steps {
+    lines.push("  Next: \{step}")
+  }
+  lines.join("\n")
+}
+
+///|
+/// The finding codes of a report, sorted and without repeats.
+fn DoctorReport::codes(self : DoctorReport) -> Array[String] {
+  let codes : Array[String] = []
+  for finding in self.findings {
+    if !codes.contains(finding.code) {
+      codes.push(finding.code)
+    }
+  }
+  codes.sort()
+  codes
+}
+
+///|
+/// The zig-cross references in `text` that give a version, as `moonrockz/zig-cross@<version>`. A
+/// placeholder such as `moonrockz/zig-cross@<version>` is not a reference.
+fn zig_cross_pins(text : String) -> Array[String] {
+  let prefix = "moonrockz/zig-cross@"
+  let pins = []
+  for part in text.split(prefix).drop(1) {
+    let version = part.to_owned()
+    // A version starts with a digit and holds digits, letters, `.`, `-` and `+` (semver).
+    guard version.length() > 0 && version[0] >= '0' && version[0] <= '9' else {
+      continue
+    }
+    let mut end = 0
+    while end < version.length() {
+      let c = version[end]
+      guard (c >= '0' && c <= '9') ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        c == '.' ||
+        c == '-' ||
+        c == '+' else {
+        break
+      }
+      end += 1
+    }
+    pins.push(prefix + version[:end].trim_end(chars=".").to_owned())
+  }
+  pins
+}
+
+///|
+/// The package paths in `paths` whose `moon.pkg` under `root` imports `moonbitlang/async`.
+async fn async_importers(root : String, paths : Array[String]) -> Array[String] {
+  let importers = []
+  for path in paths {
+    let manifest = @fs.read_file("\{root}/\{path}/moon.pkg").text()
+    if manifest.contains("\"moonbitlang/async") {
+      importers.push(path)
+    }
+  }
+  importers
+}
+
+///|
+/// Run doctor for the targets of a plan, write the report, and stop when its status is `error`.
+async fn doctor(runtime : Runtime, targets : Array[Target]) -> Unit {
+  let targets = targets.map(target => target.name())
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [zig_cross, "doctor"] + targets + ["--json"],
+    extra_env={ "ZIG_CROSS_RUNTIME": runtime.name() },
+  )
+  let text = out.text()
+  @fs.mkdir("_build/cross", recursive=true, allow_exist=true)
+  @fs.write_file("_build/cross/doctor-\{runtime.name()}.json", text)
+  let report = DoctorReport::parse(text) catch {
+    InvalidReport(message) => {
+      eprintln(err.text())
+      eprintln("❌ \{message} (exit code \{code})")
+      @sys.exit(1)
+      panic()
+    }
+  }
+  println(
+    "🩺 zig-cross doctor, \{runtime.name()} runtime, \{targets.join(" ")}: \{report.codes().join(" ")}",
+  )
+  guard report.runtime == runtime else {
+    eprintln(err.text())
+    eprintln(
+      "❌ zig-cross doctor did not assess the \{runtime.name()} runtime. Read _build/cross/doctor-\{runtime.name()}.json.",
+    )
+    @sys.exit(1)
+  }
+  guard report.status != Blocked else {
+    eprintln(err.text())
+    for finding in report.findings {
+      eprintln(finding.describe())
+    }
+    eprintln(
+      "❌ zig-cross doctor reports a blocker for the \{runtime.name()} plan. Read _build/cross/doctor-\{runtime.name()}.json before you change the plan.",
+    )
+    @sys.exit(1)
+  }
+}
+
+///|
+/// Run doctor, then build the plan of a runtime for some of its targets.
+async fn build(runtime : Runtime, targets : Array[Target]) -> Unit {
+  doctor(runtime, targets)
+  let names = targets.map(target => target.name())
+  let args = [zig_cross, "build"] + names + ["--"] + runtime.paths()
+  let code = @process.run(
+    "moonx",
+    args,
+    extra_env={ "ZIG_CROSS_RUNTIME": runtime.name() },
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  guard code == 0 else {
+    eprintln(
+      "❌ The \{runtime.name()} cross-build failed. Run ZIG_CROSS_RUNTIME=\{runtime.name()} mise run doctor:zig-cross -- \{names.join(" ")}.",
+    )
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+}
+
+///|
+async fn main {
+  let plans = select(@env.args()[1:].to_owned()) catch {
+    UnknownPlan(message) => {
+      eprintln("❌ \{message}")
+      @sys.exit(2)
+      panic()
+    }
+  }
+  let importers = async_importers(".", Sync.paths())
+  guard importers.is_empty() else {
+    eprintln(
+      "❌ These sync programs import moonbitlang/async, which the sync runtime excludes: \{importers.join(", ")}. Remove them from sync_programs.",
+    )
+    @sys.exit(1)
+  }
+  let built = []
+  for plan in plans {
+    let (runtime, targets) = plan
+    build(runtime, targets)
+    built.push(targets.map(target => target.name()).join(" "))
+  }
+  println("✅ Cross-built \{built.join(" ")}")
+}
+
+///|
+let full_report : String =
+  #|{"schema_version":1,"environment":{"host_os":"Linux","runtime_mode":"full"},
+  #|"targets":["linux-x64","linux-arm64"],"status":"warning","findings":[
+  #|{"code":"ZC_LINUX_NAME_MAX","severity":"warning","targets":["linux-x64"],"message":"m",
+  #|"applicability":"a","evidence":[],"next_steps":[{"kind":"command",
+  #|"command":"zig-cross build linux-x64 -- <package-path>","prerequisites":""}]},
+  #|{"code":"ZC_LINUX_NAME_MAX","severity":"warning","targets":["linux-arm64"],"message":"m",
+  #|"applicability":"a","evidence":[],"next_steps":[]}]}
+
+///|
+test "a doctor report gives its status, runtime and findings" {
+  let report = DoctorReport::parse(full_report)
+  assert_eq(report.status, Warning)
+  assert_eq(report.runtime, Full)
+  assert_eq(report.codes(), ["ZC_LINUX_NAME_MAX"])
+  assert_eq(report.findings[0].targets, ["linux-x64"])
+  assert_eq(report.findings[0].next_steps, [
+    "zig-cross build linux-x64 -- <package-path>",
+  ])
+  assert_eq(
+    report.findings[0].describe(),
+    "[ZC_LINUX_NAME_MAX] warning (linux-x64): m\n  Next: zig-cross build linux-x64 -- <package-path>",
+  )
+  assert_eq(
+    report.findings[1].describe(),
+    "[ZC_LINUX_NAME_MAX] warning (linux-arm64): m",
+  )
+}
+
+///|
+
+///|
+/// A minimal doctor report with a status and a runtime mode.
+fn report_json(status : String, mode : String) -> String {
+  "{\"schema_version\":1,\"environment\":{\"runtime_mode\":\"\{mode}\"},\"status\":\"\{status}\",\"findings\":[]}"
+}
+
+///|
+test "each runtime mode is read, and a missing or unknown mode fails" {
+  assert_eq(DoctorReport::parse(report_json("ok", "full")).runtime, Full)
+  assert_eq(DoctorReport::parse(report_json("warning", "sync")).runtime, Sync)
+  for
+    text in [
+      "{\"schema_version\":1,\"status\":\"ok\",\"findings\":[]}",
+      report_json("ok", "turbo"),
+      report_json("ok", "Full"),
+      report_json("ok", ""),
+    ] {
+    let failed = Ok(DoctorReport::parse(text)) catch { error => Err(error) }
+    assert_true(failed is Err(InvalidReport(_)), msg=text)
+  }
+}
+
+///|
+test "each doctor status is read, and an unknown status fails" {
+  for
+    (text, status) in [
+      ("error", Blocked),
+      ("warning", Warning),
+      ("unknown", Unknown),
+      ("ok", Healthy),
+    ] {
+    let report = DoctorReport::parse(report_json(text, "full"))
+    assert_eq(report.status, status)
+  }
+  let failed = Ok(DoctorReport::parse(report_json("fine", "full"))) catch {
+    error => Err(error)
+  }
+  assert_true(failed is Err(InvalidReport(_)))
+}
+
+///|
+test "a report without schema version 1, or that is not JSON, fails" {
+  for
+    text in [
+      "{\"schema_version\":2,\"status\":\"ok\",\"findings\":[]}", "{\"status\":\"ok\"}",
+      "zig-cross doctor: error",
+    ] {
+    let failed = Ok(DoctorReport::parse(text)) catch { error => Err(error) }
+    assert_true(failed is Err(InvalidReport(_)), msg=text)
+  }
+}
+
+///|
+test "the command line selects plans and targets" {
+  let names = (plans : Array[(Runtime, Array[Target])]) => {
+    plans.map(plan => {
+      let (runtime, targets) = plan
+      runtime.name() + ":" + targets.map(target => target.name()).join(",")
+    })
+  }
+  assert_eq(names(select([])), [
+    "full:linux-arm64", "sync:darwin-arm64,darwin-x64,windows-x64",
+  ])
+  assert_eq(names(select(["sync"])), [
+    "sync:darwin-arm64,darwin-x64,windows-x64",
+  ])
+  assert_eq(names(select(["darwin-x64", "linux-arm64", "darwin-x64"])), [
+    "full:linux-arm64", "sync:darwin-x64",
+  ])
+  assert_eq(names(select(["windows-x64", "full"])), [
+    "full:linux-arm64", "sync:windows-x64",
+  ])
+  for text in ["linux-x64", "host", "bogus", ""] {
+    let failed = Ok(select([text])) catch { error => Err(error) }
+    assert_true(failed is Err(UnknownPlan(_)), msg=text)
+  }
+}
+
+///|
+test "plan names parse to runtimes, and other names fail" {
+  assert_eq(Runtime::parse("full"), Full)
+  assert_eq(Runtime::parse("sync"), Sync)
+  for text in ["", "Full", "async", "sync "] {
+    let failed = Ok(Runtime::parse(text)) catch { error => Err(error) }
+    assert_true(failed is Err(UnknownPlan(_)), msg=text)
+  }
+}
+
+///|
+test "the full plan builds Linux arm64 and the sync plan builds Darwin and Windows" {
+  assert_eq(Full.targets().map(target => target.name()), ["linux-arm64"])
+  assert_eq(Sync.targets().map(target => target.name()), [
+    "darwin-arm64", "darwin-x64", "windows-x64",
+  ])
+  assert_eq(Full.paths()[0], "tests/console-host-program")
+  assert_eq(Full.paths()[1:].to_owned(), sync_programs)
+  assert_eq(Sync.paths(), sync_programs)
+}
+
+///|
+test "zig_cross_pins reads each reference" {
+  assert_eq(
+    zig_cross_pins(
+      "a moonrockz/zig-cross@0.3.0 exec\n`moonrockz/zig-cross@0.10.12`. moonrockz/zig-cross@1.2.3.",
+    ),
+    [
+      "moonrockz/zig-cross@0.3.0", "moonrockz/zig-cross@0.10.12", "moonrockz/zig-cross@1.2.3",
+    ],
+  )
+  assert_eq(zig_cross_pins("no reference"), [])
+  assert_eq(zig_cross_pins("moonx moonrockz/zig-cross@<version> doctor"), [])
+  assert_eq(
+    zig_cross_pins(
+      "moonrockz/zig-cross@0.4.0-rc.1 and \"moonrockz/zig-cross@1.0.0+build.5\"",
+    ),
+    ["moonrockz/zig-cross@0.4.0-rc.1", "moonrockz/zig-cross@1.0.0+build.5"],
+  )
+}
+
+///|
+async test "the mise tasks and the README use the zig-cross pin of this script" {
+  for file in ["../.config/mise/config.toml", "../README.md"] {
+    let pins = zig_cross_pins(@fs.read_file(file).text())
+    assert_true(pins.length() > 0, msg=file)
+    for pin in pins {
+      assert_eq(pin, zig_cross, msg=file)
+    }
+  }
+}
+
+///|
+async test "the sync programs are executables that do not import moonbitlang/async" {
+  for path in sync_programs {
+    let manifest = @fs.read_file("../\{path}/moon.pkg").text()
+    assert_true(
+      manifest.contains("\"is-main\": true") ||
+      manifest.contains("pkgtype(kind: \"executable\")"),
+      msg=path,
+    )
+  }
+  assert_eq(async_importers("..", sync_programs), [])
+  assert_eq(async_importers("..", ["pkgs/hosting"]), ["pkgs/hosting"])
+}

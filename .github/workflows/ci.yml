@@ -37,30 +37,13 @@ jobs:
       - name: Validate workspace
         run: mise run validate
 
-  build:
-    name: Build (${{ matrix.target }})
-    runs-on: ubuntu-latest
-    needs: [lint]
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [wasm, wasm-gc, js, native]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-      - name: Install pinned tools
-        uses: ./.github/actions/setup
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build
-        run: mise run build -- ${{ matrix.target }} --release
-
+  # One job for each target tests it and then builds it in release mode. A separate build job
+  # spent more time on setup than on its build (wasm, wasm-gc and js build in 6 to 12 s).
   test:
-    name: Test (${{ matrix.target }})
+    name: Test and build (${{ matrix.target }})
     runs-on: ubuntu-latest
     needs: [lint]
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -69,6 +52,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Install pinned tools
+        id: setup
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -81,6 +65,10 @@ jobs:
       - name: Test the js host adapter on Bun
         if: matrix.target == 'js'
         run: mise run test:node-adapter -- bun
+      # The release build also runs when a test fails, so one run shows both results.
+      - name: Build in release mode
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: mise run build -- ${{ matrix.target }} --release
 
   test-native-zig:
     name: Test native (zig)
@@ -96,6 +84,34 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test using the external zig-cross tool
         run: mise run test:native-zig
+
+  # Cross-build from Linux with zig-cross, for the targets that no CI machine builds: linux-arm64
+  # with the full runtime (the hosting program and the async-free programs), and darwin-x64 with
+  # the experimental sync runtime (the async-free programs). The macOS job builds darwin-arm64 and
+  # the Windows job builds windows-x64 natively, so this job does not cross-build them. The task
+  # runs zig-cross doctor first and stops on a blocker. This is a compile, link and header check;
+  # it does not run the programs. See "Cross-builds with zig-cross" in README.md.
+  cross-build:
+    name: Cross-build (zig)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run doctor and cross-build linux-arm64 and darwin-x64
+        run: mise run build:cross -- linux-arm64 darwin-x64
+      - name: Keep the doctor reports of a failed cross-build
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zig-cross-doctor
+          path: _build/cross/doctor-*.json
+          if-no-files-found: ignore
 
   test-scripts:
     name: Test task scripts
@@ -162,50 +178,62 @@ jobs:
         # The image has no C compiler, so zig builds the native parity reference.
         run: mise run test:browser-zig -- --verify-failures
 
-  # Windows support is a project requirement, so PRs build and test native and js there.
+  # Windows support is a project requirement, so PRs build and test native and js there. One job
+  # runs both targets: the Windows setup takes 60 to 90 s, longer than the js work. The native
+  # steps run also when a js step fails. zig-cross cannot replace this job: moonbitlang/async needs
+  # MSVC, and a cross-built Windows program can read OsString values wrongly (moon#2320).
   windows:
-    name: Windows (${{ matrix.target }})
+    name: Windows (js and native)
     runs-on: windows-latest
     needs: [lint]
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [js, native]
+    timeout-minutes: 40
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Install pinned tools
+        id: setup
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up the MSVC compiler for native builds
-        if: matrix.target == 'native'
-        uses: ilammy/msvc-dev-cmd@v1
-      - name: Build
-        run: mise run build -- ${{ matrix.target }}
-      - name: Test
-        run: mise run test -- ${{ matrix.target }}
-      - name: Test the toolchain wrapper
-        if: matrix.target == 'native'
-        run: mise exec -- moonx scripts/toolchain.mbtx scripts/test-scripts.mbtx toolchain.mbtx
+      - name: Build js
+        id: js-build
+        run: mise run build -- js
+      - name: Test js
+        if: ${{ !cancelled() && steps.js-build.outcome == 'success' }}
+        run: mise run test -- js
       - name: Test the js host adapter on Bun
-        if: matrix.target == 'js'
+        if: ${{ !cancelled() && steps.js-build.outcome == 'success' }}
         run: mise run test:node-adapter -- bun
+      - name: Set up the MSVC compiler for native builds
+        id: msvc
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Build native
+        id: native-build
+        if: ${{ !cancelled() && steps.msvc.outcome == 'success' }}
+        run: mise run build -- native
+      - name: Test native
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        run: mise run test -- native
+      - name: Test the toolchain wrapper
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        run: mise exec -- moonx scripts/toolchain.mbtx scripts/test-scripts.mbtx toolchain.mbtx
       - name: Compare configuration values, provenance and reports
-        if: matrix.target == 'native'
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:config
       - name: Verify format trimming and failure propagation
-        if: matrix.target == 'native'
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:formats
       # Real CTRL_BREAK_EVENT delivery to native, Node.js and Bun children. The isolated consumer
       # copy runs on Linux and macOS only.
       - name: Test the console drivers with native and js children
-        if: matrix.target == 'native'
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:console -- --no-consumer
 
   # The core observation must also agree on every target on macOS.
-  # Reuse the existing macOS setup and retain its Node/Bun adapter coverage.
+  # Reuse the existing macOS setup and retain its Node/Bun adapter coverage. zig-cross cannot
+  # replace this job: it runs signals, configuration paths and the outside consumer on macOS, and
+  # moonbitlang/async needs the macOS SDK to compile.
   node-adapter-macos:
     name: Node adapter (macOS)
     runs-on: macos-latest
@@ -242,7 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [lint, build, test, test-native-zig, test-scripts, browser, windows, node-adapter-macos, site]
+    needs: [lint, test, test-native-zig, cross-build, test-scripts, browser, windows, node-adapter-macos, site]
     steps:
       - name: Require every job to succeed
         env:

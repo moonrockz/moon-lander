@@ -85,12 +85,12 @@ jobs:
       - name: Test using the external zig-cross tool
         run: mise run test:native-zig
 
-  # Cross-build from Linux with zig-cross: the full runtime for linux-arm64 (the hosting program
-  # and the async-free programs), and the experimental sync runtime for darwin-arm64, darwin-x64
-  # and windows-x64 (programs that do not use moonbitlang/async). The task runs zig-cross doctor
-  # first and stops on a blocker. This is a compile, link and header check. It does not replace
-  # the macOS and Windows jobs, which run the programs. See "Cross-builds with zig-cross" in
-  # README.md.
+  # Cross-build from Linux with zig-cross, for the targets that no CI machine builds: linux-arm64
+  # with the full runtime (the hosting program and the async-free programs), and darwin-x64 with
+  # the experimental sync runtime (the async-free programs). The macOS job builds darwin-arm64 and
+  # the Windows job builds windows-x64 natively, so this job does not cross-build them. The task
+  # runs zig-cross doctor first and stops on a blocker. This is a compile, link and header check;
+  # it does not run the programs. See "Cross-builds with zig-cross" in README.md.
   cross-build:
     name: Cross-build (zig)
     runs-on: ubuntu-latest
@@ -103,8 +103,8 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run doctor and cross-build four targets
-        run: mise run build:cross
+      - name: Run doctor and cross-build linux-arm64 and darwin-x64
+        run: mise run build:cross -- linux-arm64 darwin-x64
       - name: Keep the doctor reports of a failed cross-build
         if: failure()
         uses: actions/upload-artifact@v7

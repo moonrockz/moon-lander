@@ -101,7 +101,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:browser-adapter` | Reject stale production browser FFI without rewriting it |
 | `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.3.0` |
 | `mise run doctor:zig-cross` | Diagnose zig-cross targets without building (args: targets, `--json`) |
-| `mise run build:cross` | Run doctor, then cross-build Linux arm64, macOS and Windows programs (args: `full` or `sync`) |
+| `mise run build:cross` | Run doctor, then cross-build Linux arm64, macOS and Windows programs (args: plans `full`, `sync` or target names) |
 | `mise run clean` | Remove build artifacts |
 
 ## Cross-builds with zig-cross
@@ -127,6 +127,10 @@ this workspace, such as `tests/formats-default`.
 
 `mise run build:cross` runs doctor, stops on status `error`, and then builds
 these plans. It checks the header of each executable. It does not run them.
+Arguments select plans (`full`, `sync`) or single targets (`darwin-x64`). CI
+runs `mise run build:cross -- linux-arm64 darwin-x64`: the targets that no CI
+machine builds. The macOS and Windows jobs build `darwin-arm64` and
+`windows-x64` natively, and run the programs.
 
 | Plan | Runtime | Targets | Programs |
 | --- | --- | --- | --- |
@@ -138,7 +142,7 @@ What a Linux machine can and cannot do, with zig-cross `0.3.0`, MoonBit
 
 | Code | What doctor reports | Result for Moon-Lander |
 | --- | --- | --- |
-| `ZC_LINUX_NAME_MAX` | Linux targets get `-include limits.h` | Linux x64 and arm64 build with the full runtime, also `moonbitlang/async` and the hosting signal stub. CI cross-builds only arm64, because the Linux x64 jobs already build and run x64 with gcc and with zig |
+| `ZC_LINUX_NAME_MAX` | Linux targets get `-include limits.h` | Linux x64 and arm64 build with the full runtime, also `moonbitlang/async` and the hosting signal stub. The plan builds only arm64, because the Linux x64 jobs already build and run x64 with gcc and with zig |
 | `ZC_DARWIN_VNODE_HEADER` | The full runtime needs the macOS SDK; on Linux this is an error | Use the sync runtime, or build on macOS |
 | `ZC_WINDOWS_MSVC_RUNTIME` | The full runtime needs MSVC | Use the sync runtime, or build on Windows |
 | `ZC_COMPATIBILITY_MODE` | Sync runtime selected; no event loop, async file system, network, processes, TLS, thread pools or watchers | Programs that do not import `moonbitlang/async` link for Darwin and Windows |

@@ -138,7 +138,7 @@ description = "Diagnose zig-cross targets without building (args: targets, --jso
 run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 doctor"
 
 [tasks."build:cross"]
-description = "Run doctor, then cross-build Linux arm64 (full runtime) and Darwin and Windows (sync runtime) programs (args: full|sync)"
+description = "Run doctor, then cross-build Linux arm64 (full runtime) and Darwin and Windows (sync runtime) programs (args: full, sync or target names)"
 run = "moonx scripts/toolchain.mbtx scripts/cross-build.mbtx"
 
 [tasks."test:node-adapter"]

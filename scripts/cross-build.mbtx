@@ -31,8 +31,10 @@ import {
 /// cross-build to Darwin or Windows in either runtime: its C files need the macOS SDK header
 /// `sys/vnode.h` and MSVC. Build those programs on the target OS with its native compiler.
 ///
-/// Usage: `mise run build:cross [-- full|sync]`, or
-/// `moonx scripts/toolchain.mbtx scripts/cross-build.mbtx`. With no plan, it runs both.
+/// Usage: `mise run build:cross [-- <plan or target>...]`, or
+/// `moonx scripts/toolchain.mbtx scripts/cross-build.mbtx`. A plan name (`full`, `sync`) selects all
+/// targets of that plan; a target name (`linux-arm64`, `darwin-x64`, ...) selects one target of its
+/// plan. With no argument, it runs both plans for all their targets.
 
 ///|
 /// The zig-cross release. Change it here, in `.config/mise/config.toml` and in `README.md`; a
@@ -85,6 +87,47 @@ enum Runtime {
 ///|
 suberror PlanError {
   UnknownPlan(String)
+}
+
+///|
+/// Read a target name from the command line.
+fn Target::parse(text : String) -> Target raise PlanError {
+  match text {
+    "linux-arm64" => LinuxArm64
+    "darwin-arm64" => DarwinArm64
+    "darwin-x64" => DarwinX64
+    "windows-x64" => WindowsX64
+    _ =>
+      raise UnknownPlan(
+        "Unknown plan or target '\{text}'. Use full, sync, linux-arm64, darwin-arm64, darwin-x64 or windows-x64.",
+      )
+  }
+}
+
+///|
+/// The plans and targets that the command line selects, in plan order and in the target order
+/// of each plan. No argument selects every target of both plans.
+fn select(
+  args : Array[String],
+) -> Array[(Runtime, Array[Target])] raise PlanError {
+  let selected : Array[Target] = []
+  for arg in args {
+    let targets = match arg {
+      "full" | "sync" => Runtime::parse(arg).targets()
+      _ => [Target::parse(arg)]
+    }
+    selected.append(targets)
+  }
+  let plans = []
+  for runtime in [Full, Sync] {
+    let targets = runtime
+      .targets()
+      .filter(target => args.is_empty() || selected.contains(target))
+    if !targets.is_empty() {
+      plans.push((runtime, targets))
+    }
+  }
+  plans
 }
 
 ///|
@@ -296,9 +339,9 @@ async fn async_importers(root : String, paths : Array[String]) -> Array[String] 
 }
 
 ///|
-/// Run doctor for a plan, write the report, and stop when its status is `error`.
-async fn doctor(runtime : Runtime) -> Unit {
-  let targets = runtime.targets().map(target => target.name())
+/// Run doctor for the targets of a plan, write the report, and stop when its status is `error`.
+async fn doctor(runtime : Runtime, targets : Array[Target]) -> Unit {
+  let targets = targets.map(target => target.name())
   let (code, out, err) = @process.collect_output(
     "moonx",
     [zig_cross, "doctor"] + targets + ["--json"],
@@ -338,13 +381,11 @@ async fn doctor(runtime : Runtime) -> Unit {
 }
 
 ///|
-/// Run doctor, then build the plan of a runtime.
-async fn build(runtime : Runtime) -> Unit {
-  doctor(runtime)
-  let args = [zig_cross, "build"] +
-    runtime.targets().map(target => target.name()) +
-    ["--"] +
-    runtime.paths()
+/// Run doctor, then build the plan of a runtime for some of its targets.
+async fn build(runtime : Runtime, targets : Array[Target]) -> Unit {
+  doctor(runtime, targets)
+  let names = targets.map(target => target.name())
+  let args = [zig_cross, "build"] + names + ["--"] + runtime.paths()
   let code = @process.run(
     "moonx",
     args,
@@ -354,7 +395,7 @@ async fn build(runtime : Runtime) -> Unit {
   )
   guard code == 0 else {
     eprintln(
-      "❌ The \{runtime.name()} cross-build failed. Run mise run doctor:zig-cross -- \{runtime.targets().map(target => target.name()).join(" ")} (with ZIG_CROSS_RUNTIME=\{runtime.name()}).",
+      "❌ The \{runtime.name()} cross-build failed. Run ZIG_CROSS_RUNTIME=\{runtime.name()} mise run doctor:zig-cross -- \{names.join(" ")}.",
     )
     @sys.exit(if code > 0 { code } else { 1 })
   }
@@ -362,16 +403,11 @@ async fn build(runtime : Runtime) -> Unit {
 
 ///|
 async fn main {
-  let names = @env.args()[1:].to_owned()
-  let runtimes = if names.is_empty() {
-    [Full, Sync]
-  } else {
-    names.map(name => Runtime::parse(name)) catch {
-      UnknownPlan(message) => {
-        eprintln("❌ \{message}")
-        @sys.exit(2)
-        panic()
-      }
+  let plans = select(@env.args()[1:].to_owned()) catch {
+    UnknownPlan(message) => {
+      eprintln("❌ \{message}")
+      @sys.exit(2)
+      panic()
     }
   }
   let importers = async_importers(".", Sync.paths())
@@ -381,12 +417,13 @@ async fn main {
     )
     @sys.exit(1)
   }
-  for runtime in runtimes {
-    build(runtime)
+  let built = []
+  for plan in plans {
+    let (runtime, targets) = plan
+    build(runtime, targets)
+    built.push(targets.map(target => target.name()).join(" "))
   }
-  println(
-    "✅ Cross-built \{runtimes.map(runtime => runtime.name()).join(" and ")}",
-  )
+  println("✅ Cross-built \{built.join(" ")}")
 }
 
 ///|
@@ -466,6 +503,32 @@ test "a report without schema version 1, or that is not JSON, fails" {
     ] {
     let failed = Ok(DoctorReport::parse(text)) catch { error => Err(error) }
     assert_true(failed is Err(InvalidReport(_)), msg=text)
+  }
+}
+
+///|
+test "the command line selects plans and targets" {
+  let names = (plans : Array[(Runtime, Array[Target])]) => {
+    plans.map(plan => {
+      let (runtime, targets) = plan
+      runtime.name() + ":" + targets.map(target => target.name()).join(",")
+    })
+  }
+  assert_eq(names(select([])), [
+    "full:linux-arm64", "sync:darwin-arm64,darwin-x64,windows-x64",
+  ])
+  assert_eq(names(select(["sync"])), [
+    "sync:darwin-arm64,darwin-x64,windows-x64",
+  ])
+  assert_eq(names(select(["darwin-x64", "linux-arm64", "darwin-x64"])), [
+    "full:linux-arm64", "sync:darwin-x64",
+  ])
+  assert_eq(names(select(["windows-x64", "full"])), [
+    "full:linux-arm64", "sync:windows-x64",
+  ])
+  for text in ["linux-x64", "host", "bogus", ""] {
+    let failed = Ok(select([text])) catch { error => Err(error) }
+    assert_true(failed is Err(UnknownPlan(_)), msg=text)
   }
 }
 

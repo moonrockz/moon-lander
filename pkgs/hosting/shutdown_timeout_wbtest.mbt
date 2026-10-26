@@ -23,7 +23,9 @@ async test "slow stop is cancelled at the limit and reports after the stopped ev
     |> build(_ => ())
     |> run(_ => ())
   @expect.expect(log).to_equal(["b.cancelled", "event.stopped", "report"])
-  @expect.expect(elapsed.val >= 75L && elapsed.val < 2000L).to_be_true()
+  // A wide lower bound: Windows timers can fire about 16 ms early. A timeout
+  // that fires at once still fails.
+  @expect.expect(elapsed.val >= 50L && elapsed.val < 2000L).to_be_true()
   @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
   @expect.expect(result.timed_out).to_be_true()
   @expect.expect(result.failures().length()).to_equal(1)
@@ -61,14 +63,17 @@ async test "shutdown cancels hooks in every stop phase" {
 
 ///|
 async test "shutdown shares one budget across individually short hooks" {
+  // Each hook is 100 ms below the budget, and together they are 100 ms over
+  // it. Both margins are much larger than the timer resolution of a Windows
+  // runner (about 16 ms), so the result does not depend on it.
   let log = []
   let result = builder(@lander_core.AppName::parse("shared-budget"), [])
-    |> shutdown_timeout(@lander_core.TimeLimit::millis(100))
+    |> shutdown_timeout(@lander_core.TimeLimit::millis(300))
     |> service("a", stop=_ => log.push("a.stop"))
-    |> service("b", stopping=_ => { @async.sleep(60); log.push("b.stopping") },
+    |> service("b", stopping=_ => { @async.sleep(200); log.push("b.stopping") },
       stop=_ => {
         defer log.push("b.stop.defer")
-        @async.sleep(60)
+        @async.sleep(200)
         log.push("b.stop")
       })
     |> error_report((_, _) => ())
@@ -86,7 +91,9 @@ async test "command work and cancellation defers do not spend the shutdown budge
     |> service("a", stop=_ => { @async.sleep(30); log.push("stop") })
     |> build(_ => ())
     |> run(ctx => {
-      defer @async.protect_from_cancel(() => { @async.sleep(120); log.push("defer") })
+      // The defer alone is 150 ms over the budget, so a budget that started at
+      // the stop request would clearly expire.
+      defer @async.protect_from_cancel(() => { @async.sleep(250); log.push("defer") })
       @async.sleep(120)
       ctx.lifetime.stop_application()
     })

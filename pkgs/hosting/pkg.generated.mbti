@@ -2,12 +2,12 @@
 package "moonrockz/moon-lander-hosting"
 
 import {
-  "moonbitlang/core/argparse",
   "moonbitlang/core/debug",
   "moonbitlang/core/immut/sorted_map",
   "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-core",
+  "moonrockz/moon-lander-hosting/vendor/argparse",
 }
 
 // Values

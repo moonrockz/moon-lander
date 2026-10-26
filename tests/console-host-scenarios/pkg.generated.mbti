@@ -20,6 +20,8 @@ pub(all) enum Scenario {
   Output
   OutputAfterSignal
   Linger
+  Help
+  Version
 }
 pub fn Scenario::parse(String) -> Self?
 

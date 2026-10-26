@@ -6,20 +6,39 @@ import {
 }
 
 // Values
-pub fn[S] command(@moon-lander-hosting.HostBuilder[S], (String) -> @moonbitlang/core/argparse.Command) -> @moon-lander-hosting.HostBuilder[S]
+pub fn[S] command(@moon-lander-hosting.HostBuilder[S], (String) -> @moonrockz/moon-lander-hosting/vendor/argparse.Command) -> @moon-lander-hosting.HostBuilder[S]
 
-pub fn config_option() -> @moonbitlang/core/argparse.OptionArg
+pub fn config_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
 
-pub fn environment_option() -> @moonbitlang/core/argparse.OptionArg
+pub fn environment_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
 
-pub fn isolated_flag() -> @moonbitlang/core/argparse.FlagArg
+pub fn isolated_flag() -> @moonrockz/moon-lander-hosting/vendor/argparse.FlagArg
 
-pub fn project_option() -> @moonbitlang/core/argparse.OptionArg
+pub fn project_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
 
 // Errors
 
 // Types and methods
 
 // Type aliases
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type ArgGroup}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type Command}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type FlagAction}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type FlagArg}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type Matches}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type OptionAction}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type OptionArg}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type PositionArg}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type ValueRange}
+
+pub using @moonrockz/moon-lander-hosting/vendor/argparse {type ValueSource}
 
 // Traits

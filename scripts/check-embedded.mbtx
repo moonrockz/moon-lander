@@ -1,0 +1,353 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
+///|
+/// Check the embedded driver on wasm and wasm-gc (openspec add-host-lifecycle, task 13.4).
+///
+/// The check runs the test program `tests/embedded-host-program` on each target. The program runs
+/// the host with `--help`, then with `--version`, then with no arguments, and writes the exit code
+/// after each run, so a line after the help or version text proves that the run returned control
+/// to the embedder. The check then builds the program in debug and release mode and reads the
+/// import section of each module: an exit import (`proc_exit`, `exit`) fails the check, because
+/// the embedded driver must never end the process.
+///
+/// Usage: `mise run check:embedded`, or `moonx scripts/toolchain.mbtx scripts/check-embedded.mbtx`.
+
+///|
+let program : String = "tests/embedded-host-program"
+
+///|
+let targets : Array[String] = ["wasm", "wasm-gc"]
+
+///|
+/// The import names that can end the process: WASI `proc_exit` on wasm and
+/// `__moonbit_sys_unstable` `exit` on wasm-gc.
+let exit_names : Array[String] = ["proc_exit", "exit"]
+
+///|
+/// The lines of the program after the help text, which ends at the first `code=0`.
+let lines_after_help : Array[String] = [
+  "1.2.3", "code=0", "hook=a.start", "command", "code=0",
+]
+
+///|
+suberror WasmError {
+  WasmError(String)
+}
+
+///|
+/// A reader over the bytes of a wasm module.
+priv struct Reader {
+  bytes : Bytes
+  mut at : Int32
+}
+
+///|
+fn Reader::byte(self : Reader) -> Int32 raise WasmError {
+  guard self.at < self.bytes.length() else {
+    raise WasmError("unexpected end of the module at byte \{self.at}")
+  }
+  let value = self.bytes[self.at].to_int()
+  self.at += 1
+  value
+}
+
+///|
+/// Read an unsigned LEB128 number of at most 32 bits.
+fn Reader::u32(self : Reader) -> Int32 raise WasmError {
+  let mut result = 0
+  let mut shift = 0
+  while true {
+    let byte = self.byte()
+    result = result | ((byte & 0x7f) << shift)
+    if byte < 0x80 {
+      break
+    }
+    shift += 7
+    guard shift < 35 else { raise WasmError("a LEB128 number is too long") }
+  }
+  result
+}
+
+///|
+/// Skip a LEB128 number of any size and sign.
+fn Reader::skip_leb(self : Reader) -> Unit raise WasmError {
+  while self.byte() >= 0x80 {
+
+  }
+}
+
+///|
+/// Read a name. The import names of interest are ASCII, so each byte is one character.
+fn Reader::name(self : Reader) -> String raise WasmError {
+  let length = self.u32()
+  let name = StringBuilder()
+  for _ in 0..<length {
+    name.write_char(Int32::unsafe_to_char(self.byte()))
+  }
+  name.to_string()
+}
+
+///|
+/// Skip a value or reference type. `ref null ht` (0x63) and `ref ht` (0x64) carry a heap type.
+fn Reader::skip_type(self : Reader) -> Unit raise WasmError {
+  let code = self.byte()
+  if code == 0x63 || code == 0x64 {
+    self.skip_leb()
+  }
+}
+
+///|
+fn Reader::skip_limits(self : Reader) -> Unit raise WasmError {
+  let flags = self.byte()
+  self.skip_leb()
+  if (flags & 1) == 1 {
+    self.skip_leb()
+  }
+}
+
+///|
+/// The `(module, name)` pairs of the import section of a wasm module, in order.
+fn wasm_imports(bytes : Bytes) -> Array[(String, String)] raise WasmError {
+  let reader = Reader::{ bytes, at: 0, }
+  guard bytes.length() >= 8 &&
+    bytes[0] == b'\x00' &&
+    bytes[1] == b'a' &&
+    bytes[2] == b's' &&
+    bytes[3] == b'm' else {
+    raise WasmError("not a wasm module")
+  }
+  reader.at = 8
+  let imports = []
+  while reader.at < bytes.length() {
+    let id = reader.byte()
+    let size = reader.u32()
+    let end = reader.at + size
+    guard end <= bytes.length() else {
+      raise WasmError("section \{id} ends after the module")
+    }
+    if id == 2 {
+      for _ in 0..<reader.u32() {
+        let module_name = reader.name()
+        let name = reader.name()
+        match reader.byte() {
+          0 => reader.skip_leb()
+          1 => {
+            reader.skip_type()
+            reader.skip_limits()
+          }
+          2 => reader.skip_limits()
+          3 => {
+            reader.skip_type()
+            ignore(reader.byte())
+          }
+          4 => {
+            ignore(reader.byte())
+            reader.skip_leb()
+          }
+          kind =>
+            raise WasmError(
+              "unknown import kind \{kind} of \{module_name}.\{name}",
+            )
+        }
+        imports.push((module_name, name))
+      }
+      guard reader.at == end else {
+        raise WasmError("the import section has \{end - reader.at} extra bytes")
+      }
+    }
+    reader.at = end
+  }
+  imports
+}
+
+///|
+/// The imports in `imports` that can end the process.
+fn exit_imports(imports : Array[(String, String)]) -> Array[(String, String)] {
+  imports.filter(import_ => exit_names.contains(import_.1))
+}
+
+///|
+/// The problems in the output of the test program, or an empty array.
+fn output_problems(output : String) -> Array[String] {
+  let lines = output
+    .replace_all(old="\r\n", new="\n")
+    .split("\n")
+    .map(line => line.to_owned())
+    .collect()
+  while lines.last() is Some("") {
+    ignore(lines.pop())
+  }
+  let problems = []
+  if lines.get(0) != Some("Usage: embedded-host") {
+    problems.push("the output does not start with the help text")
+  }
+  guard lines.search("code=0") is Some(end) else {
+    return ["no exit code after the help text"]
+  }
+  let help = lines[:end]
+  if help.iter().any(line => line.has_prefix("hook=") || line == "command") {
+    problems.push("a hook or the command ran before the help text ended")
+  }
+  if lines[end + 1:].to_owned() != lines_after_help {
+    problems.push(
+      "the lines after the help text are not: " + lines_after_help.join(", "),
+    )
+  }
+  problems
+}
+
+///|
+async fn run_program(target : String) -> Unit {
+  let (code, out, err) = @process.collect_output("moon", [
+    "run", "--deny-warn", "--target", target, program,
+  ])
+  guard code == 0 else {
+    println(out.text() + err.text())
+    fail("❌ The test program fails on \{target}")
+  }
+  let problems = output_problems(out.text())
+  guard problems.is_empty() else {
+    println(out.text())
+    fail("❌ \{target}: " + problems.join("; "))
+  }
+}
+
+///|
+async fn module_path(target : String, release : Bool) -> String {
+  let args = ["run", "--build-only", "--deny-warn", "--target", target]
+  if release {
+    args.push("--release")
+  }
+  args.push(program)
+  let (code, out, err) = @process.collect_output("moon", args)
+  guard code == 0 else {
+    println(out.text() + err.text())
+    fail("❌ The test program does not build on \{target}")
+  }
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Expected one \{target} build artifact, got " + out.text())
+  }
+  path
+}
+
+///|
+async fn main {
+  for target in targets {
+    run_program(target)
+    for release in [false, true] {
+      let mode = if release { "release" } else { "debug" }
+      let path = module_path(target, release)
+      let found = exit_imports(wasm_imports(@fs.read_file(path).binary()))
+      guard found.is_empty() else {
+        let names = found.map(import_ => import_.0 + "." + import_.1).join(", ")
+        println(
+          "❌ The \{target} \{mode} module imports \{names}: the embedded driver can end the process.",
+        )
+        @sys.exit(1)
+      }
+      println(
+        "✅ \{target} \{mode}: help and version return to the embedder; no exit import",
+      )
+    }
+  }
+}
+
+///|
+test "the import reader finds exit imports and raises on a bad module" {
+  // A module with a type section and an import section of `imports`, each a
+  // function import of type 0. `extra` adds a memory and a gc global import.
+  fn test_module(imports : Array[(String, String)], extra : Bool) -> Bytes {
+    let extra_count = if extra { 2 } else { 0 }
+    let body : Array[Byte] = [(imports.length() + extra_count).to_byte()]
+    fn push_name(text : String) {
+      body.push(text.length().to_byte())
+      for char in text {
+        body.push(char.to_int().to_byte())
+      }
+    }
+    for import_ in imports {
+      push_name(import_.0)
+      push_name(import_.1)
+      body.append([0x00, 0x00])
+    }
+    if extra {
+      push_name("env")
+      push_name("memory")
+      body.append([0x02, 0x01, 0x01, 0x80, 0x02])
+      push_name("env")
+      push_name("global")
+      body.append([0x03, 0x63, 0x70, 0x00])
+    }
+    let header : Array[Byte] = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]
+    let types : Array[Byte] = [0x01, 0x04, 0x01, 0x60, 0x00, 0x00]
+    Bytes::from_array(
+      [..header, ..types, 0x02, body.length().to_byte(), ..body],
+    )
+  }
+
+  // WASI proc_exit on wasm.
+  let imports = wasm_imports(
+    test_module(
+      [("spectest", "print_char"), ("wasi_snapshot_preview1", "proc_exit")],
+      false,
+    ),
+  )
+  assert_eq(imports, [
+    ("spectest", "print_char"),
+    ("wasi_snapshot_preview1", "proc_exit"),
+  ])
+  assert_eq(exit_imports(imports), [("wasi_snapshot_preview1", "proc_exit")])
+  // The wasm-gc exit, before a memory and a gc global import.
+  let imports = wasm_imports(
+    test_module([("__moonbit_sys_unstable", "exit")], true),
+  )
+  assert_eq(imports, [
+    ("__moonbit_sys_unstable", "exit"),
+    ("env", "memory"),
+    ("env", "global"),
+  ])
+  assert_eq(exit_imports(imports), [("__moonbit_sys_unstable", "exit")])
+  // No exit import.
+  assert_eq(
+    exit_imports(wasm_imports(test_module([("spectest", "print_char")], true))),
+    [],
+  )
+  // A truncated module, and a module of another format.
+  let bytes = test_module([("wasi_snapshot_preview1", "proc_exit")], false)
+  let truncated = Bytes::from_array(
+    bytes.to_array()[:bytes.length() - 3].to_owned(),
+  )
+  for bad in [truncated, b"\x7fELF\x02\x01\x01\x00"] {
+    let imports = wasm_imports(bad) catch { WasmError(_) => continue }
+    fail("expected WasmError, got \{imports.length()} imports")
+  }
+}
+
+///|
+test "the output check accepts returns after help and version" {
+  let output = "Usage: embedded-host\n\nOptions:\n  -h, --help  Show help information.\ncode=0\n1.2.3\ncode=0\nhook=a.start\ncommand\ncode=0\n"
+  assert_eq(output_problems(output), [])
+  assert_eq(output_problems(output.replace_all(old="\n", new="\r\n")), [])
+}
+
+///|
+test "the output check fails when a run does not return or a hook runs" {
+  assert_eq(output_problems("Usage: embedded-host\n"), [
+    "no exit code after the help text",
+  ])
+  assert_true(output_problems("Usage: embedded-host\ncode=0\n").length() == 1)
+  assert_true(
+    output_problems(
+      "hook=a.start\nUsage: embedded-host\ncode=0\n1.2.3\ncode=0\nhook=a.start\ncommand\ncode=0\n",
+    ).length() ==
+    2,
+  )
+}

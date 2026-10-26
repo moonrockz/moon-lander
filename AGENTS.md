@@ -45,6 +45,12 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   no signal identity and no handler that runs during code that never yields. The
   stub does only async-signal-safe work. All other process and filesystem work stays
   with `moonbitlang/async`.
+- `pkgs/hosting/vendor/` holds a copy of `moonbitlang/core/argparse` with the patch of
+  moonbitlang/core#4487 (`Command::try_parse`), until a pinned MoonBit release has it
+  (bead `lander-4us.5.18`). Do not edit it; its `README.md` gives the source, the one
+  local change and the return steps. Importers keep the alias of the core package,
+  and applications use the `@hosting_argparse` type re-exports, so the return changes
+  only the `moon.pkg` imports.
 - Consult `zig-cross` doctor before you change the zig-cross pin, `ZIG_CROSS_RUNTIME`,
   `sync_programs` in `scripts/cross-build.mbtx` or a cross-build CI job:
   `mise run doctor:zig-cross` (add `-- --json` for the `schema_version: 1` report), on

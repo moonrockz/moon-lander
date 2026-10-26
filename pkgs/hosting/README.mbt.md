@@ -46,8 +46,9 @@ test "build a host with one service" {
 | Package | Targets | Content |
 | --- | --- | --- |
 | `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js`; `run_embedded` on `wasm` and `wasm-gc` | Builder, `command`, hosted services, `Host[S]`, `run`, `SignalProbe`, `run_embedded`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
-| [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory and global standard discovery flags |
+| [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory, global standard discovery flags, and the argparse types for the command (`Command`, `OptionArg`, `FlagArg` and others) |
 | [`moonrockz/moon-lander-hosting/console`](console/README.mbt.md) (`@console`) | `native`, `js` | The console driver `run`: signals, the second signal and the process exit. A C signal stub on native, Node.js listeners on js |
+| [`moonrockz/moon-lander-hosting/vendor/argparse`](vendor/README.md) | all | A copy of `moonbitlang/core/argparse` with `Command::try_parse`, until a pinned MoonBit release has it. Do not import it; use `@hosting_argparse` |
 
 The [`moonrockz/moon-lander` guide](../lander/README.mbt.md) shows the full
 pipeline, the name and exit-code rules, and `run`.

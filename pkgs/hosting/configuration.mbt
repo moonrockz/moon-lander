@@ -107,6 +107,13 @@ fn[S] finish_configuration(host : Host[S], inputs : ConfigurationInputs, config 
 }
 
 ///|
+/// A run that ends before the first hook without a failure: a help or version
+/// request of the argument parse, or a factory that raises `StopRequested`.
+fn requested_outcome() -> RunOutcome {
+  { exit_code: ExitCode::success(), timed_out: false, failures: [], reason: Requested, requested_code: None, signal: None }
+}
+
+///|
 /// A configuration or factory failure before the engine starts.
 fn outcome(error : Error) -> RunOutcome {
   { exit_code: select_exit_code(None, [error], false, None), timed_out: false, failures: [error], reason: StartFailed(error), requested_code: None, signal: None }

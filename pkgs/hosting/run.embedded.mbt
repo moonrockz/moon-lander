@@ -42,6 +42,10 @@ fn run_to_completion(work : async () -> Unit) -> Completion {
 /// failure and exit-code rules as `run`, but they must not suspend: a hook or
 /// command that waits fails with `SuspendError` and code 1. Do not call
 /// `moonbitlang/async` there, because it needs its own event loop.
+/// A help or version request of the arguments, such as `--help`, `--version`
+/// or `help <subcommand>`, writes the argparse text one time with `println` and
+/// returns code 0 with the reason `Requested`. The run then reads no file of the
+/// tree and runs no factory or hook, and it never ends the process.
 /// There are no signals and no shutdown timeout. The run stops through
 /// `stop_application` or through `stop_probe`. The host reads the probe in
 /// each cancellation check and after each hook. When it gives `true`, the run
@@ -55,12 +59,12 @@ fn run_to_completion(work : async () -> Unit) -> Completion {
 /// the run, so it can make a stop request while the run is in progress. Do not
 /// keep continuations of hooks or the command.
 pub fn[S] run_embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> RunOutcome {
-  run_embedded_with_writer(host, command, stop_probe?, write_line=line => eprintln(line))
+  run_embedded_with_writer(host, command, stop_probe?, write_line=line => eprintln(line), write_output=text => println(text))
 }
 
 ///|
-fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : () -> Bool, write_line~ : (String) -> Unit) -> RunOutcome {
-  let result = execute_embedded(host, command, stop_probe)
+fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : () -> Bool, write_line~ : (String) -> Unit, write_output~ : (String) -> Unit) -> RunOutcome {
+  let result = execute_embedded(host, command, stop_probe, write_output~)
   for error in result.failures {
     if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
       match host.report {
@@ -73,17 +77,17 @@ fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : 
 }
 
 ///|
-fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bool)?) -> RunOutcome {
-  let inputs = configuration_inputs(host) catch { err => return outcome(err) }
-  // Task 13.4: a help or version request will return here with code 0,
-  // before configuration, the factory and the hooks. Today the pinned argparse
-  // ends the process inside `parse_arguments`.
+fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bool)?, write_output~ : (String) -> Unit) -> RunOutcome {
+  let inputs = configuration_inputs(host) catch {
+    DisplayRequested(text) => {
+      write_output(text)
+      return requested_outcome()
+    }
+    err => return outcome(err)
+  }
   let config = configuration_from_tree(inputs.sources, host.file_tree) catch { err => return outcome(err) }
   let configured = finish_configuration(host, inputs, config) catch {
-    StopRequested => return {
-      exit_code: ExitCode::success(), timed_out: false, failures: [],
-      reason: Requested, requested_code: None, signal: None,
-    }
+    StopRequested => return requested_outcome()
     err => return outcome(err)
   }
   let ctx = configured.context

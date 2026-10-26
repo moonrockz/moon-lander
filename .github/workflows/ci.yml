@@ -137,6 +137,8 @@ jobs:
         run: mise run check:openrpc
       - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
+      - name: Run the embedded driver with help and version, and check for exit imports
+        run: mise run check:embedded
       - name: Verify generated OpenRPC Unicode data
         run: mise run check:openrpc-unicode
       - name: Verify generated OpenRPC artifact metaschemas

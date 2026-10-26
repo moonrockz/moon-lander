@@ -13,8 +13,93 @@ pub extend EmbeddedTestError with @debug.Debug::{to_repr}
 /// Run with a captured report writer. It gives the outcome and the lines.
 fn[S] embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> (RunOutcome, Array[String]) {
   let lines = []
-  let result = run_embedded_with_writer(host, command, stop_probe?, write_line=line => lines.push(line))
+  let result = run_embedded_with_writer(host, command, stop_probe?, write_line=line => lines.push(line),
+    write_output=text => abort("unexpected standard output: \{text}"))
   (result, lines)
+}
+
+///|
+/// Run with captured writers. It gives the outcome, the standard output texts
+/// and the report lines.
+fn[S] embedded_output(host : Host[S]) -> (RunOutcome, Array[String], Array[String]) {
+  let output = []
+  let lines = []
+  let result = run_embedded_with_writer(host, _ => abort("unexpected command"),
+    write_line=line => lines.push(line), write_output=text => output.push(text))
+  (result, output, lines)
+}
+
+///|
+/// A command with a version, and a subcommand with a required argument.
+fn help_command(name : String) -> @hosting_argparse.Command {
+  @hosting_argparse.Command(name, version="1.2.3", options=[@hosting_argparse.config_option()],
+    subcommands=[@hosting_argparse.Command("build", about="Build the project.",
+      positionals=[@hosting_argparse.PositionArg("target", num_args=@hosting_argparse.ValueRange::single())])])
+}
+
+///|
+/// A host with `help_command`. Its file tree is empty, so a configuration load
+/// gives code 2, and the factory and the hook record each call.
+fn help_host(argv : Array[String], calls : Array[String]) -> Host[Unit] raise {
+  builder(@lander_core.AppName::parse("acme"), argv)
+  |> @hosting_argparse.command(help_command)
+  |> configure(s => s |> @config.format(@toml.format()))
+  |> app_dirs() |> files(@config.FileTree::new())
+  |> service("a", starting=_ => calls.push("hook"))
+  |> build(_ => calls.push("factory"))
+}
+
+///|
+test "help returns its text once with code 0 and reads no file before the factory" {
+  // `render_help` ends with a newline; the request text does not.
+  let help = help_command("acme").render_help()
+  for argv in [["--help"], ["-h"], ["--config", "missing.toml", "--help"]] {
+    let calls = []
+    let (result, output, lines) = embedded_output(help_host(argv, calls))
+    assert_eq(result.exit_code.to_int(), 0, msg=argv.join(" "))
+    assert_eq(result.failures.length(), 0)
+    assert_true(result.reason is Requested)
+    assert_eq(output.length(), 1)
+    assert_eq(output[0] + "\n", help)
+    assert_eq(calls, [])
+    assert_eq(lines, [])
+  }
+}
+
+///|
+test "subcommand help and help with a missing required argument return the subcommand text" {
+  for argv in [["help", "build"], ["build", "--help"]] {
+    let calls = []
+    let (result, output, _) = embedded_output(help_host(argv, calls))
+    assert_eq(result.exit_code.to_int(), 0, msg=argv.join(" "))
+    assert_true(result.reason is Requested)
+    assert_eq(output.length(), 1)
+    assert_true(output[0].contains("Build the project."), msg=output[0])
+    assert_true(output[0].contains("<target>"), msg=output[0])
+    assert_eq(calls, [])
+  }
+}
+
+///|
+test "version returns its text once with code 0 to the caller" {
+  let calls = []
+  let (result, output, lines) = embedded_output(help_host(["--version"], calls))
+  assert_eq(result.exit_code.to_int(), 0)
+  assert_true(result.reason is Requested)
+  assert_eq(result.failures.length(), 0)
+  assert_eq(output, ["1.2.3"])
+  assert_eq(calls, [])
+  assert_eq(lines, [])
+}
+
+///|
+test "a usage error still gives 2 and writes no standard output" {
+  let calls = []
+  let (result, output, lines) = embedded_output(help_host(["--no-such-option"], calls))
+  assert_eq(result.exit_code.to_int(), 2)
+  assert_eq(output, [])
+  assert_eq(lines.length(), 1)
+  assert_eq(calls, [])
 }
 
 ///|

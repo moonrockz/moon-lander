@@ -193,6 +193,10 @@ run = "moonx scripts/toolchain.mbtx scripts/build-node-adapter.mbtx --check"
 description = "Test the console drivers with native, Node.js and Bun children, and a consumer outside the workspace (args: --no-consumer)"
 run = "moonx scripts/toolchain.mbtx scripts/check-console.mbtx"
 
+[tasks."check:embedded"]
+description = "Run the embedded driver on wasm and wasm-gc with --help and --version, and fail on an exit import in the built modules"
+run = "moonx scripts/toolchain.mbtx scripts/check-embedded.mbtx"
+
 [tasks."check:config"]
 description = "Compare configuration values, provenance and reports on all four targets"
 run = "moonx scripts/toolchain.mbtx scripts/check-config.mbtx"

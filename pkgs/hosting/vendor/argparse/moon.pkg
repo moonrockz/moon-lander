@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/builtin",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/core/set",
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-hosting/vendor/internal/edit_distance",
+}
+
+import {
+  "moonbitlang/core/test",
+  "moonbitlang/core/bench",
+} for "test"
+
+warnings = "+unnecessary_annotation"

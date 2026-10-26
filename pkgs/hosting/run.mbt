@@ -7,6 +7,11 @@
 /// for code 1 or 2, in failure order, through `error_report` or as
 /// `<name>: <message>` on standard error. Report errors do not change the outcome.
 ///
+/// A help or version request of the arguments writes the argparse text one
+/// time with `println` and returns code 0 with the reason `Requested`, before
+/// the configuration load, the factory and the hooks. The console driver then
+/// ends the process with that code.
+///
 /// A console driver gives `signals`. The run registers the probe before the
 /// first hook, so each cancellation check reads it, and a watcher task reads it
 /// every 50 ms until the run ends. The first signal is a stop request with the
@@ -39,13 +44,16 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 
 ///|
 async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError, signals? : SignalProbe) -> RunOutcome {
-  let inputs = configuration_inputs(host, read_directory~) catch { err => return with_signal(outcome(err), signals) }
+  let inputs = configuration_inputs(host, read_directory~) catch {
+    DisplayRequested(text) => {
+      println(text)
+      return with_signal(requested_outcome(), signals)
+    }
+    err => return with_signal(outcome(err), signals)
+  }
   let config = @host.load(inputs.sources) catch { err => return with_signal(outcome(err), signals) }
   let configured = finish_configuration(host, inputs, config) catch {
-    StopRequested => return with_signal({
-      exit_code: ExitCode::success(), timed_out: false, failures: [],
-      reason: Requested, requested_code: None, signal: None,
-    }, signals)
+    StopRequested => return with_signal(requested_outcome(), signals)
     err => return with_signal(outcome(err), signals)
   }
   let ctx = configured.context

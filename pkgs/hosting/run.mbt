@@ -85,8 +85,7 @@ async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : 
   let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let mut step = Engine::start(host.services)
-  step = lifetime.skip_first_if_stopped(step)
+  let mut step = lifetime.start_engine(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)

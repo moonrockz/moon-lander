@@ -202,9 +202,14 @@ fn Lifetime::reply(self : Lifetime, pending : Pending, result : ActionResult) ->
 }
 
 ///|
-/// A probe stop that arrived during configuration loading or the services
-/// factory runs no start hook: reply to the first step without running it.
-fn Lifetime::skip_first_if_stopped(self : Lifetime, step : Step) -> Step {
-  guard self.probe_stop() && step is Run(pending, _) && self.request is Some(request) else { return step }
+/// Start the engine, after the probe read. A probe stop that arrived during
+/// configuration loading or the services factory means that the start phase
+/// reached no service: no service is started and no hook runs. The engine then
+/// starts without services, so it marks none started, and the reply to its first
+/// step goes to the stop events.
+fn[S] Lifetime::start_engine(self : Lifetime, services : Array[HostedService[S]]) -> Step {
+  guard self.probe_stop() && self.request is Some(request) else { return Engine::start(services) }
+  let none : Array[HostedService[S]] = []
+  guard Engine::start(none) is Run(pending, _) else { abort("an engine without services raises Started first") }
   pending.stop_requested(request, self.requested_code, result=Interrupted, observed_signal?=self.signal)
 }

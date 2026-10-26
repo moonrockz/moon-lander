@@ -95,7 +95,7 @@ fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bo
   if stop_probe is Some(probe) {
     lifetime.register_stop_probe(() => if probe() { Some(Embedder) } else { None })
   }
-  let mut step = lifetime.skip_first_if_stopped(Engine::start(host.services))
+  let mut step = lifetime.start_engine(host.services)
   while step is Run(pending, action) {
     step = lifetime.reply(pending, perform_embedded(host, ctx, command, pending, action))
   }

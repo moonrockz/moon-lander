@@ -310,6 +310,20 @@ test "an embedder stop before the first hook runs no hook" {
 }
 
 ///|
+test "an embedder stop before the first hook runs no stop hook of a service without start hooks" {
+  // A service without `starting` and `start` hooks is started when the start
+  // phase reaches it. A stop before the first step reaches no service.
+  let log = []
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), [])
+    |> service("a", stopping=_ => log.push("a.stopping"), stop=_ => log.push("a.stop"))
+    |> service("b", start=_ => log.push("b.start"), stop=_ => log.push("b.stop"))
+    |> build(_ => ())
+  let (result, _) = embedded(host, _ => log.push("command"), stop_probe=() => true)
+  assert_true(result.reason is Embedder)
+  assert_eq(log, [])
+}
+
+///|
 test "stop_application from the command runs the stop phase and gives 0" {
   let log = []
   let (result, _) = embedded(embedded_services(log), ctx => {

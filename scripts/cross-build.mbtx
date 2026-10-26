@@ -11,7 +11,7 @@ import {
 ----
 
 ///|
-/// Cross-build the native programs for five targets from one Linux or macOS machine with
+/// Cross-build the native programs for four targets from one Linux or macOS machine with
 /// `moonrockz/zig-cross`.
 ///
 /// Each plan first runs `zig-cross doctor --json` for its targets and runtime. A report with
@@ -19,8 +19,9 @@ import {
 /// output, and the report goes to `_build/cross/doctor-<runtime>.json`. Then the plan runs
 /// `zig-cross build`, which checks the header of each executable.
 ///
-/// - `full`: the full MoonBit runtime for `linux-x64` and `linux-arm64`, for every native
-///   executable of the workspace, also the ones that use `moonbitlang/async`.
+/// - `full`: the full MoonBit runtime for `linux-arm64`, for `full_programs`: the hosting program
+///   with the console signal stub and `moonbitlang/async`, and the sync programs. CI already builds
+///   and runs x64 Linux with gcc and with zig, so this plan does not build `linux-x64`.
 /// - `sync`: the experimental synchronous runtime (`ZIG_CROSS_RUNTIME=sync`) for `darwin-arm64`,
 ///   `darwin-x64` and `windows-x64`, for `sync_programs` only.
 ///
@@ -48,9 +49,15 @@ let sync_programs : Array[String] = [
 ]
 
 ///|
+/// The executables of the full plan: the sync programs and the console host program, which links
+/// hosting, the console signal stub and `moonbitlang/async`. The docs site tools are not framework
+/// code, and they took most of the build time, so the plan does not build them.
+let full_programs : Array[String] = ["tests/console-host-program"] +
+  sync_programs
+
+///|
 /// A zig-cross target, without `host`.
 enum Target {
-  LinuxX64
   LinuxArm64
   DarwinArm64
   DarwinX64
@@ -60,7 +67,6 @@ enum Target {
 ///|
 fn Target::name(self : Target) -> String {
   match self {
-    LinuxX64 => "linux-x64"
     LinuxArm64 => "linux-arm64"
     DarwinArm64 => "darwin-arm64"
     DarwinX64 => "darwin-x64"
@@ -102,16 +108,16 @@ fn Runtime::name(self : Runtime) -> String {
 /// The targets of the plan of a runtime.
 fn Runtime::targets(self : Runtime) -> Array[Target] {
   match self {
-    Full => [LinuxX64, LinuxArm64]
+    Full => [LinuxArm64]
     Sync => [DarwinArm64, DarwinX64, WindowsX64]
   }
 }
 
 ///|
-/// The package paths of the plan of a runtime. No path builds the whole workspace.
+/// The package paths of the plan of a runtime.
 fn Runtime::paths(self : Runtime) -> Array[String] {
   match self {
-    Full => []
+    Full => full_programs
     Sync => sync_programs
   }
 }
@@ -314,10 +320,10 @@ async fn doctor(runtime : Runtime) -> Unit {
 /// Run doctor, then build the plan of a runtime.
 async fn build(runtime : Runtime) -> Unit {
   doctor(runtime)
-  let paths = runtime.paths()
   let args = [zig_cross, "build"] +
-    runtime.targets().map(target => target.name())
-  let args = if paths.is_empty() { args } else { args + ["--"] + paths }
+    runtime.targets().map(target => target.name()) +
+    ["--"] +
+    runtime.paths()
   let code = @process.run(
     "moonx",
     args,
@@ -435,14 +441,13 @@ test "plan names parse to runtimes, and other names fail" {
 }
 
 ///|
-test "the full plan builds Linux and the sync plan builds Darwin and Windows" {
-  assert_eq(Full.targets().map(target => target.name()), [
-    "linux-x64", "linux-arm64",
-  ])
+test "the full plan builds Linux arm64 and the sync plan builds Darwin and Windows" {
+  assert_eq(Full.targets().map(target => target.name()), ["linux-arm64"])
   assert_eq(Sync.targets().map(target => target.name()), [
     "darwin-arm64", "darwin-x64", "windows-x64",
   ])
-  assert_eq(Full.paths(), [])
+  assert_eq(Full.paths()[0], "tests/console-host-program")
+  assert_eq(Full.paths()[1:].to_owned(), sync_programs)
   assert_eq(Sync.paths(), sync_programs)
 }
 

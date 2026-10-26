@@ -32,7 +32,7 @@ graph LR
 | Sender | `Sender[C, Req, Res]`: one handler for one request type | `@mediator.sender(handler)` |
 | Topic | `Topic[C, Ev]`: one or more handlers for one event type | `@mediator.topic(handler)`, then `add` |
 | Middleware | `Middleware[C, Req, Res]`: one wrapper step | `@mediator.middleware(wrap)`, `before`, `after`, `finally_` |
-| Error | `MediatorError`: a refusal, or the failures of a publish | `raise @mediator.Rejected(reason=...)`; `publish` raises `PublishFailed` |
+| Error | `MediatorError`: a refusal, or the failures of a publish | `raise @mediator.MediatorError::rejected(...)`; `publish` raises `PublishFailed` |
 
 ## Send a request
 
@@ -132,8 +132,9 @@ test "one handler fails and the others still run" {
     @mediator.PublishFailed(handlers~, failures~) as error => {
       assert_eq(handlers, 3)
       assert_eq(failures.length(), 1)
-      assert_eq(failures[0].position, 2)
-      assert_true(failures[0].error is CountFull("Ann"))
+      guard failures.get(0) is Some(failure) else { fail("missing failure") }
+      assert_eq(failure.position, 2)
+      assert_true(failure.error is CountFull("Ann"))
       assert_eq(
         error.message(),
         "Publish failed: 1 of 3 handlers raised an error (position 2)",
@@ -246,6 +247,7 @@ mediator does not turn an error into a reply.
 | Case | Raised by | `message` gives |
 | --- | --- | --- |
 | `Rejected(reason~)` | A handler or a middleware that refuses a request, for example after validation | `Request rejected: <reason>` |
+| `TimedOut(after~)` | Async timeout middleware, with a core `TimeLimit` | `Request timed out after <milliseconds> ms` |
 | `PublishFailed(handlers~, failures~)` | `publish`, when one or more handlers raise | `Publish failed: 2 of 3 handlers raised an error (positions 2, 3)` |
 
 `MediatorError::message` gives the text for people. It holds only the reason,
@@ -266,7 +268,7 @@ test "a validation middleware rejects a request" {
     @mediator.before((_, req) => {
       let Ping(text) = req
       if text == "" {
-        raise @mediator.Rejected(reason="the ping text is empty")
+        raise @mediator.MediatorError::rejected("the ping text is empty")
       }
     }),
   )
@@ -278,5 +280,44 @@ test "a validation middleware rejects a request" {
     reply => fail("send gave a reply: \{reply}")
   }
   assert_eq(checked.send((), Ping("Hello")), "Pong: Hello")
+}
+```
+
+## Migrate error construction and failure access
+
+Callers can match `MediatorError` cases, but cannot construct their cases
+or `PublishFailure` records. Use `MediatorError::rejected(reason)` for a refusal
+and `MediatorError::timed_out(limit)` for a timeout with a core `TimeLimit`.
+
+`PublishFailed` holds a `PublishFailures` collection. Use `length()` for the
+failure count, `get(index)` for optional zero-based access, and `to_array()`
+for a copy that you can iterate or change. The 1-based handler positions and
+the original report stay unchanged.
+
+Adapters that collect handler results use
+`MediatorError::from_publish_errors(errors)`. Each slot is `None` for success
+or `Some(error)` for failure, in handler add order. The constructor derives the
+handler count and positions. It gives `None` for empty or all-success inputs.
+
+```mbt check
+///|
+test "derive a report and read failures safely" {
+  let outcomes : Array[Error?] = [None, Some(CountFull("audit"))]
+  guard @mediator.MediatorError::from_publish_errors(outcomes) is Some(error) else {
+    fail("expected a publish error")
+  }
+  guard error is @mediator.PublishFailed(handlers~, failures~) else {
+    fail("expected PublishFailed")
+  }
+  assert_eq(handlers, 2)
+  assert_eq(failures.length(), 1)
+  guard failures.get(0) is Some(failure) else { fail("expected a failure") }
+  assert_eq(failure.position, 2)
+  assert_true(failure.error is CountFull("audit"))
+  assert_true(failures.get(1) is None)
+  let copy = failures.to_array()
+  copy.clear()
+  outcomes.clear()
+  assert_eq(failures.length(), 1)
 }
 ```

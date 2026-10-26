@@ -128,8 +128,8 @@ async test "a handler timeout is a publish failure and the other handlers run" {
   try all.publish((), Job("a")) catch {
     @mediator.PublishFailed(handlers~, failures~) => {
       assert_eq(handlers, 2)
-      assert_eq(failures.map(failure => failure.position), [1])
-      assert_true(failures[0].error is @aio.TimeoutError)
+      assert_eq(failures.to_array().map(failure => failure.position), [1])
+      assert_true(failures.to_array()[0].error is @aio.TimeoutError)
     }
     other => fail("publish raised another error: \{other}")
   } noraise {
@@ -141,9 +141,9 @@ async test "a handler timeout is a publish failure and the other handlers run" {
 ///|
 async test "the timeout middleware stops a slow handler and raises TimedOut" {
   let log = []
-  let limited = slow_sender(log, wait_ms=1000).use_(@mediator_async.timeout(50))
+  let limited = slow_sender(log, wait_ms=1000).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(50)))
   try limited.send((), Job("a")) catch {
-    @mediator.TimedOut(after_ms~) => assert_eq(after_ms, 50)
+    @mediator.TimedOut(after~) => assert_eq(after.to_millis(), 50)
     other => fail("send raised another error: \{other}")
   } noraise {
     reply => fail("send gave a reply: \{reply}")
@@ -154,7 +154,7 @@ async test "the timeout middleware stops a slow handler and raises TimedOut" {
 ///|
 async test "the timeout middleware gives the reply of a step that ends in time" {
   let log = []
-  let limited = slow_sender(log, wait_ms=10).use_(@mediator_async.timeout(1000))
+  let limited = slow_sender(log, wait_ms=10).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(1000)))
   assert_eq(limited.send((), Job("a")), "done a")
   assert_eq(log, ["start a", "end a", "stopped a"])
 }
@@ -235,4 +235,23 @@ async test "send gives the cleanup error of a cancelled handler, as a direct cal
   }
   assert_eq(direct, "cleanup")
   assert_eq(sent, direct)
+}
+
+///|
+async test "timeout reports the exact typed limit and does not replace handler errors" {
+  let limit = @lander_core.TimeLimit::millis(1)
+  let log = []
+  let slow = slow_sender(log, wait_ms=1000).use_(@mediator_async.timeout(limit))
+  try slow.send((), Job("secret")) catch {
+    @mediator.TimedOut(after~) => assert_eq(after, limit)
+    other => fail("unexpected error: \{other}")
+  } noraise { _ => fail("expected timeout") }
+  assert_eq(log, ["start secret", "stopped secret"])
+  let fast : @mediator_async.Sender[Unit, Unit, Unit] = @mediator_async.sender((_, _) => {
+    raise Broken("unchanged")
+  }).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(2147483647)))
+  try fast.send((), ()) catch {
+    Broken(text) => assert_eq(text, "unchanged")
+    other => fail("unexpected error: \{other}")
+  } noraise { _ => fail("expected handler error") }
 }

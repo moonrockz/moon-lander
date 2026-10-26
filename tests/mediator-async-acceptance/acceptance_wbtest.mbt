@@ -69,7 +69,7 @@ fn publish_failures(error : Error) -> (Int, Array[(Int, String)]) raise {
   guard error is @mediator.PublishFailed(handlers~, failures~) else {
     fail("publish raised another error: \{error}")
   }
-  let seen = failures.map(failure => {
+  let seen = failures.to_array().map(failure => {
     guard failure.error is Closed(name) else {
       fail("a failure holds another error: \{failure.error}")
     }
@@ -276,10 +276,10 @@ async test "One handler times out" {
 async test "The handler is too slow" {
   let log = []
   let limited = ping_sender(log, wait_ms=1000, stops=true).use_(
-    @mediator_async.timeout(50),
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(50)),
   )
   try limited.send(empty_context(), Ping("Hello")) catch {
-    @mediator.TimedOut(after_ms~) => assert_eq(after_ms, 50)
+    @mediator.TimedOut(after~) => assert_eq(after.to_millis(), 50)
     other => fail("send raised another error: \{other}")
   } noraise {
     reply => fail("send gave a reply: \{reply}")
@@ -290,7 +290,7 @@ async test "The handler is too slow" {
 ///|
 async test "The handler ends in time" {
   let log = []
-  let limited = ping_sender(log, wait_ms=10).use_(@mediator_async.timeout(1000))
+  let limited = ping_sender(log, wait_ms=10).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(1000)))
   assert_eq(limited.send(empty_context(), Ping("Hello")), "Pong: Hello")
 }
 

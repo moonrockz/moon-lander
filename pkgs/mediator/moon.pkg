@@ -1,4 +1,8 @@
 import {
+  "moonrockz/moon-lander-core" @lander_core,
+}
+
+import {
   "moonrockz/moon-lander-mediator" @mediator,
 } for "test"
 

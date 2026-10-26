@@ -118,10 +118,10 @@ publish lists it as a failure and runs the other handlers.
 
 ### Requirement: The timeout middleware ends a slow call
 
-The system SHALL offer a timeout middleware with a time limit in
-milliseconds. When the next step does not end within the limit, the
+The system SHALL offer a timeout middleware with the shared core
+`TimeLimit`. When the next step does not end within the limit, the
 middleware SHALL cancel the next step and raise a mediator timeout error that
-holds the limit and no request values. A step that ends in time SHALL give
+holds the same valid TimeLimit and no request values. A step that ends in time SHALL give
 its reply unchanged.
 
 #### Scenario: The handler is too slow
@@ -196,3 +196,20 @@ zero tests MUST NOT count as a pass.
 
 - **WHEN** the async acceptance suite runs on `wasm`, `js` and `native`
 - **THEN** each scenario gives the same result on each target and each target runs more than zero async mediator tests
+
+### Requirement: Core wrapping uses a typed alternative
+
+An async topic SHALL represent a wrapped core topic separately from its own
+async handlers. The core alternative MUST NOT permit extra handlers that publish
+would ignore. Attaching middleware SHALL keep that alternative. Adding a handler
+SHALL give ordinary async handlers, with the core publish at position 1.
+
+#### Scenario: Middleware on a wrapped core topic
+
+- **WHEN** a caller attaches async middleware to a wrapped core topic and publishes sequentially or concurrently
+- **THEN** the middleware runs and the original core publish error passes out unchanged
+
+#### Scenario: Add after wrapping
+
+- **WHEN** a caller adds an async handler to a wrapped core topic and publishes sequentially or concurrently
+- **THEN** both handlers run, and any core publish error is the nested failure at position 1 of the combined error

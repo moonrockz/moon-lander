@@ -236,3 +236,103 @@ async test "a leg that runs zero tests fails the check" {
   assert_eq(code, 0, msg=output)
   assert_false(output.contains("mediator/async"), msg=output)
 }
+
+///|
+/// Copy just the source and manifests needed by the isolated API consumer.
+async fn copy_api_package(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "moon.mod" ||
+      entry == "moon.pkg" ||
+      (entry.has_suffix(".mbt") && !entry.has_suffix("test.mbt")) {
+      @fs.write_file(
+        "\{destination}/\{entry}",
+        @fs.read_file("\{source}/\{entry}"),
+      )
+    }
+  }
+}
+
+///|
+async test "external callers cannot bypass mediator error invariants" {
+  let root = @fs.realpath("..")
+  let dir = @fs.tmpdir(prefix="lander-mediator-api")
+  defer @fs.rmdir(dir, recursive=true)
+  copy_api_package("\{root}/pkgs/core", "\{dir}/core")
+  copy_api_package("\{root}/pkgs/mediator", "\{dir}/mediator")
+  copy_api_package("\{root}/pkgs/mediator/async", "\{dir}/mediator/async")
+  @fs.write_file(
+    "\{dir}/moon.work",
+    "members = [\".\", \"core\", \"mediator\"]\n",
+  )
+  let manifest = @fs.read_file("\{root}/pkgs/mediator/moon.mod").text()
+  let version_line = manifest
+    .split("\n")
+    .map(line => line.trim().to_owned())
+    .filter(line => line.has_prefix("version = "))
+    .to_array()[0]
+  let version = version_line[11:version_line.length() - 1].to_owned()
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    manifest
+    .replace(
+      old="name = \"moonrockz/moon-lander-mediator\"",
+      new="name = \"fixture/mediator-api\"",
+    )
+    .replace(
+      old="import {",
+      new="import {\n  \"moonrockz/moon-lander-mediator@\{version}\",",
+    ),
+  )
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-core\" @core,\n  \"moonrockz/moon-lander-mediator\" @mediator,\n  \"moonrockz/moon-lander-mediator/async\" @mediator_async,\n}\nsupported_targets = \"wasm+js+native\"\n",
+  )
+  let valid =
+    #|pub fn probe() -> Unit raise {
+    #|  let limit = @core.TimeLimit::millis(1)
+    #|  let _ = @mediator.MediatorError::timed_out(limit)
+    #|  let _ : @mediator_async.Middleware[Unit, Unit, Unit] = @mediator_async.timeout(limit)
+    #|  let _ = @mediator.MediatorError::from_publish_errors([Some(@mediator.MediatorError::rejected("closed"))])
+    #|}
+  @fs.write_file("\{dir}/probe.mbt", valid)
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    ["check", "--target", "wasm", "."],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  for
+    (source, diagnostic) in [
+      (
+        "pub fn probe() -> Unit { let _ = @mediator.PublishFailed(handlers=0, failures=abort(\"unused\")) }",
+        "4036",
+      ),
+      (
+        "pub fn probe() -> Unit { let _ = @mediator.Rejected(reason=\"closed\") }",
+        "4036",
+      ),
+      (
+        "pub fn probe() -> Unit raise { let _ = @mediator.TimedOut(after=@core.TimeLimit::millis(1)) }",
+        "4036",
+      ),
+      (
+        "pub fn probe() -> Unit { let _ : @mediator.PublishFailure = { position: 0, error: @mediator.MediatorError::rejected(\"closed\") } }",
+        "read-only",
+      ),
+      (
+        "pub fn probe() -> Unit { let _ : @mediator_async.Middleware[Unit, Unit, Unit] = @mediator_async.timeout(-1) }",
+        "4014",
+      ),
+    ] {
+    @fs.write_file("\{dir}/probe.mbt", source)
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--target", "wasm", "."],
+      cwd=dir,
+    )
+    let output = out.text() + err.text()
+    assert_true(code != 0, msg="Invalid API use compiled: " + source)
+    assert_true(output.contains(diagnostic), msg=output)
+  }
+}

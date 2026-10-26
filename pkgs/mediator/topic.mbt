@@ -59,14 +59,14 @@ pub fn[C, Ev] Topic::publish(
     self.middleware,
     0,
     (c, e) => {
-      let failures = []
+      let errors : Array[Error?] = Array::make(handlers.length(), None)
       for index, handle in handlers {
         handle(c, e) catch {
-          error => failures.push({ position: index + 1, error, })
+          error => errors[index] = Some(error)
         }
       }
-      if !failures.is_empty() {
-        raise PublishFailed(handlers=handlers.length(), failures~)
+      if MediatorError::from_publish_errors(errors) is Some(error) {
+        raise error
       }
     },
     ctx,

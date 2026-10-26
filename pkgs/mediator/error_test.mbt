@@ -19,7 +19,7 @@ test "a validation middleware raises Rejected and the handler does not run" {
   let checked = login.use_(
     @mediator.before((_, req) => {
       if req.password.length() < 8 {
-        raise @mediator.Rejected(reason="password is too short")
+        raise @mediator.MediatorError::rejected("password is too short")
       }
     }),
   )
@@ -41,7 +41,7 @@ test "a validation middleware raises Rejected and the handler does not run" {
 test "the message holds the reason and no request value" {
   let secret = "hunter2-secret"
   let login : @mediator.Sender[Unit, Login, String] = @mediator.sender((_, _) => {
-    raise @mediator.Rejected(reason="unknown user")
+    raise @mediator.MediatorError::rejected("unknown user")
   })
   try login.send((), { user: "ann", password: secret, }) catch {
     @mediator.Rejected(_) as error => {
@@ -60,7 +60,7 @@ test "the message holds the reason and no request value" {
 test "one sender passes MediatorError and an application error out unchanged" {
   let login : @mediator.Sender[Unit, Login, String] = @mediator.sender((_, req) => {
     match req.user {
-      "" => raise @mediator.Rejected(reason="user is empty")
+      "" => raise @mediator.MediatorError::rejected("user is empty")
       "bo" => raise Locked(req.user)
       user => "welcome " + user
     }
@@ -81,9 +81,7 @@ test "one sender passes MediatorError and an application error out unchanged" {
 
 ///|
 test "the publish message gives the count and position of one failure" {
-  let error = @mediator.PublishFailed(handlers=3, failures=[
-    { position: 2, error: Locked("ann"), },
-  ])
+  let error = @mediator.MediatorError::from_publish_errors([None, Some(Locked("ann")), None]).unwrap()
   assert_eq(
     error.message(),
     "Publish failed: 1 of 3 handlers raised an error (position 2)",
@@ -92,10 +90,7 @@ test "the publish message gives the count and position of one failure" {
 
 ///|
 test "the publish message gives the count and positions of two failures" {
-  let error = @mediator.PublishFailed(handlers=3, failures=[
-    { position: 2, error: Locked("ann"), },
-    { position: 3, error: Locked("bo"), },
-  ])
+  let error = @mediator.MediatorError::from_publish_errors([None, Some(Locked("ann")), Some(Locked("bo"))]).unwrap()
   assert_eq(
     error.message(),
     "Publish failed: 2 of 3 handlers raised an error (positions 2, 3)",
@@ -134,6 +129,91 @@ test "the publish message holds no event value and no handler error text" {
 
 ///|
 test "the timeout message gives the limit and nothing else" {
-  let error = @mediator.TimedOut(after_ms=50)
+  let error = @mediator.MediatorError::timed_out(@lander_core.TimeLimit::millis(50))
   assert_eq(error.message(), "Request timed out after 50 ms")
+}
+
+///|
+test "empty and all-success outcomes cannot make PublishFailed" {
+  assert_true(@mediator.MediatorError::from_publish_errors([]) is None)
+  assert_true(@mediator.MediatorError::from_publish_errors([None]) is None)
+  assert_true(@mediator.MediatorError::from_publish_errors([None, None]) is None)
+}
+
+///|
+test "derived failures include first and last positions with safe access" {
+  let outcomes : Array[Error?] = [Some(Locked("first")), None, Some(Locked("last"))]
+  guard @mediator.MediatorError::from_publish_errors(outcomes) is Some(error) else {
+    fail("expected a publish error")
+  }
+  guard error is @mediator.PublishFailed(handlers~, failures~) else {
+    fail("expected PublishFailed")
+  }
+  assert_eq(handlers, 3)
+  assert_eq(failures.length(), 2)
+  assert_true(failures.get(-1) is None)
+  assert_true(failures.get(2) is None)
+  guard failures.get(0) is Some(first) else { fail("missing first failure") }
+  guard failures.get(1) is Some(last) else { fail("missing last failure") }
+  assert_eq(first.position, 1)
+  assert_eq(last.position, 3)
+  assert_true(first.error is Locked("first"))
+  assert_true(last.error is Locked("last"))
+  assert_eq(error.message(), "Publish failed: 2 of 3 handlers raised an error (positions 1, 3)")
+}
+
+///|
+test "a one-handler failure has position one and independent storage" {
+  let outcomes : Array[Error?] = [Some(Locked("only"))]
+  guard @mediator.MediatorError::from_publish_errors(outcomes) is Some(error) else {
+    fail("expected a publish error")
+  }
+  guard error is @mediator.PublishFailed(handlers~, failures~) else {
+    fail("expected PublishFailed")
+  }
+  let before = error.message()
+  let copy = failures.to_array()
+  copy.clear()
+  outcomes[0] = None
+  outcomes.clear()
+  assert_eq(handlers, 1)
+  assert_eq(failures.length(), 1)
+  guard failures.get(0) is Some(failure) else { fail("missing failure") }
+  assert_eq(failure.position, 1)
+  assert_true(failure.error is Locked("only"))
+  assert_eq(error.message(), before)
+}
+
+///|
+test "middleware cannot clear a failure report before it re-raises" {
+  let guarded : @mediator.Topic[Unit, Unit] = @mediator.topic((_, _) => {
+    raise Locked("only")
+  }).use_(@mediator.middleware((next, ctx, ev) => {
+    next(ctx, ev) catch {
+      @mediator.PublishFailed(failures~, ..) as error => {
+        failures.to_array().clear()
+        raise error
+      }
+      other => raise other
+    }
+  }))
+  try guarded.publish((), ()) catch {
+    @mediator.PublishFailed(handlers~, failures~) as error => {
+      assert_eq(handlers, 1)
+      assert_eq(failures.length(), 1)
+      assert_eq(error.message(), "Publish failed: 1 of 1 handlers raised an error (position 1)")
+    }
+    other => fail("unexpected error: \{other}")
+  } noraise { _ => fail("expected a failure") }
+}
+
+///|
+test "timeout construction keeps the smallest and largest core limits" {
+  for millis in [1, 2147483647] {
+    let limit = @lander_core.TimeLimit::millis(millis)
+    let error = @mediator.MediatorError::timed_out(limit)
+    guard error is @mediator.TimedOut(after~) else { fail("expected TimedOut") }
+    assert_eq(after, limit)
+    assert_eq(error.message(), "Request timed out after \{millis} ms")
+  }
 }

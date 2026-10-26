@@ -66,8 +66,8 @@ fn expect_core_failure(error : Error) -> Unit raise {
   }
   assert_eq(handlers, 3)
   assert_eq(failures.length(), 1)
-  assert_eq(failures[0].position, 2)
-  assert_true(failures[0].error is Rejected("a"))
+  assert_eq(failures.to_array()[0].position, 2)
+  assert_true(failures.to_array()[0].error is Rejected("a"))
 }
 
 ///|
@@ -110,13 +110,61 @@ async test "after add, the wrapped core publish is the handler at position 1" {
   try all.publish((), Order("a")) catch {
     @mediator.PublishFailed(handlers~, failures~) => {
       assert_eq(handlers, 2)
-      assert_eq(failures.map(failure => failure.position), [1, 2])
-      expect_core_failure(failures[0].error)
-      assert_true(failures[1].error is Rejected("late"))
+      assert_eq(failures.to_array().map(failure => failure.position), [1, 2])
+      expect_core_failure(failures.to_array()[0].error)
+      assert_true(failures.to_array()[1].error is Rejected("late"))
     }
     other => fail("publish raised another error: \{other}")
   } noraise {
     _ => fail("publish did not raise")
   }
   assert_eq(log, ["core one", "core two", "core three", "async two"])
+}
+
+///|
+async test "middleware preserves wrapped core failures on both publish paths" {
+  let log = []
+  let wraps = Ref(0)
+  let wrapped = @mediator_async.Topic::from_sync(core_orders(log)).use_(
+    @mediator_async.middleware((next, ctx, ev) => {
+      wraps.val += 1
+      next(ctx, ev)
+    }),
+  )
+  try wrapped.publish((), Order("a")) catch {
+    error => expect_core_failure(error)
+  } noraise { _ => fail("expected failure") }
+  try wrapped.publish_concurrent((), Order("a")) catch {
+    error => expect_core_failure(error)
+  } noraise { _ => fail("expected failure") }
+  assert_eq(wraps.val, 2)
+  assert_eq(log, ["core one", "core two", "core three", "core one", "core two", "core three"])
+}
+
+///|
+async test "concurrent add preserves the original core wrapper and nested failures" {
+  let log = []
+  let wrapped = @mediator_async.Topic::from_sync(core_orders(log))
+  let all = wrapped.add((_, _) => {
+    @aio.sleep(1)
+    log.push("async two")
+    raise Rejected("late")
+  })
+  try all.publish_concurrent((), Order("a")) catch {
+    @mediator.PublishFailed(handlers~, failures~) => {
+      assert_eq(handlers, 2)
+      assert_eq(failures.to_array().map(failure => failure.position), [1, 2])
+      guard failures.get(0) is Some(first) else { fail("missing core failure") }
+      guard failures.get(1) is Some(second) else { fail("missing async failure") }
+      expect_core_failure(first.error)
+      assert_true(second.error is Rejected("late"))
+    }
+    other => fail("unexpected error: \{other}")
+  } noraise { _ => fail("expected failure") }
+  assert_true(log.contains("async two"))
+  log.clear()
+  try wrapped.publish_concurrent((), Order("a")) catch {
+    error => expect_core_failure(error)
+  } noraise { _ => fail("expected failure") }
+  assert_eq(log, ["core one", "core two", "core three"])
 }

@@ -160,7 +160,7 @@ impl @moonspec.World for MediatorWorld with fn configure(self, setup) {
     topic.publish(self.ctx, Joined(name)) catch {
       @mediator.PublishFailed(handlers~, failures~) => {
         self.publish_handlers = Some(handlers)
-        for failure in failures {
+        for failure in failures.to_array() {
           guard failure.error is Closed(text) else {
             fail("a publish failure holds another error: \{failure.error}")
           }

@@ -1,23 +1,27 @@
 ///|
+/// A core topic passes errors through; own handlers collect their failures.
+priv enum Handlers[C, Ev] {
+  Core(@mediator.Topic[C, Ev])
+  Own(Array[async (C, Ev) -> Unit])
+}
+
+///|
 /// A typed async topic for one event type. It holds one or more async event
 /// handlers and the middleware around them. A topic starts with one handler,
 /// so a topic with no handlers is not a value. An event has no reply.
 struct Topic[C, Ev] {
-  /// The handlers in add order. No function changes this array after the
-  /// topic exists.
-  handlers : Array[async (C, Ev) -> Unit]
+  /// A wrapped core topic or async handlers in add order. No function
+  /// changes this value after the topic exists.
+  handlers : Handlers[C, Ev]
   /// The first item is the outermost step. No function changes this array
   /// after the topic exists.
   middleware : Array[Middleware[C, Ev, Unit]]
-  /// True when the one handler is the publish of a wrapped core topic, so its
-  /// error passes out unchanged. `add` gives a topic where it is false.
-  wraps_core : Bool
 }
 
 ///|
 /// Build an async topic from its first event handler.
 pub fn[C, Ev] topic(handle : async (C, Ev) -> Unit) -> Topic[C, Ev] {
-  { handlers: [handle], middleware: [], wraps_core: false }
+  { handlers: Own([handle]), middleware: [] }
 }
 
 ///|
@@ -27,7 +31,7 @@ pub fn[C, Ev] topic(handle : async (C, Ev) -> Unit) -> Topic[C, Ev] {
 /// handler count of the core topic. After `add`, the core publish counts as
 /// one handler at position 1, and its error is the failure at that position.
 pub fn[C, Ev] Topic::from_sync(core : @mediator.Topic[C, Ev]) -> Topic[C, Ev] {
-  { handlers: [(c, e) => core.publish(c, e)], middleware: [], wraps_core: true }
+  { handlers: Core(core), middleware: [] }
 }
 
 ///|
@@ -37,9 +41,12 @@ pub fn[C, Ev] Topic::add(
   self : Topic[C, Ev],
   handle : async (C, Ev) -> Unit,
 ) -> Topic[C, Ev] {
-  let handlers = self.handlers.copy()
+  let handlers : Array[async (C, Ev) -> Unit] = match self.handlers {
+    Core(core) => [(c, e) => core.publish(c, e)]
+    Own(handlers) => handlers.copy()
+  }
   handlers.push(handle)
-  { handlers, middleware: self.middleware, wraps_core: false }
+  { handlers: Own(handlers), middleware: self.middleware }
 }
 
 ///|
@@ -53,7 +60,7 @@ pub fn[C, Ev] Topic::use_(
 ) -> Topic[C, Ev] {
   let steps = self.middleware.copy()
   steps.push(middleware)
-  { handlers: self.handlers, middleware: steps, wraps_core: self.wraps_core }
+  { handlers: self.handlers, middleware: steps }
 }
 
 ///|
@@ -69,23 +76,23 @@ pub async fn[C, Ev] Topic::publish(
   ctx : C,
   ev : Ev,
 ) -> Unit {
-  let handlers = self.handlers
-  if self.wraps_core {
-    return run(self.middleware, 0, handlers[0], ctx, ev)
+  let handlers = match self.handlers {
+    Core(core) => return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
+    Own(handlers) => handlers
   }
   run(
     self.middleware,
     0,
     (c, e) => {
-      let failures : Array[@mediator.PublishFailure] = []
+      let slots : Array[Error?] = Array::make(handlers.length(), None)
       for index, handle in handlers {
         stop_if_cancelled()
         handle(c, e) catch {
-          error => failures.push({ position: index + 1, error })
+          error => slots[index] = Some(error)
         }
       }
       stop_if_cancelled()
-      raise_failures(handlers.length(), failures)
+      raise_failures(slots)
     },
     ctx,
     ev,
@@ -105,9 +112,9 @@ pub async fn[C, Ev] Topic::publish_concurrent(
   ctx : C,
   ev : Ev,
 ) -> Unit {
-  let handlers = self.handlers
-  if self.wraps_core {
-    return run(self.middleware, 0, handlers[0], ctx, ev)
+  let handlers = match self.handlers {
+    Core(core) => return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
+    Own(handlers) => handlers
   }
   run(
     self.middleware,
@@ -123,13 +130,7 @@ pub async fn[C, Ev] Topic::publish_concurrent(
           })
         }
       })
-      let failures : Array[@mediator.PublishFailure] = []
-      for index, slot in slots {
-        if slot is Some(error) {
-          failures.push({ position: index + 1, error })
-        }
-      }
-      raise_failures(handlers.length(), failures)
+      raise_failures(slots)
     },
     ctx,
     ev,
@@ -149,12 +150,9 @@ async fn stop_if_cancelled() -> Unit {
 }
 
 ///|
-/// Raise one `PublishFailed` when `failures` is not empty.
-fn raise_failures(
-  handlers : Int,
-  failures : Array[@mediator.PublishFailure],
-) -> Unit raise @mediator.MediatorError {
-  if !failures.is_empty() {
-    raise @mediator.PublishFailed(handlers~, failures~)
+/// Raise a derived publish error when at least one handler failed.
+fn raise_failures(errors : Array[Error?]) -> Unit raise @mediator.MediatorError {
+  if @mediator.MediatorError::from_publish_errors(errors) is Some(error) {
+    raise error
   }
 }

@@ -2,6 +2,7 @@
 package "moonrockz/moon-lander-mediator/async"
 
 import {
+  "moonrockz/moon-lander-core",
   "moonrockz/moon-lander-mediator",
 }
 
@@ -16,7 +17,7 @@ pub fn[C, Req, Res] middleware(async (async (C, Req) -> Res, C, Req) -> Res) -> 
 
 pub fn[C, Req, Res] sender(async (C, Req) -> Res) -> Sender[C, Req, Res]
 
-pub fn[C, Req, Res] timeout(Int32) -> Middleware[C, Req, Res]
+pub fn[C, Req, Res] timeout(@moon-lander-core.TimeLimit) -> Middleware[C, Req, Res]
 
 pub fn[C, Ev] topic(async (C, Ev) -> Unit) -> Topic[C, Ev]
 

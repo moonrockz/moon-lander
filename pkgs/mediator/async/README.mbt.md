@@ -11,6 +11,7 @@ Import the package with an explicit alias, because its last path segment is
 
 ```text
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-mediator/async" @mediator_async,
   "moonbitlang/async",
 }
@@ -169,8 +170,9 @@ async test "a concurrent publish runs every handler and lists the failure" {
     @mediator.PublishFailed(handlers~, failures~) as error => {
       assert_eq(handlers, 2)
       assert_eq(failures.length(), 1)
-      assert_eq(failures[0].position, 2)
-      assert_true(failures[0].error is AuditClosed("Ann"))
+      guard failures.get(0) is Some(failure) else { fail("missing failure") }
+      assert_eq(failure.position, 2)
+      assert_true(failure.error is AuditClosed("Ann"))
       assert_eq(
         error.message(),
         "Publish failed: 1 of 2 handlers raised an error (position 2)",
@@ -210,10 +212,14 @@ A time limit that a handler sets for itself, for example with
 `with_timeout`, raises an ordinary error. `send` passes it out, and a publish
 lists it as a failure and runs the other handlers.
 
-`@mediator_async.timeout(after_ms)` is a middleware that gives the next step
-`after_ms` milliseconds. When the step does not end in time, the middleware
-cancels it and raises `@mediator.TimedOut(after_ms~)`. Its `message` is
-`Request timed out after <after_ms> ms` and holds no request values.
+`@mediator_async.timeout(limit)` takes a `@lander_core.TimeLimit`. Parse or
+construct the limit once at the input boundary; zero and negative limits raise
+`TimeLimitError` there. Replace a raw `timeout(50)` call with
+`timeout(@lander_core.TimeLimit::millis(50))`. When the step does not end in time,
+the middleware cancels it and raises `@mediator.TimedOut(after~)`, where `after`
+is the same valid limit. Its message is `Request timed out after <milliseconds> ms`
+and holds no request values. The shared limit is converted to milliseconds only
+at the call to `moonbitlang/async`.
 
 ```mbt check
 ///|
@@ -228,7 +234,7 @@ async test "a timeout stops a slow send, and a caller cancellation is not an err
     let Ping(text) = req
     "Pong: " + text
   })
-  let limited = slow.use_(@mediator_async.timeout(50))
+  let limited = slow.use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(50)))
   try limited.send((), Ping("Hello")) catch {
     @mediator.TimedOut(_) as error =>
       assert_eq(error.message(), "Request timed out after 50 ms")

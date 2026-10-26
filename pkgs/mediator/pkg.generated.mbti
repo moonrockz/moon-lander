@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonrockz/moon-lander-mediator"
 
+import {
+  "moonrockz/moon-lander-core",
+}
+
 // Values
 pub fn[C, Req, Res] after((C, Req, Res) -> Unit raise) -> Middleware[C, Req, Res]
 
@@ -15,20 +19,28 @@ pub fn[C, Req, Res] sender((C, Req) -> Res raise) -> Sender[C, Req, Res]
 pub fn[C, Ev] topic((C, Ev) -> Unit raise) -> Topic[C, Ev]
 
 // Errors
-pub(all) suberror MediatorError {
+pub suberror MediatorError {
   Rejected(reason~ : String)
-  PublishFailed(handlers~ : Int32, failures~ : Array[PublishFailure])
-  TimedOut(after_ms~ : Int32)
+  PublishFailed(handlers~ : Int32, failures~ : PublishFailures)
+  TimedOut(after~ : @moon-lander-core.TimeLimit)
 }
+pub fn MediatorError::from_publish_errors(Array[Error?]) -> Self?
 pub fn MediatorError::message(Self) -> String
+pub fn MediatorError::rejected(String) -> Self
+pub fn MediatorError::timed_out(@moon-lander-core.TimeLimit) -> Self
 
 // Types and methods
 type Middleware[C, Req, Res]
 
-pub(all) struct PublishFailure {
+pub struct PublishFailure {
   position : Int32
   error : Error
 }
+
+type PublishFailures
+pub fn PublishFailures::get(Self, Int32) -> PublishFailure?
+pub fn PublishFailures::length(Self) -> Int32
+pub fn PublishFailures::to_array(Self) -> Array[PublishFailure]
 
 type Sender[C, Req, Res]
 pub fn[C, Req, Res] Sender::send(Self[C, Req, Res], C, Req) -> Res raise

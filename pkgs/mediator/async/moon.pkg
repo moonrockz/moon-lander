@@ -1,4 +1,5 @@
 import {
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-mediator" @mediator,
   "moonbitlang/async" @aio,
 }

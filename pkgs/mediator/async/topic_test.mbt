@@ -39,7 +39,7 @@ fn expect_publish_failed(
     fail("publish raised another error: \{error}")
   }
   assert_eq(count, handlers)
-  let seen = got.map(failure => {
+  let seen = got.to_array().map(failure => {
     guard failure.error is Full(name) else {
       fail("a failure holds another error: \{failure.error}")
     }

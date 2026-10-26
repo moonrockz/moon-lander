@@ -1,6 +1,7 @@
 import {
   "moonrockz/moon-lander-hosting" @hosting,
   "moonrockz/moon-lander-hosting/console" @hosting_console,
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/moon-lander-core" @lander_core,
   "moonbitlang/async",
   "moonbitlang/async/stdio",

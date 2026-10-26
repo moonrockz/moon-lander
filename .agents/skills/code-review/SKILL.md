@@ -22,6 +22,8 @@ point here. Change the checklist here, not in a wrapper.
    `design.md`, `tasks.md` and the spec deltas in `openspec/changes/<name>/`.
 4. Read the full changed files, not only the diff lines, before you report a
    finding.
+5. Vendored upstream code in `pkgs/hosting/vendor/` is out of scope for the
+   checklist. Review only its difference from upstream, as its `README.md` says.
 
 Use the compiler for mechanical questions. You can run `moon check --deny-warn
 --target all`, `moon test` with a target, and `mise exec -- openspec validate --all

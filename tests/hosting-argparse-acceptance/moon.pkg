@@ -3,7 +3,10 @@ import {
   "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-config" @config,
-  "moonbitlang/core/argparse",
+  // Vendored moonbitlang/core/argparse until a pinned MoonBit has
+  // Command::try_parse (lander-4us.5.18). The alias stays, so the return changes
+  // only this line.
+  "moonrockz/moon-lander-hosting/vendor/argparse" @argparse,
   "moonrockz/expect",
   "moonbitlang/async",
   "moonbitlang/async/process",

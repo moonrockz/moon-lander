@@ -20,6 +20,10 @@ pub(all) enum Scenario {
   OutputAfterSignal
   /// As `Wait`, and the `started` hook of `a` leaves a timer open on js.
   Linger
+  /// The arguments are `--help`, so the run ends before any hook.
+  Help
+  /// The arguments are `--version`, so the run ends before any hook.
+  Version
 }
 
 ///|
@@ -34,6 +38,8 @@ pub fn Scenario::parse(text : String) -> Scenario? {
     "output" => Some(Output)
     "output-after-signal" => Some(OutputAfterSignal)
     "linger" => Some(Linger)
+    "help" => Some(Help)
+    "version" => Some(Version)
     _ => None
   }
 }
@@ -77,10 +83,19 @@ async fn write_output() -> Unit {
 /// inside `@hosting_console.run`; on js it ends when the event loop is empty.
 pub async fn run(scenario : Scenario) -> Unit {
   let polled = Ref(false)
+  let args = match scenario {
+    Help => ["--help"]
+    Version => ["--version"]
+    _ => []
+  }
   let host : @hosting.Host[Unit] = @hosting.builder(
       @lander_core.AppName::parse("console-host"),
-      [],
+      args,
     )
+    |> @hosting_argparse.command(name => @hosting_argparse.Command(
+      name,
+      version="1.2.3",
+    ))
     |> @hosting.service(
       "a",
       starting=_ => emit("hook=a.starting"),
@@ -126,6 +141,7 @@ pub async fn run(scenario : Scenario) -> Unit {
   @hosting_console.run(host, ctx => {
     match scenario {
       Clean => emit("command")
+      Help | Version => emit("command must not run")
       Output => write_output()
       Wait | SlowStop | OutputAfterSignal | Linger => {
         emit("ready")

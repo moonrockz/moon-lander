@@ -3,7 +3,8 @@
 The host of a Moon-Lander application. A host builder holds the application
 name, the arguments, the hosted services and a services factory. `build` gives a
 `Host`, and `run` starts the services, runs the command and stops the services in
-a known order, with a clear exit code. Each run has a lifetime for events,
+a known order, with a clear exit code. On wasm and wasm-gc, `run_embedded` does
+the same without an event loop. Each run has a lifetime for events,
 stop requests and cancellation checks. The run resolves its starting settings,
 then parses arguments, loads configuration, builds services and runs hooks.
 The console driver in [`moonrockz/moon-lander-hosting/console`](console/README.mbt.md)
@@ -44,9 +45,10 @@ test "build a host with one service" {
 
 | Package | Targets | Content |
 | --- | --- | --- |
-| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js` | Builder, `command`, hosted services, `Host[S]`, `run`, `SignalProbe`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
-| [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory and global standard discovery flags |
+| `moonrockz/moon-lander-hosting` (`@hosting`) | all; `run` on `native` and `js`; `run_embedded` on `wasm` and `wasm-gc` | Builder, `command`, hosted services, `Host[S]`, `run`, `SignalProbe`, `run_embedded`, `Lifetime`, `StopToken`, `StopReason`, `SignalKind`, `StopRequested`, `ServiceName`, `ExitCode` and `HostError` |
+| [`moonrockz/moon-lander-hosting/argparse`](argparse/README.mbt.md) (`@hosting_argparse`) | all | Command factory, global standard discovery flags, and the argparse types for the command (`Command`, `OptionArg`, `FlagArg` and others) |
 | [`moonrockz/moon-lander-hosting/console`](console/README.mbt.md) (`@console`) | `native`, `js` | The console driver `run`: signals, the second signal and the process exit. A C signal stub on native, Node.js listeners on js |
+| [`moonrockz/moon-lander-hosting/vendor/argparse`](vendor/README.md) | all | A copy of `moonbitlang/core/argparse` with `Command::try_parse`, until a pinned MoonBit release has it. Do not import it; use `@hosting_argparse` |
 
 The [`moonrockz/moon-lander` guide](../lander/README.mbt.md) shows the full
 pipeline, the name and exit-code rules, and `run`.
@@ -216,7 +218,7 @@ signal codes 130, 143 and 131. It reports other failures only for code 1 or 2.
 Reports follow failure order. The default report writes one line to standard
 error: `<application name>: <message>`. A run with no failures writes nothing,
 including an application code of 1 or 2. `HostError`, `WorkingDirectoryError`,
-`UsageError`, `FileTreeError`, `ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
+`UsageError`, `FileTreeError`, `SuspendError`, `ShutdownTimedOut` and `ConfigError` use their `message()` text; other errors use
 their `Show` text.
 
 `error_report` replaces the default report. Its async callback gets each reported
@@ -373,8 +375,8 @@ run's variable snapshot and working directory. They ignore `files(tree)`.
 On wasm and wasm-gc, `files(tree)` supplies the immutable snapshot to the pure
 `@config.load`. A complete tree gives the configuration. An incomplete tree
 raises `FileTreeError::IncompleteFileTree` with code 2 and preserves each
-requested path and request kind. Its report names every path. The embedded
-phase driver and its standard-error report arrive in task group 13.
+requested path and request kind. Its report names every path. `run_embedded`
+ends with this code before the factory or any hook.
 
 After loading, the factory runs once. Its `BuildContext` and every hook's and
 command's `Context[S]` share the final configuration, variable snapshot and
@@ -382,3 +384,47 @@ working directory. Each hook, lifetime handler and command uses the same
 services record. Loading and timeout-decoding failures occur before the factory
 or any hook. The public argparse overrides layer at priority 700 arrives in
 task group 14.
+
+## Embedded driver on wasm and wasm-gc
+
+`run_embedded(host, command, stop_probe?)` is a synchronous driver for wasm and
+wasm-gc. It needs no event loop, so any WebAssembly runtime can run the host.
+It loads configuration from the `files(tree)` snapshot. With no `env_vars` or
+`working_dir`, the variable set is empty and the working directory is `/`.
+Hooks and the command run in the same order, with the same failure, stop-reason
+and exit-code rules as `run`. The function returns a `RunOutcome` and does not
+end the process.
+
+Each hook and the command run until they return. They must not wait: a hook or
+command that suspends fails with `SuspendError` and code 1, and the normal
+failure and stop rules apply. The driver has no signals and no shutdown timeout.
+The run stops through `stop_application` or through `stop_probe`. The host reads
+the probe in each cancellation check and after each hook. When the probe gives
+`true`, the run stops with the reason `Embedder`, and the stop phase runs.
+
+The default report writes `<application name>: <message>` lines with `eprintln`.
+On wasm, that is WASI standard error. On wasm-gc, core has no standard-error
+channel, so the line goes to standard output; use `error_report` to send it to
+a different place. A replacement report must not suspend. The driver ignores a
+report that raises or suspends.
+
+```mbt check
+///|
+test "prepare a host and a polling command for the embedded driver" {
+  let stop = Ref(false)
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.files(@config.FileTree::new(complete=true))
+    |> @hosting.build(_ => ())
+  let command : @hosting.Hook[Unit] = ctx => {
+    while !ctx.cancelled() {
+      // Process one bounded batch here, without a wait.
+      stop.val = true
+    }
+  }
+  // On wasm and wasm-gc:
+  // let outcome = @hosting.run_embedded(host, command, stop_probe=() => stop.val)
+  ignore((host, command))
+}
+```

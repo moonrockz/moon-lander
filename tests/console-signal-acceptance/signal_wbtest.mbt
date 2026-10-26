@@ -193,6 +193,19 @@ async test "a clean run runs all hooks and ends with 0" {
 }
 
 ///|
+async test "help and version end the process with 0 before any hook" {
+  for child in children(native=true) {
+    for (scenario, text) in [("help", "Usage: console-host"), ("version", "1.2.3")] {
+      let (code, output) = run_child(child, scenario, [])
+      assert_eq(code, 0, msg="\{child.label()} \{scenario}\n\{output}")
+      assert_eq(output.split(text).count() - 1, 1, msg="\{child.label()} \{scenario}\n\{output}")
+      assert_false(output.contains("hook="), msg=output)
+      assert_false(output.contains("command"), msg=output)
+    }
+  }
+}
+
+///|
 async test "a first signal stops gracefully with its identity, all stop hooks and its code" {
   for child in children(native=true) {
     for case in sendable_kinds() {

@@ -232,10 +232,14 @@ async fn morphir_command(ctx : @hosting.Context[App]) -> Unit raise {
    process on native and js. A conversion error ends the run with `UsageError` and
    exit code 2, before any file read. The host gives both values to the core builder
    (`@config.env_vars`, `@config.working_dir`).
-2. The host parses `args` one time with `moonbitlang/core/argparse`. An argparse
-   error or a misused standard flag ends the run with `UsageError` and exit code 2,
-   before any file read. `--help` and `--version` end the process inside argparse with
-   code 0. Settings come first because the parse reads the variable set of the run.
+2. The host parses `args` one time with core argparse `Command::try_parse` (D6,
+   D11). An argparse error or a misused standard flag ends the run with
+   `UsageError` and exit code 2, before any file read. A help or version request
+   ends the run with code 0 and the reason `Requested`, before any file read, and
+   the run returns: on native and js the console driver then ends the process with
+   code 0, and on wasm and wasm-gc control returns to the embedder (D6, "Help and
+   version in the embedded driver"). Settings come first
+   because the parse reads the variable set of the run.
 3. The host finds the environment name for `HostEnvironment`: the `--environment`
    value, then `<PREFIX>_ENVIRONMENT` in the variable set of the run, then the builder
    default. This is the same order that conventions uses, so both give the same name.
@@ -439,6 +443,67 @@ Drivers run the steps:
   `false` inside).
 - Call (this change): wasm uses the embedded driver too, so a WASI runtime without the
   `moonbitlang/async` imports can run the host.
+- Call (group 13): the embedded driver is
+  `pub fn[S] run_embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> RunOutcome`,
+  synchronous, in `run.embedded.mbt` (wasm, wasm-gc). It uses the shared
+  `configuration_inputs`, `configuration_from_tree`, `finish_configuration` and
+  `outcome`, and the same reply rule after each step as `run` (one shared
+  `Lifetime::reply`). Each hook, the command and a custom report run through
+  `%async.run` inside `%async.capture_cancellation`. A probe of the pinned compiler
+  on both targets showed that `%async.run` returns at the first suspension, and that
+  a stored continuation can resume later outside it. So each step has its own open
+  flag and result cell, which the driver closes when `%async.run` returns: a late
+  resume cannot change a completed step or run.
+- Call (group 13): a hook or command that suspends fails with
+  `SuspendError::HookSuspended(service~, phase~)` or `CommandSuspended` (code 1), and
+  the engine failure and stop rules apply. The message names the hook and says that
+  hooks on wasm and wasm-gc must not wait. The public enum `HookPhase` names the
+  phase, because the engine `Phase` stays private. A cancellation that the closure
+  does not catch is a stop request, as in `run`.
+- Call (group 13): the embedder probe is a stop probe that maps `true` to the private
+  request `Embedder` and the reason `StopReason::Embedder`. The driver registers it
+  before the first hook. A probe stop before the first hook runs no hook.
+- Call (group 13): the default report writes `<name>: <message>` with core
+  `eprintln`, so the driver links no event loop. On wasm that is WASI standard
+  error. On wasm-gc, core has no standard-error channel, and `eprintln` writes to the
+  one output import of core. A wasm-gc embedder that needs a separate channel gives
+  `error_report`. A custom report that raises or suspends is ignored.
+- Owner (2026-10-25), Call (group 13): **Help and version in the embedded driver.**
+  `--help` and `--version` (and every other argparse help or version request, such as
+  `help <subcommand>` or `arg_required_else_help`) return control to the embedder.
+  The contract:
+  - Output: the driver writes the text that argparse renders, one time, to standard
+    output with `println`, the same text as on native and js.
+  - Result: `run_embedded` returns a `RunOutcome` with exit code 0, no failures and
+    the stop reason `Requested`, the same reason as a services factory that raises
+    `StopRequested`, which also ends the run before any hook.
+  - Order: the request ends the run after the argument parse and before the
+    configuration load. No file of the tree is read, and the services factory, the
+    lifetime and the hooks do not run.
+  - No exit: the driver calls no process exit, and the built wasm and wasm-gc modules
+    have no exit import (`proc_exit`, `__moonbit_sys_unstable.exit`). Today
+    `Command::parse` links that import into every host, also when no argument asks for
+    help.
+  - Call (review of group 13): `run` on native and js uses the same entry point, so
+    the host has one parse path. `run` writes the text and returns the same outcome,
+    and `run` still does not end the process. The console driver then ends the
+    process with code 0 (native) or sets `process.exitCode` (js), which keeps help
+    text that is still in a pipe.
+  - Parser: the driver uses one argparse parse of the same command. It does not read
+    argv itself and does not add a second parser. The pinned public
+    `Command::parse` catches the private help and version requests and exits, so the
+    driver needs a public entry point that returns them. Upstream request:
+    moonbitlang/core#4486, with `Command::try_parse(...) -> ParseOutcome` in
+    moonbitlang/core#4487.
+  - Owner (2026-10-26): until a pinned MoonBit release has `try_parse`, the host
+    uses a vendored copy of core argparse with the patch of moonbitlang/core#4487
+    (D11). The host does not wait for the release, and it does not weaken the
+    contract: help and version stay built-in argparse features that need no step
+    of the application, and no exit import is linked. A private `DisplayRequested(text)` carries the request from
+    the parse to each driver, as `StopRequested` does from the factory.
+    `mise run check:embedded` runs a wasm and a wasm-gc embedder with `--help` and
+    `--version` and fails on an exit import in the built modules. Bead
+    `lander-4us.5.18` returns to core.
 - Call (this change): the shutdown timeout is one budget for the full stop phase. It
   starts when the command task has ended. Default 30 000 ms, as in .NET.
 - Owner (2026-10-24): the builder sets the shutdown timeout with
@@ -681,6 +746,11 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
   selected subcommand path. The application dispatches the subcommand itself.
 - Call (this change): argparse errors are private types. The host wraps every parse
   error into `UsageError` with the argparse message.
+- Owner (2026-10-26), Call (group 13): `hosting/argparse` re-exports the argparse
+  types of a command with `pub using` (`Command`, `Matches`, `FlagArg`, `OptionArg`,
+  `PositionArg`, `ArgGroup`, `FlagAction`, `OptionAction`, `ValueRange`,
+  `ValueSource`). Applications build the command with these names, so the return
+  from the vendored copy to core (D11) does not change application code.
   A command-definition fault also gives `UsageError` and code 2 because core argparse does not distinguish it from a user error without matching message text.
 
 ### D11. Package layout (Call: shared names)
@@ -691,11 +761,22 @@ The root package defines `command` because it needs the private builder fields; 
 | --- | --- | --- |
 | `moonrockz/moon-lander-hosting` | all | Builder, `Host[S]`, `Context[S]`, engine, lifetime, environment, `ExitCode`, `UsageError`, `StopRequested`, `IntoEnvVars`, starting settings (`env_vars`, `working_dir`), env source composition, `run` (native, js), `run_embedded` (wasm, wasm-gc), `files` (wasm, wasm-gc) |
 | `moonrockz/moon-lander-hosting/console` | native, js | C signal stub and native driver; js driver over the TypeScript adapter; process exit |
-| `moonrockz/moon-lander-hosting/argparse` | all | `command`, standard flags, mappings, overrides source |
+| `moonrockz/moon-lander-hosting/argparse` | all | `command`, standard flags, mappings, overrides source, argparse type re-exports (D10) |
+| `moonrockz/moon-lander-hosting/vendor/argparse` | all | Temporary: a copy of `moonbitlang/core/argparse` with `Command::try_parse` (D6), and its private `vendor/internal/edit_distance` |
 | `moonrockz/moon-lander` (`@lander`) | all | Batteries-included entry (D15): `cli` with the starting settings, the default steps (`formats`, `conventions`, `no_standard_flags`, `no_environments`, `build`, `run`) and `pub using` re-exports of `@hosting` steps |
 
 - `hosting` imports `config`, `config/conventions`, `config/host` (native and js) and
   `moonbitlang/core/argparse` (for `Context[S].args`).
+- Owner (2026-10-26), Call (group 13): until a pinned MoonBit release has
+  `Command::try_parse`, `hosting`, `hosting/argparse` and the tests import
+  `vendor/argparse` in place of `moonbitlang/core/argparse`, under the alias that they
+  used for core. The copy is the core package of the pinned MoonBit release with the
+  patch of moonbitlang/core#4487, byte for byte, except one import line: the core
+  `internal/edit_distance` package moves to `vendor/internal/edit_distance`, because
+  a package outside core cannot import a core `internal` package. The copy keeps its
+  Apache-2.0 license, `NOTICE` and upstream tests. The return (bead
+  `lander-4us.5.18`) changes the pin, the four `moon.pkg` imports, and deletes
+  `pkgs/hosting/vendor`; no `.mbt` source line changes.
 - `@lander` imports `hosting`, `hosting/argparse`, `hosting/console` (native and js),
   `config/conventions` and the virtual package `moonrockz/moon-lander-config/formats` of
   `add-configuration-core`. `hosting` does not import `formats`, so the bare path
@@ -1121,6 +1202,11 @@ not check the rules again.
 - [Defaults on by default can surprise an application that expects nothing] → Each
   default has one step that turns it off, and the bare `@hosting.builder` turns on
   nothing.
+- [The vendored argparse copy misses upstream fixes and makes core argparse types
+  not fit the `command` step] → The copy is temporary, unmodified and tested by its
+  upstream tests on all four targets. Applications use the `@hosting_argparse`
+  re-exports, so the return is a change of imports only. Bead `lander-4us.5.18`
+  tracks the return.
 - [`moonbitlang/async` is experimental] → Pin an exact version (0.22.5 was read for
   this design). Keep all use in drivers. The engine does not import it.
 

@@ -4,6 +4,25 @@
 pub using @hosting {command}
 
 ///|
+/// The argparse types of a host command. Build the command with these names, not
+/// with `moonbitlang/core/argparse`: until a pinned MoonBit release has
+/// `Command::try_parse` (moonbitlang/core#4487), the host uses a vendored copy of
+/// core argparse, and core types do not fit the `command` step. After the return
+/// to core, these names are the core types, so the application does not change.
+pub using @core_argparse {
+  type ArgGroup,
+  type Command,
+  type FlagAction,
+  type FlagArg,
+  type Matches,
+  type OptionAction,
+  type OptionArg,
+  type PositionArg,
+  type ValueRange,
+  type ValueSource,
+}
+
+///|
 /// The global `--environment <name>` option. The host passes it to discovery.
 /// Add it to the root command. The host does not read it from a subcommand only.
 pub fn environment_option() -> @core_argparse.OptionArg {

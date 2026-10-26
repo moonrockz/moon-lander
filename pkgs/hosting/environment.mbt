@@ -63,8 +63,6 @@ pub fn[S] content_root(builder : HostBuilder[S], path : @lander_core.AbsolutePat
 /// Resolve after arguments and before configuration, even when environment
 /// files are off. Empty variables count as unset, as in conventions. A parsed
 /// builder default needs no second parse.
-// The embedded driver arrives in group 13. Remove with that caller.
-#warnings("-1")
 fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> HostEnvironment raise @config.ConfigError {
   let variable = "\{host.prefix}_ENVIRONMENT"
   let raw = match (options.environment, settings.variables.get(variable)) {
@@ -82,8 +80,6 @@ fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @con
 
 ///|
 /// Convert the resolved name to text only at the conventions input boundary.
-// The embedded driver arrives in group 13. Remove with that caller.
-#warnings("-1")
 fn[S] environment_options(host : Host[S], options : @conventions.DiscoveryOptions, environment : HostEnvironment) -> @conventions.DiscoveryOptions {
   if host.environment is Some(_) {
     { ..options, environment: environment.environment_name.map(name => name.to_string()) }

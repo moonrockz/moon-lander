@@ -7,6 +7,11 @@
 /// for code 1 or 2, in failure order, through `error_report` or as
 /// `<name>: <message>` on standard error. Report errors do not change the outcome.
 ///
+/// A help or version request of the arguments writes the argparse text one
+/// time with `println` and returns code 0 with the reason `Requested`, before
+/// the configuration load, the factory and the hooks. The console driver then
+/// ends the process with that code.
+///
 /// A console driver gives `signals`. The run registers the probe before the
 /// first hook, so each cancellation check reads it, and a watcher task reads it
 /// every 50 ms until the run ends. The first signal is a stop request with the
@@ -39,13 +44,16 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
 
 ///|
 async fn[S] execute(host : Host[S], command : Hook[S], read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError, signals? : SignalProbe) -> RunOutcome {
-  let inputs = configuration_inputs(host, read_directory~) catch { err => return with_signal(outcome(err), signals) }
+  let inputs = configuration_inputs(host, read_directory~) catch {
+    DisplayRequested(text) => {
+      println(text)
+      return with_signal(requested_outcome(), signals)
+    }
+    err => return with_signal(outcome(err), signals)
+  }
   let config = @host.load(inputs.sources) catch { err => return with_signal(outcome(err), signals) }
   let configured = finish_configuration(host, inputs, config) catch {
-    StopRequested => return with_signal({
-      exit_code: ExitCode::success(), timed_out: false, failures: [],
-      reason: Requested, requested_code: None, signal: None,
-    }, signals)
+    StopRequested => return with_signal(requested_outcome(), signals)
     err => return with_signal(outcome(err), signals)
   }
   let ctx = configured.context
@@ -77,11 +85,7 @@ async fn[S] run_engine(host : Host[S], configured : ConfiguredRun[S], command : 
   let lifetime = ctx.lifetime
   lifetime.task_cancelled.val = @async.is_being_cancelled
   defer { lifetime.task_cancelled.val = () => false }
-  let mut step = Engine::start(host.services)
-  // A probe stop that arrived during configuration loading runs no start hook.
-  if lifetime.probe_stop() && step is Run(pending, _) && lifetime.request is Some(request) {
-    step = pending.stop_requested(request, lifetime.requested_code, result=Interrupted, observed_signal?=lifetime.signal)
-  }
+  let mut step = lifetime.start_engine(host.services)
   while step is Run(pending, action) {
     if action == Raise(Stopping) { break }
     step = run_step(host, ctx, command, pending, action)
@@ -143,16 +147,8 @@ async fn[S] perform_step(host : Host[S], ctx : Context[S], command : Hook[S], pe
 
 ///|
 fn[S] reply_step(ctx : Context[S], pending : Pending, completed : ActionResult?) -> Step {
-  let lifetime = ctx.lifetime
-  if completed is None { lifetime.stop_application() }
-  ignore(lifetime.probe_stop())
-  let result = completed.unwrap_or(Interrupted)
-  let next = if lifetime.request is Some(request) {
-    pending.stop_requested(request, lifetime.requested_code, result~, observed_signal?=lifetime.signal)
-  } else if result is Failed(error) { pending.failed(error) }
-  else { pending.done() }
-  if pending.engine.reason is Some(reason) { lifetime.reason = Some(reason) }
-  next
+  if completed is None { ctx.lifetime.stop_application() }
+  ctx.lifetime.reply(pending, completed.unwrap_or(Interrupted))
 }
 
 ///|

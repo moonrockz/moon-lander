@@ -59,8 +59,6 @@ priv struct ConfigurationInputs {
 }
 
 ///|
-// The embedded driver arrives in group 13.
-#warnings("-1")
 fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory) -> ConfigurationInputs raise {
   let settings = resolve_settings(host, read_directory~)
   let parsed = parse_arguments(host, env=settings.variables)
@@ -71,8 +69,9 @@ fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.
 }
 
 ///|
-/// Shared pure load path for an injected tree. Group 13 supplies the driver.
-// The embedded driver arrives in group 13.
+/// Shared pure load path for an injected tree. `run_embedded` uses it.
+// Native and js read disk through `@host.load` and do not call this. Remove the
+// override when the build system can limit a function to targets.
 #warnings("-1")
 fn configuration_from_tree(sources : @config.ConfigBuilder, tree : @config.FileTree) -> @config.Config raise {
   match @config.load(sources, tree) {
@@ -82,14 +81,15 @@ fn configuration_from_tree(sources : @config.ConfigBuilder, tree : @config.FileT
 }
 
 ///|
+// Only `run` (native, js) applies the shutdown timeout; wasm and wasm-gc have no
+// timer. Remove when the build system can limit a field read to targets.
+#warnings("-7")
 priv struct ConfiguredRun[S] {
   context : Context[S]
   shutdown_timeout : @lander_core.TimeLimit
 }
 
 ///|
-// The embedded driver arrives in group 13.
-#warnings("-1")
 fn[S] finish_configuration(host : Host[S], inputs : ConfigurationInputs, config : @config.Config) -> ConfiguredRun[S] raise {
   let shutdown_timeout = match host.timeout_key {
     Some(key) => {
@@ -107,9 +107,14 @@ fn[S] finish_configuration(host : Host[S], inputs : ConfigurationInputs, config 
 }
 
 ///|
+/// A run that ends before the first hook without a failure: a help or version
+/// request of the argument parse, or a factory that raises `StopRequested`.
+fn requested_outcome() -> RunOutcome {
+  { exit_code: ExitCode::success(), timed_out: false, failures: [], reason: Requested, requested_code: None, signal: None }
+}
+
+///|
 /// A configuration or factory failure before the engine starts.
-// The embedded driver arrives in group 13.
-#warnings("-1")
 fn outcome(error : Error) -> RunOutcome {
   { exit_code: select_exit_code(None, [error], false, None), timed_out: false, failures: [error], reason: StartFailed(error), requested_code: None, signal: None }
 }

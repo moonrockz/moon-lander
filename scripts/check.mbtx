@@ -18,8 +18,8 @@ async fn main {
   for
     task in [
       "check:node-adapter", "check:browser-adapter", "check:browser-fixture", "lint",
-      "validate", "test", "check:mediator", "check:logging", "check:config", "check:formats",
-      "check:formats-registry", "check:openrpc-assets", "check:openrpc-artifacts",
+      "validate", "test", "check:mediator", "check:logging", "check:embedded", "check:config",
+      "check:formats", "check:formats-registry", "check:openrpc-assets", "check:openrpc-artifacts",
       "check:openrpc-unicode", "check:openrpc", "qualify:openrpc", "check:openrpc-registry",
       "test:scripts", "build", "test:browser",
     ] {

@@ -1,0 +1,10 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
+  "moonrockz/moon-lander-core" @lander_core,
+}
+
+// `run_embedded` exists only on wasm and wasm-gc.
+supported_targets = "wasm+wasm-gc"
+
+options("is-main": true)

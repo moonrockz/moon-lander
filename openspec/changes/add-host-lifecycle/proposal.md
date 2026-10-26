@@ -127,7 +127,8 @@ None. This change depends on `configuration-core`, `configuration-conventions` a
 ## Impact
 
 - New packages in the `moonrockz/moon-lander-hosting` module (`pkgs/hosting`, since
-  `split-framework-modules`): the root package `@hosting`, `console` and `argparse`.
+  `split-framework-modules`): the root package `@hosting`, `console` and `argparse`,
+  and the temporary `vendor/argparse` copy of core argparse (design D11).
   The root package `@lander` of `moonrockz/moon-lander` gets the batteries-included entry:
   `cli`, its default steps, `run`, and `pub using` re-exports of `@hosting` steps.
   `@lander` imports the `formats` virtual package of `add-configuration-core`.
@@ -154,7 +155,9 @@ None. This change depends on `configuration-core`, `configuration-conventions` a
 
 - A dependency-injection container. The owner may add one later.
 - Configuration reload when a file changes.
-- A CLI parser of our own. Parsing stays with `moonbitlang/core/argparse`.
+- A CLI parser of our own. Parsing stays with `moonbitlang/core/argparse`. Until a
+  pinned MoonBit release has `Command::try_parse` (moonbitlang/core#4487), the host
+  uses an unmodified vendored copy of it with that patch (design D6, D11).
 - A logging abstraction like `Microsoft.Extensions.Logging`. It is future work.
 - Long-running background services (a `BackgroundService` equivalent) and concurrent
   service start.

@@ -92,6 +92,19 @@ async test "a signal before the first hook runs no start hook and gives its code
 }
 
 ///|
+async test "a signal before the first hook runs no stop hook of a service without start hooks" {
+  let log = []
+  let result = builder(@lander_core.AppName::parse("signals"), [])
+    |> service("a", stopping=_ => log.push("a.stopping"), stop=_ => log.push("a.stop"))
+    |> service("b", start=_ => log.push("b.start"), stop=_ => log.push("b.stop"))
+    |> build(_ => ())
+    |> run(signals=SignalProbe::new(() => Some(Terminate)), _ => log.push("command"))
+  @expect.expect(log).to_equal([])
+  @expect.expect(result.reason is Signal(Terminate)).to_be_true()
+  @expect.expect(result.exit_code().to_int()).to_equal(143)
+}
+
+///|
 async test "a signal wins over a failure before the engine starts" {
   let host : Host[Unit] = builder(@lander_core.AppName::parse("signals"), [])
     |> build(_ => raise HookFailed(0))

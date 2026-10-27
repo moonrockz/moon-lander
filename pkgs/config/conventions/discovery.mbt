@@ -58,9 +58,9 @@ priv enum DirConfig {
   /// No primary and no legacy file.
   NoFile
   /// One primary file.
-  OneFile(String)
+  OneFile(@config.FileTreePath)
   /// No primary file, and the legacy file.
-  LegacyAt(String)
+  LegacyAt(@config.FileTreePath)
   /// More than one primary file.
   Several
 }
@@ -80,8 +80,8 @@ priv enum FileKind {
 /// A project-tier primary: its path, the project root that it belongs to,
 /// and how it was found.
 priv struct ProjectFile {
-  path : String
-  root : String
+  path : @config.FileTreePath
+  root : @config.FileTreePath
   kind : FileKind
 }
 
@@ -91,7 +91,7 @@ priv enum Walk {
   /// The nearest directory with a primary or a legacy file.
   Root(ProjectFile)
   /// The nearest directory with a primary holds more than one.
-  Crowded(String)
+  Crowded(@config.FileTreePath)
   /// No directory up to the boundary holds a primary.
   NoRoot
 }
@@ -132,13 +132,19 @@ fn Conventions::project_sources(
   let context = scan.context
   let extensions = project.extensions
   let start = match context.working_dir {
-    Some(dir) if is_absolute(dir) => Some(normalize(dir))
+    Some(dir) if dir.is_absolute() => Some(normalize(dir))
     _ => None
   }
-  let stop = match (self.boundary, start) {
-    (Some(dir), _) if is_absolute(dir) => Some(normalize(dir))
-    (Some(dir), Some(start)) => Some(normalize(join(start, dir)))
-    _ => None
+  let stop = match self.boundary {
+    Some(text) => {
+      let dir = input_path(text, context.platform)
+      match (dir.is_absolute(), start) {
+        (true, _) => Some(normalize(dir))
+        (false, Some(start)) => Some(normalize(start.resolve(dir)))
+        (false, None) => None
+      }
+    }
+    None => None
   }
   let alone = (sources : Array[@config.ConfigSource]) => {
     @config.LoadStep::Done({ sources, has_member: false })
@@ -164,8 +170,8 @@ fn Conventions::project_sources(
         )
         return alone([self.skipped_project()])
       }
-      if stop is Some(stop) && !is_within(start, stop) {
-        raise OutsideBoundary(start~, boundary=stop)
+      if stop is Some(stop) && !start.is_within(stop) {
+        raise OutsideBoundary(start=start.to_string(), boundary=stop.to_string())
       }
       match scan.walk_up(start, stop) {
         None => return Need(scan.needs)
@@ -176,7 +182,7 @@ fn Conventions::project_sources(
         Some(NoRoot) => {
           if project.options.project is Some(selector) &&
             self.workspace is Some(_) {
-            raise UnknownProject(selector~, workspace=start)
+            raise UnknownProject(selector~, workspace=start.to_string())
           }
           return alone([self.primary(self.candidates(start, extensions))])
         }
@@ -197,7 +203,7 @@ fn Conventions::project_sources(
     None =>
       match scan.value_of(file) {
         Found(value) => (file, value)
-        Missing => raise FileNotFound(path=file.path)
+        Missing => raise FileNotFound(path=file.path.to_string())
         Unknown => return Need(scan.needs)
       }
   }
@@ -265,7 +271,11 @@ fn Conventions::project_sources(
 /// counts only when no primary exists there. `None` when the tree does not
 /// hold a listing yet; the walk asks for the listings of one directory per
 /// round, nearest first.
-fn Scan::walk_up(self : Scan, start : String, stop : String?) -> Walk? {
+fn Scan::walk_up(
+  self : Scan,
+  start : @config.FileTreePath,
+  stop : @config.FileTreePath?,
+) -> Walk? raise @config.ConfigError {
   let mut dir = start
   while true {
     match self.config_at(dir) {
@@ -277,7 +287,7 @@ fn Scan::walk_up(self : Scan, start : String, stop : String?) -> Walk? {
     }
     guard self.conventions.walk_up &&
       stop != Some(dir) &&
-      parent_dir(dir) is Some(parent) else {
+      dir.parent() is Some(parent) else {
       break
     }
     dir = parent
@@ -289,7 +299,10 @@ fn Scan::walk_up(self : Scan, start : String, stop : String?) -> Walk? {
 /// What `dir` holds: the primary candidates of the three layouts, else the
 /// legacy file. Asks for each listing that the tree does not hold, and for
 /// each candidate that the listing holds as `Inaccessible`.
-fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
+fn Scan::config_at(
+  self : Scan,
+  dir : @config.FileTreePath,
+) -> DirConfig raise @config.ConfigError {
   let tree = self.context.tree
   let existing = []
   let mut known = true
@@ -313,7 +326,7 @@ fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
     return OneFile(path)
   }
   guard self.conventions.legacy is Some(legacy) else { return NoFile }
-  let path = join(dir, legacy.name)
+  let path = dir.join(legacy.name)
   match tree.is_file(path) {
     Found(true) => LegacyAt(path)
     Found(false) | Missing => NoFile
@@ -337,8 +350,9 @@ fn Scan::value_of(
       Found(
         match (file.kind, self.conventions.legacy) {
           (LegacyFile, Some(legacy)) =>
-            (legacy.decode)((legacy.format.parse)(text, file.path))
-          _ => @config.parse_file(self.context.formats, file.path, text)
+            (legacy.decode)((legacy.format.parse)(text, file.path.to_string()))
+          _ =>
+            @config.parse_file(self.context.formats, file.path.to_string(), text)
         },
       )
     Missing => Missing
@@ -373,13 +387,13 @@ fn Conventions::layer(
   let primary = match file.kind {
     Discovered =>
       @config.ConfigSource::candidates(
-        self.candidates(file.root, project.extensions),
+        texts(self.candidates(file.root, project.extensions)),
         display=self.display,
         role=if as_member { Member } else { Workspace },
       )
     ExplicitFile =>
       @config.ConfigSource::file(
-        file.path,
+        file.path.to_string(),
         role=if as_member { Member } else { Explicit },
         name=self.display,
       )
@@ -388,14 +402,14 @@ fn Conventions::layer(
         Found(value) =>
           return Some({
             primary: @config.ConfigSource::parsed_file(
-              file.path,
+              file.path.to_string(),
               value,
               role=if as_member { Member } else { Legacy },
               name=self.display,
             ),
             adjacent: [],
           })
-        Missing => raise FileNotFound(path=file.path)
+        Missing => raise FileNotFound(path=file.path.to_string())
         Unknown => return None
       }
   }
@@ -408,7 +422,7 @@ fn Conventions::layer(
 /// `NotFound` with every candidate, or the core load raises `Ambiguous`.
 fn Conventions::member_layer(
   self : Conventions,
-  dir : String,
+  dir : @config.FileTreePath,
   project : ProjectInputs,
   scan : Scan,
 ) -> Layer? raise @config.ConfigError {
@@ -421,7 +435,7 @@ fn Conventions::member_layer(
     NoFile | Several =>
       Some({
         primary: @config.ConfigSource::candidates(
-          self.candidates(dir, project.extensions),
+          texts(self.candidates(dir, project.extensions)),
           display=self.display,
           role=Member,
         ),
@@ -431,32 +445,29 @@ fn Conventions::member_layer(
 }
 
 ///|
-/// The explicit primary at `given`. A relative path joins the working
-/// directory, and on Windows `\` becomes `/`. The project root is the
-/// directory of the file, or the directory that holds `.<app>/` or
-/// `.config/<app>/` for those layouts.
+/// The explicit primary at `given`. The text is in the native form of the
+/// platform, so on Windows `\` works. A relative path joins the working
+/// directory. The project root is the directory of the file, or the directory
+/// that holds `.<app>/` or `.config/<app>/` for those layouts.
 fn Conventions::explicit_file(
   self : Conventions,
   given : String,
   context : @config.LoadContext,
   extensions : Array[String],
-) -> ProjectFile {
-  let path = match context.platform {
-    Some(Windows) => given.replace_all(old="\\", new="/")
-    _ => given
-  }
-  let resolved = if is_absolute(path) {
+) -> ProjectFile raise @config.ConfigError {
+  let path = input_path(given, context.platform)
+  let resolved = if path.is_absolute() {
     normalize(path)
   } else {
     match context.working_dir {
-      Some(dir) if is_absolute(dir) => normalize(join(dir, path))
+      Some(dir) if dir.is_absolute() => normalize(dir.resolve(path))
       _ => path
     }
   }
   let root = match self.adjacent(resolved, extensions) {
-    Some((dir, "config")) if file_name(parent_of(dir)) == ".config" =>
+    Some((dir, "config")) if parent_of(dir).name() == Some(".config") =>
       parent_of(parent_of(dir))
-    Some((dir, _)) if file_name(dir) == ".\{self.name}" => parent_of(dir)
+    Some((dir, _)) if dir.name() == Some(".\{self.name}") => parent_of(dir)
     _ => parent_of(resolved)
   }
   { path: resolved, root, kind: ExplicitFile }
@@ -469,9 +480,9 @@ fn Conventions::explicit_file(
 /// environment file stays.
 fn Conventions::overrides(
   self : Conventions,
-  path : String,
+  path : @config.FileTreePath,
   project : ProjectInputs,
-) -> Array[@config.ConfigSource?] {
+) -> Array[@config.ConfigSource?] raise @config.ConfigError {
   let { options, environment, extensions } = project
   guard self.adjacent(path, extensions) is Some((dir, stem)) else { return [] }
   let sources = [
@@ -493,7 +504,11 @@ fn Conventions::overrides(
           @config.ConfigSource::skipped(File(role), name=self.display)
         } else {
           @config.ConfigSource::candidates(
-            extensions.map(extension => join(dir, "\{stem}.\{word}.\{extension}")),
+            texts(
+              extensions.map(extension => {
+                dir.child("\{stem}.\{word}.\{extension}")
+              }),
+            ),
             display=self.display,
             role~,
             name=self.display,
@@ -511,18 +526,19 @@ fn Conventions::overrides(
 /// and `config` for `.config/<app>/config.<ext>`.
 fn Conventions::adjacent(
   self : Conventions,
-  path : String,
+  path : @config.FileTreePath,
   extensions : Array[String],
-) -> (String, String)? {
-  let dir = parent_of(path)
-  let file = file_name(path)
+) -> (@config.FileTreePath, String)? {
+  guard path.parent() is Some(dir) && path.name() is Some(file) else {
+    return None
+  }
   for extension in extensions {
     if file == "\{self.name}.\{extension}" {
       return Some((dir, self.name))
     }
     if file == "config.\{extension}" &&
-      (dir == ".config/\{self.name}" ||
-      dir.has_suffix("/.config/\{self.name}")) {
+      dir.name() == Some(self.name) &&
+      parent_of(dir).name() == Some(".config") {
       return Some((dir, "config"))
     }
   }
@@ -591,9 +607,9 @@ fn unread_options(
 /// The primary candidates in `dir`, layout by layout, in extension order.
 fn Conventions::candidates(
   self : Conventions,
-  dir : String,
+  dir : @config.FileTreePath,
   extensions : Array[String],
-) -> Array[String] {
+) -> Array[@config.FileTreePath] raise @config.ConfigError {
   guard self.has(Layouts) else { return [] }
   let layouts : Array[Layout] = [Root, Hidden, DotConfig]
   let paths = []
@@ -604,7 +620,7 @@ fn Conventions::candidates(
         Hidden => ".\{self.name}/\{self.name}.\{extension}"
         DotConfig => ".config/\{self.name}/config.\{extension}"
       }
-      paths.push(join(dir, relative))
+      paths.push(dir.join(relative))
     }
   }
   paths
@@ -613,10 +629,10 @@ fn Conventions::candidates(
 ///|
 fn Conventions::primary(
   self : Conventions,
-  candidates : Array[String],
+  candidates : Array[@config.FileTreePath],
 ) -> @config.ConfigSource {
   @config.ConfigSource::candidates(
-    candidates,
+    texts(candidates),
     display=self.display,
     role=Workspace,
   )
@@ -645,105 +661,45 @@ fn searched_extensions(formats : Array[@config.Format]) -> Array[String] {
 }
 
 ///|
-/// Whether `path` is absolute: it starts with `/` (also `//server/share`) or
-/// with a drive such as `C:/`.
-fn is_absolute(path : String) -> Bool {
-  path.has_prefix("/") || (path.length() >= 3 && path[1:3] == ":/")
+/// The parsed path of the input text `text`. With a platform, the text is in
+/// the native form of that platform, so `\` separators work on Windows.
+fn input_path(
+  text : String,
+  platform : @config.Platform?,
+) -> @config.FileTreePath raise @config.ConfigError {
+  match platform {
+    Some(platform) => @config.FileTreePath::from_native(text, platform)
+    None => @config.FileTreePath::parse(text)
+  }
 }
 
 ///|
-/// Whether `dir` is `root` or below it.
-fn is_within(dir : String, root : String) -> Bool {
-  dir == root ||
-  dir.has_prefix(if root.has_suffix("/") { root } else { root + "/" })
-}
-
-///|
-/// Whether `dir` is a root: `/`, a drive such as `C:/`, or a UNC share such as
-/// `//server/share`.
-fn is_root(dir : String) -> Bool {
-  dir == "/" ||
-  (dir.length() == 3 && dir[1:3] == ":/") ||
-  (dir.has_prefix("//") && dir[2:].split("/").count() <= 2)
-}
-
-///|
-/// The absolute `path` without `.` segments, with each `..` segment applied,
-/// and without a trailing `/` except at a root. `..` never goes above the root.
-fn normalize(path : String) -> String {
-  let (root, rest) = split_root(path)
-  let names : Array[String] = []
-  for name in rest.split("/") {
-    match name {
-      "" | "." => ()
-      ".." => names.pop() |> ignore
-      _ => names.push(name.to_owned())
+/// `path` with each `..` name applied to the name before it. `..` never goes
+/// above the root. Discovery applies this rule to the paths that a run gives,
+/// such as the explicit file `../configs/acme.toml` or a relative variable,
+/// before it uses them. The file-tree path itself never applies `..`.
+fn normalize(
+  path : @config.FileTreePath,
+) -> @config.FileTreePath raise @config.ConfigError {
+  let mut result = path.root()
+  for name in path.names() {
+    result = if name == ".." {
+      result.parent().unwrap_or(result)
+    } else {
+      result.child(name)
     }
   }
-  if names.is_empty() {
-    trim_dir(root)
-  } else {
-    root + names.join("/")
-  }
+  result
 }
 
 ///|
-/// The root of the absolute `path` (`/`, `C:/`, or `//server/share/`) and the
-/// rest.
-fn split_root(path : String) -> (String, String) {
-  if path.has_prefix("//") {
-    let parts = path[2:].split("/").map(part => part.to_owned()).collect()
-    let share = parts.length().min(2)
-    let root = "//" + parts[:share].join("/") + "/"
-    return (root, parts[share:].join("/"))
-  }
-  if path.length() >= 3 && path[1:3] == ":/" {
-    return (path[:3].to_owned(), path[3:].to_owned())
-  }
-  ("/", path[1:].to_owned())
+/// The directory of `path`, or `path` itself at a root.
+fn parent_of(path : @config.FileTreePath) -> @config.FileTreePath {
+  path.parent().unwrap_or(path)
 }
 
 ///|
-/// `dir` without a trailing `/`, except at a root.
-fn trim_dir(dir : String) -> String {
-  if dir.length() > 1 && dir.has_suffix("/") && !is_root(dir) {
-    dir[:dir.length() - 1].to_owned()
-  } else {
-    dir
-  }
-}
-
-///|
-/// The directory above `dir`, or `None` at a root or for a path with no `/`.
-fn parent_dir(dir : String) -> String? {
-  if is_root(dir) {
-    return None
-  }
-  match dir.rev_find("/") {
-    None => None
-    Some(0) => Some("/")
-    Some(index) => {
-      let parent = dir[:index].to_owned()
-      if parent.length() == 2 && parent[1:2] == ":" {
-        Some(parent + "/")
-      } else {
-        Some(parent)
-      }
-    }
-  }
-}
-
-///|
-/// The directory of the file `path`.
-fn parent_of(path : String) -> String {
-  parent_dir(path).unwrap_or(".")
-}
-
-///|
-fn join(dir : String, name : String) -> String {
-  if dir.has_suffix("/") {
-    dir + name
-  } else {
-    "\{dir}/\{name}"
-  }
+/// The text form of each path, for a source or a report.
+fn texts(paths : Array[@config.FileTreePath]) -> Array[String] {
+  paths.map(path => path.to_string())
 }

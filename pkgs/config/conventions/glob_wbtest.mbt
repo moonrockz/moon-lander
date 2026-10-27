@@ -209,9 +209,9 @@ test "entries that leave the workspace are not confined" {
 
 ///|
 test "the workspace root is never its own member" {
-  assert_eq(is_member("/w", [], "/w"), false)
-  assert_eq(is_member("/w", [], "/w/packages/a"), true)
-  assert_eq(is_member("/w", ["packages/*"], "/w/packages/a"), false)
-  assert_eq(is_member("/w", [], "/other/a"), false)
-  assert_eq(is_member("/", [], "/a"), true)
+  assert_eq(is_member(wp("/w"), [], wp("/w")), false)
+  assert_eq(is_member(wp("/w"), [], wp("/w/packages/a")), true)
+  assert_eq(is_member(wp("/w"), ["packages/*"], wp("/w/packages/a")), false)
+  assert_eq(is_member(wp("/w"), [], wp("/other/a")), false)
+  assert_eq(is_member(wp("/"), [], wp("/a")), true)
 }

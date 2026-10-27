@@ -15,6 +15,7 @@ import {
 
 import {
   "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/expect",
   "moonrockz/moon-lander-config/parsers/toml",
   "moonrockz/moon-lander-config/parsers/ion" @ion_format,

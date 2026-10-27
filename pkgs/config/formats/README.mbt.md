@@ -36,7 +36,7 @@ test "load a file with the linked configuration formats" {
     |> @config.working_dir("/app")
     |> @config.file("settings.toml")
   let files = @config.FileTree::new(complete=true).with_file(
-    "/app/settings.toml", "[server]\nport = 8080",
+    @config.FileTreePath::parse("/app/settings.toml"), "[server]\nport = 8080",
   )
   guard @config.load(builder, files) is Done(config) else {
     fail("a complete file tree must finish loading")

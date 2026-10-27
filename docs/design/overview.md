@@ -299,6 +299,12 @@ snapshot of directory listings and file text. The pure function
 a path. It returns `Done(config)` when the tree has all the paths. The same tree
 gives the same result on all four targets.
 
+Each path in the tree and in a request is a `FileTreePath`: a parsed path with a
+root (`/`, a drive root such as `C:/`, a UNC share root such as `//server/share`,
+or `.`) and `/` separators on every platform. Text enters it one time, through
+`FileTreePath::parse` or, for native Windows text, `FileTreePath::from_native`.
+A host renders the native form only for its file calls.
+
 | Path state | Meaning |
 | --- | --- |
 | Held | The tree has the listing or the file text. The loader uses it. |

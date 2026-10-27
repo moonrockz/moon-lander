@@ -11,8 +11,8 @@ test "omitted wasm and wasm-gc settings are empty and root" {
 ///|
 test "omitted wasm settings feed root discovery through the shared injected load" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/", [{ name: "acme.toml", kind: File }])
-    .with_file("/acme.toml", "from_root = true")
+    .with_listing(p("/"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/acme.toml"), "from_root = true")
   let loaded = builder(@lander_core.AppName::parse("acme"), [])
     |> configure(s => s |> @config.format(@toml.format()))
     |> app_dirs() |> files(tree)

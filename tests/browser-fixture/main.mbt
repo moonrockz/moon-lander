@@ -171,21 +171,22 @@ async fn execute(input : Json) -> Json {
   }
   if mode == "context" {
     builder = builder |> @config.provider({ name: "context", expand: context => Done({ sources: [@config.in_memory_pairs([
-      ("cwd", @config.string(context.working_dir.unwrap_or("none"))),
+      ("cwd", @config.string(context.working_dir.map(dir => dir.to_string()).unwrap_or("none"))),
       ("platform", @config.string(match context.platform { Some(Windows) => "Windows"; Some(MacOs) => "MacOs"; Some(Linux) => "Linux"; None => "none" })),
     ])], warnings: [] }) })
     builder = builder |> @config.env(prefix="APP")
   }
   let path = text(field(input, "path", "/workspace/acme.toml"))
   if mode == "repeat" || mode == "empty-need" {
-    builder = builder |> @config.provider({ name: "faulty", expand: _ => Need(if mode == "empty-need" { [] } else { [ReadFile(path)] }) })
+    builder = builder |> @config.provider({ name: "faulty", expand: _ => Need(if mode == "empty-need" { [] } else { [ReadFile(@config.FileTreePath::parse(path))] }) })
   }
   if mode == "listing" || mode == "missing-descendant" {
     builder = builder |> @config.provider({ name: "listing", expand: context => {
-      match context.tree.listing(path) {
-        Unknown => Need([ListDir(path)])
+      let dir = @config.FileTreePath::parse(path)
+      match context.tree.listing(dir) {
+        Unknown => Need([ListDir(dir)])
         Found(entries) => Done({ sources: [@config.in_memory_pairs([("listing", @config.string(entries.map(entry => entry.name).join(",")))])], warnings: [] })
-        Missing => Done({ sources: [@config.in_memory_pairs([("listing", @config.string(if context.tree.file(path + "/child.toml") is Missing { "missing-descendant" } else { "unknown" }))])], warnings: [] })
+        Missing => Done({ sources: [@config.in_memory_pairs([("listing", @config.string(if context.tree.file(dir.child("child.toml")) is Missing { "missing-descendant" } else { "unknown" }))])], warnings: [] })
       }
     } })
   }

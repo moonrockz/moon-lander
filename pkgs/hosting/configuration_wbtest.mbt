@@ -8,8 +8,8 @@ fn[S] injected_run(host : Host[S]) -> ConfiguredRun[S] raise {
 test "configure convention pipeline loads files and variables win on every target" {
   let vars = { "ACME_LOG__FORMAT": "json", "HOME": "/home/test" }
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [{ name: "acme.toml", kind: File }])
-    .with_file("/w/acme.toml", "log.format = \"text\"\nfile_only = true")
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/w/acme.toml"), "log.format = \"text\"\nfile_only = true")
   let host = builder(@lander_core.AppName::parse("acme"), [], env_vars=vars,
       working_dir=@lander_core.AbsolutePath::parse("/w"))
     |> configure(sources => sources |> @config.platform(Linux) |> @config.format(@toml.format())
@@ -43,7 +43,7 @@ test "incomplete tree names every requested path and has usage code 2 before fac
     |> files(@config.FileTree::new()) |> build(_ => { calls.val += 1 })
   try { ignore(injected_run(host)); fail("expected incomplete tree") } catch {
     IncompleteFileTree(requests~) as error => {
-      assert_eq(requests, [@config.ReadFile("/w/a.toml"), @config.ReadFile("/w/b.toml")])
+      assert_eq(requests, [@config.ReadFile(p("/w/a.toml")), @config.ReadFile(p("/w/b.toml"))])
       assert_eq(report_text(host.name, error), "acme: Incomplete configuration file tree; requested paths: /w/a.toml, /w/b.toml")
       assert_eq(outcome(error).exit_code().to_int(), 2)
     }
@@ -61,7 +61,7 @@ test "incomplete app_dirs tree names the unlisted start directory before factory
     |> app_dirs() |> files(@config.FileTree::new()) |> build(_ => { calls.val += 1 })
   try { ignore(injected_run(host)); fail("expected incomplete tree") } catch {
     IncompleteFileTree(requests~) as error => {
-      assert_true(requests.contains(@config.ListDir("/w")))
+      assert_true(requests.contains(@config.ListDir(p("/w"))))
       assert_true(report_text(host.name, error).contains("/w"))
       assert_eq(outcome(error).exit_code().to_int(), 2)
     }
@@ -77,7 +77,7 @@ test "configure file at 300 before host-owned conventions fails with SourceOrder
       working_dir=@lander_core.AbsolutePath::parse("/w"))
     |> configure(s => s |> @config.platform(Linux) |> @config.format(@toml.format())
       |> @config.file("/w/extra.toml"))
-    |> app_dirs() |> files(@config.FileTree::new(complete=true).with_file("/w/extra.toml", ""))
+    |> app_dirs() |> files(@config.FileTree::new(complete=true).with_file(p("/w/extra.toml"), ""))
     |> build(_ => { calls.val += 1 })
   try { ignore(injected_run(host)); fail("expected source order failure") } catch {
     @config.SourceOrder(previous~, previous_priority~, priority~, ..) as error => {
@@ -152,4 +152,12 @@ test "host-owned conventions compose in pipeline order and app_dirs replaces ear
     |> build(_ => ()) |> injected_run
   assert_false(replaced.context.config.reports().iter().any(r => r.kind is File(System)))
   assert_true(replaced.context.config.reports().iter().any(r => r.kind is File(Workspace)))
+}
+
+///|
+/// The parsed path of the test path `text`.
+fn p(text : String) -> @config.FileTreePath {
+  @config.FileTreePath::parse(text) catch {
+    _ => abort("invalid test path \{text}")
+  }
 }

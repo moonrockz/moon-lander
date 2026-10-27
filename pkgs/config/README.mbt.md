@@ -83,7 +83,7 @@ test "describe sources with a builder" {
       @config.in_memory_pairs([("server.port", @config.int(9000))]),
     )
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml",
+    @config.FileTreePath::parse("/srv/app.toml"),
     (
       #|[server]
       #|host = "example.org"
@@ -149,6 +149,11 @@ listings, file text, and absence records. A path is held, missing, or unknown.
 complete tree every path that the tree does not hold is missing, so `load` never
 asks.
 
+Each path in the tree and in a request is a `FileTreePath`. Make one with
+`FileTreePath::parse` from the portable text, which uses `/`, or with
+`FileTreePath::from_native` from the native text of a platform. See
+[File-tree paths](#file-tree-paths).
+
 | `FileTree` call | Effect |
 | --- | --- |
 | `FileTree::new(complete?)` | An empty tree |
@@ -161,27 +166,29 @@ complete tree. The loop below answers from a map, so it runs on every target.
 
 ```mbt check
 ///|
-/// Answer one request from `disk`, a map from file path to text. A directory
-/// exists when a file path in `disk` is below it.
+/// Answer one request from `disk`, a map from file path text to file text. A
+/// directory exists when a file path in `disk` is below it.
 fn answer(
   tree : @config.FileTree,
   request : @config.FileRequest,
   disk : Map[String, String],
-) -> @config.FileTree {
+) -> @config.FileTree raise @config.ConfigError {
   match request {
     ReadFile(path) =>
-      match disk.get(path) {
+      match disk.get(path.to_string()) {
         Some(text) => tree.with_file(path, text)
         None => tree.with_missing(path)
       }
     ListDir(dir) => {
       let entries : Array[@config.DirEntry] = []
-      for path, _ in disk {
-        guard path.has_prefix(dir + "/") else { continue }
-        let rest = path[dir.length() + 1:].to_owned()
-        let entry : @config.DirEntry = match rest.find("/") {
-          Some(index) => { name: rest[:index].to_owned(), kind: Directory }
-          None => { name: rest, kind: File }
+      for text, _ in disk {
+        let path = @config.FileTreePath::parse(text)
+        guard path != dir && path.is_within(dir) else { continue }
+        let below = path.names()[dir.names().length():]
+        let entry : @config.DirEntry = if below.length() > 1 {
+          { name: below[0], kind: Directory }
+        } else {
+          { name: below[0], kind: File }
         }
         if !entries.contains(entry) {
           entries.push(entry)
@@ -201,19 +208,18 @@ fn answer(
 fn load_from(
   builder : @config.ConfigBuilder,
   disk : Map[String, String],
-  tree? : @config.FileTree = @config.FileTree::new(),
 ) -> @config.Config raise @config.ConfigError {
-  match @config.load(builder, tree) {
-    Done(config) => config
-    Need(requests) =>
-      load_from(
-        builder,
-        disk,
-        tree=requests.fold(init=tree, (tree, request) => {
-          answer(tree, request, disk)
-        }),
-      )
+  let mut tree = @config.FileTree::new()
+  while true {
+    match @config.load(builder, tree) {
+      Done(config) => return config
+      Need(requests) =>
+        for request in requests {
+          tree = answer(tree, request, disk)
+        }
+    }
   }
+  abort("the loop ends only with a configuration")
 }
 
 ///|
@@ -230,6 +236,57 @@ test "a host answers the requests of a load" {
 
 A relative path joins the working directory that `@config.working_dir` sets. A
 missing explicit file is an error, `FileNotFound`.
+
+## File-tree paths
+
+A `FileTreePath` is a parsed path of the file-tree protocol. It has a root and a
+list of names, and it uses `/` as the separator on every platform. The fields
+are private, so `FileTreePath::parse` and `FileTreePath::from_native` are the
+only ways to make one. A failure is the configuration error `InvalidFilePath`
+with the input text and a `FilePathRule`.
+
+| Root | Example | Parent of the root |
+| --- | --- | --- |
+| POSIX | `/w/app.toml` | none |
+| Drive | `C:/w/app.toml` | none; the parent of `C:/app.toml` is `C:/` |
+| UNC share | `//server/share/app.toml` | none; `//server` is not a root |
+| Current directory | `app.toml`, `.` | none; the parent of `app.toml` is `.` |
+
+| Rule | Rejected text |
+| --- | --- |
+| `Empty` | `""` |
+| `Nul` | text with a NUL character |
+| `Backslash` | `C:\w\app.toml` in `parse`; `from_native(text, Windows)` converts it |
+| `DriveRelative` | `C:` and `C:app.toml`, which name the current directory of the drive |
+| `IncompleteUnc` | `//server` and `//server/` |
+| `NotAName` | `""`, `.`, `..` or a name with `/` in `child` |
+
+A path keeps the exact case and the order of its names. `parse` leaves out empty
+names and `.` names. It keeps `..`, because through a symbolic link the parent
+on the disk is not the lexical parent. The operations `parent`, `name`, `child`,
+`join`, `resolve`, `root` and `is_within` work on the parsed names; they do not
+print and parse the path again. A path does not tell that a file exists or that a
+browser mount holds it.
+
+```mbt check
+///|
+test "file-tree paths keep their root" {
+  let file = @config.FileTreePath::parse("C:/w/app.toml")
+  @expect.expect(file.parent().map(dir => dir.to_string())).to_equal(Some("C:/w"))
+  let root = @config.FileTreePath::parse("D:/")
+  @expect.expect(root.parent()).to_equal(None)
+  @expect.expect(root.join("acme.toml").to_string()).to_equal("D:/acme.toml")
+  let native = @config.FileTreePath::from_native("C:\\w\\app.toml", Windows)
+  @expect.expect(native).to_equal(file)
+  @expect.expect(file.to_native(Windows)).to_equal("C:\\w\\app.toml")
+  try @config.FileTreePath::parse("C:app.toml") catch {
+    InvalidFilePath(rule~, ..) => @expect.expect(rule).to_equal(DriveRelative)
+    _ => fail("expected an invalid-path error")
+  } noraise {
+    _ => fail("C:app.toml is relative to the current directory of drive C")
+  }
+}
+```
 
 ## Candidate files
 
@@ -477,7 +534,7 @@ test "a decode error names the file that set the value" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml",
+    @config.FileTreePath::parse("/srv/app.toml"),
     "server.host = \"example.org\"\nserver.port = \"eighty\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
@@ -564,7 +621,7 @@ test "a secret reference stops binding" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml",
+    @config.FileTreePath::parse("/srv/app.toml"),
     "api.url = \"https://example.org\"\napi.token = { env = \"API_TOKEN\" }",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
@@ -627,7 +684,7 @@ test "validation names each value and its source" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml",
+    @config.FileTreePath::parse("/srv/app.toml"),
     "ir.layout = \"split\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
@@ -721,7 +778,7 @@ test "a misspelled key is an error with its source" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml",
+    @config.FileTreePath::parse("/srv/app.toml"),
     "ir.layout = \"split\"\nir.strict_mod = true",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
@@ -801,7 +858,7 @@ test "exact decoding keeps the decimal scale and the file" {
     |> @config.format(@ion_format.format())
     |> @config.file("/srv/app.ion")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.ion",
+    @config.FileTreePath::parse("/srv/app.ion"),
     (
       #|{
       #|  billing: {
@@ -839,7 +896,7 @@ test "bind a timeout from configuration text" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/app.toml", "[http]\ntimeout = \"1m 30s\"",
+    @config.FileTreePath::parse("/srv/app.toml"), "[http]\ntimeout = \"1m 30s\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
   let timeout : @lander_core.TimeLimit = config
@@ -866,7 +923,7 @@ test "an environment variable overrides a file" {
     |> @config.file("/srv/acme.toml")
     |> @config.env(prefix="ACME")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/srv/acme.toml",
+    @config.FileTreePath::parse("/srv/acme.toml"),
     "server.port = 8080\nserver.host = \"example.org\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
@@ -903,7 +960,7 @@ test "a wasm host gives every input" {
     |> @config.format(@toml.format())
     |> @config.file("acme.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    "/app/acme.toml",
+    @config.FileTreePath::parse("/app/acme.toml"),
     "mode = \"safe\"",
   )
   guard @config.load(builder, tree) is Done(config) else {

@@ -329,7 +329,7 @@ fn BindingWorld::config(self : BindingWorld) -> @config.Config raise {
       source = source.with_key_policy(@config.KeyPath::parse(key), Append)
     }
     builder = builder |> @config.add(source)
-    tree = tree.with_file(file.0, file.2)
+    tree = tree.with_file(@config.FileTreePath::parse(file.0), file.2)
   }
   if !self.vars.is_empty() {
     builder = builder

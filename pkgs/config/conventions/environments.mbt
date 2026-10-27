@@ -64,13 +64,13 @@ pub fn check_environment_name(
 /// `stem`: `<stem>.<name>.<ext>`, with the role `EnvironmentFile`.
 fn Conventions::environment_file(
   self : Conventions,
-  dir : String,
+  dir : @config.FileTreePath,
   stem : String,
   name : String,
   extensions : Array[String],
-) -> @config.ConfigSource {
+) -> @config.ConfigSource raise @config.ConfigError {
   @config.ConfigSource::candidates(
-    extensions.map(extension => join(dir, "\{stem}.\{name}.\{extension}")),
+    texts(extensions.map(extension => dir.child("\{stem}.\{name}.\{extension}"))),
     display=self.display,
     role=EnvironmentFile,
     name=self.display,

@@ -119,8 +119,7 @@ test "with secret syntax off, a reference shape is an ordinary table" {
     |> @config.format(@toml.format())
     |> @config.secret_syntax(@config.SecretSyntax::none())
     |> @config.file("/repo/acme.toml")
-  let tree = @config.FileTree::new(complete=true).with_file(
-    "/repo/acme.toml", "service.token = { env = \"SERVICE_TOKEN\" }",
+  let tree = @config.FileTree::new(complete=true).with_file(p("/repo/acme.toml"), "service.token = { env = \"SERVICE_TOKEN\" }",
   )
   guard @config.load(builder, tree) is Done(config) else {
     abort("a complete tree never asks for files")

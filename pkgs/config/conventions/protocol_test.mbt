@@ -21,9 +21,9 @@ test "Missing entries requested" {
   // The tree holds the listings of the start directory, but not the listing
   // of its parent.
   let tree = @config.FileTree::new()
-    .with_listing("/w/src", [])
-    .with_missing("/w/src/.acme")
-    .with_missing("/w/src/.config/acme")
+    .with_listing(p("/w/src"), [])
+    .with_missing(p("/w/src/.acme"))
+    .with_missing(p("/w/src/.config/acme"))
   let builder = @config.builder()
     |> @config.working_dir("/w/src")
     |> @config.format(@toml.format())
@@ -32,9 +32,9 @@ test "Missing entries requested" {
     fail("a partial tree needs the parent listing")
   }
   @expect.expect(requests).to_equal([
-    ListDir("/w"),
-    ListDir("/w/.acme"),
-    ListDir("/w/.config/acme"),
+    ListDir(p("/w")),
+    ListDir(p("/w/.acme")),
+    ListDir(p("/w/.config/acme")),
   ])
 }
 
@@ -55,8 +55,8 @@ test "Complete tree" {
 ///|
 test "wasm uses injected tree" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [{ name: "acme.toml", kind: File }])
-    .with_file("/w/acme.toml", "project.name = \"injected\"")
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/w/acme.toml"), "project.name = \"injected\"")
   let builder = @config.builder()
     |> @config.working_dir("/w")
     |> @config.format(@toml.format())

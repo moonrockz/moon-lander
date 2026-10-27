@@ -313,12 +313,12 @@ test "a relative dot-config explicit file has its overrides" {
     )
     |> @config.load(
       @config.FileTree::new(complete=true)
-      .with_listing(".config/acme", [
+      .with_listing(p(".config/acme"), [
         { name: "config.toml", kind: File },
         { name: "config.user.toml", kind: File },
       ])
-      .with_file(".config/acme/config.toml", "ui.theme = \"shared\"")
-      .with_file(".config/acme/config.user.toml", "ui.theme = \"personal\""),
+      .with_file(p(".config/acme/config.toml"), "ui.theme = \"shared\"")
+      .with_file(p(".config/acme/config.user.toml"), "ui.theme = \"personal\""),
     )
     |> done
   @expect.expect(@config.get_text(config, "ui.theme")).to_equal("personal")

@@ -15,12 +15,12 @@ pub extend Platform with @debug.Debug::{to_repr}
 ///|
 /// The inputs that a source provider gets during a load. `platform` is `None`
 /// when no host gave it, and `env_vars` is empty when the builder holds no
-/// variable set.
+/// variable set. `working_dir` is the parsed working directory of the builder.
 pub(all) struct LoadContext {
   tree : FileTree
   platform : Platform?
   env_vars : Map[String, String]
-  working_dir : String?
+  working_dir : FileTreePath?
   formats : Array[Format]
 }
 
@@ -53,11 +53,15 @@ pub fn load(
   builder : ConfigBuilder,
   tree : FileTree,
 ) -> LoadStep[Config] raise ConfigError {
+  let working_dir = match builder.working_dir {
+    Some(text) => Some(input_path(text, builder.platform))
+    None => None
+  }
   let context : LoadContext = {
     tree,
     platform: builder.platform,
     env_vars: builder.env_vars.map(vars => vars.copy()).unwrap_or(Map([])),
-    working_dir: builder.working_dir,
+    working_dir,
     formats: builder.formats(),
   }
   let sources : Array[ConfigSource] = []
@@ -183,7 +187,7 @@ fn resolve(
       Some({ pieces: [(value, None)], path: None, candidates: [], status: Loaded })
     NoInput => Some({ pieces: [], path: None, candidates: [], status: Skipped })
     Parsed(given, value) => {
-      let path = join_path(context.working_dir, given)
+      let path = source_path(context, given).to_string()
       Some({ pieces: [(value, Some(path))], path: Some(path), candidates: [], status: Loaded })
     }
     Env(selection, prefix, reserved) =>
@@ -207,9 +211,10 @@ fn resolve(
           Some({ pieces: [], path: None, candidates: [], status: NotFound })
       }
     Path(given) => {
-      let path = join_path(context.working_dir, given)
+      let file = source_path(context, given)
+      let path = file.to_string()
       let format = select_format(context.formats, path)
-      match context.tree.file(path) {
+      match context.tree.file(file) {
         Found(text) =>
           Some({
             pieces: [(parse_with(format, path, text), Some(path))],
@@ -219,22 +224,23 @@ fn resolve(
           })
         Missing => raise FileNotFound(path~)
         Unknown => {
-          add_needs(needs, [ReadFile(path)])
+          add_needs(needs, [ReadFile(file)])
           None
         }
       }
     }
     Candidates(given, display) => {
-      let candidates : Array[String] = []
-      for path in given {
-        let joined = join_path(context.working_dir, path)
-        if !candidates.contains(joined) {
-          candidates.push(joined)
+      let paths : Array[FileTreePath] = []
+      for text in given {
+        let path = source_path(context, text)
+        if !paths.contains(path) {
+          paths.push(path)
         }
       }
-      let existing = []
+      let candidates = paths.map(path => path.to_string())
+      let existing : Array[FileTreePath] = []
       let mut unknown = false
-      for candidate in candidates {
+      for candidate in paths {
         match context.tree.is_file(candidate) {
           Found(true) => existing.push(candidate)
           Found(false) | Missing => ()
@@ -250,15 +256,18 @@ fn resolve(
       if existing.length() > 1 {
         raise Ambiguous(
           display~,
-          location=common_dir(candidates),
-          candidates=existing,
+          location=FileTreePath::common_dir(paths)
+            .map(dir => dir.to_string())
+            .unwrap_or("."),
+          candidates=existing.map(path => path.to_string()),
         )
       }
-      guard existing is [path] else {
+      guard existing is [file] else {
         return Some({ pieces: [], path: None, candidates, status: NotFound })
       }
+      let path = file.to_string()
       let format = select_format(context.formats, path)
-      match context.tree.file(path) {
+      match context.tree.file(file) {
         Found(text) =>
           Some({
             pieces: [(parse_with(format, path, text), Some(path))],
@@ -268,7 +277,7 @@ fn resolve(
           })
         Missing => raise FileNotFound(path~)
         Unknown => {
-          add_needs(needs, [ReadFile(path)])
+          add_needs(needs, [ReadFile(file)])
           None
         }
       }
@@ -345,36 +354,28 @@ fn add_needs(needs : Array[FileRequest], requests : Array[FileRequest]) -> Unit 
 }
 
 ///|
-/// `path` joined to `dir` when `path` is relative. An absolute path starts with
-/// `/` (also `//server/share`) or with a drive such as `C:/`.
-fn join_path(dir : String?, path : String) -> String {
-  guard dir is Some(dir) && !is_absolute(path) else { path }
-  if dir.has_suffix("/") {
-    dir + path
-  } else {
-    "\{dir}/\{path}"
+/// The parsed form of the path text `text`. With a platform, the text is in
+/// the native form of that platform, so `\` separators work on Windows.
+fn input_path(
+  text : String,
+  platform : Platform?,
+) -> FileTreePath raise ConfigError {
+  match platform {
+    Some(platform) => FileTreePath::from_native(text, platform)
+    None => FileTreePath::parse(text)
   }
 }
 
 ///|
-fn is_absolute(path : String) -> Bool {
-  path.has_prefix("/") || (path.length() >= 3 && path[1:3] == ":/")
-}
-
-///|
-/// The longest directory that holds every path in `paths`.
-fn common_dir(paths : Array[String]) -> String {
-  guard paths is [first, .. rest] else { return "." }
-  let mut dir = split_path(first).0
-  for path in rest {
-    while !path.has_prefix(if dir.has_suffix("/") { dir } else { dir + "/" }) {
-      let parent = split_path(dir).0
-      // A root, such as `/` or `C:/`, and `.` have no parent.
-      if parent == dir || dir == "." {
-        break
-      }
-      dir = parent
-    }
+/// The path of the source text `text`: parsed one time, and below the working
+/// directory when it is relative.
+fn source_path(
+  context : LoadContext,
+  text : String,
+) -> FileTreePath raise ConfigError {
+  let path = input_path(text, context.platform)
+  match context.working_dir {
+    Some(dir) => dir.resolve(path)
+    None => path
   }
-  dir
 }

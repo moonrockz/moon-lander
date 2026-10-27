@@ -104,6 +104,7 @@ pub(all) suberror ConfigError {
   UnsupportedFormat(path~ : String, extensions~ : Array[String])
   Ambiguous(display~ : String, location~ : String, candidates~ : Array[String])
   InvalidKeyPath(text~ : String, reason~ : String)
+  InvalidFilePath(text~ : String, rule~ : FilePathRule)
   InvalidEnvKey(variable~ : String)
   MergeKey(key~ : KeyPath, index~ : Int32, source~ : String)
   InvalidSecret(key~ : KeyPath, origin~ : String, reason~ : String)
@@ -172,6 +173,7 @@ pub struct ConfigBuilder {
 }
 pub fn ConfigBuilder::formats(Self) -> Array[Format]
 pub fn ConfigBuilder::given_env_vars(Self) -> Map[String, String]?
+pub fn ConfigBuilder::given_file_paths(Self) -> Array[String]
 pub fn ConfigBuilder::given_platform(Self) -> Platform?
 pub fn ConfigBuilder::given_working_dir(Self) -> String?
 
@@ -274,9 +276,22 @@ pub(all) struct Expansion {
   warnings : Array[ConfigWarning]
 }
 
+pub(all) enum FilePathRule {
+  Empty
+  Nul
+  Backslash
+  DriveRelative
+  IncompleteUnc
+  NotAName
+} derive(Eq, @debug.Debug)
+pub fn FilePathRule::describe(Self) -> String
+pub fn FilePathRule::equal(Self, Self) -> Bool
+pub fn FilePathRule::not_equal(Self, Self) -> Bool
+pub fn FilePathRule::to_repr(Self) -> @debug.Repr
+
 pub(all) enum FileRequest {
-  ListDir(String)
-  ReadFile(String)
+  ListDir(FileTreePath)
+  ReadFile(FileTreePath)
 } derive(Eq, Hash, @debug.Debug)
 pub fn FileRequest::equal(Self, Self) -> Bool
 pub fn FileRequest::hash(Self) -> Int32
@@ -302,15 +317,49 @@ pub fn FileRole::to_repr(Self) -> @debug.Repr
 pub struct FileTree {
   // private fields
 }
-pub fn FileTree::file(Self, String) -> Lookup[String]
-pub fn FileTree::file_request(Self, String) -> FileRequest
+pub fn FileTree::file(Self, FileTreePath) -> Lookup[String]
+pub fn FileTree::file_request(Self, FileTreePath) -> FileRequest
 pub fn FileTree::is_complete(Self) -> Bool
-pub fn FileTree::is_file(Self, String) -> Lookup[Bool]
-pub fn FileTree::listing(Self, String) -> Lookup[Array[DirEntry]]
+pub fn FileTree::is_file(Self, FileTreePath) -> Lookup[Bool]
+pub fn FileTree::listing(Self, FileTreePath) -> Lookup[Array[DirEntry]]
 pub fn FileTree::new(complete? : Bool) -> Self
-pub fn FileTree::with_file(Self, String, String) -> Self
-pub fn FileTree::with_listing(Self, String, Array[DirEntry]) -> Self
-pub fn FileTree::with_missing(Self, String) -> Self
+pub fn FileTree::with_file(Self, FileTreePath, String) -> Self
+pub fn FileTree::with_listing(Self, FileTreePath, Array[DirEntry]) -> Self
+pub fn FileTree::with_missing(Self, FileTreePath) -> Self
+
+pub struct FileTreePath {
+  // private fields
+} derive(Eq, Hash)
+pub fn FileTreePath::child(Self, String) -> Self raise ConfigError
+pub fn FileTreePath::common_dir(Array[Self]) -> Self?
+pub fn FileTreePath::compare(Self, Self) -> Int32
+pub fn FileTreePath::equal(Self, Self) -> Bool
+pub fn FileTreePath::from_absolute(@moon-lander-core.AbsolutePath) -> Self raise ConfigError
+pub fn FileTreePath::from_native(String, Platform) -> Self raise ConfigError
+pub fn FileTreePath::hash(Self) -> Int32
+pub fn FileTreePath::hash_combine(Self, Hasher) -> Unit
+pub fn FileTreePath::is_absolute(Self) -> Bool
+pub fn FileTreePath::is_root(Self) -> Bool
+pub fn FileTreePath::is_within(Self, Self) -> Bool
+pub fn FileTreePath::join(Self, String) -> Self raise ConfigError
+pub fn FileTreePath::name(Self) -> String?
+pub fn FileTreePath::names(Self) -> Array[String]
+pub fn FileTreePath::not_equal(Self, Self) -> Bool
+pub fn FileTreePath::op_ge(Self, Self) -> Bool
+pub fn FileTreePath::op_gt(Self, Self) -> Bool
+pub fn FileTreePath::op_le(Self, Self) -> Bool
+pub fn FileTreePath::op_lt(Self, Self) -> Bool
+pub fn FileTreePath::output(Self, &Logger) -> Unit
+pub fn FileTreePath::parent(Self) -> Self?
+pub fn FileTreePath::parse(String) -> Self raise ConfigError
+pub fn FileTreePath::resolve(Self, Self) -> Self
+pub fn FileTreePath::root(Self) -> Self
+pub fn FileTreePath::to_native(Self, Platform) -> String
+pub fn FileTreePath::to_repr(Self) -> @debug.Repr
+pub fn FileTreePath::to_string(Self) -> String
+pub impl Compare for FileTreePath
+pub impl Show for FileTreePath
+pub impl @debug.Debug for FileTreePath
 
 pub(all) struct Format {
   name : String
@@ -337,7 +386,7 @@ pub(all) struct LoadContext {
   tree : FileTree
   platform : Platform?
   env_vars : Map[String, String]
-  working_dir : String?
+  working_dir : FileTreePath?
   formats : Array[Format]
 }
 

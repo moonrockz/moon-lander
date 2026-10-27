@@ -13,18 +13,19 @@ fn drive(
       Need(needs) =>
         for need in needs {
           let path = request_path(need)
-          requests.push(path)
-          guard contains(mount.root, path) else {
-            raise OutsideMount(operation="load", path~)
+          let text = path.to_string()
+          requests.push(text)
+          guard contains(mount.root, text) else {
+            raise OutsideMount(operation="load", path=text)
           }
           match need {
             ListDir(_) =>
-              tree = match mount.listings.get(path) {
+              tree = match mount.listings.get(text) {
                 Some(entries) => tree.with_listing(path, entries)
                 None => tree.with_missing(path)
               }
             ReadFile(_) =>
-              tree = match texts.get(path) {
+              tree = match texts.get(text) {
                 Some(text) => tree.with_file(path, text)
                 None => tree.with_missing(path)
               }
@@ -120,4 +121,26 @@ test "a narrower caller boundary stops discovery below the mount root" {
   } noraise {
     _ => fail("expected no discovered value")
   }
+}
+
+///|
+test "browser rules check the source spelling before the load parses it" {
+  for text in [
+    "/workspace/./acme.toml", "/workspace//acme.toml", "/workspace\\acme.toml",
+    "/workspace/../acme.toml", "./acme.toml", "C:/acme.toml", "conf//app.toml",
+  ] {
+    let builder = @config.builder()
+      |> @config.platform(Windows)
+      |> @config.file(text)
+    try check_source_paths(builder) catch {
+      InvalidPath(operation~, ..) => assert_eq(operation, "load")
+      _ => fail("expected an invalid-path error for \{text}")
+    } noraise {
+      _ => fail("the browser rules accepted \{text}")
+    }
+  }
+  let valid = @config.builder()
+    |> @config.file("/workspace/acme.toml")
+    |> @config.file("conf/app.toml")
+  check_source_paths(valid)
 }

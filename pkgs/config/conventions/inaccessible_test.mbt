@@ -26,17 +26,17 @@ fn locked(name : String) -> @config.DirEntry {
 ///|
 test "Unbounded search reaches a locked file at the drive root" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("D:/", [
+    .with_listing(p("D:/"), [
       { name: "a", kind: Directory },
       locked("pagefile.sys"),
       locked("System Volume Information"),
     ])
-    .with_listing("D:/a", [{ name: "proj", kind: Directory }])
-    .with_listing("D:/a/proj", [
+    .with_listing(p("D:/a"), [{ name: "proj", kind: Directory }])
+    .with_listing(p("D:/a/proj"), [
       { name: "acme.toml", kind: File },
       locked("busy.log"),
     ])
-    .with_file("D:/a/proj/acme.toml", "project.name = \"proj\"")
+    .with_file(p("D:/a/proj/acme.toml"), "project.name = \"proj\"")
   let config = unbounded("D:/a/proj") |> @config.load(tree) |> done
   @expect.expect(primary_path(config)).to_equal(Some("D:/a/proj/acme.toml"))
   @expect.expect(@config.get_text(config, "project.name")).to_equal("proj")
@@ -45,22 +45,21 @@ test "Unbounded search reaches a locked file at the drive root" {
 ///|
 test "a locked entry does not change workspace and member selection" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("D:/", [{ name: "w", kind: Directory }, locked("pagefile.sys")])
-    .with_listing("D:/w", [
+    .with_listing(p("D:/"), [{ name: "w", kind: Directory }, locked("pagefile.sys")])
+    .with_listing(p("D:/w"), [
       { name: "acme.toml", kind: File },
       { name: "packages", kind: Directory },
       locked("DumpStack.log.tmp"),
     ])
-    .with_listing("D:/w/packages", [{ name: "billing", kind: Directory }])
-    .with_listing("D:/w/packages/billing", [
+    .with_listing(p("D:/w/packages"), [{ name: "billing", kind: Directory }])
+    .with_listing(p("D:/w/packages/billing"), [
       { name: "acme.toml", kind: File },
       locked("busy.log"),
     ])
-    .with_file(
-      "D:/w/acme.toml",
+    .with_file(p("D:/w/acme.toml"),
       "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",
     )
-    .with_file("D:/w/packages/billing/acme.toml", "ui.font = \"member\"")
+    .with_file(p("D:/w/packages/billing/acme.toml"), "ui.font = \"member\"")
   let config = unbounded("D:/w/packages/billing") |> @config.load(tree) |> done
   @expect.expect(primary_path(config)).to_equal(Some("D:/w/acme.toml"))
   @expect.expect(member_report(config).map(report => report.path)).to_equal(
@@ -74,9 +73,9 @@ test "a locked entry does not change workspace and member selection" {
 test "Inaccessible candidate is an error" {
   // The tree is not complete, so the load asks the host for the file.
   let tree = @config.FileTree::new()
-    .with_listing("/w", [locked("acme.toml")])
-    .with_missing("/w/.acme")
-    .with_missing("/w/.config/acme")
+    .with_listing(p("/w"), [locked("acme.toml")])
+    .with_missing(p("/w/.acme"))
+    .with_missing(p("/w/.config/acme"))
   let builder = @config.builder()
     |> @config.working_dir("/w")
     |> @config.format(@toml.format())
@@ -86,7 +85,7 @@ test "Inaccessible candidate is an error" {
   guard @config.load(builder, tree) is Need(requests) else {
     fail("an inaccessible candidate must be read")
   }
-  @expect.expect(requests).to_equal([ReadFile("/w/acme.toml")])
+  @expect.expect(requests).to_equal([ReadFile(p("/w/acme.toml"))])
 }
 
 ///|
@@ -94,10 +93,10 @@ test "Inaccessible entry next to a candidate" {
   // The host is asked for the inaccessible candidate before discovery counts
   // the candidates, so its error passes out instead of an ambiguity error.
   let tree = @config.FileTree::new()
-    .with_listing("/w", [{ name: "acme.toml", kind: File }, locked("acme.yaml")])
-    .with_missing("/w/.acme")
-    .with_missing("/w/.config/acme")
-    .with_file("/w/acme.toml", "a = 1")
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }, locked("acme.yaml")])
+    .with_missing(p("/w/.acme"))
+    .with_missing(p("/w/.config/acme"))
+    .with_file(p("/w/acme.toml"), "a = 1")
   let builder = @config.builder()
     |> @config.working_dir("/w")
     |> @config.format(@toml.format())
@@ -108,10 +107,10 @@ test "Inaccessible entry next to a candidate" {
   guard @config.load(builder, tree) is Need(requests) else {
     fail("the inaccessible candidate must be read first")
   }
-  @expect.expect(requests).to_equal([ReadFile("/w/acme.yaml")])
+  @expect.expect(requests).to_equal([ReadFile(p("/w/acme.yaml"))])
   // When the host can read it, both files exist, so discovery is ambiguous.
   let (_, candidates) = ambiguity(() => {
-    @config.load(builder, tree.with_file("/w/acme.yaml", "b: 1"))
+    @config.load(builder, tree.with_file(p("/w/acme.yaml"), "b: 1"))
     |> done
     |> ignore
   })
@@ -123,21 +122,21 @@ test "Inaccessible file next to a workspace file" {
   // The enclosing search must not pass over the workspace in `/w` as a
   // directory with several files before the host answers for `acme.yaml`.
   let tree = @config.FileTree::new()
-    .with_listing("/w", [
+    .with_listing(p("/w"), [
       { name: "acme.toml", kind: File },
       locked("acme.yaml"),
       { name: "packages", kind: Directory },
     ])
-    .with_missing("/w/.acme")
-    .with_missing("/w/.config/acme")
-    .with_file("/w/acme.toml", "workspace.members = [\"packages/*\"]")
-    .with_listing("/w/packages", [{ name: "a", kind: Directory }])
-    .with_missing("/w/packages/.acme")
-    .with_missing("/w/packages/.config/acme")
-    .with_listing("/w/packages/a", [{ name: "acme.toml", kind: File }])
-    .with_missing("/w/packages/a/.acme")
-    .with_missing("/w/packages/a/.config/acme")
-    .with_file("/w/packages/a/acme.toml", "a = 1")
+    .with_missing(p("/w/.acme"))
+    .with_missing(p("/w/.config/acme"))
+    .with_file(p("/w/acme.toml"), "workspace.members = [\"packages/*\"]")
+    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory }])
+    .with_missing(p("/w/packages/.acme"))
+    .with_missing(p("/w/packages/.config/acme"))
+    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File }])
+    .with_missing(p("/w/packages/a/.acme"))
+    .with_missing(p("/w/packages/a/.config/acme"))
+    .with_file(p("/w/packages/a/acme.toml"), "a = 1")
   let builder = @config.builder()
     |> @config.working_dir("/w/packages/a")
     |> @config.env_vars({})
@@ -152,20 +151,20 @@ test "Inaccessible file next to a workspace file" {
   guard @config.load(builder, tree) is Need(requests) else {
     fail("the enclosing search passed over the workspace")
   }
-  @expect.expect(requests).to_equal([ReadFile("/w/acme.yaml")])
+  @expect.expect(requests).to_equal([ReadFile(p("/w/acme.yaml"))])
 }
 
 ///|
 test "Inaccessible member directory is not dropped" {
   let tree = @config.FileTree::new()
-    .with_listing("/w", [
+    .with_listing(p("/w"), [
       { name: "acme.toml", kind: File },
       { name: "packages", kind: Directory },
     ])
-    .with_missing("/w/.acme")
-    .with_missing("/w/.config/acme")
-    .with_file("/w/acme.toml", "workspace.members = [\"packages/*\"]")
-    .with_listing("/w/packages", [locked("billing")])
+    .with_missing(p("/w/.acme"))
+    .with_missing(p("/w/.config/acme"))
+    .with_file(p("/w/acme.toml"), "workspace.members = [\"packages/*\"]")
+    .with_listing(p("/w/packages"), [locked("billing")])
   let builder = @config.builder()
     |> @config.working_dir("/w")
     |> @config.env_vars({})
@@ -179,7 +178,7 @@ test "Inaccessible member directory is not dropped" {
   guard @config.load(builder, tree) is Need(requests) else {
     fail("an inaccessible member directory must be listed")
   }
-  @expect.expect(requests.contains(ListDir("/w/packages/billing"))).to_equal(
+  @expect.expect(requests.contains(ListDir(p("/w/packages/billing")))).to_equal(
     true,
   )
 }
@@ -203,12 +202,12 @@ fn load_on_drive(
           asked.push(request)
           tree = match request {
             ListDir(dir) =>
-              match listings.get(dir) {
+              match listings.get(dir.to_string()) {
                 Some(entries) => tree.with_listing(dir, entries)
                 None => tree.with_missing(dir)
               }
             ReadFile(path) =>
-              match files.get(path) {
+              match files.get(path.to_string()) {
                 Some(text) => tree.with_file(path, text)
                 None => tree.with_missing(path)
               }
@@ -236,8 +235,8 @@ test "the search asks for the drive root, not the current directory of the drive
     asked,
   )
   @expect.expect(@config.get_text(config, "project.name")).to_equal("proj")
-  @expect.expect(asked.contains(ListDir("D:/"))).to_equal(true)
-  @expect.expect(asked.contains(ListDir("D:"))).to_equal(false)
+  // A typed request cannot name `D:`, because the path type rejects it.
+  @expect.expect(asked.contains(ListDir(p("D:/")))).to_equal(true)
 }
 
 ///|
@@ -254,7 +253,7 @@ test "a candidate at the drive root is found" {
     asked,
   )
   @expect.expect(primary_path(config)).to_equal(Some("D:/acme.toml"))
-  @expect.expect(asked.contains(ListDir("D:"))).to_equal(false)
+  @expect.expect(asked.contains(ListDir(p("D:/")))).to_equal(true)
 }
 
 ///|
@@ -262,23 +261,23 @@ test "an inaccessible candidate is read before two readable ones are ambiguous" 
   // The enclosing search passes over a directory with more than one file, so
   // it must not decide that before the host answers for `acme.yaml`.
   let tree = @config.FileTree::new()
-    .with_listing("/w", [
+    .with_listing(p("/w"), [
       { name: ".acme", kind: Directory },
       { name: "acme.toml", kind: File },
       locked("acme.yaml"),
       { name: "packages", kind: Directory },
     ])
-    .with_listing("/w/.acme", [{ name: "acme.toml", kind: File }])
-    .with_missing("/w/.config/acme")
-    .with_file("/w/acme.toml", "workspace.members = [\"packages/*\"]")
-    .with_file("/w/.acme/acme.toml", "workspace.members = [\"packages/*\"]")
-    .with_listing("/w/packages", [{ name: "a", kind: Directory }])
-    .with_missing("/w/packages/.acme")
-    .with_missing("/w/packages/.config/acme")
-    .with_listing("/w/packages/a", [{ name: "acme.toml", kind: File }])
-    .with_missing("/w/packages/a/.acme")
-    .with_missing("/w/packages/a/.config/acme")
-    .with_file("/w/packages/a/acme.toml", "a = 1")
+    .with_listing(p("/w/.acme"), [{ name: "acme.toml", kind: File }])
+    .with_missing(p("/w/.config/acme"))
+    .with_file(p("/w/acme.toml"), "workspace.members = [\"packages/*\"]")
+    .with_file(p("/w/.acme/acme.toml"), "workspace.members = [\"packages/*\"]")
+    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory }])
+    .with_missing(p("/w/packages/.acme"))
+    .with_missing(p("/w/packages/.config/acme"))
+    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File }])
+    .with_missing(p("/w/packages/a/.acme"))
+    .with_missing(p("/w/packages/a/.config/acme"))
+    .with_file(p("/w/packages/a/acme.toml"), "a = 1")
   let builder = @config.builder()
     |> @config.working_dir("/w/packages/a")
     |> @config.env_vars({})
@@ -293,5 +292,5 @@ test "an inaccessible candidate is read before two readable ones are ambiguous" 
   guard @config.load(builder, tree) is Need(requests) else {
     fail("the enclosing search decided before the host answered")
   }
-  @expect.expect(requests).to_equal([ReadFile("/w/acme.yaml")])
+  @expect.expect(requests).to_equal([ReadFile(p("/w/acme.yaml"))])
 }

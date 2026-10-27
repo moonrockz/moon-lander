@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.4.0 - 2026-10-27
+
+Moon-Lander splits the framework into six modules, adds the application host
+and the logging module, and types the configuration file-tree paths. The shared
+workspace version moves to `0.4.0`, so `moonrockz/notebooks` and
+`moonrockz/openrpc` are republished unchanged at `0.4.0`. The framework modules
+are not published.
+
+### Breaking changes
+
+- The framework is six modules. `moonrockz/moon-lander/config` is now
+  `moonrockz/moon-lander-config` (`@config`), with `conventions`, `host` and
+  `browser` below it; `moonrockz/moon-lander/config/formats/<name>` is
+  `moonrockz/moon-lander-config/parsers/<name>`, and the linked format set is
+  `moonrockz/moon-lander-config/formats`. The mediator is
+  `moonrockz/moon-lander-mediator` (`@mediator`), with the async mediator in
+  `moonrockz/moon-lander-mediator/async`. The host is
+  `moonrockz/moon-lander-hosting`. `moonrockz/moon-lander` stays the umbrella
+  module.
+- `moonrockz/moon-lander-mediator`: a caller cannot make an invalid
+  `MediatorError`. Use `MediatorError::rejected(reason)` in place of the
+  `Rejected` constructor, give `timed_out` and the async `timeout` middleware a
+  core `TimeLimit`, and read publish failures through the collection accessors.
+- `moonrockz/moon-lander-config`: every `FileTree` path parameter, both
+  `FileRequest` cases and `LoadContext.working_dir` take the new
+  `FileTreePath`. Make one with `FileTreePath::parse` or, for native Windows
+  text, `FileTreePath::from_native`. The load parses the builder working
+  directory and each file source one time, so `C:\cfg\app.toml` with the working
+  directory `C:/proj` now loads `C:/cfg/app.toml`. A drive-relative path such
+  as `C:app.toml`, or `\` in portable text, is the new configuration error
+  `InvalidFilePath` with a `FilePathRule`.
+- `EntryKind` has the new case `Inaccessible`. An exhaustive `match` on it must
+  add the case.
+
+### Added
+
+- `moonrockz/moon-lander-core`: `AppName` and `TimeLimit` (for example `2m30s`),
+  with smart constructors. `moonrockz/moon-lander-config` binds a `TimeLimit`
+  from configuration text.
+- `moonrockz/moon-lander-logging`: a bring-your-own `Logger` trait, six levels,
+  immutable `LogEvent` values, `{Name}` message templates, `null_logger`,
+  `MemoryLogger`, `min_level`, `fan_out` and `with_category`.
+- `moonrockz/moon-lander-hosting`: the application host. It parses the
+  arguments first with the standard flags, resolves the environment name, loads
+  the configuration with the variable prefix and the starting settings, builds
+  the services record, and runs the hooks in order with a lifetime, stop
+  requests, cancellation checks, a bounded shutdown timeout, exit-code
+  precedence and an error report. It has console drivers for native and js,
+  with signal handling, and an embedded driver for wasm and wasm-gc. Mapped
+  command-line options become the last configuration source.
+- `FileTreePath` operations: `parent`, `name`, `child`, `join`, `resolve`,
+  `root`, `is_within`, `common_dir`, `to_native` and `from_absolute`.
+  `ConfigBuilder::given_file_paths` gives the source path texts as given.
+
+### Fixed
+
+- Workspace discovery on Windows no longer fails with an OS error on a locked
+  entry such as `D:/pagefile.sys` at the drive root. A host adapter records an
+  entry that it cannot inspect as `Inaccessible`; the load still reads it when it
+  is a candidate, so its real error is not hidden. The directory of a file below a
+  drive root is the drive root `C:/`, not the drive-relative `C:`.
+
 ## 0.3.0 - 2026-10-23
 
 Moon-Lander changes the mediator publish policy and adds the async mediator

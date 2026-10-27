@@ -1,0 +1,47 @@
+name: Browser nightly
+
+# The browser suite in Chromium, Firefox and WebKit. Pull requests test only Chromium and Firefox
+# (ci.yml), because WebKit page loads stall about once in 350 loads on GitHub Linux runners
+# (lander-4us.22). Release validation also runs all three engines through `mise run check`.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-nightly
+  cancel-in-progress: false
+
+env:
+  MISE_EXPERIMENTAL: 'true'
+
+jobs:
+  browser:
+    name: Browser configuration (Chromium, Firefox and WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The same pinned Playwright image as the ci.yml browser job. Its tag must match the
+    # Playwright pin in .config/mise/config.toml.
+    container:
+      # A tag with a digest cannot be split.
+      # yamllint disable-line rule:line-length
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+      options: --user 1001
+    env:
+      # The image has no pipx, and this job does not lint YAML.
+      MISE_DISABLE_TOOLS: yamllint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install pinned tools
+        uses: ./.github/actions/setup
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install locked harness and check the engines
+        run: mise run browsers:install
+      - name: Test browsers and failure propagation in all three engines
+        # The image has no C compiler, so zig builds the native parity reference.
+        run: mise run test:browser-zig -- --verify-failures

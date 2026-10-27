@@ -153,7 +153,7 @@ jobs:
   # Real browser execution cannot be proved by Node tests. Build one fixture for
   # all three engines in one Linux job, required on the same events as other CI.
   browser:
-    name: Browser configuration
+    name: Browser configuration (Chromium and Firefox)
     runs-on: ubuntu-latest
     needs: [lint]
     timeout-minutes: 20
@@ -178,7 +178,9 @@ jobs:
         run: mise run browsers:install
       - name: Test browsers and failure propagation
         # The image has no C compiler, so zig builds the native parity reference.
-        run: mise run test:browser-zig -- --verify-failures
+        # WebKit runs in browser-nightly.yml and in release validation, not here: its page loads
+        # stall about once in 350 loads on GitHub Linux runners (lander-4us.22).
+        run: mise run test:browser-zig -- --verify-failures --engines chromium,firefox
 
   # Windows support is a project requirement, so PRs build and test native and js there. One job
   # runs both targets: the Windows setup takes 60 to 90 s, longer than the js work. The native

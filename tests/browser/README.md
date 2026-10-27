@@ -47,11 +47,28 @@ directory. It requires the specific failure messages and expected failed-test
 counts from the original smoke file, so an unrelated nonzero exit cannot satisfy those checks. No engine is
 skipped or retried. This command is the browser CI job's gate.
 
-The CI job runs in the pinned `mcr.microsoft.com/playwright` image, whose tag matches the Playwright
-pin. The image holds the three engines and their OS packages, so CI runs `browsers:install` without
-`--with-deps` and installs nothing with apt. The image has no C compiler, so CI runs the suite as
-`mise run test:browser-zig -- --verify-failures`, and zig builds the native parity reference.
-Change the image tag and digest in `.github/workflows/ci.yml` when you change the Playwright pin.
+`mise run test:browser -- --engines chromium,firefox` (and the same option of
+`test:browser-zig` and `test:browser-failures`) runs only the listed engines. The deliberate-failure
+checks then expect failures in each listed engine. Without the option, all three engines run.
+
+Where each engine runs:
+
+| Run | Engines | Command |
+| --- | --- | --- |
+| Pull requests and `main` (`ci.yml`, part of `ci-ok`) | Chromium, Firefox | `mise run test:browser-zig -- --verify-failures --engines chromium,firefox` |
+| Nightly and manual (`browser-nightly.yml`) | Chromium, Firefox, WebKit | `mise run test:browser-zig -- --verify-failures` |
+| Release validation (`release.yml`, `mise run check`) | Chromium, Firefox, WebKit | `mise run test:browser` |
+
+WebKit is not in the pull-request gate, because its page loads stall about once in 350 loads on
+GitHub Linux runners (bead `lander-4us.22`). A WebKit regression fails the nightly run and the
+release.
+
+The two browser jobs run in the pinned `mcr.microsoft.com/playwright` image, whose tag matches the
+Playwright pin. The image holds the three engines and their OS packages, so the jobs run
+`browsers:install` without `--with-deps` and install nothing with apt. The image has no C compiler,
+so the jobs run the suite through `mise run test:browser-zig`, and zig builds the native parity
+reference. Change the image tag and digest in `.github/workflows/ci.yml` and
+`.github/workflows/browser-nightly.yml` when you change the Playwright pin.
 
 The suite has a 300-second Playwright limit inside a 420-second MoonBit limit.
 The fixture build, with its four reference builds, has a 300-second limit.

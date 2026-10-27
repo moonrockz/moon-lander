@@ -303,10 +303,12 @@ fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
       }
     }
   }
+  // The host answers for each candidate first, so the error of an
+  // inaccessible candidate passes out even when two others exist.
+  guard known else { return NotKnown }
   if existing.length() > 1 {
     return Several
   }
-  guard known else { return NotKnown }
   if existing is [path] {
     return OneFile(path)
   }

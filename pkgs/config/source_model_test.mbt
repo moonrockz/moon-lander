@@ -705,3 +705,25 @@ test "ambiguity at a drive root names the drive root" {
     _ => fail("expected an ambiguity error")
   }
 }
+
+///|
+test "the core reads an inaccessible candidate before it reports ambiguity" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.add(
+      @config.ConfigSource::candidates(
+        ["/w/app.toml", "/w/.app/app.toml", "/w/.config/app.toml"],
+        display="App",
+      ),
+    )
+  let tree = @config.FileTree::new()
+    .with_listing("/w", [
+      { name: "app.toml", kind: File },
+      { name: ".app", kind: Directory },
+    ])
+    .with_listing("/w/.app", [{ name: "app.toml", kind: File }])
+    .with_listing("/w/.config", [{ name: "app.toml", kind: Inaccessible }])
+  @expect.expect(
+    @config.load(builder, tree) is Need([ReadFile("/w/.config/app.toml")]),
+  ).to_equal(true)
+}

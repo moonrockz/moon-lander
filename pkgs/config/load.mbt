@@ -244,6 +244,9 @@ fn resolve(
           }
         }
       }
+      // The host answers for each candidate first, so the error of an
+      // inaccessible candidate passes out even when two others exist.
+      guard !unknown else { return None }
       if existing.length() > 1 {
         raise Ambiguous(
           display~,
@@ -251,7 +254,6 @@ fn resolve(
           candidates=existing,
         )
       }
-      guard !unknown else { return None }
       guard existing is [path] else {
         return Some({ pieces: [], path: None, candidates, status: NotFound })
       }

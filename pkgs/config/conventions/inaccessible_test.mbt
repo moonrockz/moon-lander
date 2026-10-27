@@ -256,3 +256,42 @@ test "a candidate at the drive root is found" {
   @expect.expect(primary_path(config)).to_equal(Some("D:/acme.toml"))
   @expect.expect(asked.contains(ListDir("D:"))).to_equal(false)
 }
+
+///|
+test "an inaccessible candidate is read before two readable ones are ambiguous" {
+  // The enclosing search passes over a directory with more than one file, so
+  // it must not decide that before the host answers for `acme.yaml`.
+  let tree = @config.FileTree::new()
+    .with_listing("/w", [
+      { name: ".acme", kind: Directory },
+      { name: "acme.toml", kind: File },
+      locked("acme.yaml"),
+      { name: "packages", kind: Directory },
+    ])
+    .with_listing("/w/.acme", [{ name: "acme.toml", kind: File }])
+    .with_missing("/w/.config/acme")
+    .with_file("/w/acme.toml", "workspace.members = [\"packages/*\"]")
+    .with_file("/w/.acme/acme.toml", "workspace.members = [\"packages/*\"]")
+    .with_listing("/w/packages", [{ name: "a", kind: Directory }])
+    .with_missing("/w/packages/.acme")
+    .with_missing("/w/packages/.config/acme")
+    .with_listing("/w/packages/a", [{ name: "acme.toml", kind: File }])
+    .with_missing("/w/packages/a/.acme")
+    .with_missing("/w/packages/a/.config/acme")
+    .with_file("/w/packages/a/acme.toml", "a = 1")
+  let builder = @config.builder()
+    |> @config.working_dir("/w/packages/a")
+    |> @config.env_vars({})
+    |> @config.format(@toml.format())
+    |> @config.format(yaml_only())
+    |> @conventions.add(
+      @conventions.app_dirs("acme")
+      |> @conventions.workspace
+      |> @conventions.without(SystemDir)
+      |> @conventions.boundary("/w"),
+    )
+  guard @config.load(builder, tree) is Need(requests) else {
+    fail("the enclosing search decided before the host answered")
+  }
+  @expect.expect(requests).to_equal([ReadFile("/w/acme.yaml")])
+}

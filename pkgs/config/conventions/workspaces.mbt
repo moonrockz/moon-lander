@@ -94,19 +94,22 @@ fn is_confined(entry : String) -> Bool {
 }
 
 ///|
-/// The segments of `dir` below `root`, or `None` when `dir` is not `root` or
+/// The names of `dir` below `root`, or `None` when `dir` is not `root` or
 /// below it.
-fn relative_segments(root : String, dir : String) -> Array[String]? {
-  guard is_within(dir, root) else { return None }
-  Some(entry_segments(dir[root.length():].to_owned()))
+fn relative_segments(
+  root : @config.FileTreePath,
+  dir : @config.FileTreePath,
+) -> Array[String]? {
+  guard dir.is_within(root) else { return None }
+  Some(dir.names()[root.names().length():].to_owned())
 }
 
 ///|
 /// Whether one of `patterns` selects `dir`, relative to `root`.
 fn patterns_select(
-  root : String,
+  root : @config.FileTreePath,
   patterns : Array[String],
-  dir : String,
+  dir : @config.FileTreePath,
 ) -> Bool {
   guard relative_segments(root, dir) is Some(path) else { return false }
   patterns.iter().any(pattern => segments_match(entry_segments(pattern), path))
@@ -116,7 +119,11 @@ fn patterns_select(
 /// Whether `dir`, which the member entries select, is a member of the
 /// workspace at `root`: it is below `root`, it is not `root`, and no exclude
 /// entry selects it.
-fn is_member(root : String, exclude : Array[String], dir : String) -> Bool {
+fn is_member(
+  root : @config.FileTreePath,
+  exclude : Array[String],
+  dir : @config.FileTreePath,
+) -> Bool {
   relative_segments(root, dir) is Some(path) &&
   !path.is_empty() &&
   !patterns_select(root, exclude, dir)
@@ -124,8 +131,15 @@ fn is_member(root : String, exclude : Array[String], dir : String) -> Bool {
 
 ///|
 /// `root` joined with the segments of a confined entry.
-fn entry_dir(root : String, entry : String) -> String {
-  entry_segments(entry).fold(init=root, join)
+fn entry_dir(
+  root : @config.FileTreePath,
+  entry : String,
+) -> @config.FileTreePath raise @config.ConfigError {
+  let mut dir = root
+  for segment in entry_segments(entry) {
+    dir = dir.child(segment)
+  }
+  dir
 }
 
 ///|
@@ -192,9 +206,9 @@ fn Conventions::project_name(
 /// not hold a listing yet.
 fn Scan::members(
   self : Scan,
-  root : String,
+  root : @config.FileTreePath,
   declaration : Declaration,
-) -> Array[String]? {
+) -> Array[@config.FileTreePath]? raise @config.ConfigError {
   let members = []
   let exclude = self.confined(declaration.exclude)
   let mut known = true
@@ -228,9 +242,9 @@ fn Scan::members(
 /// hidden directory. `None` when the tree does not hold a listing yet.
 fn Scan::expand(
   self : Scan,
-  dir : String,
+  dir : @config.FileTreePath,
   segments : ArrayView[String],
-) -> Array[String]? {
+) -> Array[@config.FileTreePath]? raise @config.ConfigError {
   match segments {
     [] =>
       match self.config_at(dir) {
@@ -242,12 +256,15 @@ fn Scan::expand(
       guard self.children(dir) is Some(children) else { return None }
       let found = []
       let mut known = true
-      let parts : Array[(String, ArrayView[String])] = if head == "**" {
-        [(dir, rest), ..children.map(child => (child, segments))]
+      // A child name that the pattern selects must form a path, else the
+      // error names it. A name that the pattern does not select is not used.
+      let parts : Array[(@config.FileTreePath, ArrayView[String])] = if head ==
+        "**" {
+        [(dir, rest), ..children.map(name => (dir.child(name), segments))]
       } else {
         children
-        .filter(child => segment_matches(head, file_name(child)))
-        .map(child => (child, rest))
+        .filter(name => segment_matches(head, name))
+        .map(name => (dir.child(name), rest))
       }
       for part in parts {
         let (path, next) = part
@@ -266,11 +283,11 @@ fn Scan::expand(
 }
 
 ///|
-/// The directories in `dir` whose names do not start with `.`, or `None` when
-/// the tree does not hold the listing yet. An `Inaccessible` entry can be a
-/// directory, so it is in the result: a pattern that selects it asks for its
-/// listing, and the host reports the error.
-fn Scan::children(self : Scan, dir : String) -> Array[String]? {
+/// The names of the directories in `dir` that do not start with `.`, or
+/// `None` when the tree does not hold the listing yet. An `Inaccessible` entry
+/// can be a directory, so it is in the result: a pattern that selects it asks
+/// for its listing, and the host reports the error.
+fn Scan::children(self : Scan, dir : @config.FileTreePath) -> Array[String]? {
   match self.context.tree.listing(dir) {
     Found(entries) =>
       Some(
@@ -278,7 +295,7 @@ fn Scan::children(self : Scan, dir : String) -> Array[String]? {
         .filter(entry => {
           entry.kind is (Directory | Inaccessible) && !entry.name.has_prefix(".")
         })
-        .map(entry => join(dir, entry.name)),
+        .map(entry => entry.name),
       )
     Missing => Some([])
     Unknown => {
@@ -293,9 +310,9 @@ fn Scan::children(self : Scan, dir : String) -> Array[String]? {
 /// member.
 fn Scan::selects(
   self : Scan,
-  root : String,
+  root : @config.FileTreePath,
   declaration : Declaration,
-  dir : String,
+  dir : @config.FileTreePath,
 ) -> Bool {
   patterns_select(root, self.confined(declaration.members), dir) &&
   is_member(root, self.confined(declaration.exclude), dir)
@@ -310,16 +327,16 @@ fn Scan::selects(
 /// yet. One directory is examined in each round, nearest first.
 fn Scan::enclosing(
   self : Scan,
-  root : String,
-  stop : String?,
-) -> Enclosing?? {
+  root : @config.FileTreePath,
+  stop : @config.FileTreePath?,
+) -> Enclosing?? raise @config.ConfigError {
   let mut dir = root
   while true {
     let below_stop = match stop {
-      Some(stop) => dir != stop && is_within(dir, stop)
+      Some(stop) => dir != stop && dir.is_within(stop)
       None => true
     }
-    guard below_stop && parent_dir(dir) is Some(parent) else { break }
+    guard below_stop && dir.parent() is Some(parent) else { break }
     dir = parent
     let file = match self.config_at(dir) {
       NotKnown => return None
@@ -374,7 +391,7 @@ fn Scan::root_value(
     }
     guard known && existing is [path] else { continue }
     match self.value_of({ path, root: parent_of(path), kind: Discovered }) {
-      Found(layer) => value = @config.merge(value, layer, source=path)
+      Found(layer) => value = @config.merge(value, layer, source=path.to_string())
       Missing => ()
       Unknown => known = false
     }
@@ -394,13 +411,13 @@ fn Scan::root_value(
 /// and no member.
 fn Scan::automatic_member(
   self : Scan,
-  root : String,
+  root : @config.FileTreePath,
   declaration : Declaration,
-  start : String?,
-) -> String?? {
+  start : @config.FileTreePath?,
+) -> @config.FileTreePath?? raise @config.ConfigError {
   guard self.members(root, declaration) is Some(members) else { return None }
   if start is Some(start) &&
-    members.iter().find_first(dir => is_within(start, dir))
+    members.iter().find_first(dir => start.is_within(dir))
     is Some(dir) {
     return Some(Some(dir))
   }
@@ -427,11 +444,11 @@ fn Scan::automatic_member(
 /// raises `AmbiguousProject`.
 fn Scan::selected_project(
   self : Scan,
-  root : String,
+  root : @config.FileTreePath,
   declaration : Declaration?,
   value : @config.ConfigValue,
   selector : String,
-) -> String?? raise @config.ConfigError {
+) -> @config.FileTreePath?? raise @config.ConfigError {
   let wanted = entry_segments(selector.replace_all(old="\\", new="/"))
   if wanted.is_empty() {
     return Some(None)
@@ -449,7 +466,7 @@ fn Scan::selected_project(
       return Some(Some(dir))
     }
   }
-  let matches : Array[String?] = []
+  let matches : Array[@config.FileTreePath?] = []
   if self.conventions.project_name(value) == Some(selector) {
     matches.push(None)
   }
@@ -476,7 +493,7 @@ fn Scan::selected_project(
   guard known else { return None }
   match matches {
     [only] => Some(only)
-    [] => raise UnknownProject(selector~, workspace=root)
+    [] => raise UnknownProject(selector~, workspace=root.to_string())
     _ =>
       raise AmbiguousProject(
         selector~,
@@ -486,14 +503,5 @@ fn Scan::selected_project(
           None => "."
         }),
       )
-  }
-}
-
-///|
-/// The last name of `path`.
-fn file_name(path : String) -> String {
-  match path.rev_find("/") {
-    Some(index) => path[index + 1:].to_owned()
-    None => path
   }
 }

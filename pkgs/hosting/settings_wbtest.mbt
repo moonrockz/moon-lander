@@ -42,8 +42,8 @@ test "variables beat a file through the host source and conventions composition"
   let host = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_LOG__FORMAT": "json" },
     working_dir=@lander_core.AbsolutePath::parse("/w")) |> app_dirs() |> build(_ => ())
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [{ name: "acme.toml", kind: File }])
-    .with_file("/w/acme.toml", "log.format = \"text\"")
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/w/acme.toml"), "log.format = \"text\"")
   let config = settings_config(host, tree~)
   assert_eq(@config.get_text(config, "log.format"), "json")
   assert_true(config.reports().iter().any(r => r.path == Some("/w/acme.toml") && r.status is Loaded))
@@ -178,8 +178,8 @@ test "explicit settings compose equal configuration and reports on every target"
     "ACME_LOG__FORMAT": "json", "HOME": "/home/test",
   } : Json), working_dir=@lander_core.AbsolutePath::parse("/w")) |> app_dirs() |> build(_ => ())
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [{ name: "acme.toml", kind: File }])
-    .with_file("/w/acme.toml", "log.format = \"text\"\nfile_only = true")
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/w/acme.toml"), "log.format = \"text\"\nfile_only = true")
   let config = settings_config(first, tree~)
   let equivalent = settings_config(second, tree~)
   assert_eq(config.value(), @config.ConfigValue::from_json({ "log": { "format": "json" }, "file_only": true }))

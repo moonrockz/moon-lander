@@ -36,7 +36,7 @@ fn load_files(
   for file in files {
     let (path, role, text) = file
     builder = builder |> @config.file(path, role~)
-    tree = tree.with_file(path, text)
+    tree = tree.with_file(p(path), text)
   }
   guard @config.load(builder, tree) is Done(config) else {
     abort("a complete tree never asks for files")

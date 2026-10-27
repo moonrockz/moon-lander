@@ -116,7 +116,7 @@ pub fn reference() -> String raise @config.ConfigError {
   for case in cases {
     let mut tree = @config.FileTree::new(complete=true)
     for file in case.files {
-      tree = tree.with_file(file.0, file.1)
+      tree = tree.with_file(@config.FileTreePath::parse(file.0), file.1)
     }
     lines.push(
       try {

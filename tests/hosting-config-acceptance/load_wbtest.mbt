@@ -88,7 +88,7 @@ async test "Staging flag beats variable and starting default and loads exact-cas
 async test "host app_dirs receives config and isolated flags while files tree is ignored on native and js" {
   let result = configured_host(["--config", "../alternate/acme.toml", "--isolated"])
     |> @hosting.files(@config.FileTree::new(complete=true)
-      .with_file(fixture("alternate/acme.toml").to_string(), "from_directory = \"injected\""))
+      .with_file(@config.FileTreePath::from_absolute(fixture("alternate/acme.toml")), "from_directory = \"injected\""))
     |> @hosting.build(b => {
       assert_eq(@config.get_text(b.config, "from_directory"), "alternate")
       assert_true(b.config.reports().iter().any(r => r.kind is File(System) && r.status is Skipped))
@@ -229,10 +229,11 @@ async test "omitted settings use the process snapshot and discover from its actu
 async test "explicit disk settings give the same complete configuration and reports as an injected tree" {
   let vars = { "ACME_LOG__FORMAT": "json", "HOME": "/home/test" }
   let dir = fixture("workspace").to_string()
+  let root = @config.FileTreePath::from_absolute(fixture("workspace"))
   let tree = @config.FileTree::new(complete=true)
-    .with_listing(dir, [{ name: "acme.toml", kind: File }, { name: "acme.Staging.toml", kind: File }, { name: "packages", kind: Directory }])
-    .with_file(dir + "/acme.toml", "workspace.members = [\"packages/*\"]\nlog.format = \"text\"\nfile_only = true\n")
-    .with_file(dir + "/acme.Staging.toml", "environment_file = \"Staging\"\n")
+    .with_listing(root, [{ name: "acme.toml", kind: File }, { name: "acme.Staging.toml", kind: File }, { name: "packages", kind: Directory }])
+    .with_file(root.child("acme.toml"), "workspace.members = [\"packages/*\"]\nlog.format = \"text\"\nfile_only = true\n")
+    .with_file(root.child("acme.Staging.toml"), "environment_file = \"Staging\"\n")
   let sources = @config.builder() |> @config.env_vars(vars) |> @config.working_dir(dir)
     |> @config.platform(Linux) |> @config.format(@toml.format())
     |> @conventions.add(@conventions.app_dirs("acme"))

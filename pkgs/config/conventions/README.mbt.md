@@ -73,13 +73,13 @@ test "find the project file from a nested directory" {
     |> @config.format(@toml.format())
     |> @conventions.add(@conventions.app_dirs("acme"))
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [
+    .with_listing(@config.FileTreePath::parse("/w"), [
       { name: "acme.toml", kind: File },
       { name: "src", kind: Directory },
     ])
-    .with_listing("/w/src", [{ name: "nested", kind: Directory }])
-    .with_listing("/w/src/nested", [])
-    .with_file("/w/acme.toml", "project.name = \"acme\"")
+    .with_listing(@config.FileTreePath::parse("/w/src"), [{ name: "nested", kind: Directory }])
+    .with_listing(@config.FileTreePath::parse("/w/src/nested"), [])
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"), "project.name = \"acme\"")
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -111,12 +111,12 @@ test "a test root keeps files above it out" {
       @conventions.app_dirs("acme") |> @conventions.boundary("/tmp/case"),
     )
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/tmp", [
+    .with_listing(@config.FileTreePath::parse("/tmp"), [
       { name: "acme.toml", kind: File },
       { name: "case", kind: Directory },
     ])
-    .with_listing("/tmp/case", [{ name: "src", kind: Directory }])
-    .with_listing("/tmp/case/src", [])
+    .with_listing(@config.FileTreePath::parse("/tmp/case"), [{ name: "src", kind: Directory }])
+    .with_listing(@config.FileTreePath::parse("/tmp/case/src"), [])
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -208,12 +208,12 @@ test "the user override wins over the project file" {
     |> @config.format(@toml.format())
     |> @conventions.add(@conventions.app_dirs("acme"))
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [
+    .with_listing(@config.FileTreePath::parse("/w"), [
       { name: "acme.toml", kind: File },
       { name: "acme.user.toml", kind: File },
     ])
-    .with_file("/w/acme.toml", "ui.theme = \"shared\"")
-    .with_file("/w/acme.user.toml", "ui.theme = \"personal\"")
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"), "ui.theme = \"shared\"")
+    .with_file(@config.FileTreePath::parse("/w/acme.user.toml"), "ui.theme = \"personal\"")
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -288,12 +288,12 @@ test "the environment file of the run wins over the project file" {
     |> @conventions.add(conventions)
     |> @config.env(prefix="ACME", reserved=["ACME_ENVIRONMENT", "ACME_HOME"])
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [
+    .with_listing(@config.FileTreePath::parse("/w"), [
       { name: "acme.toml", kind: File },
       { name: "acme.Production.toml", kind: File },
     ])
-    .with_file("/w/acme.toml", "log.level = \"info\"")
-    .with_file("/w/acme.Production.toml", "log.level = \"warn\"")
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"), "log.level = \"info\"")
+    .with_file(@config.FileTreePath::parse("/w/acme.Production.toml"), "log.level = \"warn\"")
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -331,8 +331,8 @@ test "remove the system part, or build from single parts" {
       |> @config.format(@toml.format())
       |> @conventions.add(conventions)
     let tree = @config.FileTree::new(complete=true)
-      .with_listing("/w", [{ name: "acme.toml", kind: File }])
-      .with_file("/w/acme.toml", "a = 1")
+      .with_listing(@config.FileTreePath::parse("/w"), [{ name: "acme.toml", kind: File }])
+      .with_file(@config.FileTreePath::parse("/w/acme.toml"), "a = 1")
     guard @config.load(builder, tree) is Done(config) else {
       fail("a complete tree never asks for files")
     }
@@ -399,21 +399,20 @@ test "the member file wins over the workspace file" {
     |> @config.format(@toml.format())
     |> @conventions.add(@conventions.app_dirs("acme") |> @conventions.workspace)
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [
+    .with_listing(@config.FileTreePath::parse("/w"), [
       { name: "acme.toml", kind: File },
       { name: "packages", kind: Directory },
     ])
-    .with_listing("/w/packages", [{ name: "billing", kind: Directory }])
-    .with_listing("/w/packages/billing", [
+    .with_listing(@config.FileTreePath::parse("/w/packages"), [{ name: "billing", kind: Directory }])
+    .with_listing(@config.FileTreePath::parse("/w/packages/billing"), [
       { name: "acme.toml", kind: File },
       { name: "src", kind: Directory },
     ])
-    .with_listing("/w/packages/billing/src", [])
-    .with_file(
-      "/w/acme.toml",
+    .with_listing(@config.FileTreePath::parse("/w/packages/billing/src"), [])
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"),
       "workspace.members = [\"packages/*\"]\nui.theme = \"light\"",
     )
-    .with_file("/w/packages/billing/acme.toml", "ui.theme = \"dark\"")
+    .with_file(@config.FileTreePath::parse("/w/packages/billing/acme.toml"), "ui.theme = \"dark\"")
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -463,16 +462,15 @@ test "a member cannot set a workspace key and does not inherit the root project"
     |> @config.format(@toml.format())
     |> @conventions.add(conventions)
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [
+    .with_listing(@config.FileTreePath::parse("/w"), [
       { name: "acme.toml", kind: File },
       { name: "app", kind: Directory },
     ])
-    .with_listing("/w/app", [{ name: "acme.toml", kind: File }])
-    .with_file(
-      "/w/acme.toml",
+    .with_listing(@config.FileTreePath::parse("/w/app"), [{ name: "acme.toml", kind: File }])
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"),
       "workspace.members = [\"app\"]\nworkspace.out_dir = \"out\"\nproject.name = \"root\"",
     )
-    .with_file("/w/app/acme.toml", "workspace.out_dir = \"mine\"")
+    .with_file(@config.FileTreePath::parse("/w/app/acme.toml"), "workspace.out_dir = \"mine\"")
   guard @config.load(builder, tree) is Done(config) else {
     fail("a complete tree never asks for files")
   }
@@ -515,9 +513,9 @@ test "discovery asks for the listing of the working directory first" {
     fail("an empty tree needs a listing")
   }
   @expect.expect(requests).to_equal([
-    ListDir("/w/src"),
-    ListDir("/w/src/.acme"),
-    ListDir("/w/src/.config/acme"),
+    ListDir(@config.FileTreePath::parse("/w/src")),
+    ListDir(@config.FileTreePath::parse("/w/src/.acme")),
+    ListDir(@config.FileTreePath::parse("/w/src/.config/acme")),
   ])
 }
 ```

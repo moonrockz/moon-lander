@@ -64,7 +64,7 @@ fn answer_with(
     ReadFile(path) => (path, false)
     ListDir(path) => (path, true)
   }
-  let reply = reply(from_slash(path, platform), listing)
+  let reply = reply(path.to_native(platform), listing)
   match reply.kind() {
     "missing" => tree.with_missing(path)
     "file" => tree.with_file(path, reply.text())

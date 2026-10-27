@@ -21,20 +21,22 @@ async fn answer_with(
 ) -> @config.FileTree raise {
   match request {
     ReadFile(path) => {
-      let native = from_slash(path, platform)
+      let native = path.to_native(platform)
       guard kind_of(native, inspect) is Some(Regular) else {
         return tree.with_missing(path)
       }
       tree.with_file(path, @fs.read_file(native).text())
     }
     ListDir(dir) => {
-      let native = from_slash(dir, platform)
+      let native = dir.to_native(platform)
       guard kind_of(native, inspect) is Some(Directory) else {
         return tree.with_missing(dir)
       }
       let entries : Array[@config.DirEntry] = []
       for name in @fs.readdir(native, include_hidden=true, sort=true) {
-        let path = from_slash(join(dir, name), platform)
+        // The entry name stays as the system gives it. Only a candidate name
+        // has to form a file-tree path, so an odd unrelated name is no error.
+        let path = native_join(native, name, platform)
         if entry_kind(path, inspect) is Some(kind) {
           entries.push({ name, kind })
         }
@@ -92,10 +94,15 @@ fn running_platform() -> @config.Platform {
 }
 
 ///|
-fn join(dir : String, name : String) -> String {
-  if dir.has_suffix("/") {
+/// The native path of the entry `name` in the native directory `dir`.
+fn native_join(dir : String, name : String, platform : @config.Platform) -> String {
+  let separator = match platform {
+    Windows => "\\"
+    Linux | MacOs => "/"
+  }
+  if dir.has_suffix("/") || dir.has_suffix("\\") {
     dir + name
   } else {
-    "\{dir}/\{name}"
+    dir + separator + name
   }
 }

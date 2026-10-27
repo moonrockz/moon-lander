@@ -377,8 +377,8 @@ test "explicit embedded settings reach the factory, hooks and command" {
 ///|
 test "a complete injected tree gives the configuration" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/", [{ name: "acme.toml", kind: File }])
-    .with_file("/acme.toml", "log.format = \"text\"")
+    .with_listing(p("/"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/acme.toml"), "log.format = \"text\"")
   let host = builder(@lander_core.AppName::parse("acme"), [])
     |> configure(s => s |> @config.format(@toml.format()))
     |> app_dirs() |> files(tree) |> build(_ => ())
@@ -402,7 +402,9 @@ test "an incomplete injected tree gives 2 and names the paths before the factory
   assert_eq(calls, [])
   assert_eq(lines.length(), 1)
   guard result.failures is [IncompleteFileTree(requests~)] else { fail("expected one incomplete tree") }
-  let paths = requests.map(request => match request { ListDir(path) | ReadFile(path) => path })
+  let paths = requests.map(request => match request {
+    ListDir(path) | ReadFile(path) => path.to_string()
+  })
   assert_true(paths.length() > 0)
   // The report names every requested path, in request order.
   assert_eq(lines[0], "acme: Incomplete configuration file tree; requested paths: " + paths.join(", "))

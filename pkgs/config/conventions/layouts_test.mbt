@@ -13,7 +13,7 @@ fn disk(files : Array[(String, String)]) -> @config.FileTree {
   let mut tree = @config.FileTree::new(complete=true)
   for file in files {
     let (path, text) = file
-    tree = tree.with_file(path, text)
+    tree = tree.with_file(p(path), text)
     let parts = path[1:].split("/").map(part => part.to_owned()).collect()
     let mut dir = "/"
     for index, part in parts {
@@ -27,7 +27,7 @@ fn disk(files : Array[(String, String)]) -> @config.FileTree {
     }
   }
   for dir, entries in listings {
-    tree = tree.with_listing(dir, entries)
+    tree = tree.with_listing(p(dir), entries)
   }
   tree
 }

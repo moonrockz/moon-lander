@@ -30,10 +30,10 @@ pub extend DirEntry with @debug.Debug::{to_repr}
 
 ///|
 /// A request that the pure load passes out to a host: the listing of a
-/// directory or the text of a file. Paths use `/` separators.
+/// directory or the text of a file.
 pub(all) enum FileRequest {
-  ListDir(String)
-  ReadFile(String)
+  ListDir(FileTreePath)
+  ReadFile(FileTreePath)
 } derive(Eq, Hash, Debug)
 
 ///|
@@ -81,9 +81,9 @@ pub extend Lookup with @debug.Debug::{to_repr}
 /// absent. The pure load asks only for paths that the tree does not know.
 pub struct FileTree {
   priv complete : Bool
-  priv listings : Map[String, Array[DirEntry]]
-  priv files : Map[String, String]
-  priv missing : Array[String]
+  priv listings : Map[FileTreePath, Array[DirEntry]]
+  priv files : Map[FileTreePath, String]
+  priv missing : Array[FileTreePath]
 }
 
 ///|
@@ -97,7 +97,7 @@ pub fn FileTree::new(complete? : Bool = false) -> FileTree {
 /// A new tree that also holds the listing of the directory `dir`.
 pub fn FileTree::with_listing(
   self : FileTree,
-  dir : String,
+  dir : FileTreePath,
   entries : Array[DirEntry],
 ) -> FileTree {
   let listings = self.listings.copy()
@@ -109,7 +109,7 @@ pub fn FileTree::with_listing(
 /// A new tree that also holds the text of the file `path`.
 pub fn FileTree::with_file(
   self : FileTree,
-  path : String,
+  path : FileTreePath,
   text : String,
 ) -> FileTree {
   let files = self.files.copy()
@@ -120,7 +120,7 @@ pub fn FileTree::with_file(
 ///|
 /// A new tree that records `path` as absent. When `path` is a directory, every
 /// path under it is also absent.
-pub fn FileTree::with_missing(self : FileTree, path : String) -> FileTree {
+pub fn FileTree::with_missing(self : FileTree, path : FileTreePath) -> FileTree {
   { ..self, missing: [..self.missing, path] }
 }
 
@@ -132,7 +132,7 @@ pub fn FileTree::is_complete(self : FileTree) -> Bool {
 
 ///|
 /// The text of the file `path`.
-pub fn FileTree::file(self : FileTree, path : String) -> Lookup[String] {
+pub fn FileTree::file(self : FileTree, path : FileTreePath) -> Lookup[String] {
   match self.files.get(path) {
     Some(text) => Found(text)
     None => if self.is_absent(path) { Missing } else { Unknown }
@@ -143,7 +143,7 @@ pub fn FileTree::file(self : FileTree, path : String) -> Lookup[String] {
 /// The listing of the directory `dir`.
 pub fn FileTree::listing(
   self : FileTree,
-  dir : String,
+  dir : FileTreePath,
 ) -> Lookup[Array[DirEntry]] {
   match self.listings.get(dir) {
     Some(entries) => Found(entries.copy())
@@ -161,8 +161,10 @@ pub fn FileTree::listing(
 /// `file_request` asks the host for the file, so the host reports its error. In
 /// a complete tree the entry is a file, so a read of it raises file-not-found
 /// and the entry never disappears without a report.
-pub fn FileTree::is_file(self : FileTree, path : String) -> Lookup[Bool] {
-  let (dir, name) = split_path(path)
+pub fn FileTree::is_file(self : FileTree, path : FileTreePath) -> Lookup[Bool] {
+  guard path.parent() is Some(dir) && path.name() is Some(name) else {
+    return Found(false)
+  }
   match self.listing(dir) {
     Found(entries) => {
       guard entries.iter().find_first(entry => entry.name == name)
@@ -189,8 +191,11 @@ pub fn FileTree::is_file(self : FileTree, path : String) -> Lookup[Bool] {
 /// The request that answers `is_file(path)` when it gives `Unknown`: the
 /// listing of the directory of `path`, or the file itself when the tree holds
 /// that listing and the entry is `Inaccessible`.
-pub fn FileTree::file_request(self : FileTree, path : String) -> FileRequest {
-  let (dir, _) = split_path(path)
+pub fn FileTree::file_request(
+  self : FileTree,
+  path : FileTreePath,
+) -> FileRequest {
+  guard path.parent() is Some(dir) else { return ListDir(path) }
   match self.listing(dir) {
     Found(_) => ReadFile(path)
     Missing | Unknown => ListDir(dir)
@@ -199,30 +204,8 @@ pub fn FileTree::file_request(self : FileTree, path : String) -> FileRequest {
 
 ///|
 /// Whether `path` is absent: the tree is complete, or it records `path` or a
-/// directory above it as missing.
-fn FileTree::is_absent(self : FileTree, path : String) -> Bool {
-  self.complete ||
-  self.missing
-  .iter()
-  .any(dir => {
-    let prefix = if dir.has_suffix("/") { dir } else { dir + "/" }
-    path == dir || path.has_prefix(prefix)
-  })
-}
-
-///|
-/// The directory and the name of `path`. A path with no `/` has the directory
-/// `.`, and a name directly below the root has the directory `/`. A name
-/// directly below a drive has the drive root as its directory, such as `C:/`
-/// for `C:/app.toml`, because `C:` alone is the current directory of the drive.
-fn split_path(path : String) -> (String, String) {
-  match path.rev_find("/") {
-    Some(0) => ("/", path[1:].to_owned())
-    Some(index) => {
-      let dir = path[:index].to_owned()
-      let dir = if dir.length() == 2 && dir[1:2] == ":" { dir + "/" } else { dir }
-      (dir, path[index + 1:].to_owned())
-    }
-    None => (".", path)
-  }
+/// directory above it as missing. The compare is name by name, so a record for
+/// `/w/config` does not cover `/w/config2`.
+fn FileTree::is_absent(self : FileTree, path : FileTreePath) -> Bool {
+  self.complete || self.missing.iter().any(dir => path.is_within(dir))
 }

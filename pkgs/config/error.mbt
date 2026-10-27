@@ -25,6 +25,8 @@ pub(all) suberror ConfigError {
   Ambiguous(display~ : String, location~ : String, candidates~ : Array[String])
   /// The text is not a valid key path.
   InvalidKeyPath(text~ : String, reason~ : String)
+  /// The text of a file-tree path breaks a path rule.
+  InvalidFilePath(text~ : String, rule~ : FilePathRule)
   /// An environment variable name gives a key path with an empty segment.
   InvalidEnvKey(variable~ : String)
   /// A merge-by-key list item has no key value, or repeats a key value.
@@ -94,6 +96,8 @@ pub fn ConfigError::message(self : ConfigError) -> String {
       "Ambiguous \{display} configuration; found: \{candidates.join(", ")}"
     InvalidKeyPath(text~, reason~) =>
       "Invalid configuration key path \"\{text}\": \{reason}"
+    InvalidFilePath(text~, rule~) =>
+      "Invalid file path \"\{text}\": \{rule.describe()}"
     InvalidEnvKey(variable~) =>
       "Invalid configuration environment variable \{variable}: a key segment is empty"
     MergeKey(key~, index~, source~) =>

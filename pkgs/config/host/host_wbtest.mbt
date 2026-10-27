@@ -1,4 +1,22 @@
 ///|
+/// `path` with `/` separators, for a test fixture. Only Windows paths change.
+fn to_slash(path : String, platform : @config.Platform) -> String {
+  match platform {
+    Windows => path.replace_all(old="\\", new="/")
+    _ => path
+  }
+}
+
+///|
+/// `path` with the native separators of `platform`, for a fixture file call.
+fn from_slash(path : String, platform : @config.Platform) -> String {
+  match platform {
+    Windows => path.replace_all(old="/", new="\\")
+    _ => path
+  }
+}
+
+///|
 /// A provider that records the context it gets and adds no source.
 fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
   {
@@ -51,7 +69,9 @@ async test "Host adapter fills the inputs" {
     without_test_vars(@env.get_env_vars()),
   )
   @expect.expect(context.working_dir).to_equal(
-    @env.current_dir().map(dir => to_slash(dir, running_platform())),
+    @env.current_dir().map(dir => {
+      @config.FileTreePath::from_native(dir, running_platform())
+    }),
   )
   @expect.expect(context.platform).to_equal(Some(running_platform()))
 }
@@ -137,11 +157,11 @@ async test "discovery finds the project file on the disk" {
 }
 
 ///|
-test "paths convert only on Windows" {
-  assert_eq(to_slash("C:\\w\\app.toml", Windows), "C:/w/app.toml")
-  assert_eq(from_slash("C:/w/app.toml", Windows), "C:\\w\\app.toml")
-  assert_eq(to_slash("/w/a\\b", Linux), "/w/a\\b")
-  assert_eq(from_slash("/w/app.toml", MacOs), "/w/app.toml")
+test "the adapter renders a typed path natively only for the file call" {
+  let path = @config.FileTreePath::from_native("C:\\w\\app.toml", Windows)
+  assert_eq(path.to_string(), "C:/w/app.toml")
+  assert_eq(path.to_native(Windows), "C:\\w\\app.toml")
+  assert_eq(@config.FileTreePath::parse("/w/app.toml").to_native(MacOs), "/w/app.toml")
 }
 
 ///|
@@ -299,4 +319,44 @@ async test "discovery passes over an entry it cannot inspect" {
     )
     |> load
   @expect.expect(@config.get_text(config, "project.name")).to_equal("found")
+}
+
+///|
+async test "native and portable Windows spellings select the same file" {
+  // The native spelling needs a Windows run; elsewhere `\` is a name character.
+  guard running_platform() is Windows else { return }
+  let dir = temp_dir()
+  defer remove_dir(from_slash(dir, running_platform()))
+  write("\{dir}/cfg/app.toml", "a = 1")
+  let paths = []
+  for given in ["\{dir}/cfg/app.toml", from_slash("\{dir}/cfg/app.toml", Windows)] {
+    let config = @config.builder()
+      |> @config.format(@toml.format())
+      |> @config.file(given)
+      |> load
+    @expect.expect(@config.get_text(config, "a")).to_equal("1")
+    paths.push(config.reports()[0].path)
+  }
+  @expect.expect(paths).to_equal([
+    Some("\{dir}/cfg/app.toml"),
+    Some("\{dir}/cfg/app.toml"),
+  ])
+}
+
+///|
+async test "a drive-relative source is an error before any file call" {
+  let builder = @config.builder()
+    |> @config.platform(Windows)
+    |> @config.working_dir("C:/proj")
+    |> @config.format(@toml.format())
+    |> @config.file("C:app.toml")
+  try load(builder) catch {
+    @config.InvalidFilePath(text~, rule~) => {
+      @expect.expect(text).to_equal("C:app.toml")
+      @expect.expect(rule).to_equal(DriveRelative)
+    }
+    _ => fail("expected an invalid-path error")
+  } noraise {
+    _ => fail("C:app.toml is relative to the current directory of drive C")
+  }
 }

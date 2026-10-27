@@ -38,11 +38,11 @@ async test "Locked entry next to a configuration file" {
   write("\{dir}/src/main.mbt", "")
   let tree = faulty_answer(
     @config.FileTree::new(),
-    ListDir(dir),
+    ListDir(@config.FileTreePath::parse(dir)),
     locked=["\{dir}/pagefile.sys"],
     vanished=["\{dir}/gone.txt"],
   )
-  guard tree.listing(dir) is Found(entries) else {
+  guard tree.listing(@config.FileTreePath::parse(dir)) is Found(entries) else {
     fail("the adapter gave no listing")
   }
   // The native and js listings sort in a different order. MoonBit compares
@@ -75,7 +75,7 @@ async test "an inspection error that is not a system error passes out" {
   try
     faulty_answer(
       @config.FileTree::new(),
-      ListDir(dir),
+      ListDir(@config.FileTreePath::parse(dir)),
       locked=[],
       broken=["\{dir}/odd.bin"],
     )

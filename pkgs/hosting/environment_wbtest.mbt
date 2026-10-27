@@ -92,8 +92,8 @@ test "default environment enables the conventions environment part and the resol
   let second = first |> default_environment(@conventions.EnvironmentName::parse("Production"))
   let third = second |> default_environment(@conventions.EnvironmentName::parse("Staging"))
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/work/repo", [{ name: "acme.toml", kind: File }])
-    .with_file("/work/repo/acme.toml", "")
+    .with_listing(p("/work/repo"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/work/repo/acme.toml"), "")
   assert_true(!settings_config(first |> build(_ => ()), tree~).reports().iter().any(r => r.kind is File(EnvironmentFile)))
   for (builder, expected) in [(second, "Production"), (third, "Staging")] {
     let config = settings_config(builder |> build(_ => ()), tree~)

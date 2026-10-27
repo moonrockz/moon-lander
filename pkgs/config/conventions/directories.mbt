@@ -3,7 +3,7 @@
 /// skipped source has no candidates.
 priv struct MachineSource {
   source : @config.ConfigSource
-  candidates : Array[String]
+  candidates : Array[@config.FileTreePath]
 }
 
 ///|
@@ -16,7 +16,7 @@ fn Conventions::machine_sources(
   context : @config.LoadContext,
   extensions : Array[String],
   notes : Array[@config.ConfigWarning],
-) -> Array[MachineSource] {
+) -> Array[MachineSource] raise @config.ConfigError {
   let roles : Array[@config.FileRole] = []
   if self.has(SystemDir) {
     roles.push(System)
@@ -42,41 +42,59 @@ fn Conventions::machine_sources(
       }
     })
   }
-  let vars : DirVars = { platform, env_vars: context.env_vars, working_dir: context.working_dir }
-  roles.map(role => {
+  let vars : DirVars = {
+    conventions: self,
+    platform,
+    env_vars: context.env_vars,
+    working_dir: context.working_dir,
+    notes,
+  }
+  let sources = []
+  for role in roles {
     let paths = match role {
       System => self.files_in(self.system_path(vars), extensions)
       _ => self.global_candidates(vars, extensions)
     }
-    {
+    sources.push({
       source: @config.ConfigSource::candidates(
-        paths,
+        texts(paths),
         display=self.display,
         role~,
         name=self.display,
       ),
       candidates: paths,
-    }
-  })
+    })
+  }
+  sources
 }
 
 ///|
-/// The inputs that give the system and global directories: the platform, the
-/// variable set of the run, and the working directory for a relative value.
+/// The inputs that give the system and global directories: the convention
+/// set, the platform, the variable set of the run, the working directory for a
+/// relative value, and the warnings of the run.
 priv struct DirVars {
+  conventions : Conventions
   platform : @config.Platform
   env_vars : Map[String, String]
-  working_dir : String?
+  working_dir : @config.FileTreePath?
+  notes : Array[@config.ConfigWarning]
 }
 
 ///|
 /// The system directory of the application.
-fn Conventions::system_path(self : Conventions, vars : DirVars) -> String {
+fn Conventions::system_path(
+  self : Conventions,
+  vars : DirVars,
+) -> @config.FileTreePath raise @config.ConfigError {
   let root = match vars.platform {
-    Windows => vars.dir("PROGRAMDATA").unwrap_or("C:/ProgramData")
-    Linux | MacOs => "/etc"
+    Windows =>
+      match vars.dir("PROGRAMDATA") {
+        Some(dir) => dir
+        None => @config.FileTreePath::parse("C:/ProgramData")
+      }
+    Linux | MacOs => @config.FileTreePath::parse("/etc")
   }
-  join(root, self.name)
+  root.child(self.name)
 }
 
 ///|
@@ -87,10 +105,10 @@ fn Conventions::global_candidates(
   self : Conventions,
   vars : DirVars,
   extensions : Array[String],
-) -> Array[String] {
+) -> Array[@config.FileTreePath] raise @config.ConfigError {
   let paths = []
   if self.has(UserConfigDir) && user_config_root(vars) is Some(root) {
-    paths.append(self.files_in(join(root, self.name), extensions))
+    paths.append(self.files_in(root.child(self.name), extensions))
   }
   if self.has(AppHome) && self.home_path(vars) is Some(home) {
     paths.append(self.files_in(home, extensions))
@@ -101,19 +119,20 @@ fn Conventions::global_candidates(
 ///|
 /// The global user configuration directory, or `None` when the variables
 /// that give it are not set.
-fn user_config_root(vars : DirVars) -> String? {
+fn user_config_root(
+  vars : DirVars,
+) -> @config.FileTreePath? raise @config.ConfigError {
   match vars.platform {
     Windows => vars.dir("APPDATA")
     Linux | MacOs => {
       // A relative XDG_CONFIG_HOME is invalid, so it falls back to the default.
-      if vars.value("XDG_CONFIG_HOME") is Some(xdg) &&
-        is_absolute_on(xdg, vars.platform) {
+      if vars.path("XDG_CONFIG_HOME") is Some(xdg) && xdg.is_absolute() {
         return Some(normalize(xdg))
       }
-      let home = vars.dir("HOME")
-      match vars.platform {
-        MacOs => home.map(home => join(home, "Library/Application Support"))
-        _ => home.map(home => join(home, ".config"))
+      match (vars.dir("HOME"), vars.platform) {
+        (Some(home), MacOs) => Some(home.join("Library/Application Support"))
+        (Some(home), _) => Some(home.child(".config"))
+        (None, _) => None
       }
     }
   }
@@ -121,7 +140,10 @@ fn user_config_root(vars : DirVars) -> String? {
 
 ///|
 /// The application home: `$<PREFIX>_HOME`, else `.<app>` in the user home.
-fn Conventions::home_path(self : Conventions, vars : DirVars) -> String? {
+fn Conventions::home_path(
+  self : Conventions,
+  vars : DirVars,
+) -> @config.FileTreePath? raise @config.ConfigError {
   if vars.dir("\{self.prefix}_HOME") is Some(home) {
     return Some(home)
   }
@@ -129,29 +151,43 @@ fn Conventions::home_path(self : Conventions, vars : DirVars) -> String? {
     Windows => vars.dir("USERPROFILE")
     Linux | MacOs => vars.dir("HOME")
   }
-  user_home.map(home => join(home, ".\{self.name}"))
+  match user_home {
+    Some(home) => Some(home.child(".\{self.name}"))
+    None => None
+  }
 }
 
 ///|
 /// `<app>.<ext>` in `dir` for each searched extension.
 fn Conventions::files_in(
   self : Conventions,
-  dir : String,
+  dir : @config.FileTreePath,
   extensions : Array[String],
-) -> Array[String] {
-  extensions.map(extension => join(dir, "\{self.name}.\{extension}"))
+) -> Array[@config.FileTreePath] raise @config.ConfigError {
+  extensions.map(extension => dir.child("\{self.name}.\{extension}"))
 }
 
 ///|
-/// The value of the variable `name` in the `/` form, or `None` when it is not
-/// set or empty. On Windows, `\` becomes `/`.
-fn DirVars::value(self : DirVars, name : String) -> String? {
+/// The parsed path in the variable `name`, in the native form of the
+/// platform, or `None` when it is not set or empty. A value that is not a
+/// valid path, such as the drive-relative `C:x` on Windows, counts as not set
+/// and gives a `Note` warning.
+fn DirVars::path(self : DirVars, name : String) -> @config.FileTreePath? {
   guard self.env_vars.get(name) is Some(value) && !value.is_empty() else {
     return None
   }
-  match self.platform {
-    Windows => Some(value.replace_all(old="\\", new="/"))
-    Linux | MacOs => Some(value)
+  Some(@config.FileTreePath::from_native(value, self.platform)) catch {
+    InvalidFilePath(rule~, ..) => {
+      let warning = note(
+        self.conventions,
+        "discovery ignores the variable \{name}, because \{rule.describe()}",
+      )
+      if !self.notes.contains(warning) {
+        self.notes.push(warning)
+      }
+      None
+    }
+    _ => None
   }
 }
 
@@ -159,29 +195,16 @@ fn DirVars::value(self : DirVars, name : String) -> String? {
 /// The directory that the variable `name` gives. An absolute value is
 /// normalized. A relative value joins the working directory, when the working
 /// directory is absolute.
-fn DirVars::dir(self : DirVars, name : String) -> String? {
-  guard self.value(name) is Some(value) else { return None }
-  if is_absolute_on(value, self.platform) {
+fn DirVars::dir(
+  self : DirVars,
+  name : String,
+) -> @config.FileTreePath? raise @config.ConfigError {
+  guard self.path(name) is Some(value) else { return None }
+  if value.is_absolute() {
     return Some(normalize(value))
   }
   match self.working_dir {
-    Some(dir) if is_absolute(dir) => Some(normalize(join(dir, value)))
+    Some(dir) if dir.is_absolute() => Some(normalize(dir.resolve(value)))
     _ => Some(value)
-  }
-}
-
-///|
-/// Whether `path`, in the `/` form, is absolute on `platform`. On Windows that
-/// is a drive letter followed by `/` (`C:/`) or a UNC prefix (`//server`); a
-/// drive-relative path such as `C:foo` is not absolute. Elsewhere the path
-/// starts with `/`.
-fn is_absolute_on(path : String, platform : @config.Platform) -> Bool {
-  match platform {
-    Windows =>
-      path.has_prefix("//") ||
-      (path.length() >= 3 && path.get_char(0) is Some(letter) &&
-      letter.is_ascii_alphabetic() &&
-      path[1:3] == ":/")
-    Linux | MacOs => path.has_prefix("/")
   }
 }

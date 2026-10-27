@@ -119,7 +119,7 @@ test "a parser default leaves the real file value intact on every target" {
   let host = builder(@lander_core.AppName::parse("acme"), [], env_vars=({} : Map[String, String]), working_dir=@lander_core.AbsolutePath::root())
     |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("format", default_values=["text"])]), mappings=[mapping("format", "log.format")])
     |> configure(s => s |> @config.format(@toml.format()) |> @config.file("/acme.toml"))
-    |> files(@config.FileTree::new(complete=true).with_file("/acme.toml", "log.format = \"json\""))
+    |> files(@config.FileTree::new(complete=true).with_file(p("/acme.toml"), "log.format = \"json\""))
     |> build(b => @config.get_text(b.config, "log.format"))
   let loaded = injected_run(host)
   assert_eq(loaded.context.services, "json")
@@ -128,8 +128,8 @@ test "a parser default leaves the real file value intact on every target" {
 
 ///|
 test "real host override source is last and the factory sees the result on all targets" {
-  let tree = @config.FileTree::new(complete=true).with_listing("/w", [{ name: "acme.toml", kind: File }])
-    .with_file("/w/acme.toml", "log.format = \"text\"")
+  let tree = @config.FileTree::new(complete=true).with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("/w/acme.toml"), "log.format = \"text\"")
   let host = builder(@lander_core.AppName::parse("acme"), ["--log-format", "json"],
       env_vars={ "ACME_LOG__FORMAT": "yaml" }, working_dir=@lander_core.AbsolutePath::parse("/w"))
     |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("log-format")]), mappings=[mapping("log-format", "log.format")])

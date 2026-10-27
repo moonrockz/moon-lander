@@ -190,8 +190,7 @@ test "an origin holds the kind, name, priority, and file path" {
     |> @config.defaults({ "ir": { "layout": "tree" } })
     |> @config.file("/w/app.toml")
     |> @config.load(
-      @config.FileTree::new(complete=true).with_file(
-        "/w/app.toml",
+      @config.FileTree::new(complete=true).with_file(p("/w/app.toml"),
         "ir.mode = \"fast\"",
       ),
     )
@@ -255,8 +254,8 @@ test "Report order and status" {
     )
     |> @config.load(
       @config.FileTree::new(complete=true)
-      .with_listing("/w", [{ name: "app.toml", kind: File }])
-      .with_file("/w/app.toml", "b = 2"),
+      .with_listing(p("/w"), [{ name: "app.toml", kind: File }])
+      .with_file(p("/w/app.toml"), "b = 2"),
     )
     |> done
   @expect.expect(

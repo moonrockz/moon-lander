@@ -51,8 +51,8 @@ let no_platform : String = "discovery has no platform, so it skips the system an
 ///|
 test "discovery reads one listing of a complete tree" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", files(["acme.toml"]))
-    .with_file("/w/acme.toml", "project.name = \"demo\"")
+    .with_listing(p("/w"), files(["acme.toml"]))
+    .with_file(p("/w/acme.toml"), "project.name = \"demo\"")
   let config = acme("/w") |> @config.load(tree) |> done
   @expect.expect(@config.get_text(config, "project.name")).to_equal("demo")
 }
@@ -60,10 +60,10 @@ test "discovery reads one listing of a complete tree" {
 ///|
 test "Configuration found from a nested directory" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [..files(["acme.toml"]), ..dirs(["src"])])
-    .with_listing("/w/src", dirs(["nested"]))
-    .with_listing("/w/src/nested", [])
-    .with_file("/w/acme.toml", "project.name = \"root\"")
+    .with_listing(p("/w"), [..files(["acme.toml"]), ..dirs(["src"])])
+    .with_listing(p("/w/src"), dirs(["nested"]))
+    .with_listing(p("/w/src/nested"), [])
+    .with_file(p("/w/acme.toml"), "project.name = \"root\"")
   let config = acme("/w/src/nested") |> @config.load(tree) |> done
   let report = project(config)
   @expect.expect((report.kind, report.priority, report.path, report.status)).to_equal((
@@ -78,11 +78,11 @@ test "Configuration found from a nested directory" {
 ///|
 test "Nearest configuration wins" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("/w", [..files(["acme.toml"]), ..dirs(["sub"])])
-    .with_listing("/w/sub", [..files(["acme.toml"]), ..dirs(["deep"])])
-    .with_listing("/w/sub/deep", [])
-    .with_file("/w/acme.toml", "project.name = \"root\"")
-    .with_file("/w/sub/acme.toml", "project.name = \"sub\"")
+    .with_listing(p("/w"), [..files(["acme.toml"]), ..dirs(["sub"])])
+    .with_listing(p("/w/sub"), [..files(["acme.toml"]), ..dirs(["deep"])])
+    .with_listing(p("/w/sub/deep"), [])
+    .with_file(p("/w/acme.toml"), "project.name = \"root\"")
+    .with_file(p("/w/sub/acme.toml"), "project.name = \"sub\"")
   let config = acme("/w/sub/deep") |> @config.load(tree) |> done
   @expect.expect(@config.get_text(config, "project.name")).to_equal("sub")
 }
@@ -103,19 +103,20 @@ fn load_from(
       let tree = requests.fold(init=tree, (tree, request) => {
         match request {
           ReadFile(path) =>
-            match disk.get(path) {
+            match disk.get(path.to_string()) {
               Some(text) => tree.with_file(path, text)
               None => tree.with_missing(path)
             }
           ListDir(dir) => {
-            let prefix = if dir.has_suffix("/") { dir } else { dir + "/" }
             let entries : Array[@config.DirEntry] = []
-            for path, _ in disk {
-              guard path.has_prefix(prefix) else { continue }
-              let rest = path[prefix.length():].to_owned()
-              let entry : @config.DirEntry = match rest.find("/") {
-                Some(index) => { name: rest[:index].to_owned(), kind: Directory }
-                None => { name: rest, kind: File }
+            for text, _ in disk {
+              let path = p(text)
+              guard path != dir && path.is_within(dir) else { continue }
+              let below = path.names()[dir.names().length():]
+              let entry : @config.DirEntry = if below.length() > 1 {
+                { name: below[0], kind: Directory }
+              } else {
+                { name: below[0], kind: File }
               }
               if !entries.contains(entry) {
                 entries.push(entry)
@@ -146,12 +147,11 @@ test "the core load runs discovery and asks for each directory" {
 ///|
 test "the first request lists the layout directories of the start directory" {
   let step = acme("/w/src") |> @config.load(@config.FileTree::new())
-  @expect.expect(
-    step
-    is Need(
-      [ListDir("/w/src"), ListDir("/w/src/.acme"), ListDir("/w/src/.config/acme")]
-    ),
-  ).to_equal(true)
+  @expect.expect(needs(step)).to_equal([
+    ListDir(p("/w/src")),
+    ListDir(p("/w/src/.acme")),
+    ListDir(p("/w/src/.config/acme")),
+  ])
 }
 
 ///|
@@ -242,8 +242,8 @@ test "discovery options default to not given" {
 ///|
 test "discovery needs an absolute working directory" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing("repo/sub", [{ name: "acme.toml", kind: File }])
-    .with_file("repo/sub/acme.toml", "a = 1")
+    .with_listing(p("repo/sub"), [{ name: "acme.toml", kind: File }])
+    .with_file(p("repo/sub/acme.toml"), "a = 1")
   let config = acme("repo/sub") |> @config.load(tree) |> done
   @expect.expect(project(config).status).to_equal(Skipped)
   @expect.expect(config.warnings()).to_equal([
@@ -253,4 +253,19 @@ test "discovery needs an absolute working directory" {
       message="discovery needs an absolute working directory, not repo/sub",
     ),
   ])
+}
+
+///|
+/// The parsed path of the test path `text`.
+fn p(text : String) -> @config.FileTreePath {
+  @config.FileTreePath::parse(text) catch {
+    _ => abort("invalid test path \{text}")
+  }
+}
+
+///|
+/// The requests of a load step that needs files.
+fn[T] needs(step : @config.LoadStep[T]) -> Array[@config.FileRequest] {
+  guard step is Need(requests) else { abort("the load step needs no files") }
+  requests
 }

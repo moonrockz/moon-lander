@@ -116,7 +116,7 @@ pub fn tree(files : Array[(String, String)]) -> @config.FileTree {
   for file in files {
     let (given, text) = file
     let path = at_root(given)
-    tree = tree.with_file(path, text)
+    tree = tree.with_file(fixture_path(path), text)
     let (prefix, rest) = if path.has_prefix("/") {
       ("/", path[1:].to_owned())
     } else {
@@ -138,7 +138,7 @@ pub fn tree(files : Array[(String, String)]) -> @config.FileTree {
     }
   }
   for dir, entries in listings {
-    tree = tree.with_listing(dir, entries)
+    tree = tree.with_listing(fixture_path(dir), entries)
   }
   tree
 }
@@ -193,5 +193,13 @@ fn describe(warning : @config.ConfigWarning) -> String {
     KeyRemoved(key, origin) =>
       "key-removed \{key} from \{origin.location.unwrap_or(origin.source)}"
     Note(message~, ..) => "note \{message}"
+  }
+}
+
+///|
+/// The parsed path of the fixture path `text`, which is a constant.
+fn fixture_path(text : String) -> @config.FileTreePath {
+  @config.FileTreePath::parse(text) catch {
+    _ => abort("invalid fixture path \{text}")
   }
 }

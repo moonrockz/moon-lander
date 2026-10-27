@@ -13,18 +13,19 @@ fn drive(
       Need(needs) =>
         for need in needs {
           let path = request_path(need)
-          requests.push(path)
-          guard contains(mount.root, path) else {
-            raise OutsideMount(operation="load", path~)
+          let text = path.to_string()
+          requests.push(text)
+          guard contains(mount.root, text) else {
+            raise OutsideMount(operation="load", path=text)
           }
           match need {
             ListDir(_) =>
-              tree = match mount.listings.get(path) {
+              tree = match mount.listings.get(text) {
                 Some(entries) => tree.with_listing(path, entries)
                 None => tree.with_missing(path)
               }
             ReadFile(_) =>
-              tree = match texts.get(path) {
+              tree = match texts.get(text) {
                 Some(text) => tree.with_file(path, text)
                 None => tree.with_missing(path)
               }

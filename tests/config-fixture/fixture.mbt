@@ -59,7 +59,7 @@ pub fn files() -> Array[(String, String)] {
 pub fn load() -> @config.Config raise @config.ConfigError {
   let mut tree = @config.FileTree::new(complete=true)
   for file in files() {
-    tree = tree.with_file(file.0, file.1)
+    tree = tree.with_file(@config.FileTreePath::parse(file.0), file.1)
   }
   match @config.load(builder(), tree) {
     Done(config) => config

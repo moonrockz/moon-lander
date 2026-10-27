@@ -31,7 +31,10 @@ fn select_format(
   formats : Array[Format],
   path : String,
 ) -> Format raise ConfigError {
-  let (_, name) = split_path(path)
+  let name = match path.rev_find("/") {
+    Some(index) => path[index + 1:].to_owned()
+    None => path
+  }
   if name.rev_find(".") is Some(index) && index > 0 {
     let extension = name[index + 1:].to_owned().to_lower()
     for format in formats {

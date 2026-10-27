@@ -29,8 +29,16 @@ Windows locks, has the kind `Inaccessible` and does not stop the listing. The lo
 reads such an entry only when it is a candidate, and that read raises the error.
 An entry that disappears before the adapter inspects it, or a link that points
 nowhere, is not in the listing.
-On Windows paths use `/` in the file tree, reports, origins, and errors. The
-adapter converts to native separators only for file calls.
+Paths use `/` in the file tree, reports, origins, and errors on every platform.
+The adapter gives the process working directory in its native form. The pure
+load parses it, and each explicit file and candidate, one time with
+`FileTreePath::from_native` for the platform of the run. So on Windows
+`C:\cfg\app.toml` and `C:/cfg/app.toml` select the same file, a UNC path keeps
+its `//server/share` root, and a drive-relative path such as `C:app.toml` is a
+configuration error before any file call. A file call uses
+`FileTreePath::to_native`, which converts `/` to `\` only on Windows. A listed
+entry keeps the name that the system gives; only a candidate name has to form a
+file-tree path.
 
 This example reads the module manifest from the process working directory with
 a format that accepts its text. It runs as a doc test on native and js.

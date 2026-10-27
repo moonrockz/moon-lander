@@ -21,7 +21,7 @@ pub suberror FileTreeError {
 pub fn FileTreeError::message(self : FileTreeError) -> String {
   let IncompleteFileTree(requests~) = self
   let paths = requests.map(request => match request {
-    ListDir(path) | ReadFile(path) => path
+    ListDir(path) | ReadFile(path) => path.to_string()
   })
   "Incomplete configuration file tree; requested paths: " + paths.join(", ")
 }

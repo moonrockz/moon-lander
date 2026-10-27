@@ -267,13 +267,17 @@ fn Scan::expand(
 
 ///|
 /// The directories in `dir` whose names do not start with `.`, or `None` when
-/// the tree does not hold the listing yet.
+/// the tree does not hold the listing yet. An `Inaccessible` entry can be a
+/// directory, so it is in the result: a pattern that selects it asks for its
+/// listing, and the host reports the error.
 fn Scan::children(self : Scan, dir : String) -> Array[String]? {
   match self.context.tree.listing(dir) {
     Found(entries) =>
       Some(
         entries
-        .filter(entry => entry.kind is Directory && !entry.name.has_prefix("."))
+        .filter(entry => {
+          entry.kind is (Directory | Inaccessible) && !entry.name.has_prefix(".")
+        })
         .map(entry => join(dir, entry.name)),
       )
     Missing => Some([])
@@ -363,7 +367,7 @@ fn Scan::root_value(
         Found(true) => existing.push(candidate)
         Found(false) | Missing => ()
         Unknown => {
-          add_need(self.needs, ListDir(parent_of(candidate)))
+          add_need(self.needs, self.context.tree.file_request(candidate))
           known = false
         }
       }

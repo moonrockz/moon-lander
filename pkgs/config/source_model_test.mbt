@@ -632,3 +632,44 @@ test "a candidate named twice is one candidate" {
     ["/w/app.toml"],
   ))
 }
+
+///|
+test "an inaccessible entry is a file only when the host answers for it" {
+  let listed = @config.FileTree::new().with_listing("/w", [
+    { name: "app.toml", kind: Inaccessible },
+  ])
+  @expect.expect(listed.is_file("/w/app.toml")).to_equal(Unknown)
+  @expect.expect(listed.file_request("/w/app.toml")).to_equal(
+    ReadFile("/w/app.toml"),
+  )
+  @expect.expect(listed.with_file("/w/app.toml", "a = 1").is_file("/w/app.toml")).to_equal(
+    Found(true),
+  )
+  @expect.expect(listed.with_missing("/w/app.toml").is_file("/w/app.toml")).to_equal(
+    Found(false),
+  )
+  // A complete tree has no host to ask, so the read reports file-not-found.
+  let complete = complete().with_listing("/w", [
+    { name: "app.toml", kind: Inaccessible },
+  ])
+  @expect.expect(complete.is_file("/w/app.toml")).to_equal(Found(true))
+  // Without the listing, the request is the listing.
+  @expect.expect(@config.FileTree::new().file_request("/w/app.toml")).to_equal(
+    ListDir("/w"),
+  )
+}
+
+///|
+test "Inaccessible candidate file" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.add(
+      @config.ConfigSource::candidates(["/w/app.toml"], display="App"),
+    )
+  let tree = @config.FileTree::new().with_listing("/w", [
+    { name: "app.toml", kind: Inaccessible },
+  ])
+  @expect.expect(@config.load(builder, tree) is Need([ReadFile("/w/app.toml")])).to_equal(
+    true,
+  )
+}

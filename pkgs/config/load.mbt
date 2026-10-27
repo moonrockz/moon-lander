@@ -239,7 +239,7 @@ fn resolve(
           Found(true) => existing.push(candidate)
           Found(false) | Missing => ()
           Unknown => {
-            add_needs(needs, [ListDir(split_path(candidate).0)])
+            add_needs(needs, [context.tree.file_request(candidate)])
             unknown = true
           }
         }

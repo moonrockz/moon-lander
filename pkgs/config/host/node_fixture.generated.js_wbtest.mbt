@@ -51,8 +51,10 @@ extern "js" fn node_fixture() -> NodeFixture =
   #|  var exports_fixture = {};
   #|  __export(exports_fixture, {
   #|    chmod: () => chmod,
+  #|    faultyStat: () => faultyStat,
   #|    mkdir: () => mkdir,
   #|    removeDir: () => removeDir,
+  #|    symlink: () => symlink,
   #|    tempDir: () => tempDir,
   #|    write: () => write
   #|  });
@@ -76,6 +78,28 @@ extern "js" fn node_fixture() -> NodeFixture =
   #|  }
   #|  function chmod(path, permission) {
   #|    import_node_fs.chmodSync(path, permission);
+  #|  }
+  #|  function symlink(target, path) {
+  #|    import_node_fs.symlinkSync(target, path);
+  #|  }
+  #|  function faultyStat(locked, vanished, broken) {
+  #|    return (path) => {
+  #|      const slashed = process.platform === "win32" ? path.replaceAll("\\", "/") : path;
+  #|      if (locked.includes(slashed)) {
+  #|        const error = new Error(`EBUSY: resource busy or locked, stat '${path}'`);
+  #|        error.code = "EBUSY";
+  #|        error.errno = -4082;
+  #|        error.syscall = "stat";
+  #|        error.path = path;
+  #|        throw error;
+  #|      }
+  #|      if (broken.includes(slashed)) {
+  #|        const error = new TypeError(`injected fault for ${path}`);
+  #|        error.code = "ERR_INVALID_ARG_TYPE";
+  #|        throw error;
+  #|      }
+  #|      return import_node_fs.statSync(vanished.includes(slashed) ? `${path}.vanished` : path);
+  #|    };
   #|  }
   #|  return module.exports;
   #|}

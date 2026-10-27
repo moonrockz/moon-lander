@@ -257,6 +257,7 @@ pub(all) enum EntryKind {
   File
   Directory
   Other
+  Inaccessible
 } derive(Eq, @debug.Debug)
 pub fn EntryKind::equal(Self, Self) -> Bool
 pub fn EntryKind::not_equal(Self, Self) -> Bool
@@ -302,6 +303,7 @@ pub struct FileTree {
   // private fields
 }
 pub fn FileTree::file(Self, String) -> Lookup[String]
+pub fn FileTree::file_request(Self, String) -> FileRequest
 pub fn FileTree::is_complete(Self) -> Bool
 pub fn FileTree::is_file(Self, String) -> Lookup[Bool]
 pub fn FileTree::listing(Self, String) -> Lookup[Array[DirEntry]]

@@ -4,6 +4,9 @@ pub(all) enum EntryKind {
   File
   Directory
   Other
+  /// The host lists the entry but cannot inspect its kind, for example a file
+  /// that another process locks, a link loop, or a missing permission.
+  Inaccessible
 } derive(Eq, Debug)
 
 ///|
@@ -152,13 +155,45 @@ pub fn FileTree::listing(
 /// Whether `path` exists as a file: the listing of its directory holds its
 /// exact name as a file. The compare is case-sensitive on every platform. A
 /// missing directory gives `Found(false)`.
+///
+/// An `Inaccessible` entry with the exact name is a file when the tree holds
+/// its text. When the tree does not hold its text, the answer is `Unknown`, and
+/// `file_request` asks the host for the file, so the host reports its error. In
+/// a complete tree the entry is a file, so a read of it raises file-not-found
+/// and the entry never disappears without a report.
 pub fn FileTree::is_file(self : FileTree, path : String) -> Lookup[Bool] {
   let (dir, name) = split_path(path)
   match self.listing(dir) {
-    Found(entries) =>
-      Found(entries.iter().any(entry => entry.name == name && entry.kind == File))
+    Found(entries) => {
+      guard entries.iter().find_first(entry => entry.name == name)
+        is Some(entry) else {
+        return Found(false)
+      }
+      match entry.kind {
+        File => Found(true)
+        Inaccessible =>
+          match self.file(path) {
+            Found(_) => Found(true)
+            Missing => Found(self.complete)
+            Unknown => Unknown
+          }
+        Directory | Other => Found(false)
+      }
+    }
     Missing => Found(false)
     Unknown => Unknown
+  }
+}
+
+///|
+/// The request that answers `is_file(path)` when it gives `Unknown`: the
+/// listing of the directory of `path`, or the file itself when the tree holds
+/// that listing and the entry is `Inaccessible`.
+pub fn FileTree::file_request(self : FileTree, path : String) -> FileRequest {
+  let (dir, _) = split_path(path)
+  match self.listing(dir) {
+    Found(_) => ReadFile(path)
+    Missing | Unknown => ListDir(dir)
   }
 }
 
@@ -177,11 +212,17 @@ fn FileTree::is_absent(self : FileTree, path : String) -> Bool {
 
 ///|
 /// The directory and the name of `path`. A path with no `/` has the directory
-/// `.`, and a name directly below the root has the directory `/`.
+/// `.`, and a name directly below the root has the directory `/`. A name
+/// directly below a drive has the drive root as its directory, such as `C:/`
+/// for `C:/app.toml`, because `C:` alone is the current directory of the drive.
 fn split_path(path : String) -> (String, String) {
   match path.rev_find("/") {
     Some(0) => ("/", path[1:].to_owned())
-    Some(index) => (path[:index].to_owned(), path[index + 1:].to_owned())
+    Some(index) => {
+      let dir = path[:index].to_owned()
+      let dir = if dir.length() == 2 && dir[1:2] == ":" { dir + "/" } else { dir }
+      (dir, path[index + 1:].to_owned())
+    }
     None => (".", path)
   }
 }

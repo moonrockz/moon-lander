@@ -24,6 +24,11 @@ edit to `pkgs/config/adapters/node/`, run `mise run build:node-adapter`. Both
 A missing file or directory becomes an absence record. Other I/O errors are
 raised, so an inaccessible file does not silently disappear from discovery.
 Listings include hidden entries and follow symbolic links to classify entries.
+A listed entry that the adapter cannot inspect, such as `D:/pagefile.sys` that
+Windows locks, has the kind `Inaccessible` and does not stop the listing. The load
+reads such an entry only when it is a candidate, and that read raises the error.
+An entry that disappears before the adapter inspects it, or a link that points
+nowhere, is not in the listing.
 On Windows paths use `/` in the file tree, reports, origins, and errors. The
 adapter converts to native separators only for file calls.
 

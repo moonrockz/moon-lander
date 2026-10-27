@@ -239,11 +239,14 @@ fn resolve(
           Found(true) => existing.push(candidate)
           Found(false) | Missing => ()
           Unknown => {
-            add_needs(needs, [ListDir(split_path(candidate).0)])
+            add_needs(needs, [context.tree.file_request(candidate)])
             unknown = true
           }
         }
       }
+      // The host answers for each candidate first, so the error of an
+      // inaccessible candidate passes out even when two others exist.
+      guard !unknown else { return None }
       if existing.length() > 1 {
         raise Ambiguous(
           display~,
@@ -251,7 +254,6 @@ fn resolve(
           candidates=existing,
         )
       }
-      guard !unknown else { return None }
       guard existing is [path] else {
         return Some({ pieces: [], path: None, candidates, status: NotFound })
       }
@@ -365,8 +367,13 @@ fn common_dir(paths : Array[String]) -> String {
   guard paths is [first, .. rest] else { return "." }
   let mut dir = split_path(first).0
   for path in rest {
-    while dir != "/" && dir != "." && !path.has_prefix(dir + "/") {
-      dir = split_path(dir).0
+    while !path.has_prefix(if dir.has_suffix("/") { dir } else { dir + "/" }) {
+      let parent = split_path(dir).0
+      // A root, such as `/` or `C:/`, and `.` have no parent.
+      if parent == dir || dir == "." {
+        break
+      }
+      dir = parent
     }
   }
   dir

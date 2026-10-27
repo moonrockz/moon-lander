@@ -40,16 +40,31 @@ extern "js" fn NodeReply::kinds(self : NodeReply) -> FixedArray[String] =
   #|reply => reply.kinds
 
 ///|
+/// Add the answer to one request to the tree.
 fn answer(
   tree : @config.FileTree,
   request : @config.FileRequest,
   platform : @config.Platform,
 ) -> @config.FileTree raise {
+  answer_with(tree, request, platform, (path, listing) => {
+    node_files.answer(path, listing)
+  })
+}
+
+///|
+/// Add the answer to one request to the tree, with `reply` for the adapter
+/// call. Tests give a `reply` whose inspection fails as a locked file does.
+fn answer_with(
+  tree : @config.FileTree,
+  request : @config.FileRequest,
+  platform : @config.Platform,
+  reply : (String, Bool) -> NodeReply,
+) -> @config.FileTree raise {
   let (path, listing) = match request {
     ReadFile(path) => (path, false)
     ListDir(path) => (path, true)
   }
-  let reply = node_files.answer(from_slash(path, platform), listing)
+  let reply = reply(from_slash(path, platform), listing)
   match reply.kind() {
     "missing" => tree.with_missing(path)
     "file" => tree.with_file(path, reply.text())
@@ -61,6 +76,7 @@ fn answer(
         let kind : @config.EntryKind = match kinds[i] {
           "file" => File
           "directory" => Directory
+          "inaccessible" => Inaccessible
           _ => Other
         }
         entries.push({ name, kind })

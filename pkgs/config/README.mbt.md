@@ -153,7 +153,7 @@ asks.
 | --- | --- |
 | `FileTree::new(complete?)` | An empty tree |
 | `with_file(path, text)` | Holds the text of a file |
-| `with_listing(dir, entries)` | Holds a directory listing with the real names |
+| `with_listing(dir, entries)` | Holds a directory listing with the real names; an `Inaccessible` entry can be a file or a directory, so the load asks for it when it is a candidate |
 | `with_missing(path)` | Records a path as absent; a directory makes every path under it absent |
 
 A host runs this loop. Native and js hosts read the disk; a wasm host gives a

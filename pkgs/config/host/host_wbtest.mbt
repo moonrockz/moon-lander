@@ -275,3 +275,28 @@ async test "discovery reads the global file and the overrides on the disk" {
     ("user-override", Loaded),
   ])
 }
+
+///|
+async test "discovery passes over an entry it cannot inspect" {
+  // Windows needs a privilege for a symbolic link. The injected tests in
+  // inspect_wbtest.mbt give the same failure on every platform.
+  if running_platform() is Windows {
+    return
+  }
+  let dir = temp_dir()
+  defer remove_dir(dir)
+  write("\{dir}/acme.toml", "project.name = \"found\"")
+  write("\{dir}/src/main.mbt", "")
+  // A link to itself: the listing holds it, and a stat of it fails (ELOOP).
+  symlink(target="loop", "\{dir}/loop")
+  symlink(target="loop", "\{dir}/src/loop")
+  let config = @config.builder()
+    |> @config.working_dir("\{dir}/src")
+    |> @config.env_vars({})
+    |> @config.format(@toml.format())
+    |> @conventions.add(
+      @conventions.app_dirs("acme") |> @conventions.without(SystemDir),
+    )
+    |> load
+  @expect.expect(@config.get_text(config, "project.name")).to_equal("found")
+}

@@ -50,7 +50,8 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|  // pkgs/config/adapters/node/index.ts
   #|  var exports_node = {};
   #|  __export(exports_node, {
-  #|    answer: () => answer
+  #|    answer: () => answer,
+  #|    answerWith: () => answerWith
   #|  });
   #|  module.exports = __toCommonJS(exports_node);
   #|  var import_node_fs = require("node:fs");
@@ -59,9 +60,9 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|    const code = error.code;
   #|    return code === "ENOENT" || code === "ENOTDIR";
   #|  }
-  #|  function kind(path) {
+  #|  function kind(path, inspect) {
   #|    try {
-  #|      const stat = import_node_fs.statSync(path);
+  #|      const stat = inspect(path);
   #|      return stat.isFile() ? "file" : stat.isDirectory() ? "directory" : "other";
   #|    } catch (error) {
   #|      if (absent(error))
@@ -69,15 +70,37 @@ extern "js" fn node_adapter() -> NodeAdapter =
   #|      throw error;
   #|    }
   #|  }
-  #|  function answer(path, listing) {
+  #|  function entryKind(path, inspect) {
   #|    try {
-  #|      if (kind(path) !== (listing ? "directory" : "file")) {
+  #|      return kind(path, inspect);
+  #|    } catch (error) {
+  #|      const { errno, syscall } = error;
+  #|      if (typeof errno === "number" && typeof syscall === "string")
+  #|        return "inaccessible";
+  #|      throw error;
+  #|    }
+  #|  }
+  #|  var stat = (path) => import_node_fs.statSync(path);
+  #|  function answer(path, listing) {
+  #|    return answerWith(path, listing, stat);
+  #|  }
+  #|  function answerWith(path, listing, inspect) {
+  #|    try {
+  #|      if (kind(path, inspect) !== (listing ? "directory" : "file")) {
   #|        return { kind: "missing" };
   #|      }
   #|      if (!listing)
   #|        return { kind: "file", text: import_node_fs.readFileSync(path, "utf8") };
-  #|      const names = import_node_fs.readdirSync(path).sort();
-  #|      return { kind: "directory", names, kinds: names.map((name) => kind(import_node_path.join(path, name))) };
+  #|      const names = [];
+  #|      const kinds = [];
+  #|      for (const name of import_node_fs.readdirSync(path).sort()) {
+  #|        const entry = entryKind(import_node_path.join(path, name), inspect);
+  #|        if (entry === "missing")
+  #|          continue;
+  #|        names.push(name);
+  #|        kinds.push(entry);
+  #|      }
+  #|      return { kind: "directory", names, kinds };
   #|    } catch (error) {
   #|      if (absent(error))
   #|        return { kind: "missing" };

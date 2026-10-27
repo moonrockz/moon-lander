@@ -29,6 +29,7 @@ options(targets: {
   "host.mbt": ["native", "js"],
   "host_wbtest.mbt": ["native", "js"],
   "conventions_wbtest.mbt": ["native", "js"],
+  "inspect_wbtest.mbt": ["native", "js"],
   "fixture.native_wbtest.mbt": ["native"],
   "fixture.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],

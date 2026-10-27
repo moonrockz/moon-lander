@@ -287,7 +287,8 @@ fn Scan::walk_up(self : Scan, start : String, stop : String?) -> Walk? {
 
 ///|
 /// What `dir` holds: the primary candidates of the three layouts, else the
-/// legacy file. Asks for each listing that the tree does not hold.
+/// legacy file. Asks for each listing that the tree does not hold, and for
+/// each candidate that the listing holds as `Inaccessible`.
 fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
   let tree = self.context.tree
   let existing = []
@@ -297,15 +298,17 @@ fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
       Found(true) => existing.push(candidate)
       Found(false) | Missing => ()
       Unknown => {
-        add_need(self.needs, ListDir(parent_of(candidate)))
+        add_need(self.needs, tree.file_request(candidate))
         known = false
       }
     }
   }
+  // The host answers for each candidate first, so the error of an
+  // inaccessible candidate passes out even when two others exist.
+  guard known else { return NotKnown }
   if existing.length() > 1 {
     return Several
   }
-  guard known else { return NotKnown }
   if existing is [path] {
     return OneFile(path)
   }
@@ -315,7 +318,7 @@ fn Scan::config_at(self : Scan, dir : String) -> DirConfig {
     Found(true) => LegacyAt(path)
     Found(false) | Missing => NoFile
     Unknown => {
-      add_need(self.needs, ListDir(dir))
+      add_need(self.needs, tree.file_request(path))
       NotKnown
     }
   }

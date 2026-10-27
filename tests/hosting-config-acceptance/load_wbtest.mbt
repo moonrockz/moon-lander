@@ -19,13 +19,13 @@ fn[S] configured_host(argv : Array[String], directory? : String = "workspace") -
 
 ///|
 async test "project selector chooses a path before a conflicting project name through disk load" {
-  // An unbounded search reaches the drive root and locked files on Windows CI.
-  // Keep this fixture bounded; lander-4us.45 tracks the discovery fix.
-  let root = fixture("workspace").to_string()
+  // No boundary: the enclosing-workspace search walks up to the drive root,
+  // which holds locked files such as `D:/pagefile.sys` on Windows CI. The test
+  // expects no `acme` file in a directory above the checkout.
   for (selector, selected) in [("packages/a", "a"), ("packages/a/", "a"), ("packages/c", "c")] {
     let calls = Ref(0)
     let result = configured_host(["--project", selector])
-      |> @hosting.conventions(c => c |> @conventions.workspace() |> @conventions.boundary(root))
+      |> @hosting.conventions(c => c |> @conventions.workspace())
       |> @hosting.build(b => { calls.val += 1; @config.get_text(b.config, "selected") })
       |> @hosting.run(ctx => assert_eq(ctx.services, selected))
     assert_eq(result.exit_code().to_int(), 0,
@@ -35,11 +35,27 @@ async test "project selector chooses a path before a conflicting project name th
 }
 
 ///|
+async test "unbounded workspace search from a folder with no workspace above it reaches the root" {
+  // No directory above `alternate` holds an `acme` file, so the search walks up
+  // to the drive root. On Windows CI that root holds `D:/pagefile.sys`, which a
+  // stat cannot inspect.
+  let factory = Ref(0)
+  let command = Ref(0)
+  let result = configured_host([], directory="alternate")
+    |> @hosting.conventions(c => c |> @conventions.workspace())
+    |> @hosting.build(b => { factory.val += 1; @config.get_text(b.config, "from_directory") })
+    |> @hosting.run(ctx => { command.val += 1; assert_eq(ctx.services, "alternate") })
+  assert_eq(result.exit_code().to_int(), 0,
+    msg=result.failures().map(error => @debug.to_string(error)).join("\n"))
+  assert_eq(factory.val, 1)
+  assert_eq(command.val, 1)
+}
+
+///|
 async test "ambiguous project name gives config code 2 before factory and hooks" {
-  let root = fixture("workspace").to_string()
   let calls = Ref(0)
   let result = configured_host(["--project", "duplicate"])
-    |> @hosting.conventions(c => c |> @conventions.workspace() |> @conventions.boundary(root))
+    |> @hosting.conventions(c => c |> @conventions.workspace())
     |> @hosting.service("must-not-start", start=_ => calls.val += 1)
     |> @hosting.build(_ => calls.val += 1)
     |> @hosting.run(_ => calls.val += 1)

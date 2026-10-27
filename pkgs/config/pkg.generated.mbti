@@ -173,6 +173,7 @@ pub struct ConfigBuilder {
 }
 pub fn ConfigBuilder::formats(Self) -> Array[Format]
 pub fn ConfigBuilder::given_env_vars(Self) -> Map[String, String]?
+pub fn ConfigBuilder::given_file_paths(Self) -> Array[String]
 pub fn ConfigBuilder::given_platform(Self) -> Platform?
 pub fn ConfigBuilder::given_working_dir(Self) -> String?
 

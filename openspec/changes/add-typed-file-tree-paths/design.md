@@ -112,6 +112,15 @@ and is not a valid path counts as not set and gives a `Note` warning.
 `FileTreePath::from_absolute` converts a `@lander_core.AbsolutePath` with the path
 rules, because `AbsolutePath` allows `\` in a POSIX path.
 
+### D7. Browser checks source text before the parse (Call)
+
+`parse` leaves out `.` and empty names, and `from_native` converts `\\` on
+Windows, so a request path does not keep the spelling that the browser rules
+reject. `ConfigBuilder::given_file_paths` gives the source texts as the caller gave
+them, and the browser adapter checks each with its rules before the load. A
+relative path whose first name looks like a drive, such as `./C:/cfg`, keeps the
+`./` prefix in its text form, so rendering never changes its root.
+
 ## Risks / Trade-offs
 
 - A typed request can compile while changing lookup identity. Compare values,

@@ -122,3 +122,25 @@ test "a narrower caller boundary stops discovery below the mount root" {
     _ => fail("expected no discovered value")
   }
 }
+
+///|
+test "browser rules check the source spelling before the load parses it" {
+  for text in [
+    "/workspace/./acme.toml", "/workspace//acme.toml", "/workspace\\acme.toml",
+    "/workspace/../acme.toml", "./acme.toml", "C:/acme.toml", "conf//app.toml",
+  ] {
+    let builder = @config.builder()
+      |> @config.platform(Windows)
+      |> @config.file(text)
+    try check_source_paths(builder) catch {
+      InvalidPath(operation~, ..) => assert_eq(operation, "load")
+      _ => fail("expected an invalid-path error for \{text}")
+    } noraise {
+      _ => fail("the browser rules accepted \{text}")
+    }
+  }
+  let valid = @config.builder()
+    |> @config.file("/workspace/acme.toml")
+    |> @config.file("conf/app.toml")
+  check_source_paths(valid)
+}

@@ -346,3 +346,46 @@ test "a host absolute path converts with the path rules" {
     _ => fail("expected an invalid-path error")
   }
 }
+
+///|
+test "a native UNC source keeps its share root through the load" {
+  let builder = @config.builder()
+    |> @config.working_dir("C:/proj")
+    |> @config.platform(Windows)
+    |> @config.format(@toml.format())
+    |> @config.file("\\\\server\\share\\acme.toml")
+  let file = p("//server/share/acme.toml")
+  @expect.expect(needs(@config.load(builder, @config.FileTree::new()))).to_equal([
+    ReadFile(file),
+  ])
+  @expect.expect(file.root().to_string()).to_equal("//server/share")
+}
+
+///|
+test "a relative path whose first name looks like a drive keeps its root" {
+  let relative = p("./C:/cfg/app.toml")
+  @expect.expect(relative.is_absolute()).to_equal(false)
+  @expect.expect(relative.to_string()).to_equal("./C:/cfg/app.toml")
+  @expect.expect(p(relative.to_string())).to_equal(relative)
+  @expect.expect(relative == p("C:/cfg/app.toml")).to_equal(false)
+  @expect.expect(relative.compare(p("C:/cfg/app.toml")) == 0).to_equal(false)
+  @expect.expect(relative.to_native(Windows)).to_equal(".\\C:\\cfg\\app.toml")
+  let child = p(".").child("C:app.toml")
+  @expect.expect(child.to_string()).to_equal("./C:app.toml")
+  @expect.expect(p(child.to_string())).to_equal(child)
+  // A later name that looks like a drive needs no prefix.
+  @expect.expect(p("a/C:b").to_string()).to_equal("a/C:b")
+}
+
+///|
+test "the builder gives the source path texts as the caller gave them" {
+  let builder = @config.builder()
+    |> @config.file("/workspace/./acme.toml")
+    |> @config.add(
+      @config.ConfigSource::candidates(["a.toml", "b\\c.toml"], display="App"),
+    )
+    |> @config.env(prefix="APP")
+  @expect.expect(builder.given_file_paths()).to_equal([
+    "/workspace/./acme.toml", "a.toml", "b\\c.toml",
+  ])
+}

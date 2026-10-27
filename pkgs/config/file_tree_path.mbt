@@ -278,8 +278,12 @@ pub impl Show for FileTreePath with output(self, logger) {
       }
     }
     Current =>
-      if self.names.is_empty() {
-        logger.write_string(".")
+      // `./` stays before a first name that looks like a drive, such as
+      // `C:` or `C:x`, so the text form parses to the same relative path.
+      match self.names {
+        [] => logger.write_string(".")
+        [first, ..] if looks_like_drive(first) => logger.write_string("./")
+        _ => ()
       }
   }
   logger.write_string(self.names.join("/"))
@@ -305,3 +309,10 @@ pub impl Compare for FileTreePath with compare(self, other) {
 
 ///|
 pub extend FileTreePath with Compare::{compare, op_lt, op_le, op_gt, op_ge}
+
+///|
+/// Whether `name` starts with an ASCII letter and `:`, as a drive does.
+fn looks_like_drive(name : String) -> Bool {
+  let chars = Array::from_iter(name.iter().take(2))
+  chars is [letter, ':'] && letter.is_ascii_alphabetic()
+}

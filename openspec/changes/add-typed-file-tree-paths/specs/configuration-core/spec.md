@@ -124,3 +124,8 @@ turn drive-relative input into an absolute drive root.
 
 - **WHEN** a browser mount input contains a backslash, drive prefix, dot segment, parent segment, or empty interior segment
 - **THEN** construction still fails before a backend call and does not use Windows native-path conversion
+
+#### Scenario: Browser checks the source spelling before parsing
+
+- **WHEN** a browser load gets the file source `/workspace/./acme.toml`, `/workspace//acme.toml` or `/workspace\acme.toml`, also with the platform Windows
+- **THEN** the load fails with the browser invalid-path error before a backend call, although the parsed file-tree path would leave out the dot and empty names and convert the backslash

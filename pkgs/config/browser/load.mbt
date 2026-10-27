@@ -57,6 +57,18 @@ fn select(mounts : Array[Mount], path : String) -> Mount raise BrowserError {
 }
 
 ///|
+/// Check the path text of each file source with the browser rules before the
+/// load parses it. The file-tree path leaves out `.` and empty names, and on
+/// Windows it converts `\`, so a request no longer shows the spelling that
+/// these rules reject. An absolute text must also be a valid mount path; a
+/// relative text joins the working directory.
+fn check_source_paths(builder : @config.ConfigBuilder) -> Unit raise BrowserError {
+  for text in builder.given_file_paths() {
+    validate_path(text, absolute=text.has_prefix("/"), operation="load")
+  }
+}
+
+///|
 fn request_path(request : @config.FileRequest) -> @config.FileTreePath {
   match request { ReadFile(path) | ListDir(path) => path }
 }
@@ -111,6 +123,7 @@ pub async fn load(
   check_abort(state.signal, "")
   let cwd = builder.given_working_dir().unwrap_or(mounts[0].root)
   ignore(select(mounts, cwd))
+  check_source_paths(builder)
   let mut builder = builder |> @config.working_dir(cwd)
   if builder.given_env_vars() is None { builder = builder |> @config.env_vars(Map([])) }
   while true {

@@ -82,6 +82,24 @@ pub fn ConfigBuilder::given_working_dir(self : ConfigBuilder) -> String? {
 }
 
 ///|
+/// The path texts of the file, candidate and parsed-file sources that the
+/// builder holds, in add order, as the caller gave them. The load parses each
+/// text one time; an adapter with stricter path rules, such as the browser
+/// adapter, checks the texts here before the load. Providers are not included.
+pub fn ConfigBuilder::given_file_paths(self : ConfigBuilder) -> Array[String] {
+  let paths = []
+  for entry in self.entries {
+    guard entry is Source(source) else { continue }
+    match source.input {
+      Path(text) | Parsed(text, _) => paths.push(text)
+      Candidates(texts, _) => paths.append(texts)
+      _ => ()
+    }
+  }
+  paths
+}
+
+///|
 /// The platform that the builder holds, or `None` when nobody gave one.
 pub fn ConfigBuilder::given_platform(self : ConfigBuilder) -> Platform? {
   self.platform

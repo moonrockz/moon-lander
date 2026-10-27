@@ -22,6 +22,9 @@ acceptance tests set a boundary to hide it.
   reads that path before it counts the candidates, and the host reports the real error. So an inaccessible candidate is
   still an error, and discovery never drops a configuration file without a report.
 - An inaccessible entry that is not a candidate has no effect on the load.
+- The file tree gives the drive root `C:/`, not `C:`, as the directory of `C:/app.toml`.
+  `C:` alone is the current directory of the drive, and Bun on Windows answers it as
+  missing, which made every path on the drive missing.
 - The acceptance tests of the workspace selectors no longer need a boundary.
 
 ## Capabilities

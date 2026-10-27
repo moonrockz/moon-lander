@@ -212,11 +212,17 @@ fn FileTree::is_absent(self : FileTree, path : String) -> Bool {
 
 ///|
 /// The directory and the name of `path`. A path with no `/` has the directory
-/// `.`, and a name directly below the root has the directory `/`.
+/// `.`, and a name directly below the root has the directory `/`. A name
+/// directly below a drive has the drive root as its directory, such as `C:/`
+/// for `C:/app.toml`, because `C:` alone is the current directory of the drive.
 fn split_path(path : String) -> (String, String) {
   match path.rev_find("/") {
     Some(0) => ("/", path[1:].to_owned())
-    Some(index) => (path[:index].to_owned(), path[index + 1:].to_owned())
+    Some(index) => {
+      let dir = path[:index].to_owned()
+      let dir = if dir.length() == 2 && dir[1:2] == ":" { dir + "/" } else { dir }
+      (dir, path[index + 1:].to_owned())
+    }
     None => (".", path)
   }
 }

@@ -183,3 +183,76 @@ test "Inaccessible member directory is not dropped" {
     true,
   )
 }
+
+///|
+/// Load until done, as a host on Windows does: answer each request from
+/// `listings` and `files`, and record a path that neither holds as absent.
+/// Every request goes to `asked`.
+fn load_on_drive(
+  builder : @config.ConfigBuilder,
+  listings : Map[String, Array[@config.DirEntry]],
+  files : Map[String, String],
+  asked : Array[@config.FileRequest],
+) -> @config.Config raise {
+  let mut tree = @config.FileTree::new()
+  for _ in 0..<100 {
+    match @config.load(builder, tree) {
+      Done(config) => return config
+      Need(requests) =>
+        for request in requests {
+          asked.push(request)
+          tree = match request {
+            ListDir(dir) =>
+              match listings.get(dir) {
+                Some(entries) => tree.with_listing(dir, entries)
+                None => tree.with_missing(dir)
+              }
+            ReadFile(path) =>
+              match files.get(path) {
+                Some(text) => tree.with_file(path, text)
+                None => tree.with_missing(path)
+              }
+          }
+        }
+    }
+  }
+  fail("the load did not end")
+}
+
+///|
+test "the search asks for the drive root, not the current directory of the drive" {
+  // `D:` alone is the current directory of drive D. A host can answer it as
+  // missing, and a missing `D:` would make every path on the drive missing.
+  let listings : Map[String, Array[@config.DirEntry]] = {
+    "D:/": [{ name: "a", kind: Directory }, locked("pagefile.sys")],
+    "D:/a": [{ name: "proj", kind: Directory }],
+    "D:/a/proj": [{ name: "acme.toml", kind: File }],
+  }
+  let asked = []
+  let config = load_on_drive(
+    unbounded("D:/a/proj"),
+    listings,
+    { "D:/a/proj/acme.toml": "project.name = \"proj\"" },
+    asked,
+  )
+  @expect.expect(@config.get_text(config, "project.name")).to_equal("proj")
+  @expect.expect(asked.contains(ListDir("D:/"))).to_equal(true)
+  @expect.expect(asked.contains(ListDir("D:"))).to_equal(false)
+}
+
+///|
+test "a candidate at the drive root is found" {
+  let listings : Map[String, Array[@config.DirEntry]] = {
+    "D:/": [{ name: "acme.toml", kind: File }, { name: "a", kind: Directory }],
+    "D:/a": [],
+  }
+  let asked = []
+  let config = load_on_drive(
+    unbounded("D:/a"),
+    listings,
+    { "D:/acme.toml": "project.name = \"root\"" },
+    asked,
+  )
+  @expect.expect(primary_path(config)).to_equal(Some("D:/acme.toml"))
+  @expect.expect(asked.contains(ListDir("D:"))).to_equal(false)
+}

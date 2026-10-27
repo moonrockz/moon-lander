@@ -12,7 +12,7 @@ report.
 #### Scenario: Unbounded search reaches a locked file at the drive root
 
 - **WHEN** the workspace part is on, no boundary is set, no directory above the start directory holds a workspace file, and the drive root holds an entry that the host cannot inspect
-- **THEN** discovery loads the project file of the start directory with no error
+- **THEN** discovery asks for the listing of the drive root `D:/`, never for `D:` (the current directory of the drive), and loads the project file of the start directory with no error
 
 #### Scenario: Inaccessible candidate is an error
 

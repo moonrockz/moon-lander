@@ -673,3 +673,35 @@ test "Inaccessible candidate file" {
     true,
   )
 }
+
+///|
+test "a file directly below a drive root is in the listing of the drive root" {
+  let tree = @config.FileTree::new().with_listing("C:/", [
+    { name: "app.toml", kind: File },
+  ])
+  @expect.expect(tree.is_file("C:/app.toml")).to_equal(Found(true))
+  @expect.expect(@config.FileTree::new().file_request("C:/app.toml")).to_equal(
+    ListDir("C:/"),
+  )
+}
+
+///|
+test "ambiguity at a drive root names the drive root" {
+  let builder = @config.builder()
+    |> @config.format(@toml.format())
+    |> @config.add(
+      @config.ConfigSource::candidates(
+        ["C:/app.toml", "C:/.config/app.toml"],
+        display="App",
+      ),
+    )
+  let tree = complete()
+    .with_listing("C:/", listing(["app.toml"]))
+    .with_listing("C:/.config", listing(["app.toml"]))
+  try @config.load(builder, tree) catch {
+    Ambiguous(location~, ..) => @expect.expect(location).to_equal("C:/")
+    _ => fail("expected an ambiguity error")
+  } noraise {
+    _ => fail("expected an ambiguity error")
+  }
+}

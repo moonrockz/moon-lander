@@ -365,8 +365,13 @@ fn common_dir(paths : Array[String]) -> String {
   guard paths is [first, .. rest] else { return "." }
   let mut dir = split_path(first).0
   for path in rest {
-    while dir != "/" && dir != "." && !path.has_prefix(dir + "/") {
-      dir = split_path(dir).0
+    while !path.has_prefix(if dir.has_suffix("/") { dir } else { dir + "/" }) {
+      let parent = split_path(dir).0
+      // A root, such as `/` or `C:/`, and `.` have no parent.
+      if parent == dir || dir == "." {
+        break
+      }
+      dir = parent
     }
   }
   dir

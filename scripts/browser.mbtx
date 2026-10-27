@@ -19,6 +19,81 @@ import {
 let cli : String = "tests/browser/node_modules/@playwright/test/cli.js"
 
 ///|
+/// A browser engine of the suite. Each engine is one Playwright project.
+priv enum Engine {
+  Chromium
+  Firefox
+  WebKit
+} derive(Eq, Debug)
+
+///|
+/// All engines, in the project order of `tests/browser/playwright.config.ts`.
+let all_engines : Array[Engine] = [Chromium, Firefox, WebKit]
+
+///|
+/// The Playwright project name of the engine.
+fn Engine::project(self : Engine) -> String {
+  match self {
+    Chromium => "chromium"
+    Firefox => "firefox"
+    WebKit => "webkit"
+  }
+}
+
+///|
+/// The options of `test`: `--verify-failures`, and `--engines` with a comma
+/// list of engines. Without `--engines`, all engines run.
+priv struct TestOptions {
+  verify_failures : Bool
+  engines : Array[Engine]
+} derive(Eq, Debug)
+
+///|
+/// Parse the options of `test`. Each option occurs at most one time. The engine
+/// list is not empty, and each engine in it is known and occurs one time.
+fn parse_test_options(flags : ArrayView[String]) -> TestOptions raise {
+  let mut verify_failures = false
+  let mut engines : Array[Engine]? = None
+  let mut rest = flags
+  while rest is [flag, .. tail] {
+    rest = tail
+    match flag {
+      "--verify-failures" => {
+        guard !verify_failures else {
+          fail("--verify-failures occurs more than one time")
+        }
+        verify_failures = true
+      }
+      "--engines" => {
+        guard engines is None else {
+          fail("--engines occurs more than one time")
+        }
+        guard rest is [list, .. after] else {
+          fail("--engines needs a comma list of engines")
+        }
+        rest = after
+        let selected = []
+        for name in list.split(",") {
+          guard all_engines.search_by(engine => {
+              engine.project() == name.to_owned()
+            })
+            is Some(index) else {
+            fail("Unknown engine \"\{name}\"; use chromium, firefox or webkit")
+          }
+          guard !selected.contains(all_engines[index]) else {
+            fail("Engine \{name} occurs more than one time")
+          }
+          selected.push(all_engines[index])
+        }
+        engines = Some(selected)
+      }
+      _ => fail("Unknown test option \{flag}")
+    }
+  }
+  { verify_failures, engines: engines.unwrap_or(all_engines), }
+}
+
+///|
 async fn run(command : String, args : Array[String]) -> Unit {
   let code = @process.run(
     command,
@@ -211,6 +286,7 @@ async fn answer(
 ///|
 async fn suite(
   extra_env : Map[String, String],
+  engines~ : Array[Engine],
   smoke_only~ : Bool = false,
 ) -> (Int32, String) {
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -226,6 +302,9 @@ async fn suite(
   let args = [cli, "test", "--config", "tests/browser/playwright.config.ts"]
   if smoke_only {
     args.push("feasibility.spec.ts")
+  }
+  for engine in engines {
+    args.push("--project=\{engine.project()}")
   }
   let result = @async.with_timeout(420_000, () => {
     @async.with_task_group() <| group => {
@@ -268,31 +347,40 @@ async fn suite(
 }
 
 ///|
-async fn verify_failures() -> Unit {
+async fn verify_failures(engines : Array[Engine]) -> Unit {
+  // The smoke suite has two tests for each engine. One fails on purpose with
+  // the assertion variable; both fail without engines.
+  let count = engines.length()
   let (assertion, assertion_log) = suite(
     { "LANDER_BROWSER_FAIL_ASSERTION": "1" },
+    engines~,
     smoke_only=true,
   )
   guard assertion == 1 &&
     assertion_log.contains("deliberate failure") &&
-    assertion_log.contains("3 failed") else {
-    fail("Expected assertion failures in all three engines: " + assertion_log)
+    assertion_log.contains("\n  \{count} failed") else {
+    fail(
+      "Expected assertion failures in all \{count} engines: " + assertion_log,
+    )
   }
   let dir = @fs.tmpdir(prefix="lander-no-browser")
   defer @fs.rmdir(dir, recursive=true)
   let (missing, missing_log) = suite(
     { "PLAYWRIGHT_BROWSERS_PATH": dir },
+    engines~,
     smoke_only=true,
   )
   guard missing == 1 &&
     missing_log.contains("Executable doesn't exist") &&
-    missing_log.contains("6 failed") else {
+    missing_log.contains("\n  \{count * 2} failed") else {
     fail(
-      "Expected missing-engine failures in all three projects: " + missing_log,
+      "Expected missing-engine failures in all \{count} projects: " +
+      missing_log,
     )
   }
+  let names = engines.map(engine => engine.project()).join(", ")
   println(
-    "Verified nonzero assertion and missing-engine exits in all three projects; listeners closed.",
+    "Verified nonzero assertion and missing-engine exits in \{names}; listeners closed.",
   )
 }
 
@@ -313,15 +401,13 @@ async fn main {
       println("Browser installation: \{@async.now() - started} ms")
     }
     ["test", .. flags] => {
-      guard flags.is_empty() || flags is ["--verify-failures"] else {
-        fail("Expected test [--verify-failures]")
-      }
+      let options = parse_test_options(flags)
       check_versions()
       @async.with_timeout(300_000, () => {
         run("moonx", ["scripts/build-browser-fixture.mbtx"])
       })
       let suite_start = @async.now()
-      let (code, output) = suite(Map([]))
+      let (code, output) = suite(Map([]), engines=options.engines)
       println(output)
       guard code == 0 else { fail("Browser suite failed with exit \{code}") }
       // A skipped, flaky or unrun baseline case is a failure, not a pass.
@@ -333,13 +419,57 @@ async fn main {
       println(
         "Browser suite: \{@async.now() - suite_start} ms; total: \{@async.now() - started} ms",
       )
-      if !flags.is_empty() {
-        verify_failures()
+      if options.verify_failures {
+        verify_failures(options.engines)
       }
     }
     _ =>
       fail(
-        "Usage: moonx scripts/toolchain.mbtx scripts/browser.mbtx install [--with-deps] | test [--verify-failures]",
+        "Usage: moonx scripts/toolchain.mbtx scripts/browser.mbtx install [--with-deps] | test [--verify-failures] [--engines chromium,firefox,webkit]",
       )
+  }
+}
+
+///|
+test "test options default to all engines without failure checks" {
+  assert_eq(parse_test_options([]), {
+    verify_failures: false,
+    engines: all_engines,
+  })
+  assert_eq(parse_test_options(["--verify-failures"]), {
+    verify_failures: true,
+    engines: all_engines,
+  })
+}
+
+///|
+test "test options select engines in the given order" {
+  assert_eq(
+    parse_test_options(["--verify-failures", "--engines", "chromium,firefox"]),
+    { verify_failures: true, engines: [Chromium, Firefox], },
+  )
+  assert_eq(parse_test_options(["--engines", "webkit"]), {
+    verify_failures: false,
+    engines: [WebKit],
+  })
+}
+
+///|
+test "test options reject an empty, unknown or repeated engine and repeated options" {
+  for
+    flags in [
+      ["--engines"],
+      ["--engines", ""],
+      ["--engines", "chromium,"],
+      ["--engines", "safari"],
+      ["--engines", "Chromium"],
+      ["--engines", "firefox,firefox"],
+      ["--engines", "chromium", "--engines", "firefox"],
+      ["--verify-failures", "--verify-failures"],
+      ["--fast"],
+    ] {
+    let options = parse_test_options(flags) catch { _ => continue }
+    ignore(options)
+    fail("expected a failure for: " + flags.join(" "))
   }
 }

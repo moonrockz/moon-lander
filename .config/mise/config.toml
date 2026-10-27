@@ -170,11 +170,11 @@ description = "Install the locked browser harness and three engines (args: --wit
 run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx install"
 
 [tasks."test:browser"]
-description = "Build once and test the fixture in Chromium, Firefox and WebKit"
+description = "Build once and test the fixture in Chromium, Firefox and WebKit (args: --engines chromium,firefox,webkit)"
 run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx test"
 
 [tasks."test:browser-zig"]
-description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures)"
+description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures, --engines chromium,firefox,webkit)"
 run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 exec host -- moonx scripts/browser.mbtx test"
 
 [tasks."test:browser-failures"]

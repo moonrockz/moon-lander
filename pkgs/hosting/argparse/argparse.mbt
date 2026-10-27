@@ -1,7 +1,7 @@
 ///|
-/// Set the command factory used before configuration or hooks. Group 14 adds
-/// mappings from parsed options to configuration keys.
-pub using @hosting {command}
+/// Set the command factory and explicit mappings used before configuration or
+/// hooks. The host appends the mapped source after its environment source.
+pub using @hosting {command, map, to_overrides, type Mapping, type MappingAction, type OverrideOption, type MappingError}
 
 ///|
 /// The argparse types of a host command. Build the command with these names, not

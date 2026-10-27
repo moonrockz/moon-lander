@@ -757,12 +757,38 @@ layer.
 The argparse adapter SHALL give a flag as a boolean, a count flag as an integer, an
 option with one value as a string, and an option with the append action as a list of
 strings. A mapping MUST be able to give a parse function that changes the text into
-another value type.
+another value type. The mapping action MUST match the declared argument kind:
+`Flag`, `Count`, `Set` or `Append`. An explicit count of zero MUST remain an integer.
 
 #### Scenario: Count flag
 
 - **WHEN** the count flag `-v` maps to `log.verbosity`, and the arguments contain `-vvv`
 - **THEN** the configuration holds the integer 3 at `log.verbosity`
+
+#### Scenario: Append with one value and a custom parser
+
+- **WHEN** an Append option maps with `action=Append`, its custom parser converts text to an integer, and the arguments give one value `42`
+- **THEN** the configuration holds a list with the integer 42, rather than a scalar
+
+#### Scenario: Explicit variable value
+
+- **WHEN** a mapped option gets a value from argparse `ValueSource::Env`
+- **THEN** the overrides source contains that value with the mapped type
+
+#### Scenario: Zero count from a variable
+
+- **WHEN** a mapped count flag gets `0` from its argparse environment variable
+- **THEN** the configuration holds integer zero and a custom parser receives the text `0`, while a boolean flag supplied as false stays a boolean
+
+#### Scenario: Global and selected subcommand mappings
+
+- **WHEN** a global mapped option follows a nested subcommand and that selected command has a mapped local option
+- **THEN** the source contains both values, converts the global value once, and includes no values from an unselected command
+
+#### Scenario: Custom parser failure
+
+- **WHEN** a mapped value fails its custom parser
+- **THEN** the host reports `UsageError`, ends with code 2, and runs no configuration callback, file read, factory, hook or command
 
 ### Requirement: Batteries-included entry
 

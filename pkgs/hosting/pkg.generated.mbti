@@ -17,7 +17,7 @@ pub fn[S] build(HostBuilder[S], (BuildContext) -> S raise) -> Host[S]
 
 pub fn[S] builder(@moon-lander-core.AppName, Array[String], env_vars? : &IntoEnvVars, working_dir? : @moon-lander-core.AbsolutePath, environment? : @conventions.EnvironmentName) -> HostBuilder[S]
 
-pub fn[S] command(HostBuilder[S], (String) -> @argparse.Command) -> HostBuilder[S]
+pub fn[S] command(HostBuilder[S], (String) -> @argparse.Command, mappings? : Array[Mapping]) -> HostBuilder[S]
 
 pub fn[S] configure(HostBuilder[S], (@moon-lander-config.ConfigBuilder) -> @moon-lander-config.ConfigBuilder raise) -> HostBuilder[S]
 
@@ -35,6 +35,8 @@ pub fn[S] error_report(HostBuilder[S], async (Error, ExitCode) -> Unit) -> HostB
 
 pub fn[S] files(HostBuilder[S], @moon-lander-config.FileTree) -> HostBuilder[S]
 
+pub fn map(OverrideOption, @moon-lander-config.KeyPath, action? : MappingAction, parse? : (String) -> @moon-lander-config.ConfigValue raise) -> Mapping
+
 pub fn[S] reserve_env(HostBuilder[S], Array[String]) -> HostBuilder[S]
 
 pub fn[S] run_embedded(Host[S], async (Context[S]) -> Unit, stop_probe? : () -> Bool) -> RunOutcome
@@ -46,6 +48,8 @@ pub fn[S] shutdown_timeout(HostBuilder[S], @moon-lander-core.TimeLimit) -> HostB
 pub fn[S] shutdown_timeout_key(HostBuilder[S], @moon-lander-config.KeyPath) -> HostBuilder[S]
 
 pub fn[S] skip_env_source(HostBuilder[S]) -> HostBuilder[S]
+
+pub fn to_overrides(@argparse.Matches, Array[Mapping]) -> @moon-lander-config.ConfigSource raise UsageError
 
 pub fn[S] working_dir(HostBuilder[S], @moon-lander-core.AbsolutePath) -> HostBuilder[S]
 
@@ -62,6 +66,11 @@ pub(all) suberror HostError {
 } derive(@debug.Debug)
 pub fn HostError::message(Self) -> String
 pub fn HostError::to_repr(Self) -> @debug.Repr
+
+pub suberror MappingError {
+  InvalidOverrideOption(input~ : String, reason~ : String)
+} derive(@debug.Debug)
+pub fn MappingError::to_repr(Self) -> @debug.Repr
 
 pub suberror ShutdownTimedOut {
   ShutdownTimedOut(@moon-lander-core.TimeLimit)
@@ -163,6 +172,26 @@ pub fn Lifetime::set_exit_code(Self, ExitCode) -> Unit
 pub fn Lifetime::stop_application(Self, exit_code? : ExitCode) -> Unit
 pub fn Lifetime::stop_reason(Self) -> StopReason?
 pub fn Lifetime::stop_token(Self) -> StopToken
+
+pub struct Mapping {
+  // private fields
+}
+
+pub(all) enum MappingAction {
+  Flag
+  Count
+  Set
+  Append
+}
+
+pub struct OverrideOption {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn OverrideOption::equal(Self, Self) -> Bool
+pub fn OverrideOption::not_equal(Self, Self) -> Bool
+pub fn OverrideOption::parse(String) -> Self raise MappingError
+pub fn OverrideOption::to_repr(Self) -> @debug.Repr
+pub fn OverrideOption::to_string(Self) -> String
 
 pub struct RunOutcome {
   // private fields

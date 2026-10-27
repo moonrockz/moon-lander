@@ -167,8 +167,8 @@ async fn main {
       subcommands=[build_command, workspace_command],
     )
   }, mappings=[
-    @hosting_argparse.map("log-format", "log.format"),
-    @hosting_argparse.map("verbose", "log.verbosity"),
+    @hosting_argparse.map(@hosting_argparse.OverrideOption::parse("log-format"), @config.KeyPath::parse("log.format")),
+    @hosting_argparse.map(@hosting_argparse.OverrideOption::parse("verbose"), @config.KeyPath::parse("log.verbosity"), action=Count),
   ])
   |> @hosting.configure(fn(sources) {
     sources
@@ -706,10 +706,30 @@ pub fn environment_option() -> @argparse.OptionArg   // --environment <name>, gl
 pub fn config_option() -> @argparse.OptionArg        // --config <path>, global
 pub fn isolated_flag() -> @argparse.FlagArg          // --isolated, global
 pub fn project_option() -> @argparse.OptionArg       // --project <path|name>, global
-pub fn map(option : String, key : String, parse? : (String) -> @config.ConfigValue raise) -> Mapping
-pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @config.ConfigSource
+pub fn OverrideOption::parse(text : String) -> OverrideOption raise MappingError
+pub fn map(option : OverrideOption, key : @config.KeyPath, action? : MappingAction = Set, parse? : (String) -> @config.ConfigValue raise) -> Mapping
+pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @config.ConfigSource raise UsageError
 ```
 
+- Call (group 14): `OverrideOption` holds a non-empty argument id and rejects the
+  four discovery ids. `MappingError::InvalidOverrideOption` names the input and
+  the rule. `KeyPath` parses the configuration key at the caller boundary. The
+  mapping keeps these typed values. No public field can bypass either parse.
+- Call (group 14): `Matches` has no option-action metadata and omits zero counts
+  from its count map. `MappingAction` therefore has `Flag`, `Count`, `Set` and
+  `Append` cases. The mapping takes the action that matches its declaration.
+  `Set` is the default; Flag, Count and Append must be explicit. Count preserves
+  integer zero and Append preserves a list with one item. The application must
+  keep the mapping action and argument declaration aligned.
+- Call (group 14): a custom parser converts each option text, including each
+  Append item, or the boolean/count text of a flag. Conversion failures become
+  `UsageError` before configuration callbacks, file reads, factories or hooks.
+  A deeper explicit value with the same id wins along the selected subcommand
+  path; a default cannot hide an explicit ancestor. A repeated global result is
+  converted once. A command step copies its mapping array and replaces earlier
+  mappings. With mappings, the host appends the real source after its variable
+  source, including when no argument supplied an override. Without mappings it
+  adds no overrides source.
 - Call (R7): on the bare `@hosting.builder`, the standard flags are opt-in. The
   application adds each one to its argparse command. The host knows them by their
   ids.

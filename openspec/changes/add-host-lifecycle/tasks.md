@@ -151,9 +151,9 @@ Bead: lander-4us.5.13
 
 Bead: lander-4us.5.14
 
-- [ ] 14.1 Add `map` and `to_overrides` with value types and parse functions, and put the overrides source last at priority 700; verify flag, count, single, append and default-source cases on all four targets
-- [ ] 14.2 Verify an acceptance test in `tests/` where `--log-format json` beats a file value and a variable, the origin kind is `overrides`, and the report shows priority 700
-- [ ] 14.3 Document the adapter with the pipeline example from design.md D2 as a compiled doc test
+- [x] 14.1 Add `map` and `to_overrides` with value types and parse functions, and put the overrides source last at priority 700; verify flag, count, single, append and default-source cases on all four targets
+- [x] 14.2 Verify an acceptance test in `tests/` where `--log-format json` beats a file value and a variable, the origin kind is `overrides`, and the report shows priority 700
+- [x] 14.3 Document the adapter with the pipeline example from design.md D2 as a compiled doc test
 
 ## 15. Integration check with the Morphir shape
 

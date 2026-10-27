@@ -30,6 +30,7 @@ import {
   "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/moon-lander-config/parsers/toml",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
   "moonrockz/expect",
   "moonbitlang/core/quickcheck",
   "moonbitlang/async",

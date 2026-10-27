@@ -10,4 +10,6 @@ import {
 import {
   "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/parsers/toml",
 } for "test"

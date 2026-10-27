@@ -3,6 +3,7 @@
 priv struct ParsedArguments {
   matches : @argparse.Matches
   discovery_options : @conventions.DiscoveryOptions
+  overrides : @config.ConfigSource?
 }
 
 ///|
@@ -39,7 +40,8 @@ fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, Strin
   }
   let project = standard_option(matches, "project")
   let isolated = matches.flags.get("isolated").unwrap_or(false)
-  { matches, discovery_options: @conventions.DiscoveryOptions::new(environment?, config~, isolated~, project?) }
+  let overrides = if host.mappings.is_empty() { None } else { Some(to_overrides(matches, host.mappings)) }
+  { matches, discovery_options: @conventions.DiscoveryOptions::new(environment?, config~, isolated~, project?), overrides }
 }
 
 ///|
@@ -55,6 +57,6 @@ fn standard_option(matches : @argparse.Matches, id : String) -> String? raise Us
 ///|
 /// Set the command factory. The run gives it the application name and parses
 /// its command once, before configuration and hooks.
-pub fn[S] command(builder : HostBuilder[S], make : (String) -> @argparse.Command) -> HostBuilder[S] {
-  { ..builder, make_command: Some(make) }
+pub fn[S] command(builder : HostBuilder[S], make : (String) -> @argparse.Command, mappings? : Array[Mapping] = []) -> HostBuilder[S] {
+  { ..builder, make_command: Some(make), mappings: mappings.copy() }
 }

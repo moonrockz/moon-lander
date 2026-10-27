@@ -18,7 +18,7 @@ pub fn[S] conventions(builder : HostBuilder[S], transform : (@conventions.Conven
 /// Callbacks run in registration order, after arguments and environment
 /// resolution. Sources merge in this order: configure callbacks, the host-owned
 /// conventions set (System 100 through UserOverride 400), the <PREFIX>_* source
-/// at 600, then argparse overrides at 700 (group 14).
+/// at 600, then argparse overrides at 700.
 /// Core load requires priorities that do not go down. With app_dirs() or
 /// conventions(f), configure sources must have priority 100 or less, such as
 /// defaults or an in-memory value at 0. Put a higher-priority file in the
@@ -65,6 +65,10 @@ fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.
   let environment = resolve_environment(host, settings, parsed.discovery_options)
   let options = environment_options(host, parsed.discovery_options, environment)
   let sources = configuration_builder(host, settings, options)
+  let sources = match parsed.overrides {
+    Some(source) => sources |> @config.add(source)
+    None => sources
+  }
   { settings, parsed, environment, sources }
 }
 

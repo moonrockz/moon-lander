@@ -2,11 +2,12 @@
 package "moonrockz/moon-lander-hosting/argparse"
 
 import {
+  "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-hosting",
 }
 
 // Values
-pub fn[S] command(@moon-lander-hosting.HostBuilder[S], (String) -> @moonrockz/moon-lander-hosting/vendor/argparse.Command) -> @moon-lander-hosting.HostBuilder[S]
+pub fn[S] command(@moon-lander-hosting.HostBuilder[S], (String) -> @moonrockz/moon-lander-hosting/vendor/argparse.Command, mappings? : Array[@moon-lander-hosting.Mapping]) -> @moon-lander-hosting.HostBuilder[S]
 
 pub fn config_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
 
@@ -14,7 +15,11 @@ pub fn environment_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.Op
 
 pub fn isolated_flag() -> @moonrockz/moon-lander-hosting/vendor/argparse.FlagArg
 
+pub fn map(@moon-lander-hosting.OverrideOption, @moon-lander-config.KeyPath, action? : @moon-lander-hosting.MappingAction, parse? : (String) -> @moon-lander-config.ConfigValue raise) -> @moon-lander-hosting.Mapping
+
 pub fn project_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
+
+pub fn to_overrides(@moonrockz/moon-lander-hosting/vendor/argparse.Matches, Array[@moon-lander-hosting.Mapping]) -> @moon-lander-config.ConfigSource raise @moon-lander-hosting.UsageError
 
 // Errors
 
@@ -29,11 +34,19 @@ pub using @moonrockz/moon-lander-hosting/vendor/argparse {type FlagAction}
 
 pub using @moonrockz/moon-lander-hosting/vendor/argparse {type FlagArg}
 
+pub using @moon-lander-hosting {type Mapping}
+
+pub using @moon-lander-hosting {type MappingAction}
+
+pub using @moon-lander-hosting {type MappingError}
+
 pub using @moonrockz/moon-lander-hosting/vendor/argparse {type Matches}
 
 pub using @moonrockz/moon-lander-hosting/vendor/argparse {type OptionAction}
 
 pub using @moonrockz/moon-lander-hosting/vendor/argparse {type OptionArg}
+
+pub using @moon-lander-hosting {type OverrideOption}
 
 pub using @moonrockz/moon-lander-hosting/vendor/argparse {type PositionArg}
 

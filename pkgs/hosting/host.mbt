@@ -105,6 +105,7 @@ pub struct HostBuilder[S] {
   priv skip_variables : Bool
   priv convention_steps : Array[ConventionStep]
   priv make_command : ((String) -> @argparse.Command)?
+  priv mappings : Array[Mapping]
   priv report : ErrorReport?
   priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
   priv file_tree : @config.FileTree
@@ -130,7 +131,7 @@ pub fn[S] builder(
 ) -> HostBuilder[S] {
   { name, args: args.copy(), prefix: @lander_core.EnvPrefix::from_app_name(name),
     variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, root: None, reserved: [],
-    skip_variables: false, convention_steps: [], configure_sources: [], file_tree: @config.FileTree::new(), timeout_key: None, make_command: None, services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+    skip_variables: false, convention_steps: [], configure_sources: [], file_tree: @config.FileTree::new(), timeout_key: None, make_command: None, mappings: [], services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
 }
 
 ///|
@@ -205,6 +206,7 @@ pub struct Host[S] {
   priv skip_variables : Bool
   priv convention_steps : Array[ConventionStep]
   priv make_command : ((String) -> @argparse.Command)?
+  priv mappings : Array[Mapping]
   priv report : ErrorReport?
   priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
   priv file_tree : @config.FileTree
@@ -233,6 +235,7 @@ pub fn[S] build(
     skip_variables: builder.skip_variables,
     convention_steps: builder.convention_steps,
     make_command: builder.make_command,
+    mappings: builder.mappings,
     services: builder.services,
     factory,
     report: builder.report,

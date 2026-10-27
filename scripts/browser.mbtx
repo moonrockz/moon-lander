@@ -49,9 +49,41 @@ priv struct TestOptions {
 } derive(Eq, Debug)
 
 ///|
+/// A `test` option that does not parse, with the input and the broken rule.
+suberror TestOptionError {
+  /// The option is not `--verify-failures` or `--engines`.
+  UnknownOption(String)
+  /// The option occurs more than one time.
+  RepeatedOption(String)
+  /// `--engines` is the last argument, so it has no list.
+  MissingEngineList
+  /// The list names an engine that is not chromium, firefox or webkit. An
+  /// empty name, as in `chromium,`, is unknown too.
+  UnknownEngine(String)
+  /// The list names the engine more than one time.
+  RepeatedEngine(String)
+} derive(Eq, Debug)
+
+///|
+fn TestOptionError::message(self : TestOptionError) -> String {
+  match self {
+    UnknownOption(option) =>
+      "Unknown test option \"\{option}\"; use --verify-failures or --engines"
+    RepeatedOption(option) =>
+      "The test option \{option} occurs more than one time"
+    MissingEngineList => "--engines needs a comma list of engines"
+    UnknownEngine(name) =>
+      "Unknown engine \"\{name}\"; use chromium, firefox or webkit"
+    RepeatedEngine(name) => "The engine \{name} occurs more than one time"
+  }
+}
+
+///|
 /// Parse the options of `test`. Each option occurs at most one time. The engine
 /// list is not empty, and each engine in it is known and occurs one time.
-fn parse_test_options(flags : ArrayView[String]) -> TestOptions raise {
+fn parse_test_options(
+  flags : ArrayView[String],
+) -> TestOptions raise TestOptionError {
   let mut verify_failures = false
   let mut engines : Array[Engine]? = None
   let mut rest = flags
@@ -59,35 +91,28 @@ fn parse_test_options(flags : ArrayView[String]) -> TestOptions raise {
     rest = tail
     match flag {
       "--verify-failures" => {
-        guard !verify_failures else {
-          fail("--verify-failures occurs more than one time")
-        }
+        guard !verify_failures else { raise RepeatedOption(flag) }
         verify_failures = true
       }
       "--engines" => {
-        guard engines is None else {
-          fail("--engines occurs more than one time")
-        }
-        guard rest is [list, .. after] else {
-          fail("--engines needs a comma list of engines")
-        }
+        guard engines is None else { raise RepeatedOption(flag) }
+        guard rest is [list, .. after] else { raise MissingEngineList }
         rest = after
         let selected = []
         for name in list.split(",") {
-          guard all_engines.search_by(engine => {
-              engine.project() == name.to_owned()
-            })
+          let name = name.to_owned()
+          guard all_engines.search_by(engine => engine.project() == name)
             is Some(index) else {
-            fail("Unknown engine \"\{name}\"; use chromium, firefox or webkit")
+            raise UnknownEngine(name)
           }
           guard !selected.contains(all_engines[index]) else {
-            fail("Engine \{name} occurs more than one time")
+            raise RepeatedEngine(name)
           }
           selected.push(all_engines[index])
         }
         engines = Some(selected)
       }
-      _ => fail("Unknown test option \{flag}")
+      _ => raise UnknownOption(flag)
     }
   }
   { verify_failures, engines: engines.unwrap_or(all_engines), }
@@ -401,7 +426,9 @@ async fn main {
       println("Browser installation: \{@async.now() - started} ms")
     }
     ["test", .. flags] => {
-      let options = parse_test_options(flags)
+      let options = parse_test_options(flags) catch {
+        error => fail(error.message())
+      }
       check_versions()
       @async.with_timeout(300_000, () => {
         run("moonx", ["scripts/build-browser-fixture.mbtx"])
@@ -456,20 +483,32 @@ test "test options select engines in the given order" {
 
 ///|
 test "test options reject an empty, unknown or repeated engine and repeated options" {
-  for
-    flags in [
-      ["--engines"],
-      ["--engines", ""],
-      ["--engines", "chromium,"],
-      ["--engines", "safari"],
-      ["--engines", "Chromium"],
-      ["--engines", "firefox,firefox"],
+  let cases : Array[(Array[String], TestOptionError)] = [
+    (["--engines"], MissingEngineList),
+    (["--engines", ""], UnknownEngine("")),
+    (["--engines", "chromium,"], UnknownEngine("")),
+    (["--engines", "safari"], UnknownEngine("safari")),
+    (["--engines", "Chromium"], UnknownEngine("Chromium")),
+    (["--engines", "firefox,firefox"], RepeatedEngine("firefox")),
+    (
       ["--engines", "chromium", "--engines", "firefox"],
+      RepeatedOption("--engines"),
+    ),
+    (
       ["--verify-failures", "--verify-failures"],
-      ["--fast"],
-    ] {
-    let options = parse_test_options(flags) catch { _ => continue }
+      RepeatedOption("--verify-failures"),
+    ),
+    (["--fast"], UnknownOption("--fast")),
+  ]
+  for case in cases {
+    let (flags, expected) = case
+    let options = parse_test_options(flags) catch {
+      error => {
+        assert_eq(error, expected)
+        continue
+      }
+    }
     ignore(options)
-    fail("expected a failure for: " + flags.join(" "))
+    fail("expected \{expected.message()} for: " + flags.join(" "))
   }
 }

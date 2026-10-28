@@ -1,6 +1,6 @@
 name = "moonrockz/moon-lander-site"
 
-version = "0.4.0"
+version = "0.5.0"
 
 import {
   "moonbitlang/async@0.22.5",

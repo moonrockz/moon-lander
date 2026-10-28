@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0 - 2026-10-28
+
+Moon-Lander adds console and rolling file logging. The shared workspace version
+moves to `0.5.0`, so `moonrockz/notebooks` and `moonrockz/openrpc` are
+republished unchanged at `0.5.0`. The framework modules, including the new
+`moonrockz/moon-lander-logging-hosting-async`, are not published.
+
+### Added
+
+- `moonrockz/moon-lander-logging`: `LogEvent::segments` gives the message as
+  ordered literal and bound-value segments. The new pure packages work on all four
+  targets: `formatting` (UTC `LogTimestamp`, `LogRecord`, the Literate and plain
+  console layout, the text file layout and JSON Lines version 1 with ordered
+  `{name, value}` properties) and `rolling` (`LogFileStem`, `FileSet`,
+  `RollingPolicy`, `Retention`, `ByteCount` and the rolling plan and retention).
+- `moonrockz/moon-lander-logging-hosting-async`, a new optional module that
+  imports core, logging and `moonbitlang/async` only. Its root has typed
+  settings (`SessionSettings`, `ConsoleSink`, `FileSink`, queue and record limits,
+  `ColorMode`) and reports. Its `runtime` package (native, and js on Node.js and
+  Bun) has `with_session`: a bounded queue that drops the newest record when it
+  is full and counts each drop, one writer task, `drain` and `close`, the console
+  on standard error by default, and daily plus 10 MiB rolling text and JSON Lines
+  files that keep the newest 31, guarded by an ownership marker.
+- `moonrockz/moon-lander-hosting`: `@console.run` takes an optional `finalize`
+  step that runs after the run and its reports, before the process ends;
+  `report_writer` sends the default report lines to a writer; and the new
+  `hosting/logging` bridge runs a host with a logging session and drains it
+  before exit, also after a start failure, a shutdown timeout or a first signal.
+
 ## 0.4.0 - 2026-10-27
 
 Moon-Lander splits the framework into six modules, adds the application host

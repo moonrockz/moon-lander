@@ -167,7 +167,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.4.0`.
+- `moon.mod` holds the shared version, currently `0.5.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -232,7 +232,9 @@ publishes releases.
 
 ## Releases
 
-The `0.4.0` release splits the framework into six modules, adds the
+The `0.5.0` release adds console and rolling file logging: the optional
+`moonrockz/moon-lander-logging-hosting-async` module and the host bridge that
+drains the logs before the process ends. The `0.4.0` release splits the framework into six modules, adds the
 application host (`moonrockz/moon-lander-hosting`) and the logging module, and
 types the configuration file-tree paths; the framework modules stay
 unpublished. The `0.3.0` release changes the mediator publish policy (every handler runs,

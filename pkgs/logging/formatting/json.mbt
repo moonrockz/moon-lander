@@ -3,6 +3,22 @@
 const SCHEMA_VERSION : Int = 1
 
 ///|
+/// The JSON property layout of a file sink. OrderedArray keeps schema version
+/// 1. NamedObject selects schema version 2 with last-wins values and history.
+pub(all) enum JsonProperties {
+  /// Schema version 1, with every occurrence in an ordered array.
+  OrderedArray
+  /// Schema version 2, with last-wins named values and complete history.
+  NamedObject
+} derive(Eq, Debug)
+
+///|
+pub extend JsonProperties with Eq::{equal, not_equal}
+
+///|
+pub extend JsonProperties with @debug.Debug::{to_repr}
+
+///|
 /// True when `repr` has the complete JSON number grammar:
 /// `-? (0 | [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?`. A number with other
 /// text, for example `1e`, `+1`, `01` or `--2`, is written from its value, so a
@@ -121,8 +137,26 @@ fn write_optional(out : StringBuilder, text : String?) -> Unit {
 /// Control characters in strings are JSON escapes, for example `\n` and
 /// `\u001b`. A number that is not finite becomes `null`.
 pub fn format_json_line(record : LogRecord) -> String {
+  json_line(record, OrderedArray)
+}
+
+///|
+/// Render schema version 2 with named values under `properties`. The last
+/// occurrence wins. For each repeated name, `duplicateProperties` holds all
+/// values in original per-name order, including the winner. Omit that object
+/// without repeats. JSON types, escaping and metadata isolation are preserved.
+pub fn format_json_object_line(record : LogRecord) -> String {
+  json_line(record, NamedObject)
+}
+
+///|
+fn json_line(record : LogRecord, properties : JsonProperties) -> String {
   let out = StringBuilder()
-  out.write_string("{\"schemaVersion\":\{SCHEMA_VERSION},\"timestamp\":")
+  let version = match properties {
+    OrderedArray => SCHEMA_VERSION
+    NamedObject => 2
+  }
+  out.write_string("{\"schemaVersion\":\{version},\"timestamp\":")
   write_json_string(out, record.timestamp.to_iso8601())
   out.write_string(",\"level\":")
   write_json_string(out, record.level.to_string())
@@ -132,18 +166,46 @@ pub fn format_json_line(record : LogRecord) -> String {
   write_json_string(out, record.template)
   out.write_string(",\"message\":")
   write_json_string(out, record.message)
-  out.write_string(",\"properties\":[")
-  for index, entry in record.properties {
-    if index > 0 {
-      out.write_char(',')
+  out.write_string(",\"properties\":")
+  match properties {
+    OrderedArray => {
+      out.write_char('[')
+      for index, entry in record.properties {
+        if index > 0 {
+          out.write_char(',')
+        }
+        out.write_string("{\"name\":")
+        write_json_string(out, entry.0)
+        out.write_string(",\"value\":")
+        write_json(out, entry.1)
+        out.write_char('}')
+      }
+      out.write_char(']')
     }
-    out.write_string("{\"name\":")
-    write_json_string(out, entry.0)
-    out.write_string(",\"value\":")
-    write_json(out, entry.1)
-    out.write_char('}')
+    NamedObject => {
+      let values : Map[String, Json] = Map([])
+      let occurrences : Map[String, Array[Json]] = Map([])
+      for (name, value) in record.properties {
+        values[name] = value
+        match occurrences.get(name) {
+          Some(items) => items.push(value)
+          None => occurrences[name] = [value]
+        }
+      }
+      write_json(out, Json::object(values))
+      let duplicates : Map[String, Json] = Map([])
+      for name, items in occurrences {
+        if items.length() > 1 {
+          duplicates[name] = Json::array(items)
+        }
+      }
+      if !duplicates.is_empty() {
+        out.write_string(",\"duplicateProperties\":")
+        write_json(out, Json::object(duplicates))
+      }
+    }
   }
-  out.write_string("],\"error\":")
+  out.write_string(",\"error\":")
   write_optional(out, record.error_text)
   out.write_string("}\n")
   out.to_string()

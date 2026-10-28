@@ -24,6 +24,7 @@ import {
 | `format_console` | One console event, for example `[14:23:07.012Z INF] app: Started` |
 | `format_text` | One event of a readable log file, with the full UTC date |
 | `format_json_line` | One JSON Lines record of schema version 1 |
+| `format_json_object_line` | One JSON Lines record of schema version 2, with named properties |
 | `utf8_length` | The UTF-8 bytes of a rendered record, for size limits |
 
 ## Capture a record
@@ -222,6 +223,35 @@ test "one JSON Lines record" {
   ))
 }
 ```
+
+## Named JSON properties
+
+`format_json_object_line` selects schema version 2. Record metadata stays the
+same. `properties` is an object, and the last occurrence of each name wins.
+For each repeated name, `duplicateProperties[name]` holds all values in original
+per-name order, including the winner. Names that occur once have no history.
+Without repeats, the record omits `duplicateProperties` entirely. An empty event
+has `properties: {}`. Each value keeps its JSON type. One array-valued property
+stays an array and does not imply repetition.
+
+```mbt check
+///|
+test "named JSON with complete duplicate history" {
+  let memory = @logging.MemoryLogger::new()
+  (memory : &@logging.Logger).info("{path} {path} {level}", [
+    "/repo/morphir.toml", "/repo/app/morphir.toml", "event value",
+  ])
+  let record = @formatting.LogRecord::capture(memory.events()[0], @formatting.LogTimestamp::earliest())
+  let line = @formatting.format_json_object_line(record)
+  guard @json.parse(line) is { "schemaVersion": 2, "level": "Information", "properties": { "path": "/repo/app/morphir.toml", "level": "event value", .. }, "duplicateProperties": { "path": ["/repo/morphir.toml", "/repo/app/morphir.toml"], .. }, .. } else { fail(line) }
+}
+```
+
+An event property named `level`, `properties` or `duplicateProperties` stays
+inside `properties` and cannot replace record metadata. The formatter reads the
+whole ordered property list. It does not change `LogEvent::property`, whose
+existing first-occurrence lookup remains compatible. `format_json_line` and
+the default JSON file sink continue to write schema version 1.
 
 ## Bytes for size limits
 

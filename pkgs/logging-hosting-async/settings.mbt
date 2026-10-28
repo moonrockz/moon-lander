@@ -413,11 +413,14 @@ pub struct FileSink {
   priv files : @rolling.FileSet
   priv retention : @rolling.Retention
   priv minimum : @logging.Level
+  priv json_properties : @formatting.JsonProperties
 }
 
 ///|
 /// A file destination. The defaults are the `Text` format, daily and 10 MiB
 /// rolling, the newest 31 files including the active file, and `Information`.
+/// JsonLines uses schema version 1 OrderedArray properties by default. Select
+/// NamedObject for schema version 2. The policy has no effect on Text.
 pub fn FileSink::new(
   directory : LogDirectory,
   stem : @rolling.LogFileStem,
@@ -425,12 +428,14 @@ pub fn FileSink::new(
   policy? : @rolling.RollingPolicy = @rolling.RollingPolicy::default(),
   retention? : @rolling.Retention = @rolling.Retention::default(),
   minimum? : @logging.Level = Information,
+  json_properties? : @formatting.JsonProperties = OrderedArray,
 ) -> FileSink {
   {
     directory,
     files: @rolling.FileSet::new(stem, format, policy),
     retention,
     minimum,
+    json_properties,
   }
 }
 
@@ -456,6 +461,12 @@ pub fn FileSink::retention(self : FileSink) -> @rolling.Retention {
 /// The lowest level that the destination writes.
 pub fn FileSink::minimum(self : FileSink) -> @logging.Level {
   self.minimum
+}
+
+///|
+/// The JSON property policy. It affects JsonLines only.
+pub fn FileSink::json_properties(self : FileSink) -> @formatting.JsonProperties {
+  self.json_properties
 }
 
 ///|

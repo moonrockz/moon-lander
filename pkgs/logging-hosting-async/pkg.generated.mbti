@@ -106,9 +106,10 @@ pub struct FileSink {
 }
 pub fn FileSink::directory(Self) -> LogDirectory
 pub fn FileSink::files(Self) -> @rolling.FileSet
+pub fn FileSink::json_properties(Self) -> @formatting.JsonProperties
 pub fn FileSink::marker_path(Self) -> String
 pub fn FileSink::minimum(Self) -> @moon-lander-logging.Level
-pub fn FileSink::new(LogDirectory, @rolling.LogFileStem, format? : @rolling.FileFormat, policy? : @rolling.RollingPolicy, retention? : @rolling.Retention, minimum? : @moon-lander-logging.Level) -> Self
+pub fn FileSink::new(LogDirectory, @rolling.LogFileStem, format? : @rolling.FileFormat, policy? : @rolling.RollingPolicy, retention? : @rolling.Retention, minimum? : @moon-lander-logging.Level, json_properties? : @formatting.JsonProperties) -> Self
 pub fn FileSink::retention(Self) -> @rolling.Retention
 pub fn FileSink::target(Self) -> SinkTarget
 

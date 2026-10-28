@@ -271,6 +271,72 @@ async test "a standalone session writes the console and both files, then drains 
 }
 
 ///|
+async test "public rolling files retain approved object properties and the array default" {
+  for child in children() {
+    let label = child.label()
+    let dir = temp_dir("object-properties")
+    defer @fs.rmdir(dir, recursive=true)
+    let ran = run_child(child, "object-properties", dir, [])
+    assert_eq(ran.code, 0, msg="\{label}\n\{ran.out}\n\{ran.err}")
+    assert_true(ran.out.contains("closed accepted=4 queue_full=0 failed=false written=4,4,4"), msg=ran.out)
+    assert_no_marker(names(dir), label)
+    for prefix in ["array", "named"] {
+      let files = names(dir).filter(name => name.has_prefix(prefix) && name.has_suffix(".jsonl"))
+      assert_eq(files.length(), 4, msg=files.join(","))
+      for name in files {
+        assert_eq(lines(@fs.read_file(dir + "/" + name).text()).length(), 1)
+      }
+    }
+    let named = lines(read_files(dir, "named", ".jsonl")).map(line => @json.parse(line))
+    let expected : Array[Json] = [
+      { "path": "/repo/morphir.toml", "array": [1, Json::null(), { "nested": true }], "object": { "items": [false, 2] }, "nothing": Json::null(), "flag": true, "number": 2.5 },
+      { "path": { "nested": [true, 2] }, "level": false, "command": "project.list", "duplicateProperties": "inside", "properties": "safe" },
+      { "value": Json::null(), "text": "é 😀\n\r\u{1b}\"\\" },
+      {},
+    ]
+    let history : Array[Json?] = [
+      None,
+      Some({ "path": [Json::null(), [1, Json::null()], { "nested": [true, 2] }], "level": ["event", false] }),
+      Some({ "value": [1, Json::null()] }),
+      None,
+    ]
+    for index, record in named {
+      guard record is Object(fields) else { fail("not an object") }
+      assert_eq(fields.get("schemaVersion"), Some(2))
+      assert_eq(fields.get("level"), Some("Information"))
+      assert_eq(fields.get("properties"), Some(expected[index]), msg=label)
+      assert_eq(fields.get("duplicateProperties"), history[index], msg=label)
+    }
+    let legacy = lines(read_files(dir, "array", ".jsonl")).map(line => @json.parse(line))
+    for index, record in legacy {
+      guard record is Object(fields) else { fail("not an object") }
+      assert_eq(fields.get("schemaVersion"), Some(1))
+      assert_eq(fields.get("duplicateProperties"), None)
+      guard fields.get("properties") is Some(Array(entries)) else { fail("default ceased to be an array") }
+      assert_eq(entries.length(), [6, 8, 3, 0][index])
+    }
+    guard legacy[1] is Object(fields) else { fail("not an object") }
+    assert_eq(fields.get("properties"), Some([
+      { "name": "path", "value": Json::null() }, { "name": "level", "value": "event" },
+      { "name": "path", "value": [1, Json::null()] }, { "name": "command", "value": "project.list" },
+      { "name": "path", "value": { "nested": [true, 2] } }, { "name": "level", "value": false },
+      { "name": "duplicateProperties", "value": "inside" }, { "name": "properties", "value": "safe" },
+    ]))
+    let restarted = run_child(child, "object-properties", dir, [])
+    assert_eq(restarted.code, 0, msg=restarted.out + restarted.err)
+    assert_no_marker(names(dir), label)
+    let after = lines(read_files(dir, "named", ".jsonl"))
+    assert_eq(after.length(), 8)
+    for index, line in after {
+      guard @json.parse(line) is Object(fields) else { fail("not an object") }
+      assert_eq(fields.get("schemaVersion"), Some(2))
+      assert_eq(fields.get("properties"), Some(expected[index % 4]))
+      assert_eq(fields.get("duplicateProperties"), history[index % 4])
+    }
+  }
+}
+
+///|
 async test "an ownership marker left by a crash stops only its file set" {
   for child in children() {
     let label = child.label()

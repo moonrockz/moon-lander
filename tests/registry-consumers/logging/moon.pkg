@@ -1,2 +1,6 @@
-import { "moonrockz/moon-lander-logging" @library }
+import {
+  "moonrockz/moon-lander-logging" @library,
+  "moonrockz/moon-lander-logging/formatting",
+  "moonbitlang/core/json",
+}
 pkgtype(kind: "executable")

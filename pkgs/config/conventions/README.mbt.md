@@ -196,6 +196,56 @@ test "find the project file from a nested directory" {
 }
 ```
 
+## Select a file above discovered primaries
+
+`selected_file_policy(Overlay)` keeps root and member discovery when the host
+supplies `DiscoveryOptions(config=Explicit(path))`. The selected file loads once
+at priority 325 with role `Explicit`: after all workspace/project formats and
+before member primaries. A discovered file moves to that position, so it has no
+second merge or report. Paths resolve against the supplied working directory;
+`.` and `..` segments and Windows separators share one normalized identity.
+Its parser and any discovered supplemental transform run once per discovery
+pass. Missing or unreadable selected files fail visibly.
+
+```mbt check
+///|
+test "select JSON over TOML without losing TOML-only settings" {
+  let layers = @conventions.FormatLayers::new([
+    @conventions.FormatGroup::new([@conventions.Extension::parse("json")]),
+    @conventions.FormatGroup::new([@conventions.Extension::parse("toml")]),
+  ])
+  let conventions = @conventions.base("acme") |> @conventions.layouts
+    |> @conventions.format_layers(layers)
+    |> @conventions.selected_file_policy(Overlay)
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing(@config.FileTreePath::parse("/w"), [
+      { name: "acme.json", kind: File }, { name: "acme.toml", kind: File },
+    ])
+    .with_file(@config.FileTreePath::parse("/w/acme.json"), "{shared:'json'}")
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"), "shared='toml'\nretained=true")
+  let builder = @config.builder() |> @config.working_dir("/w")
+    |> @config.format(@json5.format()) |> @config.format(@toml.format())
+    |> @conventions.add(conventions, options=
+      @conventions.DiscoveryOptions::new(config=Explicit("./acme.json")))
+  guard @config.load(builder, tree) is Done(config) else { fail("complete tree") }
+  assert_eq(@config.get_text(config, "shared"), "json")
+  assert_eq(@config.bind(config, "retained"), true)
+  assert_eq(config.reports().filter(report => report.status is Loaded)
+    .map(report => report.priority), [300, 325])
+}
+```
+
+The default `Primary` policy keeps the existing explicit-primary behavior:
+`Explicit(path)` supplies the project primary without walk-up. With `Overlay`,
+the selection does not determine workspace identity or select a different member.
+It does not add sibling-file layouts for an external file.
+
+When profiles are enabled, selecting a discovered base preserves its control
+authority and each control's original source origin at priority 300. Only its
+ordinary values move to 325. An external or member selection cannot supply
+controls; rejection occurs before key filters. Explicitly disabled processing
+strips controls from the selected file without interpreting them.
+
 ## Stop boundary and isolated mode
 
 `boundary(dir)` stops the walk-up at `dir`: discovery looks in `dir` and never

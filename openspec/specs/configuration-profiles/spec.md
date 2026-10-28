@@ -113,7 +113,7 @@ reserved profile controls. Disabling MUST NOT change environment selection.
 ### Requirement: One authoritative base for controls
 
 When enabled, file controls SHALL come only from the standard-layout workspace
-primary, or the standard-layout project primary when no workspace is selected.
+primary documents, or the standard-layout project primary documents when no workspace is selected. With ordered format layers on, those documents SHALL form one authoritative base in format order. Each control MUST retain its supplying document origin.
 The system MUST select the workspace and member using existing base discovery
 before profile activation. Overlays and member files MUST NOT change that selection.
 
@@ -147,11 +147,7 @@ become application values or ordinary leaf origins while the feature is enabled.
 
 ### Requirement: Controls cannot activate from later layers
 
-When enabled and not explicitly disabled, controls in profile, environment,
-local/user, system/global, legacy, nonstandard explicit, or selected-member
-layers SHALL fail visibly. Generic configuration overrides MUST NOT set reserved
-profile controls. Validation MUST precede layer filters. Activation MUST remain
-fixed for the full load.
+When enabled and not disabled, controls in profile, environment, local/user, system/global, legacy, nonstandard explicit and member layers SHALL fail before filters. Generic overrides MUST NOT set reserved controls. Activation MUST remain fixed for the load. Selecting a discovered base as an ordinary overlay MUST preserve its control authority; a selected non-base file MUST NOT gain authority.
 
 #### Scenario: A profile includes another profile
 
@@ -215,11 +211,7 @@ rather than truncate and bound work for graphs with shared subgroups.
 
 ### Requirement: Adjacent profile file selection
 
-Each active name SHALL select `<stem>.profile.<name>.<ext>` beside eligible
-project/workspace/member primaries, using registered extensions. Matching MUST
-be exact; multiple existing candidates for one name/location MUST be ambiguous.
-A missing candidate MUST report not-found. Inactive profile contents MUST NOT
-be requested or parsed.
+Each active name SHALL select exact `<stem>.profile.<name>.<ext>` candidates beside eligible project/workspace/member primaries. Without ordered layers, multiple registered-format candidates per name/location SHALL be ambiguous. With layers, declared group order SHALL apply and ambiguity SHALL be checked per name/location/group. Missing candidates MUST report not-found. Inactive contents MUST NOT be requested or parsed.
 
 #### Scenario: Marker profile without a file
 
@@ -245,7 +237,7 @@ be requested or parsed.
 
 Profile layers SHALL follow all selected environment layers and precede local
 overrides. For each active profile in order, the workspace file MUST precede
-the selected member file. Later profiles MUST win under existing merge rules.
+the selected member files. With ordered format layers on, each location MUST use the declared group order before discovery advances to the next active name. Later profiles MUST win under existing merge rules.
 Local/user, environment-variable, and CLI override precedence MUST remain higher.
 
 #### Scenario: A later workspace profile beats an earlier member profile
@@ -319,3 +311,46 @@ browser hosts MUST use their existing filesystem or mount boundaries.
 
 - **WHEN** an active profile candidate is inaccessible or outside an allowed browser mount
 - **THEN** its existing host or mount failure remains visible and is not treated as an absent profile file
+
+### Requirement: Control origins survive layered bases
+
+With ordered base formats on, the resolver SHALL retain the winning origin for each active/default/include
+control and each whole-group definition. Graph errors SHALL name the effective definition's origin. Controls
+SHALL be removed from ordinary values without discarding their profile metadata. The existing single-base
+resolver API SHALL retain its behavior.
+
+#### Scenario: Higher format replaces one group
+- **WHEN** JSON defines a group and TOML replaces that group while JSON alone supplies defaults
+- **THEN** the group definition and its failures name TOML, while the default selector names JSON
+
+### Requirement: Literal control metadata merges before parsing
+
+Reserved metadata MUST merge before its one semantic parse: objects merge by field; other supplied values, including null, replace. All eligible base identities MUST remain authorized independently of which controls win.
+
+#### Scenario: A winning null control retains its shape failure
+- **WHEN** a later eligible base sets `profiles.active` to null over an earlier valid list
+- **THEN** loading fails with the existing typed control-shape error and names the later source, rather than ignoring null as an ordinary configuration overlay
+
+### Requirement: Selected discovered base retains control authority
+
+Selecting a discovered base as an overlay SHALL preserve its control authority. It SHALL be parsed once, with
+one ordinary source report at the overlay position and no duplicate merge. Non-base selections SHALL reject
+controls when processing is enabled. Explicitly disabled processing SHALL retain control stripping.
+
+#### Scenario: Selecting the workspace primary
+- **WHEN** the discovered primary contains valid profile controls and the selected overlay names the same normalized path
+- **THEN** the controls still resolve from the base and ordinary values load once above other primaries
+
+#### Scenario: Selecting an external file
+- **WHEN** processing is enabled and not explicitly disabled and a selected non-base file contains profile controls
+- **THEN** the load fails with the existing control-location failure naming that file
+
+### Requirement: Supplemental-only bases have profile layouts
+
+When a supplemental file is the only base document at a location, enabled profiles SHALL use the standard
+application layout at that location. The supplemental file SHALL NOT introduce a different profile-file stem.
+The usual active-name, format-group, boundary and isolation rules SHALL apply.
+
+#### Scenario: Workspace JSON alone
+- **WHEN** only supplemental `acme-workspace.json` declares a workspace and metrics is active
+- **THEN** profile candidates use `acme.profile.metrics.<ext>`, not `acme-workspace.profile.metrics.<ext>`

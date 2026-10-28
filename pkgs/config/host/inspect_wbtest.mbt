@@ -150,6 +150,28 @@ async test "a locked explicit file is an error" {
 }
 
 ///|
+async test "a locked selected overlay retains the host error" {
+  let dir = temp_dir()
+  defer remove_dir(from_slash(dir, running_platform()))
+  write("\{dir}/acme.toml", "base=true")
+  write("\{dir}/custom.toml", "selected=true")
+  expect_host_error(() => {
+    @config.builder()
+    |> @config.working_dir(dir)
+    |> @config.env_vars({})
+    |> @config.format(@toml.format())
+    |> @conventions.add(
+      @conventions.app_dirs("acme")
+      |> @conventions.without(SystemDir)
+      |> @conventions.boundary(dir)
+      |> @conventions.selected_file_policy(Overlay),
+      options=@conventions.DiscoveryOptions::new(config=Explicit("custom.toml")),
+    )
+    |> faulty_load(locked=["\{dir}/custom.toml"])
+  })
+}
+
+///|
 async test "a locked member directory is an error" {
   let dir = temp_dir()
   defer remove_dir(from_slash(dir, running_platform()))

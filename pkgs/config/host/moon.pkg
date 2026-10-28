@@ -11,6 +11,8 @@ import {
   "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-config/profiles",
   "moonrockz/moon-lander-config/parsers/toml",
+  "moonrockz/moon-lander-config/parsers/json5",
+  "moonrockz/moon-lander-config/parsers/yaml",
 } for "wbtest"
 
 import {
@@ -31,6 +33,7 @@ options(targets: {
   "host_wbtest.mbt": ["native", "js"],
   "conventions_wbtest.mbt": ["native", "js"],
   "profiles_wbtest.mbt": ["native", "js"],
+  "layered_wbtest.mbt": ["native", "js"],
   "inspect_wbtest.mbt": ["native", "js"],
   "fixture.native_wbtest.mbt": ["native"],
   "files.native_wbtest.mbt": ["native"],

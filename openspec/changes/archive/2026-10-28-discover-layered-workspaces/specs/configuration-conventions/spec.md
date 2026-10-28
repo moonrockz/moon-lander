@@ -58,13 +58,7 @@ project root. Discovery SHALL NOT stop at a version-control directory such as `.
 
 ### Requirement: Enclosing workspace discovery
 
-When workspace-first discovery is off, the following rules apply. Workspace-first discovery selects the nearest declared workspace before member selection.
-
-After walk-up finds a project root, discovery SHALL search from the parent of that root
-up to the boundary. It SHALL stop at the first configuration that declares a workspace
-whose member and exclude patterns select the project root. That configuration SHALL be
-the workspace primary and the found file SHALL be the member primary. Unreadable,
-ambiguous or non-workspace configurations SHALL be passed over.
+Without workspace-first discovery, discovery SHALL search the found project root's parents through the boundary. The first workspace whose member and exclude patterns select the root SHALL become the workspace primary; the found project SHALL become its member primary. Unreadable, ambiguous and non-workspace configurations SHALL be passed over. Workspace-first mode SHALL instead select the nearest declared workspace before member selection.
 
 #### Scenario: Member found from inside the member
 - **WHEN** `acme.toml` declares members `["packages/*"]`, `packages/billing/acme.toml` exists, and the start directory is `packages/billing/src`
@@ -101,14 +95,7 @@ More than one existing override for one primary SHALL be an ambiguity error.
 
 ### Requirement: Explicit primary file
 
-When selected-file overlays are off, the following rules apply. With selected-file overlays on, the selected file follows the separate overlay requirements.
-
-When the `config` value of `DiscoveryOptions` is `Explicit(path)`, discovery SHALL use that
-file and SHALL NOT walk up for a root. The enclosing-workspace search SHALL still apply.
-When the file path matches a standard layout, the local override, user override and
-environment-file rules SHALL apply, and enabled profile-file rules MUST apply.
-Other explicit files SHALL have no implicit override, environment file, or profile
-file.
+Without selected-file overlays, `Explicit(path)` SHALL supply the project primary without walk-up; enclosing-workspace search SHALL still apply. A standard-layout path SHALL retain adjacent local/user overrides, environment files and enabled profile files. A nonstandard path SHALL have no implicit adjacent files. With overlays enabled, the selected file SHALL follow the separate selected-overlay requirements.
 
 #### Scenario: Explicit file from another directory
 - **WHEN** the start directory is `elsewhere` and the explicit path is `../configs/project.yaml`
@@ -130,13 +117,7 @@ file.
 
 ### Requirement: Adjacent local overrides
 
-When ordered format layers are off, the following rules apply. With ordered format layers on, ambiguity is checked inside each declared stage and format group.
-
-For a primary in the layout `<app>.<ext>` or `.<app>/<app>.<ext>`, the local override
-candidates SHALL be `<app>.local.<ext>` in the same directory. For
-`.config/<app>/config.<ext>` they SHALL be `config.local.<ext>` in the same
-directory. The extensions SHALL come from the registered formats. More than one
-existing local override for one primary SHALL be an ambiguity error.
+Local overrides SHALL use `<app>.local.<ext>` beside `<app>.<ext>` or `.<app>/<app>.<ext>`, and `config.local.<ext>` beside `.config/<app>/config.<ext>`. Extensions SHALL come from registered formats. Without ordered layers, multiple existing candidates for one primary SHALL be ambiguous. With layers, stages SHALL use declared format order and ambiguity SHALL be checked within each group.
 
 #### Scenario: Local file loads between environment file and user override
 - **WHEN** the name is `Production`, `acme.toml` sets `ui.theme = "base"`, `acme.Production.toml` sets `"prod"`, `acme.local.toml` sets `"local"`, and `acme.user.toml` sets `"mine"`

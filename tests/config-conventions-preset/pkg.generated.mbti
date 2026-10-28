@@ -17,6 +17,10 @@ pub fn cases() -> Array[Case]
 
 pub fn formats() -> Array[@moon-lander-config.Format]
 
+pub fn layered_formats() -> Array[@moon-lander-config.Format]
+
+pub fn layered_morphir() -> @conventions.Conventions raise @moon-lander-config.ConfigError
+
 pub fn load(Case) -> @moon-lander-config.Config raise @moon-lander-config.ConfigError
 
 pub fn morphir() -> @conventions.Conventions

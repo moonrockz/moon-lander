@@ -23,19 +23,19 @@ Bead: lander-9kn.2
 
 Bead: lander-9kn.3
 
-- [ ] 3.1 Add an explicit selected-file overlay policy above primary layers and below member primaries; verify selected JSON overrides TOML while TOML-only keys and origins remain.
-- [ ] 3.2 Deduplicate normalized file-tree identities before sources execute; verify an ordinary or supplemental selected file has one report and one transform/parse invocation, including relative path variants and Windows paths.
-- [ ] 3.3 Retain the default explicit-primary behavior and typed missing/unreadable-file failures; verify existing explicit-file tests and document both policies with tested examples and updated public interfaces.
+- [x] 3.1 Add an explicit selected-file overlay policy above primary layers and below member primaries; verify selected JSON overrides TOML while TOML-only keys and origins remain.
+- [x] 3.2 Deduplicate normalized file-tree identities before sources execute; verify an ordinary or supplemental selected file has one report and one transform/parse invocation, including relative path variants and Windows paths.
+- [x] 3.3 Retain the default explicit-primary behavior and typed missing/unreadable-file failures; verify existing explicit-file tests and document both policies with tested examples and updated public interfaces.
 
-- [ ] 3.4 Preserve discovered-base profile control authority when its ordinary values move to the selected overlay; verify one parse and source report, per-control/group origins across formats, external selected-control refusal, disabled processing and unchanged single-base resolver behavior. Update both profile and convention docs.
+- [x] 3.4 Preserve discovered-base profile control authority when its ordinary values move to the selected overlay; verify one parse and source report, per-control/group origins across formats, external selected-control refusal, disabled processing and unchanged single-base resolver behavior. Update both profile and convention docs.
 
 ## 4. Qualify adapters and the Morphir preset
 
 Bead: lander-9kn.4
 
-- [ ] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file, selected overlays and enabled configuration profiles; verify effective values, origins and roots against complete and partial trees on all four targets.
-- [ ] 4.2 Add native and JS adapter tests for a temporary member under a declared workspace, format layering and isolated boundary behavior; verify that no ancestor above the selected root or boundary is read.
-- [ ] 4.3 Run `mise run check` and strict OpenSpec validation; record the actual results and retain existing source-report schemas and default-policy behavior. Update the acceptance README with the tested preset.
+- [x] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file, selected overlays and enabled configuration profiles; verify effective values, origins and roots against complete and partial trees on all four targets.
+- [x] 4.2 Add native and JS adapter tests for a temporary member under a declared workspace, format layering and isolated boundary behavior; verify that no ancestor above the selected root or boundary is read.
+- [x] 4.3 Run `mise run check` and strict OpenSpec validation; record the actual results and retain existing source-report schemas and default-policy behavior. Update the acceptance README with the tested preset.
 
 ## Workflow follow-up
 

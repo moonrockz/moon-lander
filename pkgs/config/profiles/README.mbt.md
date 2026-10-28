@@ -170,6 +170,15 @@ Control authority and winning metadata are separate: every eligible input
 document remains authorized even when another replaces all its controls. The
 single-base `resolve(..., controls=...)` API retains its behavior.
 
+With the convention `selected_file_policy(Overlay)`, a discovered base selected
+by the host keeps its original control origins and authority. Its ordinary
+values and one source report move to `Explicit` at priority 325. This does not
+grant authority to an external selected file or a selected member. Those
+locations still fail before filters, and disabled processing still strips their
+controls. Pure source providers that move an already resolved base can use
+`ProfileResolution::with_control_authority` to add its new ordinary source
+identity without changing the winning metadata.
+
 A complete effective graph has at most 64 groups, 64 members per group, 32 group
 definitions on a path, and 128 distinct active names. All definitions are checked,
 including inactive cycles. Shared subgroup expansion is memoized and deduplicated

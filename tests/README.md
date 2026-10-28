@@ -50,7 +50,25 @@ the laws run on all four targets:
 mise exec -- moon test tests/config-conventions-acceptance --target js
 mise exec -- moon test tests/config-conventions-acceptance --target native
 mise exec -- moon test tests/config-conventions-laws --target all
+mise exec -- moon test tests/config-conventions-preset --target all
 ```
+
+The preset also exports `layered_morphir()` and `layered_formats()` for the
+opt-in discovery contract. Its tested policy uses workspace-first roots,
+JSON5/JSON then YAML/YML then TOML groups, supplemental
+`morphir-workspace.json`, selected-file overlays, and enabled profiles. It leaves
+the member walk to the application; explicit project selection remains available.
+The supplemental document becomes the workspace section through a pure transform.
+The original preset and snapshots retain the default-policy compatibility cases.
+
+The layered fixture compares values, reports, control metadata, origins and root
+evidence over complete and incremental trees on all four targets. It covers a
+supplemental-only workspace and standard profile stems. The native and JavaScript
+host tests record disk requests for a temporary member under a layered workspace
+and for an empty isolated boundary, proving that discovery does not read an
+ancestor above the selected workspace or boundary. The public registry consumer
+also exercises workspace evidence, grouped formats, selected overlays and profile
+activation from the packaged config module.
 
 After an intended change to discovery, rewrite the preset snapshots and review
 the diff:

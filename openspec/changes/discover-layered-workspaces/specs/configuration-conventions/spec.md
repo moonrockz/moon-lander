@@ -128,6 +128,62 @@ file.
 - **WHEN** metrics is active and the explicit primary is `configs/custom.toml`
 - **THEN** no implicit `custom.profile.metrics` file is requested
 
+### Requirement: Adjacent local overrides
+
+When ordered format layers are off, the following rules apply. With ordered format layers on, ambiguity is checked inside each declared stage and format group.
+
+For a primary in the layout `<app>.<ext>` or `.<app>/<app>.<ext>`, the local override
+candidates SHALL be `<app>.local.<ext>` in the same directory. For
+`.config/<app>/config.<ext>` they SHALL be `config.local.<ext>` in the same
+directory. The extensions SHALL come from the registered formats. More than one
+existing local override for one primary SHALL be an ambiguity error.
+
+#### Scenario: Local file loads between environment file and user override
+- **WHEN** the name is `Production`, `acme.toml` sets `ui.theme = "base"`, `acme.Production.toml` sets `"prod"`, `acme.local.toml` sets `"local"`, and `acme.user.toml` sets `"mine"`
+- **THEN** the effective value of `ui.theme` is `mine`, without `acme.user.toml` it is `local`, and the local report has the kind name `local-override` and priority 390
+
+#### Scenario: Dot-config local override
+- **WHEN** `.config/acme/config.toml` sets `ui.theme = "shared"` and `.config/acme/config.local.toml` sets `ui.theme = "local"`
+- **THEN** the effective value of `ui.theme` is `local`
+
+#### Scenario: Sibling local override serializations
+- **WHEN** `acme.toml`, `acme.local.toml` and `acme.local.yaml` exist
+- **THEN** discovery fails with an ambiguity error that names both local override files
+
+### Requirement: One global user configuration
+
+When ordered format layers are off, the following rules apply. With ordered format layers on, ambiguity is checked inside each declared stage and format group.
+
+The configuration-directory candidates and the application-home candidates SHALL be
+alternatives at one priority. When more than one of them exists, discovery SHALL fail
+with an ambiguity error that names every existing candidate.
+
+#### Scenario: Two global files
+- **WHEN** `$HOME/.config/acme/acme.toml` and `$HOME/.acme/acme.toml` both exist
+- **THEN** discovery fails with an ambiguity error that names both paths
+
+### Requirement: Convention source priorities
+
+The priorities SHALL be system 100, global 200, workspace or project primary 300,
+member primary 350, environment file 375, profile file 380, local override 390 and
+user override 400. All profile files MUST share priority 380 and preserve their
+resolved source order at that priority.
+When selected-file overlays are on, their reports SHALL use the existing `Explicit` role and priority 325.
+The priorities SHALL not decrease along the merge order.
+
+#### Scenario: Reports in merge order
+- **WHEN** discovery loads defaults, a project primary and environment variables
+- **THEN** the reports are in merge order with priorities 0, 300 and 600
+
+#### Scenario: Member roles
+- **WHEN** a workspace primary and a selected member primary load
+- **THEN** their reports have the roles `Workspace` and `Member` with priorities 300 and 350
+
+#### Scenario: Several profiles fit between environment and local overrides
+
+- **WHEN** an environment file, two profile files, and a local override load
+- **THEN** their report priorities are 375, 380, 380, and 390, without reordering the equal-priority profile sources
+
 ## ADDED Requirements
 
 ### Requirement: Explicit discovery policies preserve compatibility
@@ -218,13 +274,21 @@ Ordered format layers SHALL use one root decision and the same group order for e
 - **WHEN** JSON declares workspace members and TOML at the same location sets another workspace key
 - **THEN** the merged primary declares one workspace and both documents contribute values
 
+#### Scenario: Local override format order
+- **WHEN** ordered groups are YAML then TOML and both `acme.local.yaml` and `acme.local.toml` exist beside a primary
+- **THEN** both local overrides load, TOML wins shared keys, and both reports retain the local-override role
+
+#### Scenario: Global formats share one stage
+- **WHEN** ordered groups are YAML then TOML and the global directory holds both primary files
+- **THEN** both load at the global stage in group order, while two candidates inside one group remain ambiguous
+
 #### Scenario: User override format order
 - **WHEN** YAML and TOML user overrides set the same key
 - **THEN** the TOML user override wins, and each report retains the user-override role
 
 ### Requirement: Selected file is one overlay
 
-With selected-file overlays on, discovery SHALL retain the discovered primary layers and load the selected file above them and below member primaries. A selected file already found by discovery SHALL load only in its overlay position. Missing or unreadable selected files SHALL fail with a typed error naming the file.
+With selected-file overlays on, discovery SHALL retain the discovered primary layers and load the selected file above them and below member primaries. A selected file already found by discovery SHALL load only in its overlay position. Reports SHALL use the existing `Explicit` role and priority 325. Missing or unreadable selected files SHALL fail with a typed error naming the file.
 
 #### Scenario: Discovered JSON selected above TOML
 - **WHEN** `acme.json` and `acme.toml` set a key differently and the selected file is `acme.json`

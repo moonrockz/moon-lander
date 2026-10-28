@@ -106,7 +106,8 @@ resolver API SHALL retain its behavior.
 
 Selecting an already discovered base file as an ordinary-value overlay SHALL retain that file's base control
 authority. The file SHALL be parsed once and have one ordinary source report in its overlay position. Arbitrary
-selected files SHALL remain forbidden control locations. Control extraction SHALL NOT cause ordinary values to
+selected files SHALL remain forbidden control locations while processing is enabled and not explicitly disabled.
+Explicitly disabled processing SHALL retain the existing control-stripping behavior. Control extraction SHALL NOT cause ordinary values to
 be merged at both positions.
 
 #### Scenario: Selecting the workspace primary
@@ -114,7 +115,7 @@ be merged at both positions.
 - **THEN** the controls still resolve from the base and ordinary values load once above other primaries
 
 #### Scenario: Selecting an external file
-- **WHEN** a selected non-base file contains profile controls
+- **WHEN** processing is enabled and not explicitly disabled and a selected non-base file contains profile controls
 - **THEN** the load fails with the existing control-location failure naming that file
 
 ### Requirement: Supplemental-only bases have profile layouts

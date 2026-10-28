@@ -6,6 +6,7 @@ import {
   "moonbitlang/core/immut/sorted_map",
   "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/profiles",
   "moonrockz/moon-lander-core",
   "moonrockz/moon-lander-hosting/vendor/argparse",
 }
@@ -36,6 +37,8 @@ pub fn[S] error_report(HostBuilder[S], async (Error, ExitCode) -> Unit) -> HostB
 pub fn[S] files(HostBuilder[S], @moon-lander-config.FileTree) -> HostBuilder[S]
 
 pub fn map(OverrideOption, @moon-lander-config.KeyPath, action? : MappingAction, parse? : (String) -> @moon-lander-config.ConfigValue raise) -> Mapping
+
+pub fn[S] profiles(HostBuilder[S], @profiles.Policy) -> HostBuilder[S]
 
 pub fn[S] report_writer(Host[S], async (String) -> Unit) -> Host[S]
 

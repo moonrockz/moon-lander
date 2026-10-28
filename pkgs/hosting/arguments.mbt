@@ -40,8 +40,31 @@ fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, Strin
   }
   let project = standard_option(matches, "project")
   let isolated = matches.flags.get("isolated").unwrap_or(false)
+  let profiles = profile_options(matches)
   let overrides = if host.mappings.is_empty() { None } else { Some(to_overrides(matches, host.mappings)) }
-  { matches, discovery_options: @conventions.DiscoveryOptions::new(environment?, config~, isolated~, project?), overrides }
+  { matches, discovery_options: @conventions.DiscoveryOptions::new(environment?, config~, isolated~, project?, profiles~), overrides }
+}
+
+///|
+/// Standard profile lists are parsed at the argument boundary, including
+/// when no profile policy is enabled. The global argparse result preserves
+/// repeated option order across subcommands.
+fn profile_options(matches : @argparse.Matches) -> @config.ProfileSelection raise UsageError {
+  let values = matches.values.get("profiles").unwrap_or([])
+  let disabled = matches.flags.get("no-profiles").unwrap_or(false)
+  if disabled && !values.is_empty() {
+    raise UsageError("--no-profiles conflicts with --profiles")
+  }
+  if disabled { return Disabled }
+  if values.is_empty() { return Unspecified }
+  let names = []
+  for value in values {
+    let parsed = @config.ProfileNames::parse_csv(value, origin=Discovery) catch {
+      error => raise UsageError(error.message())
+    }
+    names.append(parsed.names())
+  }
+  Selected(@config.ProfileNames::new(names))
 }
 
 ///|

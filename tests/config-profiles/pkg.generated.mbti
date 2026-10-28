@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/config-profiles"
+
+import {
+  "moonrockz/moon-lander-config",
+}
+
+// Values
+pub fn configurations() -> Array[(String, @moon-lander-config.Config)] raise @moon-lander-config.ConfigError
+
+pub fn observations() -> String raise @moon-lander-config.ConfigError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

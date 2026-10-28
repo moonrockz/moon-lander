@@ -2,6 +2,8 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-hosting" @hosting,
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config" @config,
+  "moonrockz/moon-lander-config/profiles",
 }
 
 import {

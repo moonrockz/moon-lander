@@ -361,7 +361,7 @@ test "configure application sources and conventions" {
 
 A conventions set added inside `configure` keeps its own options. It does not
 receive the standard host flags `--environment`, `--config`, `--isolated` and
-`--project`. Use `app_dirs()` for the host-owned standard set and
+`--project`, or the profile selectors. Use `app_dirs()` for the host-owned standard set and
 `conventions(fn(c) { ... })` to change it. These steps compose in pipeline
 order. A later `app_dirs()` replaces earlier convention parts. Without it,
 `conventions` starts from an empty base set with the final host name and prefix.
@@ -377,6 +377,57 @@ On wasm and wasm-gc, `files(tree)` supplies the immutable snapshot to the pure
 raises `FileTreeError::IncompleteFileTree` with code 2 and preserves each
 requested path and request kind. Its report names every path. `run_embedded`
 ends with this code before the factory or any hook.
+
+## Configuration profiles
+
+Enable profiles with `profiles(policy)` after `app_dirs()`. Register
+`profiles_option()` and `no_profiles_flag()` on the root argparse command.
+Repeated `--profiles postgres,metrics` options concatenate in argument order.
+`--no-profiles` conflicts with those options and disables includes, defaults,
+groups and profile files. A bare builder adds no file discovery parts.
+
+The host reserves the exact `<PREFIX>_PROFILES` selector from ordinary variable
+mapping when its conventions enable profiles. A present empty or ASCII-whitespace
+selector disables profiles; an absent selector does not. `env_prefix` sets this
+prefix too. A custom profile provider inside `configure` keeps its own discovery
+options; explicitly reserve its selector with `reserve_env`.
+
+The factory, hooks and command read one recorded `config.profiles()` value.
+Use a parsed `ProfileName` to query membership and choose services in the factory:
+
+```mbt check
+///|
+test "choose a database service from recorded profile membership" {
+  let postgres = @config.ProfileName::parse("postgres")
+  let host : @hosting.Host[String] = @hosting.builder(
+      @lander_core.AppName::parse("acme"), ["--profiles", "postgres"],
+      env_vars=({} : Map[String, String]), working_dir=@lander_core.AbsolutePath::root())
+    |> @hosting_argparse.command(name => @hosting_argparse.Command(name,
+      options=[@hosting_argparse.profiles_option()],
+      flags=[@hosting_argparse.no_profiles_flag()]))
+    |> @hosting.configure(s => s |> @config.format(@toml.format()))
+    |> @hosting.app_dirs()
+    |> @hosting.profiles(@profiles.Policy::new())
+    |> @hosting.service("database", start=ctx => {
+      assert_eq(ctx.services == "postgres", ctx.config.profiles().contains(postgres))
+    })
+    |> @hosting.build(ctx =>
+      if ctx.config.profiles().contains(postgres) { "postgres" } else { "memory" })
+  ignore(host)
+}
+```
+
+Profiles remain independent of `HostEnvironment`. A `Production` environment
+does not activate `production`. Profile file layers have priority 380, after
+environment files and before local and user overrides. Profile failures stop
+before the factory with configuration exit code 2. Invalid CLI names and lists
+give usage code 2 even when profiles are off. Help and version return before
+configuration callbacks or profile discovery.
+
+Custom source providers now return `Expansion::new(sources, warnings=notes)`
+instead of a public struct literal. They can supply immutable resolution metadata
+with its optional `profiles` argument. Providers that omit it keep state Off.
+Exhaustive matches on `FileRole` must handle `ProfileFile(ProfileName)`.
 
 After loading, the factory runs once. Its `BuildContext` and every hook's and
 command's `Context[S]` share the final configuration, variable snapshot and

@@ -14,6 +14,14 @@ pub fn[S] conventions(builder : HostBuilder[S], transform : (@conventions.Conven
 }
 
 ///|
+/// Enable configuration profiles on the host-owned conventions set. This
+/// step adds no discovery parts; use `app_dirs` to discover primary files.
+/// A later `app_dirs` replaces earlier convention steps, including this policy.
+pub fn[S] profiles(builder : HostBuilder[S], policy : @profiles.Policy) -> HostBuilder[S] {
+  builder |> conventions(c => c |> @conventions.profiles(policy))
+}
+
+///|
 /// Add application sources and formats to the core configuration pipeline.
 /// Callbacks run in registration order, after arguments and environment
 /// resolution. Sources merge in this order: configure callbacks, the host-owned

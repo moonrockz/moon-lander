@@ -24,3 +24,17 @@ pub using @lander_core {type AppName, type AppNameError, type AppNameRule}
 /// The parsed environment name for the starting default, from
 /// `moonrockz/moon-lander-config/conventions`.
 pub using @conventions {type EnvironmentName}
+
+///|
+/// Parsed profile selection and loaded activation metadata.
+pub using @config {
+  type ProfileName,
+  type ProfileNames,
+  type ProfileSelection,
+  type ProfileState,
+  type ProfileResolution,
+}
+
+///|
+/// The opt-in profile policy used by `@hosting.profiles`.
+pub using @profiles {type Policy}

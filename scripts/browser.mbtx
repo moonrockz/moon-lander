@@ -261,6 +261,16 @@ async fn answer(
         "text/javascript",
         @fs.read_file("_build/browser/fixture.js").text(),
       )
+    "/profiles/acme.toml" =>
+      (
+        200, "text/plain", "[profiles]\nactive=['production']\ninclude=['common']\n[profiles.groups]\nproduction=['metrics']\n[server]\nhost='base'\nport=8080\n",
+      )
+    "/profiles/acme.profile.metrics.toml" =>
+      (200, "text/plain", "[server]\nhost='profile'\n")
+    "/profiles/acme.profile.unused.toml" =>
+      (200, "text/plain", "invalid TOML [")
+    "/profiles/acme.profile.locked.toml" =>
+      (403, "text/plain", "unreadable selected profile")
     "/acme.toml" =>
       (200, "text/plain", "[server]\nhost = 'browser.example'\nport = 8080\n")
     "/bad.toml" => (200, "text/plain", "[broken\n")

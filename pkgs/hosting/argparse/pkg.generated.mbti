@@ -17,6 +17,10 @@ pub fn isolated_flag() -> @moonrockz/moon-lander-hosting/vendor/argparse.FlagArg
 
 pub fn map(@moon-lander-hosting.OverrideOption, @moon-lander-config.KeyPath, action? : @moon-lander-hosting.MappingAction, parse? : (String) -> @moon-lander-config.ConfigValue raise) -> @moon-lander-hosting.Mapping
 
+pub fn no_profiles_flag() -> @moonrockz/moon-lander-hosting/vendor/argparse.FlagArg
+
+pub fn profiles_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
+
 pub fn project_option() -> @moonrockz/moon-lander-hosting/vendor/argparse.OptionArg
 
 pub fn to_overrides(@moonrockz/moon-lander-hosting/vendor/argparse.Matches, Array[@moon-lander-hosting.Mapping]) -> @moon-lander-config.ConfigSource raise @moon-lander-hosting.UsageError

@@ -1,0 +1,35 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-config/profiles"
+
+import {
+  "moonrockz/moon-lander-config",
+}
+
+// Values
+pub fn fallback(Policy, @moon-lander-config.ProfileNames) -> Policy
+
+pub fn group(Policy, @moon-lander-config.ProfileName, @moon-lander-config.ProfileNames) -> Policy raise @moon-lander-config.ConfigError
+
+pub fn includes(Policy, @moon-lander-config.ProfileNames) -> Policy
+
+pub fn resolve(Policy, @moon-lander-config.ProfileSelection, variable? : (String, String), controls? : (@moon-lander-config.ConfigValue, @moon-lander-config.Origin)) -> @moon-lander-config.ProfileResolution raise @moon-lander-config.ConfigError
+
+pub fn resolve_input(Policy, SelectionInput, controls? : (@moon-lander-config.ConfigValue, @moon-lander-config.Origin)) -> @moon-lander-config.ProfileResolution raise @moon-lander-config.ConfigError
+
+// Errors
+
+// Types and methods
+pub struct Policy {
+  // private fields
+}
+pub fn Policy::new() -> Self
+
+pub struct SelectionInput {
+  // private fields
+}
+pub fn SelectionInput::disabled(Self) -> Bool
+pub fn SelectionInput::new(@moon-lander-config.ProfileSelection, variable? : (String, String)) -> Self raise @moon-lander-config.ConfigError
+
+// Type aliases
+
+// Traits

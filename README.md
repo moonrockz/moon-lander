@@ -17,6 +17,15 @@ The [format selection guide](pkgs/config/formats/README.mbt.md) shows the builde
 code, the TOML-only override, a custom combination, and the MoonBit
 virtual-package feature that enables this build-time selection.
 
+## Compose configuration profiles
+
+Opt in to ordered profiles such as `postgres` and `metrics`, with separate
+`acme.profile.metrics.toml` files, includes and reusable groups. Profiles load
+after environment files and before local overrides. The loaded configuration
+records immutable membership for factories, hooks and commands. See the
+[profile policy guide](pkgs/config/profiles/README.mbt.md) and the
+[discovery guide](pkgs/config/conventions/README.mbt.md#compose-configuration-profiles).
+
 ## Development setup
 
 The build setup follows Moonbase and smithy. Install [mise](https://mise.jdx.dev/), then run:

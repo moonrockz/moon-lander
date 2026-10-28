@@ -4,6 +4,7 @@ import {
   "moonrockz/moon-lander-core" @lander_core,
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/profiles",
   "moonrockz/moon-lander-config/parsers/toml",
   // Vendored moonbitlang/core/argparse until a pinned MoonBit has
   // Command::try_parse (lander-4us.5.18). The alias stays, so the return changes

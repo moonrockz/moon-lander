@@ -318,7 +318,7 @@ async fn qualify(root : String, corpus : String, assets : String) -> Unit {
   )
   @fs.write_file(
     "\{isolated}/moon.mod",
-    "name = \"openrpc-qualification\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+    "name = \"openrpc-qualification\"\nprivate = true\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
   )
   @fs.write_file(
     "\{isolated}/moon.pkg",

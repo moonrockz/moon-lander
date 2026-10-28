@@ -117,7 +117,7 @@ run = "moonx scripts/toolchain.mbtx scripts/lint-yaml.mbtx"
 
 [tasks.validate]
 description = "Run all validation checks"
-depends = ["validate:packages", "validate:versions"]
+depends = ["validate:packages", "validate:versions", "validate:publication"]
 
 [tasks."validate:packages"]
 description = "Verify the workspace package structure against moon.work"
@@ -303,3 +303,19 @@ run = "mise tasks"
 
 [settings]
 experimental = true
+
+[tasks."validate:publication"]
+description = "Enforce the nine-library allowlist and private tooling manifests"
+run = "moonx scripts/toolchain.mbtx scripts/publish.mbtx --check"
+
+[tasks."release:package"]
+description = "Package and audit all nine release libraries and record approved checksums"
+run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx --package"
+
+[tasks."check:framework-registry"]
+description = "Verify all nine candidate archives with isolated registry consumers on supported targets"
+run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx"
+
+[tasks."check:framework-published"]
+description = "Release gate: verify all nine public archives against release:package checksums"
+run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx --published"

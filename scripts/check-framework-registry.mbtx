@@ -1,0 +1,698 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.6/crypto",
+}
+----
+
+///|
+/// Verify every release library through isolated registry consumers.
+/// No workspace overrides, public uploads, credentials, or shared-cache writes.
+
+///|
+/// The fixed public library set. Names and folders are derived from a case.
+priv enum ReleaseLibrary {
+  Core
+  Logging
+  Config
+  Mediator
+  LoggingHostingAsync
+  Hosting
+  Lander
+  Notebooks
+  OpenRpc
+} derive(Eq, Hash)
+
+///|
+priv enum ReleaseInputRule {
+  LibraryLine
+  UnknownLibrary
+  LibraryFolder
+  VersionComponents
+  VersionDigits
+  VersionLeadingZero
+  DigestLength
+  DigestCharacter
+} derive(Eq)
+
+///|
+suberror ReleaseInputError {
+  InvalidReleaseInput(input~ : String, rule~ : ReleaseInputRule)
+}
+
+///|
+fn ReleaseLibrary::parse_name(
+  input : String,
+) -> ReleaseLibrary raise ReleaseInputError {
+  match input {
+    "moonrockz/moon-lander-core" => Core
+    "moonrockz/moon-lander-logging" => Logging
+    "moonrockz/moon-lander-config" => Config
+    "moonrockz/moon-lander-mediator" => Mediator
+    "moonrockz/moon-lander-logging-hosting-async" => LoggingHostingAsync
+    "moonrockz/moon-lander-hosting" => Hosting
+    "moonrockz/moon-lander" => Lander
+    "moonrockz/notebooks" => Notebooks
+    "moonrockz/openrpc" => OpenRpc
+    _ => raise InvalidReleaseInput(input~, rule=UnknownLibrary)
+  }
+}
+
+///|
+fn ReleaseLibrary::fixture_name(self : ReleaseLibrary) -> String {
+  match self {
+    Core => "core"
+    Logging => "logging"
+    Config => "config"
+    Mediator => "mediator"
+    LoggingHostingAsync => "logging-hosting-async"
+    Hosting => "hosting"
+    Lander => "lander"
+    Notebooks => "notebooks"
+    OpenRpc => "openrpc"
+  }
+}
+
+///|
+fn ReleaseLibrary::folder(self : ReleaseLibrary) -> String {
+  "pkgs/" + self.fixture_name()
+}
+
+///|
+fn ReleaseLibrary::name(self : ReleaseLibrary) -> String {
+  match self {
+    Notebooks | OpenRpc => "moonrockz/" + self.fixture_name()
+    Lander => "moonrockz/moon-lander"
+    _ => "moonrockz/moon-lander-" + self.fixture_name()
+  }
+}
+
+///|
+fn ReleaseLibrary::parse(
+  input : String,
+) -> ReleaseLibrary raise ReleaseInputError {
+  let parts = input.split(" ").collect()
+  guard parts[:] is [folder, name] else {
+    raise InvalidReleaseInput(input~, rule=LibraryLine)
+  }
+  let library = ReleaseLibrary::parse_name(name.to_owned())
+  guard folder == library.folder() else {
+    raise InvalidReleaseInput(input~, rule=LibraryFolder)
+  }
+  library
+}
+
+///|
+priv struct ReleaseVersion {
+  text : String
+}
+
+///|
+fn ReleaseVersion::parse(
+  input : String,
+) -> ReleaseVersion raise ReleaseInputError {
+  let parts = input.split(".").collect()
+  guard parts.length() == 3 else {
+    raise InvalidReleaseInput(input~, rule=VersionComponents)
+  }
+  for part in parts {
+    guard !part.is_empty() && part.iter().all(c => c >= '0' && c <= '9') else {
+      raise InvalidReleaseInput(input~, rule=VersionDigits)
+    }
+    guard part.length() == 1 || !part.has_prefix("0") else {
+      raise InvalidReleaseInput(input~, rule=VersionLeadingZero)
+    }
+  }
+  { text: input, }
+}
+
+///|
+impl Show for ReleaseVersion with fn output(self, logger) {
+  logger.write_string(self.text)
+}
+
+///|
+extend ReleaseVersion with Show::{to_string}
+
+///|
+priv struct ArchiveDigest {
+  hex : String
+} derive(Eq)
+
+///|
+fn ArchiveDigest::parse(
+  input : String,
+) -> ArchiveDigest raise ReleaseInputError {
+  guard input.length() == 64 else {
+    raise InvalidReleaseInput(input~, rule=DigestLength)
+  }
+  guard input.iter().all(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) else {
+    raise InvalidReleaseInput(input~, rule=DigestCharacter)
+  }
+  { hex: input, }
+}
+
+///|
+/// SHA-256 produces exactly 64 lower-case hex digits, so this cannot fail.
+fn ArchiveDigest::of_archive(bytes : Bytes) -> ArchiveDigest {
+  { hex: @crypto.bytes_to_hex_string(@crypto.sha256(bytes)), }
+}
+
+///|
+impl Show for ArchiveDigest with fn output(self, logger) {
+  logger.write_string(self.hex)
+}
+
+///|
+extend ArchiveDigest with Show::{to_string}
+
+///|
+/// A packaged candidate module.
+priv struct Candidate {
+  library : ReleaseLibrary
+  manifest : String
+  archive : Bytes
+  checksum : ArchiveDigest
+}
+
+///|
+async fn command(args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("moon", args)
+  guard code == 0 else { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for entry in @fs.readdir(source) {
+    let from = "\{source}/\{entry}"
+    let to = "\{destination}/\{entry}"
+    if @fs.kind(from) is Directory {
+      copy_tree(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let (code, listed, err) = @process.collect_output("moonx", [
+    "scripts/publish.mbtx", "--list",
+  ])
+  guard code == 0 else { fail(listed.text() + err.text()) }
+  let candidates = []
+  for line in listed.text().split("\n") {
+    if !line.is_empty() {
+      candidates.push(ReleaseLibrary::parse(line.to_owned()))
+    }
+  }
+  let manifest = @fs.read_file("moon.mod").text()
+  let version = ReleaseVersion::parse(
+    manifest.split("\n").filter(line => line.has_prefix("version = ")).collect()[0]
+    .replace_all(old="version = ", new="")
+    .replace_all(old="\"", new="")
+    .trim()
+    .to_owned(),
+  )
+  let published = @env.args().contains("--published")
+  let package_only = @env.args().contains("--package")
+  let cold_cache = @env.args().contains("--cold-cache")
+  let checksum_file = "_build/publish/checksums.json"
+  let approved : Map[ReleaseLibrary, ArchiveDigest] = Map([])
+  if published {
+    let raw : Map[String, String] = @json.from_json(
+      @json.parse(@fs.read_file(checksum_file).text()),
+    )
+    for name, digest in raw {
+      approved[ReleaseLibrary::parse_name(name)] = ArchiveDigest::parse(digest)
+    }
+  }
+  let packaged : Array[Candidate] = []
+  for library in candidates {
+    let folder = library.folder()
+    let name = library.name()
+    let archive_path = "_build/publish/\{name.replace_all(old="/", new="-")}-\{version}.zip"
+    let archive = if published {
+      b""
+    } else {
+      ignore(command(["-C", folder, "package"]))
+      let (code, out, err) = @process.collect_output("unzip", [
+        "-Z1", archive_path,
+      ])
+      guard code == 0 else { fail(err.text()) }
+      let names = out
+        .text()
+        .split("\n")
+        .filter(n => !n.is_empty())
+        .map(n => n.to_owned())
+        .collect()
+      let problems = archive_audit(names)
+      let adapter_files = match library {
+        Config =>
+          [
+            "formats/pkg.mbti", "host/node.generated.js.mbt", "browser/browser.generated.js.mbt",
+          ]
+        Hosting =>
+          [
+            "node.generated.js.mbt", "console/node.generated.js.mbt", "console/signal_stub.c",
+            "vendor/LICENSE",
+          ]
+        LoggingHostingAsync => ["runtime/node.generated.js.mbt"]
+        _ => []
+      }
+      for file in adapter_files {
+        if !names.contains(file) {
+          problems.push("missing " + file)
+        }
+      }
+      guard problems.is_empty() else { fail("\{name}: \{problems.join(", ")}") }
+      let (code, out, err) = @process.collect_output("unzip", [
+        "-p", archive_path, "moon.mod",
+      ])
+      guard code == 0 else { fail(err.text()) }
+      guard out.text() == @fs.read_file("\{folder}/moon.mod").text() else {
+        fail(
+          "\{name}: archive manifest differs from the version-pinned source manifest",
+        )
+      }
+      @fs.read_file(archive_path).binary()
+    }
+    let checksum = if published {
+      approved.get(library).unwrap()
+    } else {
+      ArchiveDigest::of_archive(archive)
+    }
+    packaged.push({
+      library,
+      manifest: @fs.read_file("\{folder}/moon.mod").text(),
+      archive,
+      checksum,
+    })
+    println("Approved archive \{name}@\{version} SHA-256 \{checksum}")
+  }
+  if !published {
+    @fs.write_file(
+      checksum_file,
+      Json(
+        packaged.fold(init=Map([]), (map, c) => {
+          map[c.library.name()] = c.checksum.to_string()
+          map
+        }),
+      ).stringify(),
+    )
+  }
+  let (_, head, _) = @process.collect_output("git", ["rev-parse", "HEAD"])
+  println("Source commit \{head.text().trim()}")
+  if package_only {
+    return
+  }
+  let dir = @fs.tmpdir(prefix="lander-libraries-registry")
+  defer @fs.rmdir(dir, recursive=true)
+  let home = @env.get_env_var("MOON_HOME").unwrap_or_else(() => {
+    let user = @env.get_env_var("HOME").unwrap_or_else(() => {
+      @env.get_env_var("USERPROFILE").unwrap()
+    })
+    user + "/.moon"
+  })
+  let isolated = "\{dir}/moon"
+  if !published {
+    copy_tree("\{home}/registry/index/user", "\{isolated}/registry/index/user")
+  } else {
+    @fs.mkdir(isolated, recursive=true)
+  }
+  let toolchain = match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
+    Some(root) => root
+    None => {
+      // Standalone registry probes can run outside the wrapper; resolve the pin then.
+      let (code, out, err) = @process.collect_output("mise", [
+        "where", "http:moonbit",
+      ])
+      guard code == 0 else { fail(err.text()) }
+      @fs.realpath(out.text().trim())
+    }
+  }
+  let consumer_env = {
+    "MOON_HOME": isolated,
+    "MOON_TOOLCHAIN_ROOT": toolchain,
+    "MOON_DEP_CACHE": "\{dir}/dependencies",
+    "MOON_BUILD_CACHE": "\{dir}/build-cache",
+  }
+  let verify = async fn() -> Unit {
+    for candidate in packaged {
+      let consumer = "\{dir}/\{candidate.library.name().replace_all(old="/", new="-")}"
+      @fs.mkdir(consumer, recursive=true)
+      @fs.write_file(
+        "\{consumer}/moon.mod",
+        "name = \"registry-consumer\"\nprivate = true\nversion = \"0.0.1\"\n",
+      )
+      let fixture = "\{root}/tests/registry-consumers/\{candidate.library.fixture_name()}"
+      for file in ["main.mbt", "moon.pkg"] {
+        @fs.write_file(
+          "\{consumer}/\{file}",
+          @fs.read_file("\{fixture}/\{file}"),
+        )
+      }
+      let run = async fn(args : Array[String]) -> String {
+        let (code, out, err) = @process.collect_output(
+          "moon",
+          args,
+          cwd=consumer,
+          extra_env=consumer_env,
+        )
+        guard code == 0 else {
+          fail(
+            "\{candidate.library.name()}: moon \{args.join(" ")}\n\{out.text()}\{err.text()}",
+          )
+        }
+        out.text()
+      }
+      if published {
+        ignore(run(["update"]))
+      }
+      ignore(run(["add", "\{candidate.library.name()}@\{version}"]))
+      let graph = run(["tree"])
+      guard graph.contains("\{candidate.library.name()}@\{version}") &&
+        !graph.contains(root) else {
+        fail("Registry graph leaks workspace or misses the candidate: \{graph}")
+      }
+      for line in graph.split("\n") {
+        if line.contains("->") && line.contains("local ") {
+          fail("Registry graph has a local dependency: \{line}")
+        }
+      }
+      // Every sibling in the graph must resolve to this release, never a workspace path.
+      for sibling in packaged {
+        for line in graph.split("\n") {
+          if line.contains(sibling.library.name() + " -> ") {
+            guard line.contains("-> \{sibling.library.name()}@\{version}") &&
+              !line.contains("local ") else {
+              fail("Wrong sibling resolution: \{line}")
+            }
+          }
+        }
+      }
+      if published {
+        let bytes = @fs.read_file(
+          "\{isolated}/registry/cache/\{candidate.library.name()}/\{version}.zip",
+        ).binary()
+        let checksum = ArchiveDigest::of_archive(bytes)
+        guard checksum == candidate.checksum else {
+          fail(
+            "Public archive mismatch for \{candidate.library.name()}: expected \{candidate.checksum}, got \{checksum}",
+          )
+        }
+        println(
+          "Public archive verified \{candidate.library.name()}@\{version} SHA-256 \{checksum}",
+        )
+      }
+      for target in ["wasm", "wasm-gc", "js", "native"] {
+        let result = run([
+          "run", "--release", "--deny-warn", "--target", target, ".",
+        ])
+        guard result.trim() == "ok" else {
+          fail("\{candidate.library.name()} on \{target}: \{result}")
+        }
+        println(
+          "Registry consumer PASS \{candidate.library.name()}@\{version}: \{target}",
+        )
+      }
+      // Compile every package of the downloaded module, including limited adapters.
+      // This uses its archived manifest, not workspace resolution.
+      let installed = "\{consumer}/.mooncakes/\{candidate.library.name()}"
+      let (code, out, err) = @process.collect_output(
+        "moon",
+        ["build", "--release", "--deny-warn", "--target", "all"],
+        cwd=installed,
+        extra_env=consumer_env,
+      )
+      guard code == 0 else {
+        fail(
+          "Archived package build \{candidate.library.name()}\n\{out.text()}\{err.text()}",
+        )
+      }
+      println("Resolved graph for \{candidate.library.name()}:\n\{graph}")
+    }
+  }
+  if published {
+    @fs.write_file(
+      "\{isolated}/config.json",
+      (
+        {
+          "registry": "https://download.mooncakes.io",
+          "index": "https://mooncakes.io/git/index",
+        } : Json).stringify(),
+    )
+    @async.with_timeout(1_800_000, verify)
+    println("All nine public registry consumers passed from \{dir}")
+    return
+  }
+  // The candidate archives are the only new registry entries. Their
+  // dependencies retain the real pinned entries and checksums from moon update.
+  for candidate in packaged {
+    let dependencies : Map[String, Json] = Map([])
+    for line in candidate.manifest.split("\n") {
+      let line = line.trim()
+      if line.has_prefix("\"") && line.contains("@") {
+        let dependency = line
+          .replace_all(old="\"", new="")
+          .replace_all(old=",", new="")
+        let parts = dependency.split("@").map(part => part.to_owned()).collect()
+        guard parts.length() == 2 else { fail("Invalid pinned dependency") }
+        dependencies[parts[0]] = Json::string(parts[1])
+      }
+    }
+    @fs.write_file(
+      "\{isolated}/registry/index/user/\{candidate.library.name()}.index",
+      (
+        {
+          "name": Json::string(candidate.library.name()),
+          "version": Json::string(version.to_string()),
+          "deps": Json::object(dependencies),
+          "checksum": Json::string(candidate.checksum.to_string()),
+        } : Json).stringify() +
+      "\n",
+    )
+  }
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let url = "http://\{server.addr}"
+  @fs.write_file(
+    "\{isolated}/config.json",
+    (
+      {
+        "registry": Json::string(url),
+        "index": Json::string("\{dir}/unused-index"),
+      } : Json).stringify(),
+  )
+  let requests : Array[String] = []
+  @async.with_timeout(1_800_000, () => {
+    @async.with_task_group() <| group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, conn) => {
+          let path = request.path.replace_all(old="%2F", new="/")
+          requests.push(path)
+          let candidate = packaged.search_by(candidate => {
+            path == "/user/\{candidate.library.name()}/\{version}.zip"
+          })
+          let bytes = if candidate is Some(index) {
+            packaged[index].archive
+          } else {
+            guard path.has_prefix("/user/") &&
+              path.has_suffix(".zip") &&
+              !path.contains("..") else {
+              conn.send_response(404, "Not Found")
+              return
+            }
+            let cached = "\{home}/registry/cache/" + path[6:].to_owned()
+            if !cold_cache && @fs.exists(cached) {
+              @fs.read_file(cached).binary()
+            } else {
+              // A module's isolated graph can choose an older transitive pin
+              // than the workspace. Fetch it without writing the shared cache.
+              println("Public dependency fallback \{request.path}")
+              conn.send_response(
+                302,
+                "Found",
+                extra_headers=Map::from_array([
+                  (
+                    @http.CaseInsensitiveString("Location"),
+                    "https://download.mooncakes.io" + request.path,
+                  ),
+                ]),
+              )
+              return
+            }
+          }
+          conn.send_response(
+            200,
+            "OK",
+            extra_headers=Map::from_array([
+              (
+                @http.CaseInsensitiveString("Content-Length"),
+                bytes.length().to_string(),
+              ),
+            ]),
+          )
+          conn.write(bytes)
+        })
+      })
+      verify()
+    }
+  })
+  for candidate in packaged {
+    guard requests.contains("/user/\{candidate.library.name()}/\{version}.zip") else {
+      fail(
+        "Consumer did not download \{candidate.library.name()} from the loopback registry",
+      )
+    }
+  }
+  let checksums = packaged
+    .map(candidate => "\{candidate.library.name()} \{candidate.checksum}")
+    .join(", ")
+  println(
+    "Registry consumer verified all four targets from candidate archives \{checksums}",
+  )
+}
+
+///|
+fn archive_audit(names : Array[String]) -> Array[String] {
+  let errors = []
+  for required in ["moon.mod", "moon.pkg", "LICENSE"] {
+    if !names.contains(required) {
+      errors.push("missing " + required)
+    }
+  }
+  for name in names {
+    if name.has_prefix("/") ||
+      name.contains("..") ||
+      ["_build/", ".mooncakes/", "node_modules/", "docs/", "tests/", ".git/"].any(prefix => {
+          name.has_prefix(prefix) || name.contains("/" + prefix)
+        },
+      ) {
+      errors.push("foreign entry " + name)
+    }
+  }
+  errors
+}
+
+///|
+test "archive audit rejects missing licenses and nested tooling" {
+  let good = [
+    "moon.mod", "moon.pkg", "LICENSE", "console/signal_stub.c", "host/node.generated.js.mbt",
+  ]
+  assert_eq(archive_audit(good), [])
+  assert_eq(archive_audit(["moon.mod", "moon.pkg"]), ["missing LICENSE"])
+  for
+    bad in [
+      "tests/moon.mod", "docs/superpowers/plan.md", "../escape", "x/.mooncakes/cache",
+    ] {
+    assert_eq(archive_audit([..good, bad]), ["foreign entry " + bad])
+  }
+}
+
+///|
+fn input_failure(
+  action : () -> Unit raise ReleaseInputError,
+) -> ReleaseInputRule? {
+  try {
+    action()
+    None
+  } catch {
+    InvalidReleaseInput(rule~, ..) => Some(rule)
+  }
+}
+
+///|
+test "candidate identity parses one fixed library with its matching folder" {
+  for
+    library in [
+      Core,
+      Logging,
+      Config,
+      Mediator,
+      LoggingHostingAsync,
+      Hosting,
+      Lander,
+      Notebooks,
+      OpenRpc,
+    ] {
+    assert_true(
+      ReleaseLibrary::parse("\{library.folder()} \{library.name()}") == library,
+    )
+  }
+  for
+    (input, rule) in [
+      ("pkgs/core", LibraryLine),
+      ("pkgs/core moonrockz/moon-lander-core extra", LibraryLine),
+      ("pkgs/core other/core", UnknownLibrary),
+      ("../core moonrockz/moon-lander-core", LibraryFolder),
+      ("pkgs/config moonrockz/moon-lander-core", LibraryFolder),
+    ] {
+    assert_true(
+      input_failure(fn() raise ReleaseInputError {
+        ignore(ReleaseLibrary::parse(input))
+      }) ==
+      Some(rule),
+      msg=input,
+    )
+  }
+}
+
+///|
+test "release versions require three canonical decimal components" {
+  for input in ["0.0.0", "0.6.0", "12.10.3"] {
+    assert_eq(ReleaseVersion::parse(input).to_string(), input)
+  }
+  for
+    (input, rule) in [
+      ("0.6", VersionComponents),
+      ("0.6.0.1", VersionComponents),
+      ("0..0", VersionDigits),
+      ("0.6.x", VersionDigits),
+      ("0.6.-1", VersionDigits),
+      ("00.6.0", VersionLeadingZero),
+      ("0.06.0", VersionLeadingZero),
+    ] {
+    assert_true(
+      input_failure(fn() raise ReleaseInputError {
+        ignore(ReleaseVersion::parse(input))
+      }) ==
+      Some(rule),
+      msg=input,
+    )
+  }
+}
+
+///|
+test "archive digests require exactly 64 lower-case hex digits" {
+  let zeros = "0".repeat(64)
+  let hex = "0123456789abcdef".repeat(4)
+  assert_eq(ArchiveDigest::parse(zeros).to_string(), zeros)
+  assert_eq(ArchiveDigest::parse(hex).to_string(), hex)
+  for
+    (input, rule) in [
+      ("0".repeat(63), DigestLength),
+      ("0".repeat(65), DigestLength),
+      ("f".repeat(63) + "g", DigestCharacter),
+      ("f".repeat(63) + "A", DigestCharacter),
+    ] {
+    assert_true(
+      input_failure(fn() raise ReleaseInputError {
+        ignore(ArchiveDigest::parse(input))
+      }) ==
+      Some(rule),
+      msg=input,
+    )
+  }
+  let digest = ArchiveDigest::of_archive(b"candidate")
+  assert_true(ArchiveDigest::parse(digest.to_string()) == digest)
+}

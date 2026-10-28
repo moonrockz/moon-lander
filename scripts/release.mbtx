@@ -4,7 +4,7 @@ import {
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/x@0.5.6/sys",
 }
 ----
 
@@ -16,7 +16,7 @@ import {
 /// - `notes X.Y.Z` prints the CHANGELOG.md section of that version.
 /// - `github X.Y.Z NOTES [ASSET...]` creates the GitHub release `vX.Y.Z` at the
 ///   checked out commit with the files `ASSET...`, such as the site asset
-///   `site-X.Y.tar.gz`. When the release exists, it only attaches the files.
+///   `site-X.Y.tar.gz`. An existing release or tag requires owner action.
 
 ///|
 priv enum Plan {
@@ -115,6 +115,23 @@ async fn output_of(cmd : String, args : Array[String]) -> (Int32, String) {
 }
 
 ///|
+/// Check the remote, because a shallow checkout need not contain its tags.
+async fn require_absent_tag(tag : String) -> Unit {
+  let (code, out) = output_of("git", [
+    "ls-remote",
+    "--exit-code",
+    "--tags",
+    "origin",
+    "refs/tags/\{tag}",
+  ])
+  if code == 0 {
+    fail_with("\{tag} already exists; owner action is required")
+  } else if code != 2 {
+    fail_with("Cannot check the remote tag \{tag}: \{out}")
+  }
+}
+
+///|
 async fn run_plan() -> Unit {
   guard module_version(@fs.read_file("moon.mod").text()) is Some(version) else {
     fail_with("moon.mod has no version")
@@ -149,6 +166,9 @@ async fn run_plan() -> Unit {
     }
     let (viewed, _) = output_of("gh", ["release", "view", "v\{version}"])
     released = viewed == 0
+    if !released {
+      require_absent_tag("v\{version}")
+    }
   }
   match
     plan(
@@ -201,13 +221,6 @@ fn create_args(
 }
 
 ///|
-/// The `gh` arguments that attach `assets` to the existing release `tag`, and replace a file of the
-/// same name, so that a re-run is safe.
-fn upload_args(tag : String, assets : Array[String]) -> Array[String] {
-  ["release", "upload", tag, ..assets, "--clobber"]
-}
-
-///|
 async fn run_github(
   version : String,
   notes : String,
@@ -216,16 +229,10 @@ async fn run_github(
   let tag = "v\{version}"
   let (viewed, _) = output_of("gh", ["release", "view", tag])
   if viewed == 0 {
-    println("\{tag} already has a GitHub release")
-    if !assets.is_empty() {
-      let (code, out) = output_of("gh", upload_args(tag, assets))
-      if code != 0 {
-        fail_with("gh release upload failed: \{out}")
-      }
-      println("Attached \{assets.join(", ")} to \{tag}")
-    }
+    fail_with("\{tag} already has a GitHub release; owner action is required")
     return
   }
+  require_absent_tag(tag)
   let target = @env.get_env_var("GITHUB_SHA").unwrap_or("HEAD")
   let (code, out) = output_of("gh", create_args(tag, target, notes, assets))
   if code != 0 {
@@ -316,7 +323,4 @@ test "Release with the site asset" {
       "notes.md", "/tmp/site-asset/site-0.3.tar.gz",
     ],
   )
-  assert_eq(upload_args("v0.3.0", ["site-0.3.tar.gz"]), [
-    "release", "upload", "v0.3.0", "site-0.3.tar.gz", "--clobber",
-  ])
 }

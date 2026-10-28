@@ -6,7 +6,7 @@ import {
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.6/crypto",
 }
 ----
 
@@ -98,7 +98,7 @@ async fn main {
   }
   @fs.write_file(
     "\{dir}/consumer/moon.mod",
-    "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
+    "name = \"moonrockz/moon-lander-tests\"\nprivate = true\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
   )
   let toolchain = match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
     Some(root) => root
@@ -125,7 +125,7 @@ async fn main {
       "\{isolated}/config.json",
       (
         {
-          "registry": "https://mooncakes.io",
+          "registry": "https://download.mooncakes.io",
           "index": "https://mooncakes.io/git/index",
         } : Json).stringify(),
     )

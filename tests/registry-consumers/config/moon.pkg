@@ -1,0 +1,2 @@
+import { "moonrockz/moon-lander-config" @library }
+pkgtype(kind: "executable")

@@ -81,6 +81,8 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
+| `mise run check:framework-registry` | Audit all nine candidate archives and build isolated registry consumers on supported targets |
+| `mise run check:framework-published` | Release-only gate for all nine public archives and approved checksums |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
@@ -176,7 +178,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.5.0`.
+- `moon.mod` holds the shared version, currently `0.6.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -208,7 +210,7 @@ script. Also update the assessed versions above.
   `@hosting`: the host builder, hosted services and `run`, the native console
   signal stub in `console`, and the opt-in logging bridge in `logging`, which
   drains a logging session before the console driver ends the process.
-- `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
+- `pkgs/lander/` contains the `moonrockz/moon-lander` library, imported
   as `@lander`: the `cli` entry, the re-exports, and `version()`, which provides a
   build and test smoke check.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
@@ -241,21 +243,25 @@ publishes releases.
 
 ## Releases
 
+The `0.6.0` release publishes all seven framework modules to mooncakes.io,
+alongside notebooks and OpenRPC, with exact shared-version dependencies.
+
 The `0.5.0` release adds console and rolling file logging: the optional
 `moonrockz/moon-lander-logging-hosting-async` module and the host bridge that
 drains the logs before the process ends. The `0.4.0` release splits the framework into six modules, adds the
 application host (`moonrockz/moon-lander-hosting`) and the logging module, and
-types the configuration file-tree paths; the framework modules stay
-unpublished. The `0.3.0` release changes the mediator publish policy (every handler runs,
-then one `PublishFailed`) and adds the async mediator to the unpublished
+types the configuration file-tree paths. The `0.3.0` release changes the mediator publish policy (every handler runs,
+then one `PublishFailed`) and adds the async mediator to the
 framework module; it is the first release with a docs site asset. The `0.2.0`
 release adds `moonrockz/openrpc`, a portable OpenRPC document library. The `0.1.0` release moved `moonrockz/notebooks` here and added MIME
 queries, runtime cell capability inspection, and Ion-backed metadata. See
 [the changelog](CHANGELOG.md) for details and API migration notes.
 
-Release versions are shared across workspace members. `pkgs/notebooks` and
-`pkgs/openrpc` are published to mooncakes.io; the framework name remains
-provisional, and the workspace root, docs site and `tests` are not published.
+Release versions are shared across workspace members. All seven framework
+modules listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are published
+to mooncakes.io. Install a module at an exact version, for example
+`moon add moonrockz/moon-lander@0.6.0`. The workspace root, docs site, `tests`
+and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 
 Releases run in GitHub Actions, never from a workstation. Prepare a release
@@ -263,8 +269,8 @@ pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
 adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
 its checks on that pull request. Merging it to `main` is the owner's approval:
 the workflow then runs the full check, publishes the public modules with the
-`MOONCAKES_USER_TOKEN` organization secret, verifies the published OpenRPC
-archive from the public registry on all four targets, and creates the GitHub
+`MOONCAKES_USER_TOKEN` organization secret, verifies all nine published archives against approved checksums, runs isolated
+registry consumers and the format override checks on supported targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
 
 Each GitHub release from `0.3` on carries the docs site of its minor line as the

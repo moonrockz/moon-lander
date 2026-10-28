@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.6.0 - 2026-10-28
+
+The framework libraries are now published to mooncakes.io. Earlier releases
+omitted them from the publication list. All nine libraries use version `0.6.0`
+and exact sibling dependency versions. The release also adds opt-in configuration
+profiles.
+
+### Breaking changes
+
+- Configuration providers use `Expansion::new` and accessors in place of record
+  literals and field reads. Complete `DiscoveryOptions` literals add
+  `profiles: Unspecified`. Exhaustive matches must handle
+  `ProfileFile(ProfileName)` and `ConfigError::Profile`.
+
+### Changed
+
+- Update the direct `moonbitlang/x` dependency to `0.5.6` in configuration, the
+  docs tool and task scripts. Other direct library pins already match the latest
+  stable registry versions.
+
+### Added
+
+- Opt-in configuration profiles with ordered activation, defaults, includes,
+  bounded groups and adjacent profile files. Activate them through typed
+  options, `--profiles`, prefixed variables or eligible base files. Loaded
+  configuration and host contexts expose immutable profile resolution.
+- Public modules: `moonrockz/moon-lander-core`, `moonrockz/moon-lander-logging`,
+  `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
+  `moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting`
+  and `moonrockz/moon-lander`. `moonrockz/notebooks` and `moonrockz/openrpc`
+  are republished at the same version.
+- Dependency-ordered publication, archive audits and isolated registry consumer
+  checks for every library. Public archive checksums and format override checks
+  must pass before GitHub release creation.
+- Private manifests for tooling, tests and generated consumers, with an enforced
+  nine-library publication allowlist.
+
 ## 0.5.0 - 2026-10-28
 
 Moon-Lander adds console and rolling file logging. The shared workspace version

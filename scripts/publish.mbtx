@@ -2,7 +2,8 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
-  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
 }
 ----
 
@@ -15,12 +16,16 @@ import {
 /// Usage: `mise run release:publish`, or `moonx scripts/toolchain.mbtx scripts/publish.mbtx`.
 
 ///|
-/// Public modules, in dependency order. The framework modules, the workspace
-/// root, the docs site and the test module are not published. The first framework
-/// release adds the framework modules in this order: `pkgs/core`, `pkgs/logging`,
-/// `pkgs/config`, `pkgs/mediator`, `pkgs/hosting`, `pkgs/lander` (openspec
-/// split-framework-modules, design D10; add-logging, design D8).
+/// Public modules in dependency order. This is the publication allowlist.
+/// All other workspace modules must be private.
 let publish_list : Array[(String, String)] = [
+  ("pkgs/core", "moonrockz/moon-lander-core"),
+  ("pkgs/logging", "moonrockz/moon-lander-logging"),
+  ("pkgs/config", "moonrockz/moon-lander-config"),
+  ("pkgs/mediator", "moonrockz/moon-lander-mediator"),
+  ("pkgs/logging-hosting-async", "moonrockz/moon-lander-logging-hosting-async"),
+  ("pkgs/hosting", "moonrockz/moon-lander-hosting"),
+  ("pkgs/lander", "moonrockz/moon-lander"),
   ("pkgs/notebooks", "moonrockz/notebooks"),
   ("pkgs/openrpc", "moonrockz/openrpc"),
 ]
@@ -96,33 +101,121 @@ async fn with_retry(
 }
 
 ///|
+fn field(manifest : String, key : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.trim().has_prefix(key + " = ") {
+      return Some(
+        line
+        .trim()
+        .to_owned()
+        .replace_all(old=key + " = ", new="")
+        .replace_all(old="\"", new=""),
+      )
+    }
+  }
+  None
+}
+
+///|
+/// Reject a missing member, a renamed library, private libraries, public tools,
+/// and sibling dependencies that are unpinned, local or out of order.
+async fn check_policy() -> Unit {
+  let version = field(@fs.read_file("moon.mod").text(), "version").unwrap()
+  let work = @fs.read_file("moon.work").text()
+  let active = ["."]
+  for line in work.split("\n") {
+    let parts = line.trim().split("\"").collect()
+    if parts.length() >= 3 && parts[0].is_empty() {
+      let path = parts[1].to_owned()
+      active.push(
+        if path.has_prefix("./") {
+          path[2:].to_owned()
+        } else {
+          path
+        },
+      )
+    }
+  }
+  for path in active {
+    let manifest = @fs.read_file("\{path}/moon.mod").text()
+    let entry = publish_list.search_by(entry => entry.0 == path)
+    if entry is Some(i) {
+      guard field(manifest, "name") == Some(publish_list[i].1) &&
+        field(manifest, "private") != Some("true") else {
+        fail("Publication policy: wrong name or private library at \{path}")
+      }
+      for j, (_, sibling) in publish_list {
+        if j == i {
+          continue
+        }
+        if manifest.contains("\"\{sibling}@") {
+          guard manifest.contains("\"\{sibling}@\{version}\"") && j < i else {
+            fail(
+              "Publication policy: unpinned or out-of-order sibling \{sibling} in \{path}",
+            )
+          }
+        } else if manifest.contains("\"\{sibling}\"") {
+          fail("Publication policy: unversioned sibling \{sibling} in \{path}")
+        }
+      }
+      guard !manifest.contains("path:") && !manifest.contains("path =") else {
+        fail("Publication policy: local dependency in \{path}")
+      }
+    } else {
+      guard field(manifest, "private") == Some("true") else {
+        fail("Publication policy: \{path} must be private")
+      }
+    }
+  }
+  for (path, _) in publish_list {
+    guard active.contains(path) else {
+      fail("Publication policy: missing member \{path}")
+    }
+  }
+}
+
+///|
 async fn main {
-  let mut failed = 0
-  for entry in publish_list {
-    let (dir, name) = entry
+  let args = @env.args()[1:]
+  guard args is [] || args is ["--check"] || args is ["--list"] else {
+    fail("Usage: publish.mbtx [--check | --list]")
+  }
+  check_policy()
+  if @env.args().contains("--list") {
+    for (path, name) in publish_list {
+      println("\{path} \{name}")
+    }
+    return
+  }
+  if @env.args().contains("--check") {
+    println(
+      "Publication policy verified: nine libraries; all tooling and tests private",
+    )
+    return
+  }
+  guard @env.get_env_var("GITHUB_ACTIONS") == Some("true") &&
+    @env.get_env_var("GITHUB_WORKFLOW") == Some("Release") &&
+    @env.get_env_var("GITHUB_EVENT_NAME") != Some("pull_request") else {
+    fail("Publication is permitted only in the GitHub Actions Release workflow")
+  }
+  for (dir, name) in publish_list {
     let (update, update_out) = with_retry("update \{name}", () => {
       output_in(dir, "moon", ["update"])
     })
-    if update != 0 {
-      failed += 1
-      eprintln("❌ \{name}: moon update failed\n\{update_out}")
-      continue
+    guard update == 0 else {
+      fail("\{name}: moon update failed\n\{update_out}")
     }
     let (code, out) = with_retry("publish \{name}", () => {
       output_in(dir, "moon", ["publish"])
     })
     match classify(code, out) {
       Published => println("✅ \{name}: published")
-      AlreadyPublished => println("✅ \{name}: already published")
-      Transient | Failed => {
-        failed += 1
-        eprintln("❌ \{name}: publish failed\n\{out}")
-      }
+      AlreadyPublished =>
+        println(
+          "\{name}: already exists; the public checksum gate must verify its identity",
+        )
+      Transient | Failed => fail("\{name}: publish failed\n\{out}")
     }
-  }
-  if failed > 0 {
-    eprintln("❌ \{failed} module(s) were not published")
-    @sys.exit(1)
   }
 }
 
@@ -136,4 +229,67 @@ test "publish outcomes distinguish duplicates, transient and refused failures" {
   assert_eq(classify(1, "connection reset by peer"), Transient)
   assert_eq(classify(1, "HTTP 403 timeout"), Failed)
   assert_eq(classify(1, "invalid module"), Failed)
+}
+
+///|
+async test "publication policy rejects public tools, renamed libraries and wrong sibling pins" {
+  let script = @fs.realpath("publish.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-publication-policy")
+  defer @fs.rmdir(dir, recursive=true)
+  let root = "name = \"fixture/root\"\nprivate = true\nversion = \"0.6.0\"\n"
+  @fs.write_file("\{dir}/moon.mod", root)
+  @fs.write_file(
+    "\{dir}/moon.work",
+    "members = [\n  \".\",\n" +
+    publish_list.map(entry => "  \"./\{entry.0}\",\n").join("") +
+    "]\n",
+  )
+  for (path, name) in publish_list {
+    @fs.mkdir("\{dir}/\{path}", recursive=true)
+    @fs.write_file(
+      "\{dir}/\{path}/moon.mod",
+      "name = \"\{name}\"\nversion = \"0.6.0\"\n",
+    )
+  }
+  let probe = async fn() -> (Int32, String) {
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, "--check"],
+      cwd=dir,
+    )
+    (code, out.text() + err.text())
+  }
+  assert_eq(probe().0, 0)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    root.replace_all(old="private = true", new="private = false"),
+  )
+  let (code, output) = probe()
+  assert_not_eq(code, 0)
+  assert_true(output.contains("must be private"), msg=output)
+  @fs.write_file("\{dir}/moon.mod", root)
+  for
+    (manifest, message) in [
+      ("name = \"wrong/core\"\nversion = \"0.6.0\"\n", "wrong name"),
+      (
+        "name = \"moonrockz/moon-lander-core\"\nversion = \"0.6.0\"\nimport { \"moonrockz/moon-lander-hosting@0.6.0\" }\n",
+        "out-of-order",
+      ),
+    ] {
+    @fs.write_file("\{dir}/pkgs/core/moon.mod", manifest)
+    let (code, output) = probe()
+    assert_not_eq(code, 0)
+    assert_true(output.contains(message), msg=output)
+  }
+  @fs.write_file(
+    "\{dir}/pkgs/core/moon.mod",
+    "name = \"moonrockz/moon-lander-core\"\nversion = \"0.6.0\"\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/config/moon.mod",
+    "name = \"moonrockz/moon-lander-config\"\nversion = \"0.6.0\"\nimport { \"moonrockz/moon-lander-core@0.5.0\" }\n",
+  )
+  let (code, output) = probe()
+  assert_not_eq(code, 0)
+  assert_true(output.contains("unpinned"), msg=output)
 }

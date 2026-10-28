@@ -6,7 +6,7 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
-  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/x@0.5.6/sys",
 }
 ----
 
@@ -83,7 +83,7 @@ fn workspace_version(manifest : String) -> String? {
 /// The `moon.mod` of the consumer module. It depends on the copied framework module and on the
 /// pinned `moonbitlang/async`, as an application does.
 fn consumer_manifest(version : String) -> String {
-  "name = \"console-consumer\"\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander-core@\{version}\",\n  \"moonrockz/moon-lander-hosting@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
+  "name = \"console-consumer\"\nprivate = true\nversion = \"0.0.1\"\nimport {\n  \"moonrockz/moon-lander-core@\{version}\",\n  \"moonrockz/moon-lander-hosting@\{version}\",\n  \"moonbitlang/async@0.22.5\",\n}\n"
 }
 
 ///|

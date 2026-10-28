@@ -2,7 +2,7 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/x@0.5.6/sys",
 }
 ----
 

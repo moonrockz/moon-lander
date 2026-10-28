@@ -6,7 +6,7 @@ import {
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.6/crypto",
 }
 ----
 
@@ -167,7 +167,7 @@ async fn write_consumer(
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"openrpc-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+    "name = \"openrpc-consumer\"\nprivate = true\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
   )
   @fs.write_file(
     "\{dir}/moon.pkg",
@@ -272,7 +272,7 @@ async fn main {
       "\{isolated}/config.json",
       (
         {
-          "registry": "https://mooncakes.io",
+          "registry": "https://download.mooncakes.io",
           "index": "https://mooncakes.io/git/index",
         } : Json).stringify(),
     )

@@ -3,7 +3,7 @@ import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/stdio",
-  "moonbitlang/x@0.5.5/sys",
+  "moonbitlang/x@0.5.6/sys",
 }
 ----
 
@@ -21,8 +21,8 @@ async fn main {
       "validate", "test", "check:mediator", "check:logging", "check:logging-sinks",
       "check:embedded", "check:config", "check:formats", "check:formats-registry",
       "check:openrpc-assets", "check:openrpc-artifacts", "check:openrpc-unicode",
-      "check:openrpc", "qualify:openrpc", "check:openrpc-registry", "test:scripts",
-      "build", "test:browser",
+      "check:openrpc", "qualify:openrpc", "check:openrpc-registry", "check:framework-registry",
+      "test:scripts", "build", "test:browser",
     ] {
     println("")
     println("=== \{task} ===")

@@ -5,8 +5,8 @@ gives a MoonBit program what .NET hosting and configuration give a .NET program:
 layered configuration from files, environment variables, and the command line,
 typed binding, and a host that runs commands and services with clear exit codes.
 
-The provisional module name is `moonrockz/moon-lander`, imported as `@lander`.
-The module has not been published. The configuration packages are in the module
+The module name is `moonrockz/moon-lander`, imported as `@lander`.
+Install the release with `moon add moonrockz/moon-lander@0.6.0`. The configuration packages are in the module
 [`moonrockz/moon-lander-config`](../config/README.mbt.md): its pure core and
 formats run on `wasm`, `wasm-gc`, `js`, and `native`, its file host adapters
 support `native` and `js`, and its browser adapter supports `js`.

@@ -4,6 +4,37 @@ fn overlay_conventions() -> @conventions.Conventions raise @config.ConfigError {
 }
 
 ///|
+test "selected member adjacent and supplemental identities retain member-scope filters" {
+  let supplemental = @conventions.SupplementalFile::new("acme-workspace.json", @conventions.Extension::parse("json"))
+  let conventions = ordered_conventions(supplemental~)
+    |> @conventions.selected_file_policy(Overlay)
+    |> @conventions.member_scope_keys(["workspace.out_dir"])
+    |> @conventions.inherited_filter(["project"])
+    |> @conventions.environments(default="Prod")
+    |> @conventions.profiles(@profiles.Policy::new())
+  let entries = [
+    ("/w/acme.json", "{workspace:{members:['a'],out_dir:'root'},profiles:{active:['metrics']}}"),
+    ("/w/a/acme.toml", "project.name='a'"),
+    ("/w/a/acme-workspace.json", "{workspace:{out_dir:'member-supplemental'}}"),
+    ("/w/a/acme.Prod.toml", "workspace.out_dir='member-env'"),
+    ("/w/a/acme.local.toml", "workspace.out_dir='member-local'"),
+    ("/w/a/acme.user.toml", "workspace.out_dir='member-user'"),
+    ("/w/a/acme.profile.metrics.toml", "workspace.out_dir='member-profile'"),
+  ]
+  for file in ["acme-workspace.json", "acme.Prod.toml", "acme.local.toml", "acme.user.toml", "acme.profile.metrics.toml"] {
+    let config = discover_in("/w", entries, conventions~, formats=ordered_formats(), options=@conventions.DiscoveryOptions::new(config=Explicit("a/./" + file), project="a"))
+    assert_eq(@config.get_text(config, "workspace.out_dir"), "root")
+    let selected = config.reports().filter(report => report.path == Some("/w/a/" + file))
+    assert_eq(selected.length(), 1)
+    assert_eq(selected[0].priority, 325)
+    assert_true(selected[0].warnings.any(warning => match warning {
+      KeyRemoved(key, _) => key.to_string() == "workspace.out_dir"
+      _ => false
+    }))
+  }
+}
+
+///|
 test "selected JSON moves above TOML once and member primaries remain higher" {
   let files = [
     ("/w/acme.json", "{workspace:{members:['a']}, shared:'json', jsonOnly:true}"),

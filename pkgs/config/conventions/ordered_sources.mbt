@@ -123,6 +123,7 @@ fn Scan::source_for(
   role : @config.FileRole,
   supplemental? : SupplementalFile,
   omit_selected? : Bool = true,
+  as_member? : Bool = false,
 ) -> Array[@config.ConfigSource]? raise @config.ConfigError {
   guard self.existing(paths) is Some(existing) else { return None }
   guard existing is [path] else {
@@ -131,7 +132,7 @@ fn Scan::source_for(
   match self.read_document(path, supplemental?) {
     Found(value) => {
       let source = @config.ConfigSource::parsed_file(path.to_string(), value, role~, name=self.conventions.display)
-      Some(if omit_selected { self.keep_source(path, source) } else { [source] })
+      Some(if omit_selected { self.keep_source(path, source, as_member~) } else { [source] })
     }
     Missing => raise @config.FileNotFound(path=path.to_string())
     Unknown => None
@@ -172,7 +173,7 @@ fn Scan::ordered_layer(
     paths.push(root.child("\{self.conventions.name}.\{layers.groups[0].extensions[0].text}"))
   }
   let anchors = self.conventions.anchors(paths, project.extensions)
-  let adjacent = self.ordered_overrides(anchors, project)
+  let adjacent = self.ordered_overrides(anchors, project, as_member~)
   guard known && adjacent is Some(adjacent) else { return None }
   let controls = if as_member || self.conventions.profiles is None { [] } else { documents.map(document => self.control_layer(document.selected.path, document.value, Workspace)) }
   Some({ primaries, adjacent, paths, controls })
@@ -195,7 +196,7 @@ fn Scan::ordered_profile_sources(
       let paths = tier.locations.filter_map(location => if location.1 == is_member { Some(location.0) } else { None })
       let anchors = self.conventions.anchors(paths, self.extensions)
       if anchors.is_empty() { continue }
-      guard self.adjacent_sources(anchors, "profile.\{name}", ProfileFile(name)) is Some(stage) else { continue }
+      guard self.adjacent_sources(anchors, "profile.\{name}", ProfileFile(name), as_member=is_member) is Some(stage) else { continue }
       let filters = if is_member { key_paths(self.conventions.member_scope) } else if tier.has_member { key_paths(self.conventions.inherited) } else { [] }
       sources.append(stage.map(source => filtered(source, filters, warn=is_member)))
     }
@@ -220,6 +221,7 @@ fn Scan::adjacent_sources(
   anchors : Array[(@config.FileTreePath, String)],
   suffix : String,
   role : @config.FileRole,
+  as_member? : Bool = false,
 ) -> Array[@config.ConfigSource]? raise @config.ConfigError {
   let groups = self.conventions.layers.map(layers => layers.groups.map(group => group.extensions.map(extension => extension.text))).unwrap_or([self.extensions])
   let sources = []
@@ -232,7 +234,7 @@ fn Scan::adjacent_sources(
         if !paths.contains(path) { paths.push(path) }
       }
     }
-    match self.source_for(paths, role) {
+    match self.source_for(paths, role, as_member~) {
       Some(stage) => sources.append(stage)
       None => known = false
     }
@@ -245,12 +247,13 @@ fn Scan::ordered_overrides(
   self : Scan,
   anchors : Array[(@config.FileTreePath, String)],
   project : ProjectInputs,
+  as_member? : Bool = false,
 ) -> Array[Array[@config.ConfigSource]]? raise @config.ConfigError {
   let stages = []
   let mut known = true
   match project.environment {
     None => stages.push([])
-    Some(name) => match self.adjacent_sources(anchors, name, EnvironmentFile) {
+    Some(name) => match self.adjacent_sources(anchors, name, EnvironmentFile, as_member~) {
       Some(sources) => stages.push(sources)
       None => { stages.push([]); known = false }
     }
@@ -263,7 +266,7 @@ fn Scan::ordered_overrides(
       stages.push(sources)
       continue
     }
-    match self.adjacent_sources(anchors, suffix, role) {
+    match self.adjacent_sources(anchors, suffix, role, as_member~) {
       Some(sources) => stages.push(sources)
       None => { stages.push([]); known = false }
     }

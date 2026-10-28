@@ -18,7 +18,6 @@ fn discover(
   match conventions.project_sources(inputs, scan, machine) {
     Need(requests) => Need(requests)
     Done(tier) => {
-      guard scan.with_selected_overlay(tier) is Some(tier) else { return Need(scan.needs) }
       let inherited = if tier.has_member {
         key_paths(conventions.inherited)
       } else {
@@ -58,6 +57,7 @@ fn discover(
         None => []
       }
       if !scan.needs.is_empty() { return Need(scan.needs) }
+      guard scan.with_selected_overlay(tier) is Some(tier) else { return Need(scan.needs) }
       let ordered = [..sources]
       let mut inserted = false
       for source in tier.sources {
@@ -92,6 +92,7 @@ priv struct Scan {
   extensions : Array[String]
   start : @config.FileTreePath?
   selected : @config.FileTreePath?
+  member_files : @hashset.HashSet[@config.FileTreePath]
   needs : Array[@config.FileRequest]
   notes : Array[@config.ConfigWarning]
   parsed : Map[@config.FileTreePath, @config.ConfigValue]
@@ -105,7 +106,7 @@ fn Scan::new(conventions : Conventions, context : @config.LoadContext, extension
     (Overlay, Explicit(path)) => Some(conventions.explicit_file(path, context, extensions).path)
     _ => None
   }
-  { conventions, context, extensions, start, selected, needs: [], notes, parsed: Map([]), documents: Map([]) }
+  { conventions, context, extensions, start, selected, member_files: @hashset.HashSet([]), needs: [], notes, parsed: Map([]), documents: Map([]) }
 }
 
 ///|
@@ -518,7 +519,7 @@ fn Conventions::layer(
   if self.prepared_layers() {
     let paths = if self.adjacent(file.path, project.extensions) is Some(_) { [file.path] } else { [] }
     let adjacent = if paths.is_empty() { [] } else {
-      guard scan.ordered_overrides(self.anchors(paths, project.extensions), project) is Some(stages) else { return None }
+      guard scan.ordered_overrides(self.anchors(paths, project.extensions), project, as_member~) is Some(stages) else { return None }
       stages
     }
     let controls = if as_member || paths.is_empty() || self.profiles is None { [] } else {

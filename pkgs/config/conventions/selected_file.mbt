@@ -13,8 +13,10 @@ fn Conventions::prepared_layers(self : Conventions) -> Bool {
 
 ///|
 /// Exclude the selected physical identity before ordinary sources execute.
-fn Scan::keep_source(self : Scan, path : @config.FileTreePath, source : @config.ConfigSource) -> Array[@config.ConfigSource] raise @config.ConfigError {
-  if self.selected == Some(normalize(path)) { [] } else { [source] }
+fn Scan::keep_source(self : Scan, path : @config.FileTreePath, source : @config.ConfigSource, as_member? : Bool = false) -> Array[@config.ConfigSource] raise @config.ConfigError {
+  let identity = normalize(path)
+  if as_member || source.kind() is File(Member) { self.member_files.add(identity) }
+  if self.selected == Some(identity) { [] } else { [source] }
 }
 
 ///|
@@ -41,7 +43,7 @@ fn Scan::with_selected_overlay(self : Scan, tier : Tier) -> Tier? raise @config.
     Missing => raise @config.FileNotFound(path=path.to_string())
     Unknown => return None
   }
-  let as_member = tier.locations.any(location => location.1 && location.0 == path)
+  let as_member = self.member_files.contains(path)
   let filters = if as_member { key_paths(self.conventions.member_scope) } else if tier.has_member { key_paths(self.conventions.inherited) } else { [] }
   let overlay = filtered(@config.ConfigSource::parsed_file(path.to_string(), value, role=Explicit, priority=325, name=self.conventions.display), filters, warn=as_member)
   let sources = []

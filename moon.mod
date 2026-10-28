@@ -1,6 +1,6 @@
 name = "moon-lander-workspace"
 
-version = "0.4.0"
+version = "0.5.0"
 
 description = "Moon-Lander workspace"
 

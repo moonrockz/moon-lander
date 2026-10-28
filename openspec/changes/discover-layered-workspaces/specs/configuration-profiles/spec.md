@@ -104,11 +104,9 @@ resolver API SHALL retain its behavior.
 
 ### Requirement: Selected discovered base retains control authority
 
-Selecting an already discovered base file as an ordinary-value overlay SHALL retain that file's base control
-authority. The file SHALL be parsed once and have one ordinary source report in its overlay position. Arbitrary
-selected files SHALL remain forbidden control locations while processing is enabled and not explicitly disabled.
-Explicitly disabled processing SHALL retain the existing control-stripping behavior. Control extraction SHALL NOT cause ordinary values to
-be merged at both positions.
+Selecting a discovered base as an overlay SHALL preserve its control authority. It SHALL be parsed once, with
+one ordinary source report at the overlay position and no duplicate merge. Non-base selections SHALL reject
+controls when processing is enabled. Explicitly disabled processing SHALL retain control stripping.
 
 #### Scenario: Selecting the workspace primary
 - **WHEN** the discovered primary contains valid profile controls and the selected overlay names the same normalized path

@@ -59,12 +59,12 @@ With Claude Code, use the commands that `openspec init` installed in `.claude/`:
 
 | Command | Use |
 | --- | --- |
-| `/opsx:explore` | Examine an idea or a problem before you write a change |
-| `/opsx:propose` | Make a change and write all of its files |
-| `/opsx:update` | Revise the files of a change and keep them consistent |
-| `/opsx:apply` | Implement the tasks of a change |
-| `/opsx:sync` | Copy the requirement changes into `openspec/specs/` without archiving |
-| `/opsx:archive` | Archive a complete change |
+| `/openspec-explore` | Examine an idea or a problem before you write a change |
+| `/openspec-propose` | Make a change and write all of its files |
+| `/openspec-update-change` | Revise the files of a change and keep them consistent |
+| `/openspec-apply-change` | Implement the tasks of a change |
+| `/openspec-sync-specs` | Copy the requirement changes into `openspec/specs/` without archiving |
+| `/openspec-archive-change` | Archive a complete change |
 
 Without an agent, run `mise exec -- openspec new change <name>`. Then run
 `mise exec -- openspec instructions <artifact> --change <name>` to see the template

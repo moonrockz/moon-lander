@@ -53,12 +53,12 @@ async test "workspace test gate delegates discovery and target filtering to moon
   @fs.mkdir("\{dir}/lib/expression_only", recursive=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   @fs.write_file("\{dir}/moon.work", "members = [\n  \".\",\n  \"./lib\",\n]\n")
   @fs.write_file(
     "\{dir}/lib/moon.mod",
-    "name = \"fixture/lib\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/lib\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   for pkg in ["lib", "lib/nested", "lib/array_only", "lib/expression_only"] {
     @fs.write_file("\{dir}/\{pkg}/moon.pkg", "")

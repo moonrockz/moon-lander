@@ -5,10 +5,9 @@
 #           or a vX.Y.Z tag, when vX.Y.Z has no GitHub release yet and
 #           CHANGELOG.md has its section.
 # validate  runs the full checks and the shared-version check.
-# publish   packages moonrockz/openrpc, publishes the public modules (an
-#           existing version counts as done), then verifies the published
-#           OpenRPC archive from the public registry on four targets against
-#           the checksum of the archive this job built.
+# publish   packages and audits all nine libraries, publishes in dependency
+#           order, then verifies each public archive against its approved
+#           checksum and runs the public format override qualification.
 # site      builds the docs site of the moon.mod minor line through
 #           site-asset.yml and gives site-<minor>.tar.gz to the release job
 #           (openspec add-docs-site, design D22).
@@ -17,9 +16,8 @@
 #           serves each minor line from that asset.
 #
 # Pull requests that change release files, and manual runs with dry_run, only
-# plan, validate and build the site asset. Re-running failed jobs is safe:
-# publish and release are idempotent, and the release job attaches the asset
-# again to an existing release.
+# plan, validate and build the site asset. A repeated publication must pass
+# the public archive checksum gate. Existing releases and tags are never replaced.
 
 name: Release
 
@@ -35,6 +33,8 @@ on:
       - scripts/publish.mbtx
       - scripts/credentials.mbtx
       - scripts/check-openrpc-registry.mbtx
+      - scripts/check-framework-registry.mbtx
+      - scripts/check-formats-registry.mbtx
       - scripts/versions.mbtx
       - .github/workflows/site-asset.yml
       - moon.mod
@@ -115,22 +115,28 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Package moonrockz/openrpc and record its checksum
-        id: candidate
-        run: |
-          set -euo pipefail
-          moon -C pkgs/openrpc package
-          sha=$(sha256sum "_build/publish/moonrockz-openrpc-${{ needs.plan.outputs.version }}.zip" | cut -d' ' -f1)
-          echo "OpenRPC archive SHA-256 $sha"
-          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+      - name: Package and audit all release libraries and record checksums
+        run: mise run release:package
+      - name: Retain approved archive checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-checksums
+          path: _build/publish/checksums.json
+          if-no-files-found: error
       - name: Write the mooncakes.io credentials
         env:
           MOONCAKES_USER_TOKEN: ${{ secrets.MOONCAKES_USER_TOKEN }}
         run: mise run release:credentials
       - name: Publish the modules
         run: mise run release:publish
-      - name: Verify the published OpenRPC module on four targets
-        run: mise run check:openrpc-published -- --checksum ${{ steps.candidate.outputs.sha256 }}
+      - name: Verify all published libraries and archive checksums
+        run: mise run check:framework-published
+      - name: Verify public format overrides on four targets
+        run: mise run check:formats-published
+      - name: Verify the published OpenRPC consumer on four targets
+        run: |
+          sha=$(jq -r '."moonrockz/openrpc"' _build/publish/checksums.json)
+          mise run check:openrpc-published -- --checksum "$sha"
 
   site:
     name: Site asset

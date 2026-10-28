@@ -1,0 +1,2 @@
+import { "moonrockz/notebooks" @library }
+pkgtype(kind: "executable")

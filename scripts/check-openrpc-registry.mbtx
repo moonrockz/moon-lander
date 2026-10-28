@@ -167,7 +167,7 @@ async fn write_consumer(
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"openrpc-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+    "name = \"openrpc-consumer\"\nprivate = true\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
   )
   @fs.write_file(
     "\{dir}/moon.pkg",

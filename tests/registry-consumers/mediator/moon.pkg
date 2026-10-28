@@ -1,0 +1,2 @@
+import { "moonrockz/moon-lander-mediator" @library }
+pkgtype(kind: "executable")

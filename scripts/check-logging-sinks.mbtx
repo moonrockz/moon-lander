@@ -81,7 +81,7 @@ fn consumer_manifest(
   version : String,
 ) -> String {
   let imports = modules.map(name => "  \"\{name}@\{version}\",\n").join("")
-  "name = \"\{name}\"\nversion = \"0.0.1\"\nimport {\n\{imports}}\n"
+  "name = \"\{name}\"\nprivate = true\nversion = \"0.0.1\"\nimport {\n\{imports}}\n"
 }
 
 ///|
@@ -381,7 +381,7 @@ test "test_count reads the last total line and none without one" {
 test "a consumer manifest imports each module at the version" {
   assert_eq(
     consumer_manifest("fixture/x", ["a/b", "c/d"], "0.4.0"),
-    "name = \"fixture/x\"\nversion = \"0.0.1\"\nimport {\n  \"a/b@0.4.0\",\n  \"c/d@0.4.0\",\n}\n",
+    "name = \"fixture/x\"\nprivate = true\nversion = \"0.0.1\"\nimport {\n  \"a/b@0.4.0\",\n  \"c/d@0.4.0\",\n}\n",
   )
 }
 
@@ -410,7 +410,7 @@ async test "the check rejects a suite that runs zero tests" {
   defer @fs.rmdir(dir, recursive=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   for path in ["tests", suite, js_program] {
     @fs.mkdir("\{dir}/\{path}")

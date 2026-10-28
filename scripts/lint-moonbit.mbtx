@@ -170,7 +170,7 @@ async test "moon check covers a package outside the preferred target" {
   @fs.mkdir("\{dir}/js_only")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\npreferred_target = \"native\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\npreferred_target = \"native\"\n",
   )
   @fs.write_file("\{dir}/js_only/moon.pkg", "supported_targets = \"js\"\n")
   @fs.write_file(
@@ -206,7 +206,7 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   @fs.mkdir("\{dir}/lib")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   @fs.write_file("\{dir}/lib/moon.pkg", "")
   @fs.write_file(
@@ -272,7 +272,7 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   @fs.mkdir("\{dir}/lib")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   @fs.write_file("\{dir}/lib/moon.pkg", "")
   @fs.write_file(

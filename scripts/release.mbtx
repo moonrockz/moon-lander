@@ -16,7 +16,7 @@ import {
 /// - `notes X.Y.Z` prints the CHANGELOG.md section of that version.
 /// - `github X.Y.Z NOTES [ASSET...]` creates the GitHub release `vX.Y.Z` at the
 ///   checked out commit with the files `ASSET...`, such as the site asset
-///   `site-X.Y.tar.gz`. When the release exists, it only attaches the files.
+///   `site-X.Y.tar.gz`. An existing release or tag requires owner action.
 
 ///|
 priv enum Plan {
@@ -201,13 +201,6 @@ fn create_args(
 }
 
 ///|
-/// The `gh` arguments that attach `assets` to the existing release `tag`, and replace a file of the
-/// same name, so that a re-run is safe.
-fn upload_args(tag : String, assets : Array[String]) -> Array[String] {
-  ["release", "upload", tag, ..assets, "--clobber"]
-}
-
-///|
 async fn run_github(
   version : String,
   notes : String,
@@ -216,14 +209,16 @@ async fn run_github(
   let tag = "v\{version}"
   let (viewed, _) = output_of("gh", ["release", "view", tag])
   if viewed == 0 {
-    println("\{tag} already has a GitHub release")
-    if !assets.is_empty() {
-      let (code, out) = output_of("gh", upload_args(tag, assets))
-      if code != 0 {
-        fail_with("gh release upload failed: \{out}")
-      }
-      println("Attached \{assets.join(", ")} to \{tag}")
-    }
+    fail_with("\{tag} already has a GitHub release; owner action is required")
+    return
+  }
+  let (tag_exists, _) = output_of("git", [
+    "rev-parse",
+    "--verify",
+    "refs/tags/\{tag}",
+  ])
+  if tag_exists == 0 {
+    fail_with("\{tag} already exists; owner action is required")
     return
   }
   let target = @env.get_env_var("GITHUB_SHA").unwrap_or("HEAD")
@@ -316,7 +311,4 @@ test "Release with the site asset" {
       "notes.md", "/tmp/site-asset/site-0.3.tar.gz",
     ],
   )
-  assert_eq(upload_args("v0.3.0", ["site-0.3.tar.gz"]), [
-    "release", "upload", "v0.3.0", "site-0.3.tar.gz", "--clobber",
-  ])
 }

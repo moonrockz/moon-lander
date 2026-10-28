@@ -1,18 +1,21 @@
 name = "moonrockz/moon-lander-tests"
 
-version = "0.5.0"
+// Tooling and tests must never publish. The pinned toolchain rejects private publication.
+private = true
+
+version = "0.6.0"
 
 import {
   "moonbitlang/async@0.22.5",
-  "moonrockz/notebooks@0.5.0",
-  "moonrockz/moon-lander@0.5.0",
-  "moonrockz/moon-lander-core@0.5.0",
-  "moonrockz/moon-lander-config@0.5.0",
-  "moonrockz/moon-lander-logging@0.5.0",
-  "moonrockz/moon-lander-mediator@0.5.0",
-  "moonrockz/moon-lander-hosting@0.5.0",
-  "moonrockz/moon-lander-logging-hosting-async@0.5.0",
-  "moonrockz/openrpc@0.5.0",
+  "moonrockz/notebooks@0.6.0",
+  "moonrockz/moon-lander@0.6.0",
+  "moonrockz/moon-lander-core@0.6.0",
+  "moonrockz/moon-lander-config@0.6.0",
+  "moonrockz/moon-lander-logging@0.6.0",
+  "moonrockz/moon-lander-mediator@0.6.0",
+  "moonrockz/moon-lander-hosting@0.6.0",
+  "moonrockz/moon-lander-logging-hosting-async@0.6.0",
+  "moonrockz/openrpc@0.6.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/moonspec@0.11.0",
   "moonrockz/expect@0.6.1",

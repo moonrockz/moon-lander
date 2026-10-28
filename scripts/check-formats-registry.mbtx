@@ -98,7 +98,7 @@ async fn main {
   }
   @fs.write_file(
     "\{dir}/consumer/moon.mod",
-    "name = \"moonrockz/moon-lander-tests\"\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
+    "name = \"moonrockz/moon-lander-tests\"\nprivate = true\nversion = \"\{version}\"\nsource = \"tests\"\nimport { \"\{consumed}@\{version}\" }\n",
   )
   let toolchain = match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
     Some(root) => root

@@ -344,7 +344,7 @@ async fn main {
   )
   @fs.write_file(
     isolated + "/moon.mod",
-    "name = \"openrpc-tracer-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+    "name = \"openrpc-tracer-consumer\"\nprivate = true\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
   )
   @fs.write_file(
     isolated + "/moon.pkg",
@@ -357,7 +357,7 @@ async fn main {
   @fs.mkdir(isolated + "/patterns")
   @fs.write_file(
     isolated + "/patterns/moon.mod",
-    "name = \"openrpc-pattern-consumer\"\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
+    "name = \"openrpc-pattern-consumer\"\nprivate = true\nversion = \"\{version}\"\nimport { \"moonrockz/openrpc@\{version}\" }\n",
   )
   @fs.write_file(
     isolated + "/patterns/moon.pkg",

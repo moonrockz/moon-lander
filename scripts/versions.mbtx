@@ -480,11 +480,11 @@ async test "root version is authoritative regardless of workspace member order" 
   @fs.mkdir("\{dir}/pkgs/lander", recursive=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   @fs.write_file(
     "\{dir}/pkgs/lander/moon.mod",
-    "name = \"fixture/lib\"\nversion = \"0.0.2\"\n",
+    "name = \"fixture/lib\"\nprivate = true\nversion = \"0.0.2\"\n",
   )
   @fs.write_file(
     "\{dir}/pkgs/lander/version.mbt",
@@ -534,22 +534,22 @@ async test "framework modules share the root version, also in their sibling impo
   defer @fs.rmdir(dir, recursive=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"moon-lander-workspace\"\nversion = \"0.3.0\"\n",
+    "name = \"moon-lander-workspace\"\nprivate = true\nversion = \"0.3.0\"\n",
   )
   @fs.mkdir("\{dir}/pkgs/core", recursive=true)
   @fs.write_file(
     "\{dir}/pkgs/core/moon.mod",
-    "name = \"moonrockz/moon-lander-core\"\nversion = \"0.3.0\"\n",
+    "name = \"moonrockz/moon-lander-core\"\nprivate = true\nversion = \"0.3.0\"\n",
   )
   @fs.mkdir("\{dir}/pkgs/mediator", recursive=true)
   @fs.write_file(
     "\{dir}/pkgs/mediator/moon.mod",
-    "name = \"moonrockz/moon-lander-mediator\"\nversion = \"0.3.1\"\n\nimport {\n  \"moonrockz/moon-lander-core@0.3.0\",\n  \"moonbitlang/async@0.22.5\",\n}\n",
+    "name = \"moonrockz/moon-lander-mediator\"\nprivate = true\nversion = \"0.3.1\"\n\nimport {\n  \"moonrockz/moon-lander-core@0.3.0\",\n  \"moonbitlang/async@0.22.5\",\n}\n",
   )
   @fs.mkdir("\{dir}/pkgs/lander", recursive=true)
   @fs.write_file(
     "\{dir}/pkgs/lander/moon.mod",
-    "name = \"moonrockz/moon-lander\"\nversion = \"0.3.0\"\n\nimport {\n  \"moonrockz/moon-lander-core@0.3.0\",\n  \"moonrockz/moon-lander-mediator@0.3.0\",\n}\n",
+    "name = \"moonrockz/moon-lander\"\nprivate = true\nversion = \"0.3.0\"\n\nimport {\n  \"moonrockz/moon-lander-core@0.3.0\",\n  \"moonrockz/moon-lander-mediator@0.3.0\",\n}\n",
   )
   @fs.write_file(
     "\{dir}/pkgs/lander/version.mbt",

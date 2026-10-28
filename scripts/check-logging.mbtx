@@ -140,7 +140,7 @@ async test "a leg that runs zero tests fails the check" {
   defer @fs.rmdir(dir, recursive=true)
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
   for path in ["pkgs", "tests"] {
     @fs.mkdir("\{dir}/\{path}")

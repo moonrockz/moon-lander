@@ -21,8 +21,8 @@ async fn main {
       "validate", "test", "check:mediator", "check:logging", "check:logging-sinks",
       "check:embedded", "check:config", "check:formats", "check:formats-registry",
       "check:openrpc-assets", "check:openrpc-artifacts", "check:openrpc-unicode",
-      "check:openrpc", "qualify:openrpc", "check:openrpc-registry", "test:scripts",
-      "build", "test:browser",
+      "check:openrpc", "qualify:openrpc", "check:openrpc-registry", "check:framework-registry",
+      "test:scripts", "build", "test:browser",
     ] {
     println("")
     println("=== \{task} ===")

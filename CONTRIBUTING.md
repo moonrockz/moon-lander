@@ -132,20 +132,29 @@ Ask the owner before opening or merging a release pull request; merging it is
 the publication approval. The pull request sets the shared version with
 `scripts/versions.mbtx set X.Y.Z` and adds the `## X.Y.Z` section to
 `CHANGELOG.md`, and the workflow dry-runs its checks on it. After the merge the
-workflow runs `mise run check`, publishes `pkgs/notebooks` and `pkgs/openrpc`
-with the `MOONCAKES_USER_TOKEN` organization secret (an existing version counts
-as published), runs `mise run check:openrpc-published -- --checksum <sha>`
-against the archive it built, and only then creates the GitHub release `vX.Y.Z`.
-Repository access to that secret must be verified before the first run.
+workflow runs `mise run check`, packages and audits the nine libraries with
+`mise run release:package`, and publishes them with the `MOONCAKES_USER_TOKEN`
+organization secret. The publication order is core, logging, config, mediator,
+logging-hosting-async, hosting, the umbrella, notebooks, then OpenRPC. Every
+sibling import uses the shared release version. Repository access to the secret
+must be verified before the first run.
 
-The framework modules (`moonrockz/moon-lander-core`,
-`moonrockz/moon-lander-logging`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
-`moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting` and
-`moonrockz/moon-lander`) stay unpublished. Before publishing them,
-run `mise run check:formats-registry` on the exact candidate, and keep release gate
-`lander-4us.9` open until `mise run check:formats-published` passes on all four
-targets for that candidate with its source SHA and published archive checksum
-recorded in the bead.
+The workflow runs `mise run check:framework-published` against the approved
+archive checksums, then `mise run check:formats-published` and
+`mise run check:openrpc-published -- --checksum <sha>`. These gates use the public
+registry outside the checkout. They must pass before the GitHub release
+`vX.Y.Z` is created. The checksum artifact and logs record the archive identities
+and source commit. Keep release gate `lander-4us.9` open until the public format
+override check passes on all four targets and its source SHA and archive checksum
+are recorded in the bead.
+
+`scripts/publish.mbtx` owns the explicit nine-library allowlist.
+`mise run validate:publication` checks it against `moon.work` and the manifests.
+The workspace root, `tests/`, `apps/site` and generated consumer or fixture
+modules are private. The pinned toolchain refuses to publish private modules.
+Never publish from a workstation. Do not overwrite tags, releases or registry
+entries. A release retry may encounter an already uploaded version, but the
+public checksum check must prove that it is the same approved archive.
 
 ## Commits and pull requests
 

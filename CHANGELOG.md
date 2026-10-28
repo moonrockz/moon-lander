@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 - 2026-10-28
+
+The framework libraries are now published to mooncakes.io. Earlier releases
+omitted them from the publication list. All nine libraries use version `0.6.0`
+and exact sibling dependency versions.
+
+### Added
+
+- Public modules: `moonrockz/moon-lander-core`, `moonrockz/moon-lander-logging`,
+  `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
+  `moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting`
+  and `moonrockz/moon-lander`. `moonrockz/notebooks` and `moonrockz/openrpc`
+  are republished at the same version.
+- Dependency-ordered publication, archive audits and isolated registry consumer
+  checks for every library. Public archive checksums and format override checks
+  must pass before GitHub release creation.
+- Private manifests for tooling, tests and generated consumers, with an enforced
+  nine-library publication allowlist.
+
 ## 0.5.0 - 2026-10-28
 
 Moon-Lander adds console and rolling file logging. The shared workspace version

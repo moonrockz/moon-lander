@@ -1,0 +1,2 @@
+import { "moonrockz/moon-lander-hosting" @library }
+pkgtype(kind: "executable")

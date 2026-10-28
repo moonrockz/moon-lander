@@ -1,0 +1,2 @@
+import { "moonrockz/openrpc" @library }
+pkgtype(kind: "executable")

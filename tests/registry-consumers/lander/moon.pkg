@@ -1,0 +1,2 @@
+import { "moonrockz/moon-lander" @library }
+pkgtype(kind: "executable")

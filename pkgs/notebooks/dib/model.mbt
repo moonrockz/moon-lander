@@ -213,9 +213,26 @@ pub fn KernelRegistry::standard() -> KernelRegistry {
 }
 
 ///|
+/// Select the compatible normalized DIB representation or preserve source-cell
+/// boundaries and LF-normalized payload exactly through the lossless codec.
+pub(all) enum SourceMode {
+  /// Trim empty boundary lines and omit empty source sections.
+  Normalized
+  /// Retain empty cells and boundary lines, without writer padding.
+  Lossless
+} derive(Eq, Debug)
+
+///|
+pub extend SourceMode with Eq::{equal, not_equal}
+
+///|
+pub extend SourceMode with @debug.Debug::{to_repr}
+
+///|
 /// An immutable source cell with a kernel name. Sources normalize line
-/// endings and trim only empty boundary lines. Notebook construction resolves
-/// kernel aliases; a standalone cell may still contain an alias.
+/// endings and, by default, trim only empty boundary lines. Lossless mode
+/// retains boundary lines. Notebook construction resolves kernel aliases;
+/// a standalone cell may still contain an alias.
 struct Cell {
   source : String
   kernel : KernelName
@@ -228,11 +245,16 @@ pub extend Cell with Eq::{equal, not_equal}
 pub extend Cell with @debug.Debug::{to_repr}
 
 ///|
-/// Normalize LF, CRLF and CR to LF and remove empty boundary lines.
-/// Retain whitespace-only and internal blank lines. Registry membership is
+/// Normalize LF, CRLF and CR to LF. Normalized mode removes empty boundary
+/// lines; Lossless retains them. Retain whitespace-only and internal blank
+/// lines in both modes. Registry membership is
 /// checked by Notebook construction; selector conflicts are checked on writing.
-pub fn Cell::Cell(source : String, kernel~ : KernelName) -> Cell {
-  { source: normalize_source(source), kernel, }
+pub fn Cell::Cell(
+  source : String,
+  kernel~ : KernelName,
+  source_mode~ : SourceMode = Normalized,
+) -> Cell {
+  { source: source_in_mode(source, source_mode), kernel, }
 }
 
 ///|
@@ -346,7 +368,8 @@ pub extend Notebook with @debug.Debug::{to_repr}
 /// Build a notebook with empty metadata and the standard registry by default.
 /// Interpret metadata registrations and canonicalize each cell's kernel alias.
 /// Raise FormatError for invalid registration metadata, duplicate kernel names
-/// or unregistered cell kernels. Empty cells remain until serialization.
+/// or unregistered cell kernels. Empty cells remain in the model; select
+/// Lossless when writing and rereading to retain them through the codec.
 pub fn Notebook::Notebook(
   cells : ReadOnlyArray[Cell],
   metadata~ : Metadata = Metadata::empty(),

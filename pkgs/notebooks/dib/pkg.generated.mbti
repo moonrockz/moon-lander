@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub fn parse(String, registry? : KernelRegistry) -> Notebook raise FormatError
+pub fn parse(String, registry? : KernelRegistry, source_mode? : SourceMode) -> Notebook raise FormatError
 
 pub fn walk(Node, (Node) -> @notebooks.Control, leave? : (Node) -> Unit) -> Unit
 
@@ -27,7 +27,7 @@ pub fn FormatError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 type Cell derive(Eq, @debug.Debug)
-pub fn Cell::Cell(String, kernel~ : KernelName) -> Self
+pub fn Cell::Cell(String, kernel~ : KernelName, source_mode? : SourceMode) -> Self
 pub fn Cell::directives(Self) -> ReadOnlyArray[Directive]
 pub fn Cell::equal(Self, Self) -> Bool
 pub fn Cell::kernel(Self) -> KernelName
@@ -112,7 +112,15 @@ pub fn Notebook::not_equal(Self, Self) -> Bool
 pub fn Notebook::registry(Self) -> KernelRegistry
 pub fn Notebook::root(Self) -> Node
 pub fn Notebook::to_repr(Self) -> @debug.Repr
-pub fn Notebook::to_string(Self, metadata_output? : MetadataOutput) -> String raise FormatError
+pub fn Notebook::to_string(Self, metadata_output? : MetadataOutput, source_mode? : SourceMode) -> String raise FormatError
+
+pub(all) enum SourceMode {
+  Normalized
+  Lossless
+} derive(Eq, @debug.Debug)
+pub fn SourceMode::equal(Self, Self) -> Bool
+pub fn SourceMode::not_equal(Self, Self) -> Bool
+pub fn SourceMode::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 pub using @notebooks {type Control}

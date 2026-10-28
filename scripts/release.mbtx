@@ -115,6 +115,23 @@ async fn output_of(cmd : String, args : Array[String]) -> (Int32, String) {
 }
 
 ///|
+/// Check the remote, because a shallow checkout need not contain its tags.
+async fn require_absent_tag(tag : String) -> Unit {
+  let (code, out) = output_of("git", [
+    "ls-remote",
+    "--exit-code",
+    "--tags",
+    "origin",
+    "refs/tags/\{tag}",
+  ])
+  if code == 0 {
+    fail_with("\{tag} already exists; owner action is required")
+  } else if code != 2 {
+    fail_with("Cannot check the remote tag \{tag}: \{out}")
+  }
+}
+
+///|
 async fn run_plan() -> Unit {
   guard module_version(@fs.read_file("moon.mod").text()) is Some(version) else {
     fail_with("moon.mod has no version")
@@ -149,6 +166,9 @@ async fn run_plan() -> Unit {
     }
     let (viewed, _) = output_of("gh", ["release", "view", "v\{version}"])
     released = viewed == 0
+    if !released {
+      require_absent_tag("v\{version}")
+    }
   }
   match
     plan(
@@ -212,15 +232,7 @@ async fn run_github(
     fail_with("\{tag} already has a GitHub release; owner action is required")
     return
   }
-  let (tag_exists, _) = output_of("git", [
-    "rev-parse",
-    "--verify",
-    "refs/tags/\{tag}",
-  ])
-  if tag_exists == 0 {
-    fail_with("\{tag} already exists; owner action is required")
-    return
-  }
+  require_absent_tag(tag)
   let target = @env.get_env_var("GITHUB_SHA").unwrap_or("HEAD")
   let (code, out) = output_of("gh", create_args(tag, target, notes, assets))
   if code != 0 {

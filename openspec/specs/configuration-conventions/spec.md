@@ -29,6 +29,8 @@ Matching SHALL use the exact file names that the `FileTree` directory listings h
 
 ### Requirement: Searched extensions come from registered formats
 
+When ordered format layers are off, the following rules apply.
+
 Discovery SHALL search the extensions of the formats that the builder registers, and
 no other extension. The order of registration SHALL only set the order of candidates
 in reports. It SHALL NOT select one file over another.
@@ -42,6 +44,8 @@ in reports. It SHALL NOT select one file over another.
 - **THEN** discovery fails with an ambiguity error and does not select `acme.toml`
 
 ### Requirement: Ambiguity at one location is an error
+
+When ordered format layers are off, the following rules apply. With ordered format layers on, ambiguity is checked inside each declared layer.
 
 When more than one candidate exists for one source at one location, discovery SHALL
 raise `ConfigError::Ambiguous` with the display name of the convention set, the
@@ -73,6 +77,8 @@ local override, user override or environment file.
 - **THEN** discovery selects `acme.toml` and does not report an ambiguity error
 
 ### Requirement: Walk-up root discovery
+
+When workspace-first discovery is off, the following rules apply. Workspace-first discovery uses the separate workspace-first requirements.
 
 Discovery SHALL start at the start directory, which is the working directory of the
 run, and move to each parent directory. The
@@ -204,6 +210,8 @@ load context. Discovery SHALL NOT read the process environment.
 
 ### Requirement: One global user configuration
 
+When ordered format layers are off, the following rules apply. With ordered format layers on, ambiguity is checked inside each declared stage and format group.
+
 The configuration-directory candidates and the application-home candidates SHALL be
 alternatives at one priority. When more than one of them exists, discovery SHALL fail
 with an ambiguity error that names every existing candidate.
@@ -213,6 +221,8 @@ with an ambiguity error that names every existing candidate.
 - **THEN** discovery fails with an ambiguity error that names both paths
 
 ### Requirement: Adjacent user overrides
+
+When ordered format layers are off, the following rules apply. With ordered format layers on, each user-override stage uses the declared format order and ambiguity scope.
 
 For a primary in the layout `<app>.<ext>` or `.<app>/<app>.<ext>`, the user override
 candidates SHALL be `<app>.user.<ext>` in the same directory. For
@@ -233,11 +243,7 @@ More than one existing override for one primary SHALL be an ambiguity error.
 
 ### Requirement: Adjacent local overrides
 
-For a primary in the layout `<app>.<ext>` or `.<app>/<app>.<ext>`, the local override
-candidates SHALL be `<app>.local.<ext>` in the same directory. For
-`.config/<app>/config.<ext>` they SHALL be `config.local.<ext>` in the same
-directory. The extensions SHALL come from the registered formats. More than one
-existing local override for one primary SHALL be an ambiguity error.
+Local overrides SHALL use `<app>.local.<ext>` beside `<app>.<ext>` or `.<app>/<app>.<ext>`, and `config.local.<ext>` beside `.config/<app>/config.<ext>`. Extensions SHALL come from registered formats. Without ordered layers, multiple existing candidates for one primary SHALL be ambiguous. With layers, stages SHALL use declared format order and ambiguity SHALL be checked within each group.
 
 #### Scenario: Local file loads between environment file and user override
 - **WHEN** the name is `Production`, `acme.toml` sets `ui.theme = "base"`, `acme.Production.toml` sets `"prod"`, `acme.local.toml` sets `"local"`, and `acme.user.toml` sets `"mine"`
@@ -267,12 +273,7 @@ remove it.
 
 ### Requirement: Explicit primary file
 
-When the `config` value of `DiscoveryOptions` is `Explicit(path)`, discovery SHALL use that
-file and SHALL NOT walk up for a root. The enclosing-workspace search SHALL still apply.
-When the file path matches a standard layout, the local override, user override and
-environment-file rules SHALL apply, and enabled profile-file rules MUST apply.
-Other explicit files SHALL have no implicit override, environment file, or profile
-file.
+Without selected-file overlays, `Explicit(path)` SHALL supply the project primary without walk-up; enclosing-workspace search SHALL still apply. A standard-layout path SHALL retain adjacent local/user overrides, environment files and enabled profile files. A nonstandard path SHALL have no implicit adjacent files. With overlays enabled, the selected file SHALL follow the separate selected-overlay requirements.
 
 #### Scenario: Explicit file from another directory
 - **WHEN** the start directory is `elsewhere` and the explicit path is `../configs/project.yaml`
@@ -294,11 +295,7 @@ file.
 
 ### Requirement: Enclosing workspace discovery
 
-After walk-up finds a project root, discovery SHALL search from the parent of that root
-up to the boundary. It SHALL stop at the first configuration that declares a workspace
-whose member and exclude patterns select the project root. That configuration SHALL be
-the workspace primary and the found file SHALL be the member primary. Unreadable,
-ambiguous or non-workspace configurations SHALL be passed over.
+Without workspace-first discovery, discovery SHALL search the found project root's parents through the boundary. The first workspace whose member and exclude patterns select the root SHALL become the workspace primary; the found project SHALL become its member primary. Unreadable, ambiguous and non-workspace configurations SHALL be passed over. Workspace-first mode SHALL instead select the nearest declared workspace before member selection.
 
 #### Scenario: Member found from inside the member
 - **WHEN** `acme.toml` declares members `["packages/*"]`, `packages/billing/acme.toml` exists, and the start directory is `packages/billing/src`
@@ -633,6 +630,7 @@ The priorities SHALL be system 100, global 200, workspace or project primary 300
 member primary 350, environment file 375, profile file 380, local override 390 and
 user override 400. All profile files MUST share priority 380 and preserve their
 resolved source order at that priority.
+When selected-file overlays are on, their reports SHALL use the existing `Explicit` role and priority 325.
 The priorities SHALL not decrease along the merge order.
 
 #### Scenario: Reports in merge order
@@ -717,3 +715,130 @@ report.
 
 - **WHEN** a workspace declares `members = ["packages/*"]` and `packages` holds an `Inaccessible` entry `billing`
 - **THEN** discovery asks for the listings of `packages/billing`, and the error of the host passes out of the load
+
+### Requirement: Explicit discovery policies preserve compatibility
+
+The application SHALL select workspace-first discovery, ordered format layers and selected-file overlays explicitly. The default policies SHALL retain the existing candidate, legacy, root, member and explicit-primary behavior. A policy SHALL use typed alternatives and validated paths.
+
+#### Scenario: Existing preset keeps its ambiguity rule
+- **WHEN** an unchanged preset registers TOML and YAML, and both primary files exist
+- **THEN** discovery raises the same ambiguity error as before this change
+
+### Requirement: Workspace-first document classification
+
+Workspace-first discovery SHALL inspect parsed candidate documents for an application-selected workspace section. A section, including an empty section, SHALL identify a workspace. Defaults, machine files and environment variables SHALL NOT create that identity. A project-only primary SHALL remain a fallback while discovery searches its parents.
+
+#### Scenario: Project under a workspace
+- **WHEN** `/w/app/acme.toml` defines only a project, `/w/acme.toml` has a workspace section, and the start directory is `/w/app/src`
+- **THEN** the selected workspace root is `/w` and the nearest project root remains `/w/app`
+
+#### Scenario: Empty workspace section
+- **WHEN** `/w/acme.toml` contains an empty workspace section
+- **THEN** `/w` is a workspace even when it has no members or default-member key
+
+#### Scenario: Machine settings cannot create a workspace
+- **WHEN** only a global file sets workspace members and the project primary has no workspace section
+- **THEN** the global setting does not classify that project directory as a workspace
+
+### Requirement: First workspace stops the search
+
+Workspace-first discovery SHALL stop at the first declared workspace from the start directory upward, including the first primary location itself. It SHALL obey the explicit boundary. Member selection SHALL follow root selection and SHALL NOT cause a search for a farther workspace. With no workspace, discovery SHALL use the nearest project primary.
+
+#### Scenario: Nested workspace wins over an outer workspace
+- **WHEN** both `/w/acme.toml` and `/w/nested/acme.toml` declare workspaces, and the start is `/w/nested/src`
+- **THEN** `/w/nested` is the selected workspace and `/w` is not read
+
+#### Scenario: Boundary prevents workspace inheritance
+- **WHEN** `/w/acme.toml` declares a workspace and the boundary is `/w/app`
+- **THEN** discovery does not read `/w/acme.toml`
+
+#### Scenario: Standalone project fallback
+- **WHEN** `/w/app/acme.toml` defines a project and no workspace exists within the boundary
+- **THEN** `/w/app` is the selected project root
+
+#### Scenario: Exclusion does not choose a farther workspace
+- **WHEN** the nearest workspace excludes the nearest project and a farther workspace includes it
+- **THEN** discovery retains the nearest workspace, does not load the excluded project as a member, and does not search the farther workspace
+
+### Requirement: Workspace classification failures are visible
+
+Workspace-first discovery SHALL report an invalid, unreadable or ambiguous candidate at an examined location. It SHALL NOT silently pass over the problem and select an ancestor. An incomplete tree SHALL return the existing load requests before classification continues.
+
+#### Scenario: Broken parent document
+- **WHEN** the upward search examines a malformed parent primary
+- **THEN** the load fails with that file and its parse problem
+
+#### Scenario: Missing parent listing
+- **WHEN** the search needs a parent directory absent from a partial tree
+- **THEN** discovery returns a request for that directory and does not choose a root yet
+
+### Requirement: Ordered format layers
+
+An application SHALL be able to declare ordered groups of registered formats. Discovery SHALL allow one primary per group at a location, merge the groups in declared order, and reject multiple candidates inside one group. Group order SHALL be independent of parser registration order. Unregistered formats SHALL remain outside discovery.
+
+#### Scenario: JSON then YAML then TOML
+- **WHEN** the declared groups are JSON, YAML and TOML, and each primary exists with a shared key
+- **THEN** TOML wins that key, keys set only by YAML or JSON remain, and each origin names its source
+
+#### Scenario: YAML alternatives are ambiguous
+- **WHEN** `.yaml` and `.yml` belong to one group and both primary files exist
+- **THEN** discovery raises ambiguity naming both files
+
+#### Scenario: TOML layout alternatives are ambiguous
+- **WHEN** both `acme.toml` and `.acme/acme.toml` exist in the TOML group
+- **THEN** discovery raises ambiguity naming both files
+
+### Requirement: Supplemental source within a format layer
+
+An application SHALL be able to name a supplemental file below the ordinary primary in one format group. It SHALL count as a root marker, load through its registered parser, retain its own origin, and coexist with the ordinary primary. It SHALL NOT disable the same group's ambiguity check for ordinary candidates.
+
+#### Scenario: Workspace JSON below project JSON
+- **WHEN** supplemental `acme-workspace.json` and primary `acme.json5` both exist
+- **THEN** both load, `acme.json5` wins shared keys, and the supplemental file is not an ambiguous ordinary primary
+
+### Requirement: Layered stages use one root decision
+
+Ordered format layers SHALL use one root decision and the same group order for each enabled machine, global, primary, member and adjacent-override stage. Candidate ambiguity SHALL remain scoped to that stage and group. Workspace classification SHALL inspect the merged primary documents at a location. Existing stage precedence and source roles SHALL remain unchanged.
+
+#### Scenario: Workspace declaration in a lower format
+- **WHEN** JSON declares workspace members and TOML at the same location sets another workspace key
+- **THEN** the merged primary declares one workspace and both documents contribute values
+
+#### Scenario: Local override format order
+- **WHEN** ordered groups are YAML then TOML and both `acme.local.yaml` and `acme.local.toml` exist beside a primary
+- **THEN** both local overrides load, TOML wins shared keys, and both reports retain the local-override role
+
+#### Scenario: Global formats share one stage
+- **WHEN** ordered groups are YAML then TOML and the global directory holds both primary files
+- **THEN** both load at the global stage in group order, while two candidates inside one group remain ambiguous
+
+#### Scenario: User override format order
+- **WHEN** YAML and TOML user overrides set the same key
+- **THEN** the TOML user override wins, and each report retains the user-override role
+
+### Requirement: Layered profile order
+
+When profiles and ordered format layers are enabled, discovery SHALL retain active-name order. Within each name,
+workspace format groups SHALL precede member format groups. All those sources SHALL keep priority 380 and the
+existing profile-file role. Ambiguity SHALL be checked per name, location and format group. Profiles SHALL NOT
+change the root decision.
+
+#### Scenario: Later profile beats an earlier member format
+- **WHEN** an earlier profile's member TOML sets a key and a later profile's workspace JSON replaces it
+- **THEN** the later workspace JSON value wins unless another later stage replaces it
+
+### Requirement: Selected file is one overlay
+
+With selected-file overlays on, discovery SHALL retain the discovered primary layers and load the selected file above them and below member primaries. A selected file already found by discovery SHALL load only in its overlay position. Reports SHALL use the existing `Explicit` role and priority 325. Missing or unreadable selected files SHALL fail with a typed error naming the file.
+
+#### Scenario: Discovered JSON selected above TOML
+- **WHEN** `acme.json` and `acme.toml` set a key differently and the selected file is `acme.json`
+- **THEN** JSON wins that key, TOML-only keys remain, and JSON has one source report in the overlay position
+
+### Requirement: Public root and layer evidence
+
+The public pure API SHALL expose selected workspace and nearest-project roots and ordered source evidence. Applications SHALL be able to use that result with their own all-member walk without running a private discovery algorithm or enabling automatic single-member loading. The same input SHALL give equal roots, reports and errors on all four targets.
+
+#### Scenario: Application keeps its member walk
+- **WHEN** an application requests root and layer evidence without automatic member selection
+- **THEN** it gets the selected roots and primary sources, and can load its members through public sources and merge

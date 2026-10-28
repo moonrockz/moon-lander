@@ -1,2 +1,8 @@
-import { "moonrockz/moon-lander-config" @library }
+import {
+  "moonrockz/moon-lander-config" @library,
+  "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/profiles",
+  "moonrockz/moon-lander-config/parsers/json5",
+  "moonrockz/moon-lander-config/parsers/toml",
+}
 pkgtype(kind: "executable")

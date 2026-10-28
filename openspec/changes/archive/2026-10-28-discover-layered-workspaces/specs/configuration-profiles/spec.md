@@ -21,11 +21,7 @@ before profile activation. Overlays and member files MUST NOT change that select
 
 ### Requirement: Controls cannot activate from later layers
 
-When enabled and not explicitly disabled, controls in profile, environment,
-local/user, system/global, legacy, nonstandard explicit, or selected-member
-layers SHALL fail visibly. Generic configuration overrides MUST NOT set reserved
-profile controls. Validation MUST precede layer filters. Activation MUST remain
-fixed for the full load. A discovered base file selected as an ordinary-value overlay MUST retain its original control authority, while a selected non-base file MUST NOT gain control authority.
+When enabled and not disabled, controls in profile, environment, local/user, system/global, legacy, nonstandard explicit and member layers SHALL fail before filters. Generic overrides MUST NOT set reserved controls. Activation MUST remain fixed for the load. Selecting a discovered base as an ordinary overlay MUST preserve its control authority; a selected non-base file MUST NOT gain authority.
 
 #### Scenario: A profile includes another profile
 
@@ -44,13 +40,7 @@ fixed for the full load. A discovered base file selected as an ordinary-value ov
 
 ### Requirement: Adjacent profile file selection
 
-When ordered format layers are off, the following selection and ambiguity rules apply. With layers on, formats load in the declared groups and ambiguity is checked within each name, location and group.
-
-Each active name SHALL select `<stem>.profile.<name>.<ext>` beside eligible
-project/workspace/member primaries, using registered extensions. Matching MUST
-be exact; multiple existing candidates for one name/location MUST be ambiguous.
-A missing candidate MUST report not-found. Inactive profile contents MUST NOT
-be requested or parsed.
+Each active name SHALL select exact `<stem>.profile.<name>.<ext>` candidates beside eligible project/workspace/member primaries. Without ordered layers, multiple registered-format candidates per name/location SHALL be ambiguous. With layers, declared group order SHALL apply and ambiguity SHALL be checked per name/location/group. Missing candidates MUST report not-found. Inactive contents MUST NOT be requested or parsed.
 
 #### Scenario: Marker profile without a file
 

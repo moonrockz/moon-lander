@@ -1,6 +1,7 @@
 import {
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/profiles",
   "moonrockz/moon-lander-config/parsers/toml",
   "moonrockz/moon-lander-config/parsers/yaml",
   "moonrockz/moon-lander-config/parsers/json5",

@@ -33,9 +33,9 @@ Bead: lander-9kn.3
 
 Bead: lander-9kn.4
 
-- [ ] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file, selected overlays and enabled configuration profiles; verify effective values, origins and roots against complete and partial trees on all four targets.
-- [ ] 4.2 Add native and JS adapter tests for a temporary member under a declared workspace, format layering and isolated boundary behavior; verify that no ancestor above the selected root or boundary is read.
-- [ ] 4.3 Run `mise run check` and strict OpenSpec validation; record the actual results and retain existing source-report schemas and default-policy behavior. Update the acceptance README with the tested preset.
+- [x] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file, selected overlays and enabled configuration profiles; verify effective values, origins and roots against complete and partial trees on all four targets.
+- [x] 4.2 Add native and JS adapter tests for a temporary member under a declared workspace, format layering and isolated boundary behavior; verify that no ancestor above the selected root or boundary is read.
+- [x] 4.3 Run `mise run check` and strict OpenSpec validation; record the actual results and retain existing source-report schemas and default-policy behavior. Update the acceptance README with the tested preset.
 
 ## Workflow follow-up
 

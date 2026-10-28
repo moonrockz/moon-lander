@@ -2,11 +2,14 @@ import {
   "moonrockz/moon-lander-config" @config,
   "moonrockz/moon-lander-config/profiles" @profiles,
   "moonbitlang/core/debug",
+  "moonbitlang/core/hashset",
 }
 
 import {
   "moonrockz/expect",
   "moonrockz/moon-lander-config/parsers/toml",
+  "moonrockz/moon-lander-config/parsers/json5",
+  "moonrockz/moon-lander-config/parsers/yaml",
 } for "test"
 
 import {

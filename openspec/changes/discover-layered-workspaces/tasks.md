@@ -12,12 +12,12 @@ Bead: lander-9kn.1
 
 Bead: lander-9kn.2
 
-- [ ] 2.1 Add validated format-group policies and supplemental sources; verify parser registration order has no precedence effect, same-group alternatives fail, and JSON/YAML/TOML layers merge with correct origins on all four targets.
-- [ ] 2.2 Use the merged primary documents for workspace classification and one root decision; verify a workspace declared in JSON remains selected when TOML supplies other keys and no ancestor can replace the nearest workspace.
-- [ ] 2.3 Apply declared format order inside enabled machine, global, member and adjacent-override stages while retaining stage priorities and roles; verify report order, two-layout ambiguity and YAML/YML ambiguity.
-- [ ] 2.4 Document format groups and supplemental source ownership with executable examples, update public interfaces, and run unchanged default-policy convention tests to prove compatibility.
+- [x] 2.1 Add validated format-group policies and supplemental sources; verify parser registration order has no precedence effect, same-group alternatives fail, and JSON/YAML/TOML layers merge with correct origins on all four targets.
+- [x] 2.2 Use the merged primary documents for workspace classification and one root decision; verify a workspace declared in JSON remains selected when TOML supplies other keys and no ancestor can replace the nearest workspace.
+- [x] 2.3 Apply declared format order inside enabled machine, global, member and adjacent-override stages while retaining stage priorities and roles; verify report order, two-layout ambiguity and YAML/YML ambiguity.
+- [x] 2.4 Document format groups and supplemental source ownership with executable examples, update public interfaces, and run unchanged default-policy convention tests to prove compatibility.
 
-- [ ] 2.5 Compose profile files with active-name order outside workspace/member format order, retaining priority 380; verify format precedence, same-group ambiguity, supplemental-only layouts, inactive-file avoidance and isolation on all four targets, and update profile examples.
+- [x] 2.5 Compose profile files with active-name order outside workspace/member format order, retaining priority 380; verify format precedence, same-group ambiguity, supplemental-only layouts, inactive-file avoidance and isolation on all four targets, and update profile examples.
 
 ## 3. Add selected-file overlays without duplicate loads
 

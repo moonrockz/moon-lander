@@ -102,6 +102,14 @@ resolver API SHALL retain its behavior.
 - **WHEN** JSON defines a group and TOML replaces that group while JSON alone supplies defaults
 - **THEN** the group definition and its failures name TOML, while the default selector names JSON
 
+### Requirement: Literal control metadata merges before parsing
+
+Reserved metadata MUST merge before its one semantic parse: objects merge by field; other supplied values, including null, replace. All eligible base identities MUST remain authorized independently of which controls win.
+
+#### Scenario: A winning null control retains its shape failure
+- **WHEN** a later eligible base sets `profiles.active` to null over an earlier valid list
+- **THEN** loading fails with the existing typed control-shape error and names the later source, rather than ignoring null as an ordinary configuration overlay
+
 ### Requirement: Selected discovered base retains control authority
 
 Selecting a discovered base as an overlay SHALL preserve its control authority. It SHALL be parsed once, with

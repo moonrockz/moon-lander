@@ -12,6 +12,7 @@ priv struct Declaration {
 priv struct Enclosing {
   file : ProjectFile
   value : @config.ConfigValue
+  primaries : Array[@config.ConfigSource]
 }
 
 ///|
@@ -375,7 +376,7 @@ fn Scan::enclosing(
       None => continue
     }
     if self.selects(dir, declaration, root) {
-      return Some(Some({ file, value }))
+      return Some(Some(self.found(file, value)))
     }
   }
   Some(None)
@@ -406,7 +407,12 @@ fn Scan::root_value(
       }
     }
     guard known && existing is [path] else { continue }
-    match self.value_of({ path, root: parent_of(path), kind: Discovered }) {
+    let layer = if self.conventions.layers is Some(_) {
+      self.read_document(path)
+    } else {
+      self.value_of({ path, root: parent_of(path), kind: Discovered })
+    }
+    match layer {
       Found(layer) => value = @config.merge(value, layer, source=path.to_string())
       Missing => ()
       Unknown => known = false

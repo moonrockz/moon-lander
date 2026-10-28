@@ -46,23 +46,11 @@ pub fn RootEvidence::sources(self : RootEvidence) -> Array[@config.ConfigSource]
 
 ///|
 fn root_evidence(
-  conventions : Conventions,
   project : Enclosing?,
   workspace : Enclosing?,
-) -> RootEvidence raise @config.ConfigError {
+) -> RootEvidence {
   let selected = if workspace is Some(_) { workspace } else { project }
-  let sources = match selected {
-    None => []
-    Some(found) => [@config.ConfigSource::parsed_file(
-      found.file.path.to_string(), found.value,
-      name=conventions.display,
-      role=match found.file.kind {
-        LegacyFile => Legacy
-        ExplicitFile => Explicit
-        Discovered => Workspace
-      },
-    )]
-  }
+  let sources = selected.map(found => found.primaries.copy()).unwrap_or([])
   { project, workspace, sources }
 }
 
@@ -71,8 +59,8 @@ fn root_evidence(
 fn Conventions::root_bounds(
   self : Conventions,
   context : @config.LoadContext,
+  start : @config.FileTreePath?,
 ) -> (@config.FileTreePath?, @config.FileTreePath?) raise @config.ConfigError {
-  let start = context.working_dir.filter(dir => dir.is_absolute()).map(normalize)
   let stop = match self.boundary {
     None => None
     Some(text) => {
@@ -96,24 +84,32 @@ pub fn Conventions::roots(
   context : @config.LoadContext,
   options? : DiscoveryOptions = DiscoveryOptions::new(),
 ) -> @config.LoadStep[RootEvidence] raise @config.ConfigError {
-  if options.config is Skip { return Done(root_evidence(self, None, None)) }
-  let (start, stop) = self.root_bounds(context)
-  let scan : Scan = { conventions: self, context, extensions: searched_extensions(context.formats), needs: [], notes: [] }
+  self.check_formats(context.formats)
+  let scan = Scan::new(self, context, searched_extensions(context.formats), [])
+  scan.roots(options)
+}
+
+///|
+/// Internal discovery already checked the final policy. Share its scan and
+/// canonical start rather than re-entering a public boundary and reparsing.
+fn Scan::roots(self : Scan, options : DiscoveryOptions) -> @config.LoadStep[RootEvidence] raise @config.ConfigError {
+  if options.config is Skip { return Done(root_evidence(None, None)) }
+  let (start, stop) = self.conventions.root_bounds(self.context, self.start)
   if options.config is Explicit(path) {
-    let file = self.explicit_file(path, context, scan.extensions)
-    return scan.nearest_roots(file, stop)
+    let file = self.conventions.explicit_file(path, self.context, self.extensions)
+    return self.nearest_roots(file, stop)
   }
-  guard start is Some(start) else { return Done(root_evidence(self, None, None)) }
+  guard start is Some(start) else { return Done(root_evidence(None, None)) }
   if stop is Some(stop) && !start.is_within(stop) {
     raise OutsideBoundary(start=start.to_string(), boundary=stop.to_string())
   }
-  match self.root_policy {
-    WorkspaceFirst(section) => scan.workspace_roots(start, stop, section)
-    NearestFile => match scan.walk_up(start, stop) {
-      None => Need(scan.needs)
-      Some(NoRoot) => Done(root_evidence(self, None, None))
-      Some(Crowded(dir)) => scan.ambiguous_root(dir)
-      Some(Root(file)) => scan.nearest_roots(file, stop)
+  match self.conventions.root_policy {
+    WorkspaceFirst(section) => self.workspace_roots(start, stop, section)
+    NearestFile => match self.walk_up(start, stop) {
+      None => Need(self.needs)
+      Some(NoRoot) => Done(root_evidence(None, None))
+      Some(Crowded(dir)) => self.ambiguous_root(dir)
+      Some(Root(file)) => self.nearest_roots(file, stop)
     }
   }
 }
@@ -131,7 +127,7 @@ fn Scan::nearest_roots(
   stop : @config.FileTreePath?,
 ) -> @config.LoadStep[RootEvidence] raise @config.ConfigError {
   let project = match self.value_of(file) {
-    Found(value) => { file, value }
+    Found(value) => self.found(file, value)
     Missing => raise @config.FileNotFound(path=file.path.to_string())
     Unknown => return Need(self.needs)
   }
@@ -142,7 +138,7 @@ fn Scan::nearest_roots(
       Some(None) => if self.conventions.declaration(project.value) is Some(_) { Some(project) } else { None }
     }
   } else { None }
-  Done(root_evidence(self.conventions, Some(project), workspace))
+  Done(root_evidence(Some(project), workspace))
 }
 
 ///|
@@ -168,20 +164,20 @@ fn Scan::workspace_roots(
         Missing => raise @config.FileNotFound(path=file.path.to_string())
         Unknown => return Need(self.needs)
       }
-      let found : Enclosing = { file, value }
+      let found = self.found(file, value)
       if nearest is None { nearest = Some(found) }
       let document = self.conventions.discovery_value(value)
       if document.get(section) is Some(_) {
         // A section must be an object, including an empty one. Bind at this
         // document boundary so a scalar gives the ordinary typed Decode error.
         let _ : Map[String, Json] = @config.bind(document, section.to_string())
-        return Done(root_evidence(self.conventions, nearest, Some(found)))
+        return Done(root_evidence(nearest, Some(found)))
       }
     }
     guard self.conventions.walk_up && stop != Some(dir) && dir.parent() is Some(parent) else { break }
     dir = parent
   }
-  Done(root_evidence(self.conventions, nearest, None))
+  Done(root_evidence(nearest, None))
 }
 
 ///|
@@ -191,20 +187,24 @@ fn Conventions::workspace_first_sources(
   scan : Scan,
   machine : Array[MachineSource],
 ) -> @config.LoadStep[Tier] raise @config.ConfigError {
-  let evidence = match self.roots(scan.context, options=project.options) {
+  let evidence = match scan.roots(project.options) {
     Need(requests) => return Need(requests)
     Done(evidence) => evidence
   }
   let selected = if evidence.workspace is Some(_) { evidence.workspace } else { evidence.project }
   guard selected is Some(base) else {
-    if project.options.project is Some(selector) && self.workspace is Some(_) && scan.context.working_dir is Some(start) {
+    if project.options.project is Some(selector) && self.workspace is Some(_) && scan.start is Some(start) {
       raise @config.UnknownProject(selector~, workspace=start.to_string())
     }
-    let sources = match scan.context.working_dir {
-      Some(start) if start.is_absolute() => [self.primary(self.candidates(normalize(start), project.extensions))]
+    if self.layers is Some(_) && scan.start is Some(start) {
+      guard scan.ordered_layer(start, project, as_member=false) is Some(layer) else { return Need(scan.needs) }
+      return Done(self.tier(layer, None))
+    }
+    let sources = match scan.start {
+      Some(start) => [self.primary(self.candidates(start, project.extensions))]
       _ => [self.skipped_project()]
     }
-    return Done({ sources, has_member: false, locations: [] })
+    return Done({ sources, has_member: false, locations: [], controls: [] })
   }
   let layer = self.layer(base.file, project, scan, as_member=false, parsed=base.value)
   guard layer is Some(layer) else { return Need(scan.needs) }
@@ -216,26 +216,19 @@ fn Conventions::workspace_first_sources(
     match project.options.project {
       Some(selector) => scan.selected_project(base.file.root, declaration, value, selector)
       None => match declaration {
-        Some(declaration) if evidence.workspace is Some(_) => scan.automatic_member(base.file.root, declaration, scan.context.working_dir.map(normalize))
+        Some(declaration) if evidence.workspace is Some(_) => scan.automatic_member(base.file.root, declaration, scan.start)
         _ => Some(None)
       }
     }
   }
   guard selection is Some(member_dir) else { return Need(scan.needs) }
   guard member_dir is Some(dir) else {
-    return Done({ sources: [layer.primary, ..layer.adjacent.filter_map(source => source)], has_member: false, locations: layer.path.map(path => [(path, false)]).unwrap_or([]) })
+    return Done(self.tier(layer, None))
   }
   let chosen = match evidence.project {
     Some(found) if found.file.root == dir => self.layer(found.file, project, scan, as_member=true, parsed=found.value)
     _ => self.member_layer(dir, project, scan)
   }
   guard chosen is Some(chosen) else { return Need(scan.needs) }
-  let inherited = key_paths(self.inherited)
-  let scoped = key_paths(self.member_scope)
-  let sources = [filtered(layer.primary, inherited, warn=false), filtered(chosen.primary, scoped, warn=true)]
-  for index in 0..<layer.adjacent.length().max(chosen.adjacent.length()) {
-    if layer.adjacent.get(index) is Some(Some(source)) { sources.push(filtered(source, inherited, warn=false)) }
-    if chosen.adjacent.get(index) is Some(Some(source)) { sources.push(filtered(source, scoped, warn=true)) }
-  }
-  Done({ sources, has_member: true, locations: [..layer.path.map(path => [(path, false)]).unwrap_or([]), ..chosen.path.map(path => [(path, true)]).unwrap_or([])] })
+  Done(self.tier(layer, Some(chosen)))
 }

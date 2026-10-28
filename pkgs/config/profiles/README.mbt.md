@@ -73,7 +73,9 @@ and before local overrides. Within each active name, workspace precedes member.
 A later workspace profile can override an earlier member profile. Missing files
 produce not-found reports, so a profile can be a code-only marker.
 
-The authoritative base accepts these literal controls:
+With ordered formats enabled, every eligible base document participates in
+format order. Within each active name, workspace format groups precede member
+format groups. The authoritative base accepts these literal controls:
 
 ```toml
 [profiles]
@@ -130,6 +132,43 @@ test "base controls retain selection and reason origins" {
 complete load. The host factory, hooks, and command can inspect that same value
 through their configuration. Returned arrays are copies. Membership uses parsed
 `ProfileName` values and never repeats discovery.
+
+Pure callers with several base documents use `ControlLayer`, `ControlLayers`,
+and `resolve_layers`. Each document has its original source origin. Objects in
+the reserved metadata merge by field; other values, including null, replace.
+Lists and individual group definitions therefore come from their last supplied
+value. Controls are parsed after this merge. A winning null control has a shape
+error; ordinary configuration's null-as-unset rule cannot hide it.
+
+```mbt check
+///|
+test "layered controls preserve each supplying origin" {
+  let json : @config.Origin = {
+    kind: File(Workspace), source: "acme", priority: 300,
+    location: Some("/work/acme.json"),
+  }
+  let toml = { ..json, location: Some("/work/acme.toml") }
+  let layers = @profiles.ControlLayers::new([
+    @profiles.ControlLayer::new(@config.ConfigValue::from_json({
+      "profiles": { "default": ["development"] },
+    }), json),
+    @profiles.ControlLayer::new(@config.ConfigValue::from_json({
+      "profiles": { "groups": { "development": ["metrics"] } },
+    }), toml),
+  ])
+  let input = @profiles.SelectionInput::new(Unspecified)
+  let resolution = @profiles.resolve_layers(@profiles.Policy::new(), input, layers)
+  assert_eq(resolution.selector(), BaseDefault(json))
+  assert_true(resolution.controls().contains(
+    Control(toml, @config.KeyPath::parse("profiles.groups.development")),
+  ))
+  assert_true(resolution.permits_controls(json))
+}
+```
+
+Control authority and winning metadata are separate: every eligible input
+document remains authorized even when another replaces all its controls. The
+single-base `resolve(..., controls=...)` API retains its behavior.
 
 A complete effective graph has at most 64 groups, 64 members per group, 32 group
 definitions on a path, and 128 distinct active names. All definitions are checked,

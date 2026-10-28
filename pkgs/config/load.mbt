@@ -142,10 +142,7 @@ pub fn load(
         let key = KeyPath::parse("profiles")
         if piece.0.at(key.names) is Some(_) {
           let piece_origin = { ..origin, location: piece.1 }
-          let authoritative = resolution.controls().any(control => match control {
-            Control(control_origin, _) => control_origin == piece_origin
-            _ => false
-          })
+          let authoritative = resolution.permits_controls(piece_origin)
           if !resolution.disabled() && !authoritative {
             raise Profile(failure=ProfileFailure::new("profiles", ForbiddenLocation, origin=Control(piece_origin, key)))
           }

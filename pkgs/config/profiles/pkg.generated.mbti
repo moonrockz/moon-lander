@@ -16,9 +16,21 @@ pub fn resolve(Policy, @moon-lander-config.ProfileSelection, variable? : (String
 
 pub fn resolve_input(Policy, SelectionInput, controls? : (@moon-lander-config.ConfigValue, @moon-lander-config.Origin)) -> @moon-lander-config.ProfileResolution raise @moon-lander-config.ConfigError
 
+pub fn resolve_layers(Policy, SelectionInput, ControlLayers) -> @moon-lander-config.ProfileResolution raise @moon-lander-config.ConfigError
+
 // Errors
 
 // Types and methods
+pub struct ControlLayer {
+  // private fields
+}
+pub fn ControlLayer::new(@moon-lander-config.ConfigValue, @moon-lander-config.Origin) -> Self raise @moon-lander-config.ConfigError
+
+pub struct ControlLayers {
+  // private fields
+}
+pub fn ControlLayers::new(Array[ControlLayer]) -> Self raise @moon-lander-config.ConfigError
+
 pub struct Policy {
   // private fields
 }

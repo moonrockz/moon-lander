@@ -105,6 +105,28 @@ test "complete and incremental workspace-first loads agree" {
 }
 
 ///|
+test "automatic workspace-first selection uses the normalized working directory" {
+  for (root, platform) in [("/w", @config.Platform::Linux), ("C:/w", @config.Platform::Windows)] {
+    let tree = @config.FileTree::new(complete=true)
+      .with_listing(p(root), [..files(["acme.toml"]), ..dirs(["a", "b"])])
+      .with_listing(p(root + "/a"), files(["acme.toml"]))
+      .with_listing(p(root + "/b"), files(["acme.toml"]))
+      .with_file(p(root + "/acme.toml"), "workspace.members=['a','b']")
+      .with_file(p(root + "/a/acme.toml"), "project.name='a'")
+      .with_file(p(root + "/b/acme.toml"), "project.name='b'")
+    let config = @config.builder()
+      |> @config.working_dir(root + "/a/../b/src")
+      |> @config.platform(platform)
+      |> @config.format(@toml.format())
+      |> @conventions.add(workspace_first())
+      |> @config.load(tree)
+      |> done
+    assert_eq(@config.get_text(config, "project.name"), "b")
+    assert_eq(member_report(config).map(report => report.path), Some(Some(root + "/b/acme.toml")))
+  }
+}
+
+///|
 test "a workspace section must be an object and explicit root evidence needs no working directory" {
   try {
     ignore(workspace_in("/w", [("/w/acme.toml", "workspace=42")], conventions=workspace_first()))

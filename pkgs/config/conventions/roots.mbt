@@ -216,7 +216,7 @@ fn Conventions::workspace_first_sources(
     match project.options.project {
       Some(selector) => scan.selected_project(base.file.root, declaration, value, selector)
       None => match declaration {
-        Some(declaration) if evidence.workspace is Some(_) => scan.automatic_member(base.file.root, declaration, scan.context.working_dir)
+        Some(declaration) if evidence.workspace is Some(_) => scan.automatic_member(base.file.root, declaration, scan.context.working_dir.map(normalize))
         _ => Some(None)
       }
     }

@@ -50,6 +50,22 @@ Use an application-level adapter over that result for warnings about lower-forma
 
 Workspace classification needs a parsed document. A parse error or same-group ambiguity at an examined location must remain visible. Do not silently choose an ancestor. Preserve the existing skip behavior when the old policy is selected.
 
+### Owner: Compose the enabled profile policy
+
+The Morphir maintainer approved configuration profiles for its adoption release on 2026-10-28. Keep the published 0.6.0 activation, includes, groups, graph limits and disabling rules. Compose those rules with ordered base documents and profile files. The consumer keeps its frontend `--profile` separate from configuration `--profiles`.
+
+### Call: Resolve controls from the discovered base with individual origins
+
+Merge the eligible workspace primary documents, or standalone project primaries, in format order before resolving profile controls. Keep the origin of each winning control and group definition. Extend the resolver input with typed control origins while retaining the existing one-base/one-origin API as a compatible adapter. Do not assign every control the origin of the highest-format file.
+
+Keep control authority by original discovered source identity. If that file is selected as an ordinary-value overlay, parse it once, assess its controls as part of the base, strip the controls from its ordinary values, and emit one ordinary source report at priority 325 with role Explicit. This does not grant control authority to an arbitrary selected file. Controls from member, system/global, user, profile and selected non-base layers retain the existing refusal. Disabled processing retains the published stripping behavior.
+
+### Call: Keep active-profile order outside format order
+
+For each resolved active name, emit workspace JSON/YAML/TOML sources, then member JSON/YAML/TOML sources, all at priority 380, before advancing to the next active name. Check ambiguity inside each name/location/format group. A supplemental-only base gives the standard application layout for profile candidates; it does not invent a supplemental-file profile stem. Reuse loaded file identities across layouts so no profile file is read twice.
+
+Profiles do not determine workspace identity or member selection. Isolated mode retains eligible profile files within the selected boundary. Missing active files remain not-found reports, and inactive file contents are never requested. Keep profile metadata separate from ordinary effective values and origins, and do not change source-report fields or host wire protocols.
+
 ## Risks / Trade-offs
 
 - More file reads during workspace search: stop at the first declared workspace and reuse the parsed value in the final load. Test that no source is parsed twice.

@@ -286,6 +286,17 @@ Ordered format layers SHALL use one root decision and the same group order for e
 - **WHEN** YAML and TOML user overrides set the same key
 - **THEN** the TOML user override wins, and each report retains the user-override role
 
+### Requirement: Layered profile order
+
+When profiles and ordered format layers are enabled, discovery SHALL retain active-name order. Within each name,
+workspace format groups SHALL precede member format groups. All those sources SHALL keep priority 380 and the
+existing profile-file role. Ambiguity SHALL be checked per name, location and format group. Profiles SHALL NOT
+change the root decision.
+
+#### Scenario: Later profile beats an earlier member format
+- **WHEN** an earlier profile's member TOML sets a key and a later profile's workspace JSON replaces it
+- **THEN** the later workspace JSON value wins unless another later stage replaces it
+
 ### Requirement: Selected file is one overlay
 
 With selected-file overlays on, discovery SHALL retain the discovered primary layers and load the selected file above them and below member primaries. A selected file already found by discovery SHALL load only in its overlay position. Reports SHALL use the existing `Explicit` role and priority 325. Missing or unreadable selected files SHALL fail with a typed error naming the file.

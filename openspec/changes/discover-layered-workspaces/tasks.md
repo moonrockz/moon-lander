@@ -17,6 +17,8 @@ Bead: pending maintainer approval.
 - [ ] 2.3 Apply declared format order inside enabled machine, global, member and adjacent-override stages while retaining stage priorities and roles; verify report order, two-layout ambiguity and YAML/YML ambiguity.
 - [ ] 2.4 Document format groups and supplemental source ownership with executable examples, update public interfaces, and run unchanged default-policy convention tests to prove compatibility.
 
+- [ ] 2.5 Compose profile files with active-name order outside workspace/member format order, retaining priority 380; verify format precedence, same-group ambiguity, supplemental-only layouts, inactive-file avoidance and isolation on all four targets, and update profile examples.
+
 ## 3. Add selected-file overlays without duplicate loads
 
 Bead: pending maintainer approval.
@@ -25,11 +27,13 @@ Bead: pending maintainer approval.
 - [ ] 3.2 Deduplicate normalized file-tree identities before sources execute; verify an ordinary or supplemental selected file has one report and one transform/parse invocation, including relative path variants and Windows paths.
 - [ ] 3.3 Retain the default explicit-primary behavior and typed missing/unreadable-file failures; verify existing explicit-file tests and document both policies with tested examples and updated public interfaces.
 
+- [ ] 3.4 Preserve discovered-base profile control authority when its ordinary values move to the selected overlay; verify one parse and source report, per-control/group origins across formats, external selected-control refusal, disabled processing and unchanged single-base resolver behavior. Update both profile and convention docs.
+
 ## 4. Qualify adapters and the Morphir preset
 
 Bead: pending maintainer approval.
 
-- [ ] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file and selected overlays; verify effective values, origins and roots against complete and partial trees on all four targets.
+- [ ] 4.1 Extend the public-parts Morphir acceptance preset for workspace-first discovery, JSON5/JSON, YAML/YML, TOML, the supplemental workspace JSON file, selected overlays and enabled configuration profiles; verify effective values, origins and roots against complete and partial trees on all four targets.
 - [ ] 4.2 Add native and JS adapter tests for a temporary member under a declared workspace, format layering and isolated boundary behavior; verify that no ancestor above the selected root or boundary is read.
 - [ ] 4.3 Run `mise run check` and strict OpenSpec validation; record the actual results and retain existing source-report schemas and default-policy behavior. Update the acceptance README with the tested preset.
 

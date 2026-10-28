@@ -11,6 +11,7 @@ Morphir must find the first workspace by reading configuration documents, even w
 - Let an application name a supplemental source below a format group, such as `morphir-workspace.json` below `morphir.json` or `morphir.json5`.
 - Add an opt-in selected-file overlay above primary layers. A selected discovered file loads once in that overlay position.
 - Expose selected roots and source reports through the public pure API. Applications can retain their own member walk without copying discovery code.
+- Compose enabled configuration profiles with format groups: retain control origins, profile order and selected-base control authority while loading each file once.
 - Keep the current policies as defaults. Keep host I/O in the existing adapters.
 
 ## Capabilities
@@ -22,6 +23,7 @@ None.
 ### Modified Capabilities
 
 - `configuration-conventions`: workspace-first discovery, ordered format groups, supplemental sources, selected-file overlays, root results and compatibility defaults.
+- `configuration-profiles`: controls from layered bases, per-control origins, ordered profile file formats and selected-base authority.
 
 ## Impact
 
@@ -31,4 +33,4 @@ Downstream: finos/morphir-moonbit [PR #268](https://github.com/finos/morphir-moo
 
 ## Out of Scope
 
-Do not implement Morphir command flags, warning suppression, TOML editing or its all-member walk here. Do not change the default legacy fallback policy, profiles, global source order, or existing MEP and Workbench protocols. Do not publish a release from this proposal PR. Implementation and publication need separate approval.
+Do not implement Morphir command flags, warning suppression, TOML editing or its all-member walk here. Do not change the default legacy fallback policy, profile activation or group rules, global source order, or existing MEP and Workbench protocols. Do not publish a release from this proposal PR. Implementation and publication need separate approval.

@@ -1,4 +1,23 @@
 ///|
+test "reserved env group metadata bypasses ordinary secret interpretation" {
+  let conventions = ordered_conventions() |> @conventions.profiles(@profiles.Policy::new())
+  for selection in [@config.ProfileSelection::Unspecified, Disabled] {
+    let config = discover_in("/w", [
+      ("/w/acme.json", "{workspace:{}, profiles:{active:['env'], groups:{env:['metrics']}}}"),
+      ("/w/acme.toml", "base=true"),
+      ("/w/acme.profile.metrics.toml", "enabled=true"),
+    ], conventions~, formats=ordered_formats(), options=@conventions.DiscoveryOptions::new(profiles=selection))
+    assert_eq(@config.bind(config, "base"), true)
+    assert_true(config.get(@config.KeyPath::parse("profiles")) is None)
+    guard config.profiles() is Resolved(resolution) else { fail("no profile resolution") }
+    if selection is Disabled { assert_true(resolution.disabled()) } else {
+      assert_eq(resolution.active().names().map(name => name.to_string()), ["env", "metrics"])
+      assert_eq(@config.bind(config, "enabled"), true)
+    }
+  }
+}
+
+///|
 test "layered profile controls retain individual origins and active-name order" {
   let conventions = ordered_conventions() |> @conventions.profiles(@profiles.Policy::new())
   let config = discover_in("/w", [

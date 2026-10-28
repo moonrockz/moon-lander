@@ -404,7 +404,15 @@ fn Scan::value_of(
   if self.conventions.layers is Some(_) && file.kind is Discovered {
     return match self.primary_documents(file.root) {
       None => Unknown
-      Some(documents) => Found(@config.build(documents.map(document => self.document_source(document, Workspace))).value())
+      Some(documents) => {
+        let sources = documents.map(document => {
+          let source = self.document_source(document, Workspace)
+          if self.conventions.profiles is Some(_) {
+            source.exclude([@config.KeyPath::parse("profiles")], warn=false)
+          } else { source }
+        })
+        Found(@config.build(sources).value())
+      }
     }
   }
   if self.conventions.layers is Some(_) && file.kind is ExplicitFile {

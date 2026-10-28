@@ -355,7 +355,13 @@ fn Scan::enclosing(
     }
     guard below_stop && dir.parent() is Some(parent) else { break }
     dir = parent
-    let file = match self.config_at(dir) {
+    // Ordered groups report ambiguity as an error instead of Several. The
+    // enclosing search still passes over that location under NearestFile.
+    let candidate = try self.config_at(dir) catch {
+      @config.Ambiguous(..) => continue
+      error => raise error
+    }
+    let file = match candidate {
       NotKnown => return None
       NoFile | Several => continue
       OneFile(path) => { path, root: dir, kind: Discovered }

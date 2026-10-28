@@ -35,6 +35,12 @@ array-form JSON logging defaults remain compatible.
   regressions for these APIs, with portable configuration and DIB coverage on
   wasm, wasm-gc, JavaScript and native.
 
+### Fixed
+
+- Preserve the enclosing-workspace search's skip-ambiguous fallback when ordered
+  formats use `NearestFile`. Workspace-first discovery still rejects an examined
+  ambiguous location.
+
 ## 0.6.0 - 2026-10-28
 
 The framework libraries are now published to mooncakes.io. Earlier releases

@@ -12,6 +12,19 @@ fn ordered_conventions(supplemental? : @conventions.SupplementalFile) -> @conven
 fn ordered_formats() -> Array[@config.Format] { [@json5.format(), @yaml.format(), @toml.format()] }
 
 ///|
+test "nearest-file ordered discovery passes over an ambiguous enclosing candidate" {
+  let config = discover_in("/w/mid/a", [
+    ("/w/acme.toml", "workspace.members=['mid/a']\nshared='workspace'"),
+    ("/w/mid/acme.json", "{}"),
+    ("/w/mid/acme.json5", "{}"),
+    ("/w/mid/a/acme.toml", "project.name='a'"),
+  ], conventions=ordered_conventions() |> @conventions.root_policy(NearestFile), formats=ordered_formats())
+  assert_eq(@config.get_text(config, "shared"), "workspace")
+  assert_eq(@config.get_text(config, "project.name"), "a")
+  assert_eq(config.reports().filter(report => report.kind is File(Workspace) && report.status is Loaded).map(report => report.path), [Some("/w/acme.toml")])
+}
+
+///|
 test "ordered formats merge at one root independent of parser registration order" {
   let files = [
     ("/w/acme.json5", "{ shared: 'json', jsonOnly: true, workspace: {} }"),

@@ -1,12 +1,16 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonrockz/moon-lander-tests/console-host-scenarios"
 
+import {
+  "moonrockz/moon-lander-hosting",
+}
+
 // Values
 pub fn output_line(Int32) -> String
 
 pub let output_lines : Int32
 
-pub async fn run(Scenario) -> Unit
+pub async fn run(Scenario, signals? : @moon-lander-hosting.SignalProbe, finalize? : async (@moon-lander-hosting.ExitCode) -> @moon-lander-hosting.ExitCode) -> Unit
 
 // Errors
 

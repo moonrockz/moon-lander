@@ -81,7 +81,11 @@ async fn write_output() -> Unit {
 ///|
 /// Run the test host with the console driver. On native the process ends
 /// inside `@hosting_console.run`; on js it ends when the event loop is empty.
-pub async fn run(scenario : Scenario) -> Unit {
+pub async fn run(
+  scenario : Scenario,
+  signals? : @hosting.SignalProbe,
+  finalize? : @hosting_console.Finalizer,
+) -> Unit {
   let polled = Ref(false)
   let args = match scenario {
     Help => ["--help"]
@@ -166,5 +170,5 @@ pub async fn run(scenario : Scenario) -> Unit {
         }
       }
     }
-  })
+  }, signals?, finalize?)
 }

@@ -55,24 +55,34 @@ extern "js" fn has_node_process() -> Bool =
 /// `finalize` runs after the run and its failure reports, before the driver
 /// sets the exit code and returns. See `Finalizer`.
 ///
+/// With `signals`, the enclosing owner installs OS listeners and owns second-
+/// signal escalation. The driver installs or removes no listeners and retains
+/// the first probe value through finalization. A shared-memory reader can see
+/// signals during a synchronous worker loop without yielding.
+///
 /// It raises `SignalHandlersUnavailable` before it reads configuration or runs a
 /// hook when the runtime has no Node.js `process`.
 pub async fn[S] run(
   host : @hosting.Host[S],
   command : @hosting.Hook[S],
   finalize? : Finalizer,
+  signals? : @hosting.SignalProbe,
 ) -> Unit {
   guard has_node_process() else { raise SignalHandlersUnavailable }
   let adapter = node_adapter()
-  let listeners = adapter.install_signals()
-  defer listeners.remove()
+  let (read, remove) = match signals {
+    Some(probe) => (external_signal_reader(probe), () => ())
+    None => {
+      let listeners = adapter.install_signals()
+      (() => kind_of_code(listeners.kind()), () => listeners.remove())
+    }
+  }
+  defer remove()
   errdefer adapter.set_exit_code(1)
-  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(() => kind_of_code(listeners.kind())))
-  let selected = selected_exit_code(outcome, kind_of_code(listeners.kind()))
-  let code = finish(selected, finalize, () => kind_of_code(
-    listeners.kind(),
-  ))
-  let signal = kind_of_code(listeners.kind())
+  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
+  let selected = selected_exit_code(outcome, read())
+  let code = finish(selected, finalize, read)
+  let signal = read()
   adapter.set_exit_code(code)
   // A signal asks the process to end. A handle that a service left open must
   // not keep it running, so the process ends after a grace time. The timer

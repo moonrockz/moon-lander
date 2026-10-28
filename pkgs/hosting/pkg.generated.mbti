@@ -175,6 +175,7 @@ pub fn Lifetime::on_stopped(Self, () -> Unit) -> Unit
 pub fn Lifetime::on_stopping(Self, () -> Unit) -> Unit
 pub fn Lifetime::set_exit_code(Self, ExitCode) -> Unit
 pub fn Lifetime::stop_application(Self, exit_code? : ExitCode) -> Unit
+pub fn Lifetime::stop_from_embedder(Self, exit_code? : ExitCode) -> Unit
 pub fn Lifetime::stop_reason(Self) -> StopReason?
 pub fn Lifetime::stop_token(Self) -> StopToken
 
@@ -203,6 +204,7 @@ pub struct RunOutcome {
 }
 pub fn RunOutcome::exit_code(Self) -> ExitCode
 pub fn RunOutcome::failures(Self) -> Array[Error]
+pub fn RunOutcome::stop_reason(Self) -> StopReason
 
 pub struct ServiceName {
   // private fields
@@ -233,6 +235,7 @@ pub struct SignalProbe {
   // private fields
 }
 pub fn SignalProbe::new(() -> SignalKind?) -> Self
+pub fn SignalProbe::read(Self) -> SignalKind?
 
 pub(all) enum StopReason {
   Completed

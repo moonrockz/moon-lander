@@ -267,6 +267,12 @@ pub fn RunOutcome::exit_code(self : RunOutcome) -> ExitCode {
 }
 
 ///|
+/// The first event that ended the run. Later stop requests do not replace it.
+pub fn RunOutcome::stop_reason(self : RunOutcome) -> StopReason {
+  self.reason
+}
+
+///|
 /// Each failure of the factory, a hook or the command, and a shutdown timeout,
 /// in the order that it occurred. The array is a copy.
 pub fn RunOutcome::failures(self : RunOutcome) -> Array[Error] {

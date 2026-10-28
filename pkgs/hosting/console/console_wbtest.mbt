@@ -1,4 +1,21 @@
 ///|
+test "external readers latch the first signal independently per run" {
+  let current : Ref[@hosting.SignalKind?] = Ref(None)
+  let probe = @hosting.SignalProbe::new(() => current.val)
+  let first = external_signal_reader(probe)
+  assert_eq(first(), None)
+  current.val = Some(Interrupt)
+  assert_eq(first(), Some(Interrupt))
+  current.val = None
+  assert_eq(first(), Some(Interrupt))
+  let second = external_signal_reader(probe)
+  assert_eq(second(), None)
+  current.val = Some(Terminate)
+  assert_eq(first(), Some(Interrupt))
+  assert_eq(second(), Some(Terminate))
+}
+
+///|
 test "a signal code becomes its kind and any other code is no signal" {
   assert_true(kind_of_code(0) is None)
   assert_true(kind_of_code(1) is Some(Interrupt))
@@ -45,6 +62,21 @@ async test "a signal while the finalizer runs selects the signal code" {
     Terminate,
   ))
   assert_eq(code, 143)
+}
+
+///|
+async test "an external signal first observed during finalization selects its code" {
+  let current : Ref[@hosting.SignalKind?] = Ref(None)
+  let read = external_signal_reader(@hosting.SignalProbe::new(() => current.val))
+  assert_eq(read(), None)
+  let code = finish(@hosting.ExitCode::success(), Some(selected => {
+    current.val = Some(Terminate)
+    @async.pause()
+    selected
+  }), read)
+  assert_eq(code, 143)
+  current.val = None
+  assert_eq(read(), Some(Terminate))
 }
 
 ///|

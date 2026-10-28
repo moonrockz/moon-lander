@@ -87,12 +87,33 @@ task. The command ends at its next suspension point and its `defer` blocks run
 before the stop phase. Shutdown runs inside `@async.protect_from_cancel`.
 A command can use the same function to protect a critical part of its work.
 
+An enclosing desktop or application host uses `stop_from_embedder(exit_code?)`
+from its shutdown callback. Capture the lifetime from a hook's public context.
+The request follows the same cancellation and cleanup path, with reason
+`Embedder`. It does not impersonate an OS signal or change an earlier stop reason.
+
+```mbt check
+///|
+test "bind an enclosing shutdown callback from a public hook" {
+  let shutdown : Ref[(() -> Unit)?] = Ref(None)
+  let host = @hosting.builder(@lander_core.AppName::parse("desktop"), [])
+    |> @hosting.service("shutdown", start=ctx => {
+      shutdown.val = Some(() => ctx.lifetime.stop_from_embedder())
+    })
+    |> @hosting.build(_ => ())
+  // The driver starts the host and registers the callback when this hook runs.
+  ignore(host)
+  assert_true(shutdown.val is None)
+}
+```
+
 The first event that ends the run sets `stop_reason()`. Later requests keep that
 reason and the first request's optional code, so all stop hooks read one reason.
 `set_exit_code(code)` sets an application result without asking to stop.
 The last call to `set_exit_code` or the first request's explicit code wins. A
 signal or failure takes precedence over the application code. The driver returns
 `RunOutcome` without ending the process.
+`outcome.stop_reason()` exposes that run's actual final reason as a typed value.
 
 ## Cancellation checks
 

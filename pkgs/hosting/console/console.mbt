@@ -27,12 +27,26 @@ fn kind_of_code(code : Int) -> @hosting.SignalKind? {
 }
 
 ///|
+/// Retain the first external signal for this run, including consuming readers.
+/// Repeated reads cannot count OS signals; escalation belongs to the owner.
+fn external_signal_reader(probe : @hosting.SignalProbe) -> () -> @hosting.SignalKind? {
+  let observed : Ref[@hosting.SignalKind?] = Ref(None)
+  () => {
+    if observed.val is None {
+      observed.val = probe.read()
+    }
+    observed.val
+  }
+}
+
+///|
 /// A step that the console driver runs after the host run and its failure
 /// reports, before the process ends. It gets the exit code that the driver
 /// selected and gives the exit code to use. The driver runs it one time, also
 /// after a configuration or start failure, a shutdown timeout and a first
-/// signal, protected from cancellation. A second signal still ends the process
-/// at once. A signal that arrives while it runs selects the signal code, because
+/// signal, protected from cancellation. With default handlers a second signal
+/// ends the process at once; an external probe owner controls escalation.
+/// A signal that arrives while it runs selects the signal code, because
 /// a signal code comes first.
 pub type Finalizer = async (@hosting.ExitCode) -> @hosting.ExitCode
 

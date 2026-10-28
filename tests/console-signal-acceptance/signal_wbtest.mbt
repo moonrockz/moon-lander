@@ -36,6 +36,7 @@ async test "helper: the child process body" {
 priv enum Child {
   Native
   Js(runtime~ : String, program~ : String)
+  Worker(launcher~ : String, program~ : String)
 }
 
 ///|
@@ -43,6 +44,7 @@ fn Child::label(self : Child) -> String {
   match self {
     Native => "native"
     Js(runtime~, ..) => runtime
+    Worker(..) => "node worker"
   }
 }
 
@@ -77,6 +79,8 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
     // given. The flag has no other effect on this one-file program.
     Js(runtime="node", program~) => ("node", ["--preserve-symlinks-main", program])
     Js(runtime~, program~) => (runtime, [program])
+    Worker(launcher~, program~) =>
+      ("node", ["--preserve-symlinks-main", launcher, program])
   }
   @async.with_timeout(20000, () => {
     @async.with_task_group(group => {
@@ -189,6 +193,24 @@ async test "a clean run runs all hooks and ends with 0" {
     assert_in_order(output, start_hooks + ["command"] + stop_hooks)
     assert_in_order(output, ["hook=a.stopping", "reason=Completed"])
     assert_eq(code, 0, msg="\{child.label()}\n\{output}")
+  }
+}
+
+///|
+async test "parent signals stop a non-yielding worker and drain once with true signal codes" {
+  guard !(@async.platform is Windows) else { return }
+  guard @env.get_env_var("LANDER_CONSOLE_WORKER_LAUNCHER") is Some(launcher) else { return }
+  guard @env.get_env_var("LANDER_CONSOLE_WORKER_PROGRAM") is Some(program) else { fail("missing worker program") }
+  for (kind, name, expected) in [(1, "Interrupt", 130), (2, "Terminate", 143)] {
+    let (code, output) = run_child(Worker(launcher~, program~), "poll", [Await("ready"), Send(kind)])
+    assert_eq(code, expected, msg=output)
+    assert_in_order(output, start_hooks + ["ready"] + stop_hooks + [
+      "finalizer=begin", "drained=true", "finalizer=end", "owner-listeners=intact",
+    ])
+    assert_in_order(output, ["reason=Signal(\{name})", "polled=true"])
+    for line in stop_hooks + ["finalizer=begin", "drained=true", "finalizer=end"] {
+      assert_eq(output.split(line + "\n").count() - 1, 1, msg=output)
+    }
   }
 }
 

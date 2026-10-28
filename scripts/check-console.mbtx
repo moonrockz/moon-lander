@@ -157,9 +157,9 @@ fn isolated_work() -> String {
 
 ///|
 /// Build the js test program and give the path of its artifact.
-async fn build_js_program() -> String {
+async fn build_js_program(path : String) -> String {
   let (code, out, err) = @process.collect_output("moon", [
-    "run", "--build-only", "--deny-warn", "--target", "js", js_program,
+    "run", "--build-only", "--deny-warn", "--target", "js", path,
   ])
   guard code == 0 else {
     println(out.text() + err.text())
@@ -174,10 +174,21 @@ async fn build_js_program() -> String {
 ///|
 async fn main {
   let root = @fs.realpath(".")
-  let program = build_js_program()
+  let program = build_js_program(js_program)
+  let worker_program = build_js_program("tests/console-worker-program")
+  let worker_dir = @fs.tmpdir(prefix="lander-console-worker")
+  defer @fs.rmdir(worker_dir, recursive=true)
+  let launcher = worker_dir + "/launcher.cjs"
+  let (code, out, err) = @process.collect_output("bun", [
+    "build", "tests/console-worker-program/launcher.ts", "--target=node", "--format=cjs",
+    "--outfile", launcher,
+  ])
+  guard code == 0 else { fail(out.text() + err.text()) }
   let js_env = {
     "LANDER_CONSOLE_JS_PROGRAM": program,
     "LANDER_CONSOLE_JS_RUNTIMES": js_runtimes,
+    "LANDER_CONSOLE_WORKER_LAUNCHER": launcher,
+    "LANDER_CONSOLE_WORKER_PROGRAM": worker_program,
   }
   for path in paths {
     native_tests(

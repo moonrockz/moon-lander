@@ -94,6 +94,40 @@ The handlers are global state. Run only one console host in a process. When the
 driver cannot install its handlers, `run` raises `SignalHandlersUnavailable` before
 it reads configuration or runs a hook.
 
+## Enclosing signal owner
+
+Pass `signals` when a launcher owns signal delivery. The driver installs no OS
+handlers or listeners and removes none owned by the launcher. On native it turns
+off the async runtime's cancellation signal mask. The launcher owns second-signal
+escalation. Repeated reads of one signal do not count as new signals. Each run
+retains its first observed signal through cleanup and finalization, even when
+the reader consumes its flag. Keep the reader cheap and non-raising.
+
+```mbt check
+///|
+async fn console_with_owner(probe : @hosting.SignalProbe) -> Unit {
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.build(_ => ())
+  @console.run(host, ctx => {
+    while !ctx.cancelled() {
+      @async.pause()
+    }
+  }, signals=probe)
+}
+
+///|
+test "the enclosing owner example compiles" {
+  ignore(console_with_owner)
+}
+```
+
+A Node parent can record SIGINT or SIGTERM in shared memory while its worker is
+busy. A probe that reads that memory lets `ctx.cancelled()` or
+`ctx.check_cancelled()` see the signal without yielding. The parent must remain
+able to receive signals and decide when a second signal ends the worker.
+
 ## Windows console events
 
 A program can send only `CTRL_BREAK_EVENT` to one process group. The acceptance

@@ -4,7 +4,15 @@
 
 The framework libraries are now published to mooncakes.io. Earlier releases
 omitted them from the publication list. All nine libraries use version `0.6.0`
-and exact sibling dependency versions.
+and exact sibling dependency versions. The release also adds opt-in configuration
+profiles.
+
+### Breaking changes
+
+- Configuration providers use `Expansion::new` and accessors in place of record
+  literals and field reads. Complete `DiscoveryOptions` literals add
+  `profiles: Unspecified`. Exhaustive matches must handle
+  `ProfileFile(ProfileName)` and `ConfigError::Profile`.
 
 ### Changed
 
@@ -14,6 +22,10 @@ and exact sibling dependency versions.
 
 ### Added
 
+- Opt-in configuration profiles with ordered activation, defaults, includes,
+  bounded groups and adjacent profile files. Activate them through typed
+  options, `--profiles`, prefixed variables or eligible base files. Loaded
+  configuration and host contexts expose immutable profile resolution.
 - Public modules: `moonrockz/moon-lander-core`, `moonrockz/moon-lander-logging`,
   `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
   `moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting`

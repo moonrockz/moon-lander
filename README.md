@@ -178,7 +178,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.6.0`.
+- `moon.mod` holds the shared version, currently `0.7.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -243,7 +243,10 @@ publishes releases.
 
 ## Releases
 
-The `0.6.0` release publishes all seven framework modules to mooncakes.io,
+The `0.7.0` release adds opt-in layered workspace discovery, enclosing-host
+shutdown controls, lossless DIB source mode and named-object JSON logging.
+
+The `0.6.0` release published all seven framework modules to mooncakes.io,
 alongside notebooks and OpenRPC, with exact shared-version dependencies.
 
 The `0.5.0` release adds console and rolling file logging: the optional
@@ -260,7 +263,7 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 Release versions are shared across workspace members. All seven framework
 modules listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are published
 to mooncakes.io. Install a module at an exact version, for example
-`moon add moonrockz/moon-lander@0.6.0`. The workspace root, docs site, `tests`
+`moon add moonrockz/moon-lander@0.7.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 

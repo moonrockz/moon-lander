@@ -3,7 +3,7 @@ name = "moonrockz/moon-lander-site"
 // Tooling and tests must never publish. The pinned toolchain rejects private publication.
 private = true
 
-version = "0.6.0"
+version = "0.7.0"
 
 import {
   "moonbitlang/async@0.22.5",

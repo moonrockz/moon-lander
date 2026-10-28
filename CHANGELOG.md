@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.7.0 - 2026-10-28
+
+All nine libraries share this version. Existing discovery, DIB encoding and
+array-form JSON logging defaults remain compatible.
+
+### Breaking changes
+
+- Exhaustive `ConfigError` matches must handle `ConventionPolicy`. Its typed
+  `ConventionRule` identifies invalid discovery-policy inputs.
+
+### Added
+
+- Opt-in workspace-first discovery with public root evidence, ordered format
+  groups, supplemental workspace documents and selected-file overlays. JSON5/JSON,
+  YAML/YML and TOML can compose at each source stage. Normalized file identities
+  prevent duplicate selected-file loads, transforms and reports.
+- Layered configuration profiles retain each control and group definition's
+  original source. Selecting a discovered base preserves control authority;
+  external selected files remain unable to activate profiles.
+- Enclosing-host shutdown through `Lifetime::stop_from_embedder` and
+  `RunOutcome::stop_reason`. An optional `SignalProbe` lets a native or JavaScript
+  console run observe signals owned by an enclosing process without installing
+  console listeners, including a spinning worker and protected cleanup.
+- Lossless DIB source mode preserves empty and consecutive cells and their source
+  boundaries. Existing normalized encoding remains the default.
+- `format_json_object_line` and the rolling sink's `NamedObject` policy emit named
+  values under `properties`. The last occurrence wins; repeated names also have
+  all values, including the winner, in ordered `duplicateProperties` arrays.
+  Nulls, arrays and objects retain their JSON types. The duplicate object is
+  omitted when no names repeat; the existing array formatter and sink default
+  retain schema 1.
+- Public rolling-sink, embedding, disk-adapter and isolated registry-consumer
+  regressions for these APIs, with portable configuration and DIB coverage on
+  wasm, wasm-gc, JavaScript and native.
+
 ## 0.6.0 - 2026-10-28
 
 The framework libraries are now published to mooncakes.io. Earlier releases

@@ -1,5 +1,31 @@
 # Moon-Lander language
 
+## Actors (proposed)
+
+**Actor name**:
+A reusable label reserved within an actor's owner scope. Separate scopes can
+have actors with the same label, which a combined directory must distinguish.
+
+**Actor address**:
+The immutable local identity of one actor lifetime. A replacement actor has a
+different address even when it reuses the same name.
+
+**Actor reference**:
+A typed send capability for one actor lifetime. It remains bound to that actor
+after the actor stops and never redirects to a replacement.
+
+**Actor directory**:
+An immutable collection of references to actors with one message protocol.
+Membership is specific to actor lifetimes and does not give ownership of them.
+
+**Directory composition**:
+Set union of directory members by actor address. Adding the same actor more
+than once does not create another member.
+
+**Directory removal**:
+Excluding a specific actor lifetime from a new directory value. It does not
+stop the actor or revoke references that other components hold.
+
 ## OpenRPC
 
 **OpenRPC document version**:

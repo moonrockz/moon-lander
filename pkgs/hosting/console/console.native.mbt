@@ -38,15 +38,29 @@ fn signal_kind() -> @hosting.SignalKind? {
 /// `finalize` runs after the run and its failure reports, before libc `exit`.
 /// See `Finalizer`.
 ///
+/// With `signals`, the enclosing owner installs OS handlers and owns second-
+/// signal escalation. The driver installs no handlers and retains the first
+/// probe value through finalization. The reader must be cheap and non-raising.
+///
 /// It raises `SignalHandlersUnavailable` before it reads configuration or runs a
 /// hook when the handlers cannot be installed.
 pub async fn[S] run(
   host : @hosting.Host[S],
   command : @hosting.Hook[S],
   finalize? : Finalizer,
+  signals? : @hosting.SignalProbe,
 ) -> Unit {
-  install()
-  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(signal_kind))
-  let selected = selected_exit_code(outcome, signal_kind())
-  libc_exit(finish(selected, finalize, signal_kind))
+  let read = match signals {
+    Some(probe) => {
+      @signal.set_global_cancellation_signals([])
+      external_signal_reader(probe)
+    }
+    None => {
+      install()
+      signal_kind
+    }
+  }
+  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
+  let selected = selected_exit_code(outcome, read())
+  libc_exit(finish(selected, finalize, read))
 }

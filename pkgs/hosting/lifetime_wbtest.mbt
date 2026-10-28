@@ -12,6 +12,17 @@ test "events raised twice and nested late handlers still run one time" {
 }
 
 ///|
+test "public embedder stop requests preserve their kind and first code on every target" {
+  let lifetime = Lifetime::new()
+  lifetime.stop_from_embedder(exit_code=ExitCode::from_int(7))
+  lifetime.stop_application(exit_code=ExitCode::from_int(9))
+  lifetime.stop_from_embedder(exit_code=ExitCode::from_int(3))
+  assert_true(lifetime.stop_reason() is Some(Embedder))
+  assert_true(lifetime.stop_token().cancelled())
+  assert_eq(lifetime.requested_code, Some(ExitCode::from_int(7)))
+}
+
+///|
 test "stop probes and repeated requests preserve first request and optional code" {
   for code in [None, Some(ExitCode::from_int(4))] {
     let lifetime = Lifetime::new()

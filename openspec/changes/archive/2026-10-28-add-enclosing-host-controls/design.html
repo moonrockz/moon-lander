@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add enclosing-host controls: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Add enclosing-host controls: design</h1>
+<p class="meta">OpenSpec change | 2026-10-28 | upstream support for issues #108 and #111</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li><li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li><li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li></ul></nav>
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">proposal.md</a>. Lifetime already has a private Embedder stop request. The console drivers always install their own OS handlers or Node listeners. Node workers do not receive the parent's OS signal events, and a busy worker cannot yield merely to receive an event.</p>
+<h2 id="goals">Goals and non-goals</h2>
+<p>Expose existing stop machinery through typed public inputs. Preserve stop reasons, cleanup, finalization and exit mapping. Keep the installed-listener default. No cross-thread calls into MoonBit, arbitrary reason injection or new production Node adapter is added.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="host-1">HOST-1. Public embedder request (Owner: actual Embedder reason; Call: method)</h3>
+<p>Add Lifetime::stop_from_embedder with the same optional ExitCode as stop_application. It forwards to the existing private request_stop with Embedder. The first event still owns the run reason. Cancellation, ordered stop phases, failures and shutdown budgets use the existing engine. A callback obtains the lifetime from a public Context hook; no new lifetime constructor is exposed.</p>
+<h3 id="sig-1">SIG-1. Public read and optional console probe (Owner: enclosing reader; Call: ownership)</h3>
+<p>Add SignalProbe::read and an optional signals argument to native and JS console run. A supplied probe replaces console ownership of OS listeners. The native path disables async global cancellation signals without installing the C stub. The JS path installs no signal listeners. Both retain the console run, reports, finalizer, output draining and exit selection.</p>
+<table><thead><tr><th>Input</th><th>OS listeners</th><th>Second signal</th></tr></thead><tbody>
+<tr><td>No probe</td><td>Existing console handlers or Node listeners</td><td>Existing immediate-exit policy</td></tr>
+<tr><td>External probe</td><td>Enclosing launcher</td><td>Enclosing launcher owns escalation</td></tr>
+</tbody></table>
+<p>A sticky first-signal reader contains no event count. Polling it repeatedly cannot count as repeated signals. Combining two owners for the same OS signal could count one event twice or replace the launcher's handlers. Explicit external ownership avoids that ambiguity. It is documented as part of the new opt-in contract.</p>
+<h3 id="sig-2">SIG-2. Latch one observed signal per console run (Call)</h3>
+<p>Wrap the supplied reader in a private per-run latch. Once a SignalKind is observed, retain it through hooks, finalization and exit selection even if a consuming reader later returns None. Pass that same latched reader to hosting.run and finalizer selection. A signal first seen during finalization still takes signal exit precedence. This does not fabricate a reason after the run; the host sees the typed signal through its ordinary probe.</p>
+<h3 id="test-1">TEST-1. Public runtime acceptance (Call)</h3>
+<p>Use public-host tests for an active command stopped by a captured lifetime. Use an unpublished Node parent/worker fixture for SIGINT and SIGTERM: the parent publishes SignalKind through shared state, and the worker polls the public cancellation check without suspension. Assert stopping reasons, reverse cleanup, selected 130/143 and one protected async finalization. MoonBit task scripts own build and process lifecycle. Worker-only Node interop stays in unpublished fixtures. Existing installed-listener and second-signal tests remain unchanged.</p>
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>An external reader is cleared after consumption.</td><td>Latch the first observed signal per run and test reads through finalization.</td></tr>
+<tr><td>A caller expects forceful second-signal handling from a level reader.</td><td>Document the enclosing owner's escalation responsibility; keep default behavior unchanged.</td></tr>
+<tr><td>A busy JS worker cannot run signal listeners.</td><td>Read parent-published shared state synchronously and test a command with no pause.</td></tr>
+</tbody></table>
+<h2 id="migration">Migration plan</h2>
+<p>Existing calls remain unchanged. A desktop callback calls stop_from_embedder. A launcher passes its SignalProbe through console.run. Land the two <a href="tasks.md">task groups</a> with their public tests, then publish in the shared release. See the <a href="specs/enclosing-host-controls/spec.md">requirements</a>. The separately approved diagnostic JSON contract is required release scope and has its own logging change.</p>
+</main></body></html>

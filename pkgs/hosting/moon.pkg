@@ -58,6 +58,7 @@ options(targets: {
   "report.js_wbtest.mbt": ["js"],
   "node_fixture.generated.js_wbtest.mbt": ["js"],
   "run_test.mbt": ["native", "js"],
+  "enclosing_test.mbt": ["native", "js"],
   "run_wbtest.mbt": ["native", "js"],
   "shutdown_timeout_wbtest.mbt": ["native", "js"],
   "signals_wbtest.mbt": ["native", "js"],

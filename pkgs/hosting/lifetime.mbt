@@ -23,9 +23,6 @@ pub extend SignalKind with @debug.Debug::{to_repr}
 /// The signal read of a console driver. `run` reads it in each cancellation
 /// check and every 50 ms, and changes the first signal into a stop request
 /// with the reason `Signal(kind)`. The read must be cheap and must not raise.
-// Only `run` (native, js) reads the probe; wasm and wasm-gc have no signals (7).
-// Remove when the build system can limit a field read to targets.
-#warnings("-7")
 pub struct SignalProbe {
   priv request : () -> StopRequest?
 }
@@ -35,6 +32,16 @@ pub struct SignalProbe {
 /// stop, or `None` before a signal.
 pub fn SignalProbe::new(read : () -> SignalKind?) -> SignalProbe {
   { request: () => read().map(kind => StopRequest::Signal(kind)) }
+}
+
+///|
+/// Read the enclosing owner's current signal without changing the probe.
+/// The callback supplied at construction must be cheap and must not raise.
+pub fn SignalProbe::read(self : SignalProbe) -> SignalKind? {
+  match (self.request)() {
+    Some(Signal(kind)) => Some(kind)
+    _ => None
+  }
 }
 
 ///|
@@ -125,6 +132,14 @@ fn Lifetime::request_stop(self : Lifetime, request : StopRequest, code : ExitCod
 /// Ask the host to stop. The first request keeps its optional exit code.
 pub fn Lifetime::stop_application(self : Lifetime, exit_code? : ExitCode) -> Unit {
   self.request_stop(Requested, exit_code)
+}
+
+///|
+/// Ask the host to stop from an enclosing embedder's shutdown callback.
+/// Use the existing cancellation and cleanup path with reason Embedder.
+/// An earlier run-ending event and the first request's optional code remain.
+pub fn Lifetime::stop_from_embedder(self : Lifetime, exit_code? : ExitCode) -> Unit {
+  self.request_stop(Embedder, exit_code)
 }
 
 ///|

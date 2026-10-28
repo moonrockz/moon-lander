@@ -1,0 +1,9 @@
+import {
+  "moonrockz/moon-lander-tests/console-host-scenarios" @scenarios,
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonbitlang/async",
+}
+
+supported_targets = "js"
+
+options("is-main": true)

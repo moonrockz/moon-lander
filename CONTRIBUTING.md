@@ -42,9 +42,14 @@ A change folder has these files:
 | File | Contents |
 | --- | --- |
 | `proposal.md` | Why the change is necessary, what it changes, and what is out of scope |
-| `design.md` | How the change works. Each decision has a label: "Owner" for a maintainer decision, or "Call" for a decision of the author |
+| `design.html` | New changes use the shared offline HTML template. Existing spec-driven changes retain `design.md`. How the change works. Each decision has a label: "Owner" for a maintainer decision, or "Call" for a decision of the author |
 | `specs/<capability>/spec.md` | Requirement changes under `## ADDED`, `## MODIFIED` or `## REMOVED Requirements` headings. Each `### Requirement:` uses SHALL or MUST and has one or more `#### Scenario:` blocks with **WHEN** and **THEN** lines |
 | `tasks.md` | Task groups. Each group is one story and has a `Bead:` line with its beads ID |
+
+New changes use the shared `html-design` schema. See [bundle maintenance](openspec/README.md).
+Run `mise run openspec:check` to verify the committed snapshot and
+`mise run openspec:setup` to regenerate skills. Each change's `.openspec.yaml` keeps
+its own schema, so existing Markdown designs remain valid.
 
 ### Write a change
 

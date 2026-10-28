@@ -23,7 +23,7 @@ yamllint = "1.38.0"
 lefthook = "2.1.1"
 
 # Spec-driven change proposals under openspec/; needs Node.js 20.19 or later
-"npm:@fission-ai/openspec" = "1.14.1"
+"npm:@fission-ai/openspec" = "1.14.3"
 
 # C compiler used through the external moonrockz/zig-cross tool
 zig = "0.17.0"
@@ -319,3 +319,11 @@ run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx"
 [tasks."check:framework-published"]
 description = "Release gate: verify all nine public archives against release:package checksums"
 run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx --published"
+
+[tasks."openspec:check"]
+description = "Shared OpenSpec check"
+run = "moonx scripts/toolchain.mbtx scripts/openspec-ext.mbtx check"
+
+[tasks."openspec:setup"]
+description = "Shared OpenSpec setup"
+run = "moonx scripts/toolchain.mbtx scripts/openspec-ext.mbtx setup"

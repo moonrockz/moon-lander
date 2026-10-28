@@ -145,3 +145,14 @@ published library stays UI-free. Consume `zig-cross` through
 mooncakes.io. Releases run only through `.github/workflows/release.yml`, which
 publishes when an owner-approved version change merges to `main`; never publish
 from a workstation.
+
+## Shared OpenSpec configuration
+
+Use the shared `html-design` schema for new changes. Read `openspec/README.md`
+and `openspec/config.yaml`; repository-local tracking and approval rules still apply.
+The files under `openspec/schemas/html-design/` and `scripts/openspec-ext.mbtx`
+are managed by Mission Control's openspec-ext bundle. Change the shared source
+and reinstall instead of editing these snapshots. Run `mise run openspec:check`
+and `mise exec -- openspec validate --all --strict` after configuration changes.
+OpenSpec artifacts are committed project documentation; existing scratch-document
+rules continue to apply to local notes. Existing changes retain their own schema.

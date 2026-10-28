@@ -1,4 +1,4 @@
-schema: spec-driven
+schema: html-design
 
 context: |
   Moon-Lander is a MoonBit application framework with no UI. One exception: the
@@ -12,6 +12,8 @@ context: |
   Write all artifacts in ASD-STE100 Simplified Technical English.
 
 rules:
+  design:
+    - Label maintainer decisions Owner and author decisions Call.
   tasks:
     - Group tasks into story-sized units. Each group names its beads issue ID once one exists.
   proposal:

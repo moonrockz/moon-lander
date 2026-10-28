@@ -67,8 +67,8 @@ of this proposal-writing task.
 
 ## References
 
-- [Existing environment conventions](../../../pkgs/config/conventions/README.mbt.md#environments).
-- [Existing host configuration](../../../pkgs/hosting/README.mbt.md#configuration-and-services).
+- [Existing environment conventions](../../../../pkgs/config/conventions/README.mbt.md#environments).
+- [Existing host configuration](../../../../pkgs/hosting/README.mbt.md#configuration-and-services).
 - [Spring Boot profiles](https://docs.spring.io/spring-boot/reference/features/profiles.html),
   the reference for active profiles, includes, and groups. The namespace,
   filenames, ordering, and compatibility rules here belong to Moon-Lander.

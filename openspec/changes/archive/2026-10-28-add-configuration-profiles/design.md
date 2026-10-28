@@ -14,8 +14,8 @@ resolved profile information can reach both a standalone loaded configuration an
 the host factory without a second independent resolution or hidden mutable state.
 
 Labels marked Owner record the user's scope choice. Labels marked Call are author
-decisions proposed for review. API spellings below are sketches, not implemented
-interfaces.
+decisions approved for this implementation. API spellings in the design describe
+intent; compiled guides and generated interfaces give the exact signatures.
 
 ## Goals and scope
 
@@ -250,3 +250,27 @@ configuration. `DiscoveryOptions::new(profiles?)` defaults to Unspecified; calle
 that use a complete public record literal add that field. Exhaustive matches on
 `FileRole` add `ProfileFile(ProfileName)`, and exhaustive configuration-error
 matches add `Profile(failure)`. No new module or adapter is needed.
+
+
+## Runtime qualification
+
+The initial implementation commit `dd1f8735be7c58ad4e3419a5d36a1eb6b2e64803`
+was qualified in [CI run 40652792217](https://github.com/moonrockz/moon-lander/actions/runs/40652792217).
+Linux ran native and Node tests plus the Bun adapter task. macOS ran the Node
+and Bun adapter task; local macOS also ran the full gate with native temporary
+profile files. Windows ran actual Node, Bun and MSVC native tests. These are
+runtime observations, not cross-build evidence. The final qualification check
+also requires nonzero native and js profile file tests on each CI host.
+
+Pure public fixtures compare values, complete provenance, source reports,
+resolution and typed control failures across wasm, wasm-gc, js and native, in
+TOML, YAML, JSON, JSON5 and Ion. Existing browser mounts load selected profiles,
+avoid inactive contents and preserve a selected HTTP 403 failure without Node
+globals. The complete local browser suite passed 138 tests in Chromium,
+Firefox and WebKit. Parser trimming and isolated existing consumers passed.
+
+Independent repository-checklist reviews covered domain types, immutable state,
+I/O boundaries, source migration, specification agreement, filters and ordering.
+The fixes removed a duplicate selector parse, retained file-control origins for
+active-limit errors, normalized disabled metadata and kept the active-count
+rule in its smart constructor. No review finding remains open.

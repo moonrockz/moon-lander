@@ -198,7 +198,7 @@ description = "Run the embedded driver on wasm and wasm-gc with --help and --ver
 run = "moonx scripts/toolchain.mbtx scripts/check-embedded.mbtx"
 
 [tasks."check:config"]
-description = "Compare configuration values, provenance and reports on all four targets"
+description = "Compare core/profile observations on all four targets; require profile and native/js file coverage"
 run = "moonx scripts/toolchain.mbtx scripts/check-config.mbtx"
 
 [tasks."check:mediator"]

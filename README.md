@@ -79,7 +79,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
 | `mise run check:logging` | Fail when a portable logging package (root, formatting, rolling, sink settings) or the acceptance suite runs zero tests on a target |
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
-| `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
+| `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |

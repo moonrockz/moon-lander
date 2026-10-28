@@ -8,7 +8,8 @@ import {
 ----
 
 ///|
-/// Compare the complete pure-load observation across compiler targets.
+/// Compare complete core/profile observations across targets, require nonzero
+/// profile coverage, and exercise real native and js profile files.
 
 ///|
 async fn main {
@@ -44,6 +45,20 @@ async fn main {
       guard code == 0 else { fail(out.text() + err.text()) }
       guard positive_test_count(out.text() + err.text()) else {
         fail("No profile coverage: \{suite} on \{target}")
+      }
+    }
+    if target == "native" || target == "js" {
+      for
+        suite in [
+          "pkgs/config/host/profiles_wbtest.mbt", "tests/hosting-config-acceptance/profiles_wbtest.mbt",
+        ] {
+        let (code, out, err) = @process.collect_output("moon", [
+          "test", "--deny-warn", "--target", target, suite,
+        ])
+        guard code == 0 else { fail(out.text() + err.text()) }
+        guard positive_test_count(out.text() + err.text()) else {
+          fail("No host profile coverage: \{suite} on \{target}")
+        }
       }
     }
     let (code, out, err) = @process.collect_output("moon", [

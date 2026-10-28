@@ -266,3 +266,16 @@ test "legacy fallback controls are forbidden and have no adjacent profile" {
     error=>raise error
   }
 }
+
+///|
+test "profile values cannot reselect the workspace member" {
+  let conventions = @conventions.app_dirs("acme") |> @conventions.workspace
+  let config = load_from(profiles_options(conventions~), {
+    "/w/acme.toml": "workspace.members=['a','b']\nworkspace.default_member='a'\n[profiles]\nactive=['metrics']",
+    "/w/a/acme.toml": "mode='member-a'",
+    "/w/b/acme.toml": "mode='member-b'",
+    "/w/acme.profile.metrics.toml": "workspace.default_member='b'",
+  })
+  @expect.expect(@config.get_text(config,"mode")).to_equal("member-a")
+  @expect.expect(config.reports().filter(report => report.kind is File(Member)).map(report => report.path)).to_equal([Some("/w/a/acme.toml")])
+}

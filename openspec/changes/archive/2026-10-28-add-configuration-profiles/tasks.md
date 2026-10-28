@@ -40,9 +40,9 @@ Bead: lander-ntc.4
 
 Bead: lander-ntc.5
 
-- [ ] 5.1 Add public acceptance fixtures for activation, groups, precedence, errors, and reports in TOML, YAML, JSON/JSON5, and Ion; run equivalent pure observations on all four targets and real native/Node/Bun file tests on Linux/macOS/Windows, plus profile reads through existing browser mounts without Node shims.
-- [ ] 5.2 Extend existing MoonBit mise checks with nonzero profile acceptance coverage and consumer parity checks; convert the reviewed output/configuration examples into compiled guides and focused assertions, verify parser trimming and no new module/dependency, and record actual OS runtime evidence rather than using a cross-build as proof.
-- [ ] 5.3 Run formatting, strict all-spec validation, and mise run check; review domain types, I/O boundaries, compatibility and generated interfaces with the repository checklist. Tick verified tasks and archive this change in the last implementation PR; after merges close each story with PR/merge SHA, close the completed epic, and sync beads successfully.
+- [x] 5.1 Add public acceptance fixtures for activation, groups, precedence, errors, and reports in TOML, YAML, JSON/JSON5, and Ion; run equivalent pure observations on all four targets and real native/Node/Bun file tests on Linux/macOS/Windows, plus profile reads through existing browser mounts without Node shims.
+- [x] 5.2 Extend existing MoonBit mise checks with nonzero profile acceptance coverage and consumer parity checks; convert the reviewed output/configuration examples into compiled guides and focused assertions, verify parser trimming and no new module/dependency, and record actual OS runtime evidence rather than using a cross-build as proof.
+- [x] 5.3 Run formatting, strict all-spec validation, and mise run check; review domain types, I/O boundaries, compatibility and generated interfaces with the repository checklist. Tick verified tasks and archive this change in the last implementation PR; after merges close each story with PR/merge SHA, close the completed epic, and sync beads successfully.
 
 ## Dependencies and PR shape
 

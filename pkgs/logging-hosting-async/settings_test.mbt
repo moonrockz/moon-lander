@@ -278,6 +278,22 @@ fn files_target() -> @sinks.SinkTarget raise {
 }
 
 ///|
+test "JSON policies share file ownership and default to the ordered array" {
+  let directory = @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/logs"))
+  let stem = @rolling.LogFileStem::parse("diagnostics")
+  let legacy = @sinks.FileSink::new(directory, stem, format=JsonLines)
+  let named = @sinks.FileSink::new(directory, stem, format=JsonLines, json_properties=NamedObject)
+  assert_true(legacy.json_properties() is OrderedArray)
+  assert_true(named.json_properties() is NamedObject)
+  assert_eq(legacy.marker_path(), named.marker_path())
+  let duplicate : @sinks.SettingsError? = try {
+    ignore(@sinks.SessionSettings::new(files=[legacy, named]))
+    None
+  } catch { error => Some(error) }
+  assert_true(duplicate is Some(DuplicateFileSet(..)))
+}
+
+///|
 test "report constructors reject negative counts and a timeout of an open session" {
   for count in [-1L] {
     let result : @sinks.ReportError? = try {

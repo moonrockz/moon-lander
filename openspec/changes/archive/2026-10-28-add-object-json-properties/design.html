@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Object JSON properties design</title><style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style></head><body><main>
+<h1>Object JSON properties design</h1>
+<p>Approved #112 contract. See <a href="proposal.md">proposal</a>, <a href="specs/object-json-properties/spec.md">requirements</a> and <a href="tasks.md">tasks</a>.</p>
+<h2>Context</h2><p>Schema version 1 writes ordered property entries. Morphir needs named lookup and complete duplicate evidence through public sinks.</p>
+<h2>Decisions</h2>
+<h3>Owner: named properties and exact duplicate contract</h3><p>The last occurrence wins. Every repeated name has all values in original per-name order, including the winner, under duplicateProperties. Unique names do not appear in history. Omit the history object without repeats. Preserve JSON types and metadata isolation.</p>
+<h3>Call: additive formatter and schema version 2</h3><p>Keep format_json_line unchanged. Add format_json_object_line. Both call one private renderer for common metadata and safe JSON value encoding. Schema version 1 remains byte compatible. Version 2 identifies the properties object and optional history.</p>
+<h3>Call: typed sink policy</h3><p>Add JsonProperties with OrderedArray and NamedObject cases in the pure formatting package. FileSink::new accepts json_properties with OrderedArray as its default and exposes a getter. It affects JsonLines only. Text stays unchanged. File ownership remains based on directory, stem and extension, so two policies cannot open the same set together.</p>
+<h3>Call: group values without mutating events</h3><p>Walk the captured ordered list once, keeping the last value and per-name arrays. Emit only arrays with two or more values as history. Use the existing safe JSON writer for nested values, escaping and non-finite numbers. State stays local to one render.</p>
+<h2>Verification and risks</h2><p>Four-target formatter tests check interleaved names, a null winner, unique arrays, nested objects, escapes, empty events and byte-compatible defaults. Public native, Node and Bun rolling sessions write both formats, roll and drain, and an independent parser checks their files. Registry fixtures exercise the additive API. A new schema version prevents an old array reader from treating the object as its schema.</p>
+<h2>Migration</h2><p>Existing callers need no changes. Consumers select NamedObject on a JsonLines FileSink or call format_json_object_line. This adds no production I/O or dependencies. Land reviewed code after green CI and publish through the authorized release workflow.</p>
+</main></body></html>

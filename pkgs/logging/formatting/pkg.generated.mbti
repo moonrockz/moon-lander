@@ -11,6 +11,8 @@ pub fn format_console(LogRecord, Theme) -> String
 
 pub fn format_json_line(LogRecord) -> String
 
+pub fn format_json_object_line(LogRecord) -> String
+
 pub fn format_text(LogRecord) -> String
 
 pub fn utf8_length(String) -> Int64
@@ -23,6 +25,14 @@ pub fn TimestampError::message(Self) -> String
 pub fn TimestampError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub(all) enum JsonProperties {
+  OrderedArray
+  NamedObject
+} derive(Eq, @debug.Debug)
+pub fn JsonProperties::equal(Self, Self) -> Bool
+pub fn JsonProperties::not_equal(Self, Self) -> Bool
+pub fn JsonProperties::to_repr(Self) -> @debug.Repr
+
 pub struct LogRecord {
   // private fields
 }

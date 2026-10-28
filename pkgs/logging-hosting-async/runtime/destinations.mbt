@@ -282,7 +282,10 @@ fn file_destination(
   let output = FileOutput::new(file, clock, warn, io)
   let render : (@formatting.LogRecord) -> String = match file.files().format() {
     Text => @formatting.format_text
-    JsonLines => @formatting.format_json_line
+    JsonLines => match file.json_properties() {
+      OrderedArray => @formatting.format_json_line
+      NamedObject => @formatting.format_json_object_line
+    }
   }
   Sink::new(output.target, file.minimum(), render, {
     write: async fn(text) { output.write(text) },

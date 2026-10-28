@@ -3,6 +3,8 @@
 /// with the environment variable `LANDER_LOGGING_SCENARIO`, and gives an
 /// absolute temporary directory in `LANDER_LOGGING_DIR`.
 pub(all) enum Scenario {
+  /// Both JSON property policies through public rolling sinks.
+  ObjectProperties
   /// No host: one session writes three events to standard output, a text file
   /// and a JSON Lines file, closes, then writes `closed ...` directly.
   Standalone
@@ -40,6 +42,7 @@ pub(all) enum Scenario {
 /// The scenario named by `text`, or `None` for an unknown name.
 pub fn Scenario::parse(text : String) -> Scenario? {
   match text {
+    "object-properties" => Some(ObjectProperties)
     "standalone" => Some(Standalone)
     "host-clean" => Some(HostClean)
     "host-wait" => Some(HostWait)
@@ -150,6 +153,32 @@ async fn standalone(dir : String) -> Unit {
         "CompilerError: Unknown identifier calculate_total\n  at app.mbt:42",
       ),
     )
+    session.close()
+  })
+  say("closed " + report_text(report))
+}
+
+///|
+async fn object_properties(dir : String) -> Unit {
+  let logs = directory(dir)
+  let limit = @rolling.FileByteLimit::bytes(1L) catch { error => abort(error.message()) }
+  let settings = settings(plain_console(), [
+    @sinks.FileSink::new(logs, stem("array"), format=JsonLines, policy=Size(limit), retention=KeepAll),
+    @sinks.FileSink::new(logs, stem("named"), format=JsonLines, json_properties=NamedObject, policy=Size(limit), retention=KeepAll),
+  ])
+  let report = @sink_runtime.with_session(settings, session => {
+    let logger : &@logging.Logger = session.logger()
+    logger.info("{path} {array} {object} {nothing} {flag} {number}", [
+      "/repo/morphir.toml", [1, Json::null(), { "nested": true }],
+      { "items": [false, 2] }, Json::null(), true, 2.5,
+    ])
+    logger.info("{path} {level} {path} {command} {path} {level} {duplicateProperties} {properties}", [
+      Json::null(), "event", [1, Json::null()], "project.list",
+      { "nested": [true, 2] }, false, "inside", "safe",
+    ])
+    ignore(session.drain())
+    logger.info("{value} {value} {text}", [1, Json::null(), "é 😀\n\r\u{1b}\"\\"])
+    logger.info("empty", [])
     session.close()
   })
   say("closed " + report_text(report))
@@ -351,6 +380,7 @@ async fn fanout(dir : String) -> Unit {
 /// console driver; on js it ends when the event loop is empty.
 pub async fn run(scenario : Scenario, dir : String) -> Unit {
   match scenario {
+    ObjectProperties => object_properties(dir)
     Standalone => standalone(dir)
     Fanout => fanout(dir)
     Quiet => quiet(dir)

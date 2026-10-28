@@ -53,6 +53,7 @@ test "settings for a console and two file formats" {
 | `ConsoleSink` stream | `StandardError` | `StandardOutput` by explicit selection |
 | `ConsoleSink` minimum, color, theme | `Information`, `Auto`, `Literate` | Typed cases |
 | `FileSink` format, policy, retention | `Text`, `DailyAndSize(10 MiB)`, `KeepNewest(31)` | Typed cases; the count includes the active file |
+| `FileSink` json_properties | `OrderedArray` | `NamedObject` selects schema version 2; applies only to `JsonLines` |
 | `QueueEventLimit` | 1024 records | 1 or more |
 | `QueueByteLimit` | 8 MiB | 1 or more |
 | `RecordByteLimit` | 1 MiB | 1 or more, and not more than `QueueByteLimit` |
@@ -63,6 +64,36 @@ The queue limits count each record that is accepted and not yet written, includi
 the record that the writer writes now, and the payload bytes of all its
 destinations. A single large input can still need temporary memory to encode
 before the session rejects it.
+
+## Named JSON file properties
+
+Select `json_properties=NamedObject` on a `JsonLines` sink for schema version 2.
+The last occurrence wins under `properties`. `duplicateProperties` holds all
+occurrences of repeated names in original per-name order, including the winner,
+and is absent without repeats. Nulls, arrays and objects keep their JSON types.
+Event names cannot overwrite record metadata. See the
+[formatter contract](../logging/formatting/README.mbt.md#named-json-properties).
+
+```mbt check
+///|
+test "select named properties for a rolling JSON file" {
+  let logs = "/var/log/acme"
+    |> @lander_core.AbsolutePath::parse
+    |> @sinks.LogDirectory::from_absolute
+  let file = @sinks.FileSink::new(
+    logs, @rolling.LogFileStem::parse("diagnostics"),
+    format=JsonLines, json_properties=NamedObject,
+  )
+  assert_true(file.json_properties() is NamedObject)
+  assert_true(file.files().format() is JsonLines)
+}
+```
+
+The default remains schema version 1 with an ordered array. The option does not
+change readable text output, file names, ownership, rolling or retention.
+Use distinct stems for simultaneous sinks with different JSON policies. A
+change of policy for an existing file set can mix schema versions in that file,
+so select a new stem when readers require one schema per file.
 
 ## Colors
 

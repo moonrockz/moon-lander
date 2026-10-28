@@ -123,16 +123,22 @@ control characters as JSON data instead of emitting raw control sequences.
 
 ### Requirement: Readable and JSON Lines file formats
 
-File sinks SHALL support readable text and JSON Lines. Both MUST encode UTF-8
-without a BOM or formatter color. JSON Lines MUST contain one complete JSON
-object and one LF per event. Its versioned schema MUST preserve captured time,
-level, category, template, rendered message, ordered structured properties, and
-error text.
+File sinks SHALL support UTF-8 text and JSON Lines without a BOM or color.
+JSON Lines MUST write one object and LF per event, preserving captured time,
+level, category, template, message, property values and error text. Schema
+version 1 SHALL remain the default and keep all properties in order as an array.
+Opt-in version 2 SHALL use named last-wins values and complete per-name history
+as defined in object-json-properties.
 
 #### Scenario: Structured values survive JSON output
 
-- **WHEN** a record contains a number, nested object, repeated property name, and newline in error text
+- **WHEN** a record contains a number, nested object, repeated property name, and newline in error text and uses the default JSON policy
 - **THEN** decoding its single JSON line recovers every property in order, including duplicate names, with its original JSON type
+
+#### Scenario: Named JSON output
+
+- **WHEN** a JsonLines sink selects NamedObject
+- **THEN** its records use schema version 2 with named last-wins properties and complete duplicate history, without changing captured metadata
 
 #### Scenario: Human-readable file output
 

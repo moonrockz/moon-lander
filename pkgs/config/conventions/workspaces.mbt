@@ -165,7 +165,7 @@ fn Conventions::declaration(
   value : @config.ConfigValue,
 ) -> Declaration? raise @config.ConfigError {
   guard self.workspace is Some(keys) else { return None }
-  let config = @config.build([@config.in_memory(value, name=self.display)])
+  let config = self.discovery_value(value)
   let members : Array[String]? = optional(config, keys.members)
   let default_member : String? = optional(config, keys.default_member)
   guard members is Some(_) || default_member is Some(_) else { return None }
@@ -194,8 +194,24 @@ fn Conventions::project_name(
   value : @config.ConfigValue,
 ) -> String? raise @config.ConfigError {
   guard self.workspace is Some(keys) else { return None }
-  let config = @config.build([@config.in_memory(value, name=self.display)])
+  let config = self.discovery_value(value)
   optional(config, keys.project_name)
+}
+
+///|
+/// Reserved controls do not participate in workspace identity. The final load
+/// checks their original location and shape after selection is fixed.
+fn Conventions::discovery_value(
+  self : Conventions,
+  value : @config.ConfigValue,
+) -> @config.Config raise @config.ConfigError {
+  let source = @config.in_memory(value, name=self.display)
+  let source = if self.profiles is Some(_) {
+    source.exclude([@config.KeyPath::parse("profiles")], warn=false)
+  } else {
+    source
+  }
+  @config.build([source])
 }
 
 ///|

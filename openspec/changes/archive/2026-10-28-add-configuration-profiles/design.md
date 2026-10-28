@@ -273,4 +273,9 @@ Independent repository-checklist reviews covered domain types, immutable state,
 I/O boundaries, source migration, specification agreement, filters and ordering.
 The fixes removed a duplicate selector parse, retained file-control origins for
 active-limit errors, normalized disabled metadata and kept the active-count
-rule in its smart constructor. No review finding remains open.
+rule in its smart constructor. A final regression also found that temporary
+workspace identity loads could interpret secret-shaped reserved controls before
+Disabled took effect. Those temporary loads now exclude controls; the final load
+still validates original locations and types. Tests cover direct and nested
+workspace entry, member-name lookup, Disabled, and typed enabled failures. No
+review finding remains open.

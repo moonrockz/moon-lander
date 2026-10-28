@@ -279,3 +279,65 @@ test "profile values cannot reselect the workspace member" {
   @expect.expect(@config.get_text(config,"mode")).to_equal("member-a")
   @expect.expect(config.reports().filter(report => report.kind is File(Member)).map(report => report.path)).to_equal([Some("/w/a/acme.toml")])
 }
+
+///|
+test "workspace selection does not interpret reserved profile secrets before disable" {
+  let conventions = @conventions.app_dirs("acme") |> @conventions.workspace
+  let disk = {
+    "/w/acme.toml":"workspace.members=['member']\nworkspace.default_member='member'\nprofiles.active={env=42}",
+    "/w/member/acme.toml":"mode='member'",
+  }
+  disk["/w/member/src/main.mbt"] = ""
+  for dir in ["/w", "/w/member/src"] {
+    let config=load_from(profiles_options(selection=Disabled,conventions~) |> @config.working_dir(dir),disk)
+    @expect.expect(@config.get_text(config,"mode")).to_equal("member")
+    @expect.expect(config.get(@config.KeyPath::parse("profiles"))).to_equal(None)
+    @expect.expect(project(config).path).to_equal(Some("/w/acme.toml"))
+  }
+}
+
+///|
+test "workspace controls retain typed failures and member-name lookup honors disable" {
+  let conventions = @conventions.app_dirs("acme") |> @conventions.workspace
+  try {
+    ignore(load_from(profiles_options(conventions~),{
+      "/w/acme.toml":"workspace.members=['member']\nworkspace.default_member='member'\nprofiles.active={env=42}",
+      "/w/member/acme.toml":"mode='member'",
+    }))
+    fail("invalid controls must reach the typed profile parser")
+  } catch {
+    @config.Profile(failure~)=>@expect.expect(failure.rule()).to_equal(ExpectedList)
+    error=>raise error
+  }
+  let builder=@config.builder() |> @config.working_dir("/w") |> @config.env_vars({}) |> @config.format(@toml.format())
+    |> @conventions.add(conventions |> @conventions.profiles(@profiles.Policy::new()), options=@conventions.DiscoveryOptions::new(project="selected",profiles=Disabled))
+  let disk={
+    "/w/acme.toml":"workspace.members=['member']",
+    "/w/member/acme.toml":"project.name='selected'\nprofiles.active={env=42}\nmode='selected'",
+  }
+  let config=load_from(builder,disk)
+  @expect.expect(@config.get_text(config,"mode")).to_equal("selected")
+  try {
+    ignore(load_from(profiles_options(conventions~),{
+      "/w/acme.toml":"workspace.members=['member']\nworkspace.default_member='member'",
+      "/w/member/acme.toml":"profiles.active={env=42}",
+    }))
+    fail("member controls must retain invalid-location failure")
+  } catch {
+    @config.Profile(failure~)=>@expect.expect(failure.rule()).to_equal(ForbiddenLocation)
+    error=>raise error
+  }
+}
+
+///|
+test "workspace profile groups may use names shared with secret reference keys" {
+  for name in ["env","file","command","keyring"] {
+    let conventions=@conventions.app_dirs("acme") |> @conventions.workspace
+    let config=load_from(profiles_options(conventions~),{
+      "/w/acme.toml":"workspace.members=['member']\nworkspace.default_member='member'\n[profiles]\nactive=['\{name}']\n[profiles.groups]\n\{name}=['metrics']",
+      "/w/member/acme.toml":"mode='member'",
+    })
+    @expect.expect(active(config)).to_equal([name,"metrics"])
+    @expect.expect(@config.get_text(config,"mode")).to_equal("member")
+  }
+}

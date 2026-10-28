@@ -1,2 +1,5 @@
-import { "moonrockz/notebooks" @library }
+import {
+  "moonrockz/notebooks" @library,
+  "moonrockz/notebooks/dib",
+}
 pkgtype(kind: "executable")

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preserve DIB source cells: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Preserve DIB source cells: design</h1>
+<p class="meta">OpenSpec change | 2026-10-28 | authorized upstream support for issue #109</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li><li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li><li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li></ul></nav>
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">proposal.md</a>. The existing codec omits empty cells, and both construction and parsing trim empty boundary lines. Existing tests require those normalized defaults.</p>
+<h2 id="goals">Goals and non-goals</h2>
+<p>Retain source-cell structure through a public opt-in path on all four targets. No output persistence, alternate metadata schema or byte-exact line-ending preservation is added.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="dib-1">DIB-1. Explicit source mode (Call)</h3>
+<p>Add SourceMode with Normalized and Lossless cases. Use the same optional mode in Cell construction, parse and to_string. Normalized remains the default. Changing the default would break documented .NET Interactive normalization. An opt-in mode supplies the supported lossless path requested in issue #109.</p>
+<h3 id="dib-2">DIB-2. Selector framing without payload padding (Call)</h3>
+<p>Lossless writing emits each canonical selector, one LF, its exact LF-normalized source and one framing LF. Blocks concatenate without an extra separator. Lossless parsing retains explicit empty selectors and all payload lines, excluding only the terminal split sentinel. A zero-cell notebook writes empty text and reads as zero cells in this mode. No extension directive or hidden metadata is needed.</p>
+<h3 id="dib-3">DIB-3. Existing representation refusal (Call)</h3>
+<p>Both modes reject source containing registered selectors with the existing cell/line error. Keep metadata output, leading BOM support and custom registry handling. A first metadata header protects later metadata directives retained as source. Reuse the current registry on reread.</p>
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>A caller mixes source modes.</td><td>Document that lossless export/import uses Lossless at every relevant boundary. Show a runnable example with one shared mode value.</td></tr>
+<tr><td>Framing is mistaken for source.</td><td>Test empty, newline-only, trailing-newline and consecutive cells, with and without metadata.</td></tr>
+<tr><td>Default output changes.</td><td>Retain all existing default-mode fixtures and assertions.</td></tr>
+</tbody></table>
+<h2 id="migration">Migration plan</h2>
+<p>The API is additive. Existing consumers keep Normalized. Morphir opts into Lossless for construction, export and import. Land with <a href="tasks.md">the task evidence</a> and <a href="specs/dib-source-roundtrip/spec.md">the requirements</a>, then publish in the authorized shared release. Rollback is to the previous version or Normalized mode.</p>
+</main></body></html>

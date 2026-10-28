@@ -115,11 +115,19 @@ let cell = @dib.Cell::Cell("Console.WriteLine(1);", kernel=@dib.KernelName("csha
 let book = @dib.Notebook::Notebook([cell])
 ```
 
-LF, CRLF and CR normalize to LF. Leading and trailing empty lines are trimmed
+By default, LF, CRLF and CR normalize to LF. Leading and trailing empty lines are trimmed
 from cells; whitespace-only lines and internal blank lines remain. Empty
 sections are omitted, and parsing an empty document yields one empty cell.
 Writing omits empty cells, emits canonical selectors, and adds a blank line
 after each selector and between cells. A leading BOM is accepted.
+
+For source-cell preservation, select `SourceMode::Lossless` when constructing
+cells, writing and parsing. This retains empty cells, consecutive selectors,
+empty boundary lines and whitespace-only lines. It normalizes CRLF and CR to LF
+but adds no source padding. A zero-cell notebook remains zero cells in this mode.
+Use the same mode at all three boundaries and the same registry for custom
+kernels. The [runnable lossless example](examples.mbt.md#preserve-empty-source-cells)
+shows the public round trip. Existing calls keep the normalized default.
 
 `to_string()` raises `UnrepresentableSource` if a constructed cell contains a
 registered selector that would change its structure when

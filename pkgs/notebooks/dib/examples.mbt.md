@@ -67,6 +67,32 @@ test "example: construct a DIB notebook" {
 }
 ```
 
+## Preserve empty source cells
+
+Use one lossless mode value for cell construction, export and import. Empty
+cells and leading or trailing empty source lines remain in the result.
+
+```mbt check
+///|
+test "example: preserve empty Markdown and source boundary lines" {
+  let source_mode = @dib.SourceMode::Lossless
+  let registry = @dib.KernelRegistry(
+    [@dib.KernelInfo(@dib.KernelName("scheme"))],
+    default_kernel=@dib.KernelName("scheme"),
+  )
+  let book = @dib.Notebook::Notebook([
+    @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
+    @dib.Cell::Cell("\n42\n", kernel=@dib.KernelName("scheme"), source_mode~),
+  ], registry~)
+  let exported = book.to_string(source_mode~)
+  let restored = @dib.parse(exported, registry=book.registry(), source_mode~)
+  @expect.expect(restored).to_equal(book)
+  @expect.expect(restored.cells().length()).to_equal(2)
+  @expect.expect(restored.cells()[0].source()).to_equal("")
+  @expect.expect(restored.cells()[1].source()).to_equal("\n42\n")
+}
+```
+
 ## Supply a custom execution environment
 
 A registry defines canonical names, aliases and a default. Language labels

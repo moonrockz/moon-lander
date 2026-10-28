@@ -53,6 +53,7 @@ pub struct Conventions {
   priv root_policy : RootPolicy
   priv member_loading : MemberLoading
   priv layers : FormatLayers?
+  priv selected_file : SelectedFilePolicy
 }
 
 ///|
@@ -139,6 +140,7 @@ pub fn base(
     root_policy: NearestFile,
     member_loading: Automatic,
     layers: None,
+    selected_file: Primary,
   }
 }
 
@@ -374,3 +376,25 @@ pub fn member_loading(conventions : Conventions, loading : MemberLoading) -> Con
 ///|
 /// Whether this convention set reserves profile controls and its selector.
 pub fn Conventions::profiles_enabled(self : Conventions) -> Bool { self.profiles is Some(_) }
+
+///|
+/// How an explicit config selection participates in discovery.
+pub(all) enum SelectedFilePolicy {
+  /// Use it as the project primary without walk-up (the default).
+  Primary
+  /// Retain discovery and move the selected file to one Explicit layer at 325.
+  Overlay
+} derive(Eq, Debug)
+
+///|
+pub extend SelectedFilePolicy with Eq::{equal, not_equal}
+
+///|
+pub extend SelectedFilePolicy with @debug.Debug::{to_repr}
+
+///|
+/// Select explicit-primary compatibility or an overlay above base primaries
+/// and below members. Overlay paths resolve against the supplied working directory.
+pub fn selected_file_policy(conventions : Conventions, policy : SelectedFilePolicy) -> Conventions {
+  { ..conventions, selected_file: policy }
+}

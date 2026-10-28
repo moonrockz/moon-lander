@@ -122,13 +122,17 @@ fn Scan::source_for(
   paths : Array[@config.FileTreePath],
   role : @config.FileRole,
   supplemental? : SupplementalFile,
-) -> @config.ConfigSource? raise @config.ConfigError {
+  omit_selected? : Bool = true,
+) -> Array[@config.ConfigSource]? raise @config.ConfigError {
   guard self.existing(paths) is Some(existing) else { return None }
   guard existing is [path] else {
-    return Some(@config.ConfigSource::candidates(texts(paths), display=self.conventions.display, role~, name=self.conventions.display))
+    return Some([@config.ConfigSource::candidates(texts(paths), display=self.conventions.display, role~, name=self.conventions.display)])
   }
   match self.read_document(path, supplemental?) {
-    Found(value) => Some(@config.ConfigSource::parsed_file(path.to_string(), value, role~, name=self.conventions.display))
+    Found(value) => {
+      let source = @config.ConfigSource::parsed_file(path.to_string(), value, role~, name=self.conventions.display)
+      Some(if omit_selected { self.keep_source(path, source) } else { [source] })
+    }
     Missing => raise @config.FileNotFound(path=path.to_string())
     Unknown => None
   }
@@ -149,13 +153,13 @@ fn Scan::ordered_layer(
   for group in layers.groups {
     if group.supplemental is Some(file) {
       match self.source_for([root.child(file.name)], role, supplemental=file) {
-        Some(source) => primaries.push(source)
+        Some(sources) => primaries.append(sources)
         None => known = false
       }
     }
     let paths = self.conventions.candidates(root, group.extensions.map(extension => extension.text))
     match self.source_for(paths, role) {
-      Some(source) => primaries.push(source)
+      Some(sources) => primaries.append(sources)
       None => known = false
     }
   }
@@ -217,19 +221,19 @@ fn Scan::adjacent_sources(
   suffix : String,
   role : @config.FileRole,
 ) -> Array[@config.ConfigSource]? raise @config.ConfigError {
-  guard self.conventions.layers is Some(layers) else { return Some([]) }
+  let groups = self.conventions.layers.map(layers => layers.groups.map(group => group.extensions.map(extension => extension.text))).unwrap_or([self.extensions])
   let sources = []
   let mut known = true
-  for group in layers.groups {
+  for extensions in groups {
     let paths = []
     for (dir, stem) in anchors {
-      for extension in group.extensions {
-        let path = dir.child("\{stem}.\{suffix}.\{extension.text}")
+      for extension in extensions {
+        let path = dir.child("\{stem}.\{suffix}.\{extension}")
         if !paths.contains(path) { paths.push(path) }
       }
     }
     match self.source_for(paths, role) {
-      Some(source) => sources.push(source)
+      Some(stage) => sources.append(stage)
       None => known = false
     }
   }
@@ -254,7 +258,8 @@ fn Scan::ordered_overrides(
   for (part, role, suffix) in [(LocalOverrides, @config.FileRole::LocalOverride, "local"), (UserOverrides, UserOverride, "user")] {
     if !self.conventions.has(part) { stages.push([]); continue }
     if project.options.isolated {
-      let sources = self.conventions.layers.map(layers => layers.groups.map(_ => @config.ConfigSource::skipped(File(role), name=self.conventions.display))).unwrap_or([])
+      let count = self.conventions.layers.map(layers => layers.groups.length()).unwrap_or(1)
+      let sources = Array::makei(count, _ => @config.ConfigSource::skipped(File(role), name=self.conventions.display))
       stages.push(sources)
       continue
     }
@@ -271,7 +276,18 @@ fn Scan::ordered_overrides(
 /// explicit format order. Supplemental files remain below ordinary candidates.
 fn Scan::machine_sources(self : Scan, options : DiscoveryOptions) -> Array[MachineSource] raise @config.ConfigError {
   let ordinary = self.conventions.machine_sources(options, self.context, self.extensions, self.notes)
-  guard self.conventions.layers is Some(layers) else { return ordinary }
+  guard self.conventions.layers is Some(layers) else {
+    if self.conventions.selected_file is Primary { return ordinary }
+    let prepared = []
+    for item in ordinary {
+      if item.candidates.is_empty() { prepared.push(item); continue }
+      guard item.source.kind() is File(role) else { continue }
+      if self.source_for(item.candidates, role, omit_selected=false) is Some(sources) {
+        for source in sources { prepared.push({ source, candidates: item.candidates }) }
+      }
+    }
+    return prepared
+  }
   let sources = []
   for item in ordinary {
     if item.candidates.is_empty() { sources.push(item); continue }
@@ -283,13 +299,13 @@ fn Scan::machine_sources(self : Scan, options : DiscoveryOptions) -> Array[Machi
     for group in layers.groups {
       if group.supplemental is Some(file) {
         let paths = directories.map(dir => dir.child(file.name))
-        if self.source_for(paths, role, supplemental=file) is Some(source) {
-          sources.push({ source, candidates: paths })
+        if self.source_for(paths, role, supplemental=file, omit_selected=false) is Some(stage) {
+          for source in stage { sources.push({ source, candidates: paths }) }
         }
       }
       let paths = item.candidates.filter(path => path.name() is Some(name) && group.extensions.any(extension => name.has_suffix("." + extension.text)))
-      if self.source_for(paths, role) is Some(source) {
-        sources.push({ source, candidates: paths })
+      if self.source_for(paths, role, omit_selected=false) is Some(stage) {
+        for source in stage { sources.push({ source, candidates: paths }) }
       }
     }
   }

@@ -331,3 +331,13 @@ pub fn ProfileSelection::from_variable(text : String, variable~ : String) -> Pro
 fn profile_ascii_trim(text : String) -> String {
   text.trim(chars=" \t\n\r\u{000b}\u{000c}").to_owned()
 }
+
+///|
+/// Authorize an additional ordinary source identity for an already resolved
+/// base. Providers use this when moving a base's values without changing its
+/// control origins. This returns a new resolution and preserves disabled mode.
+pub fn ProfileResolution::with_control_authority(self : ProfileResolution, origin : Origin) -> ProfileResolution {
+  if self.disabled || self.authorities.contains(origin) { self } else {
+    { ..self, authorities: [..self.authorities, origin] }
+  }
+}

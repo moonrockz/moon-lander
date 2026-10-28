@@ -85,7 +85,7 @@ pub fn Conventions::roots(
   options? : DiscoveryOptions = DiscoveryOptions::new(),
 ) -> @config.LoadStep[RootEvidence] raise @config.ConfigError {
   self.check_formats(context.formats)
-  let scan = Scan::new(self, context, searched_extensions(context.formats), [])
+  let scan = Scan::new(self, context, searched_extensions(context.formats), [], options~)
   scan.roots(options)
 }
 
@@ -93,6 +93,7 @@ pub fn Conventions::roots(
 /// Internal discovery already checked the final policy. Share its scan and
 /// canonical start rather than re-entering a public boundary and reparsing.
 fn Scan::roots(self : Scan, options : DiscoveryOptions) -> @config.LoadStep[RootEvidence] raise @config.ConfigError {
+  let options = self.conventions.primary_options(options)
   if options.config is Skip { return Done(root_evidence(None, None)) }
   let (start, stop) = self.conventions.root_bounds(self.context, self.start)
   if options.config is Explicit(path) {

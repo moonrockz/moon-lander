@@ -42,6 +42,8 @@ pub fn profiles(Conventions, @profiles.Policy) -> Conventions
 
 pub fn root_policy(Conventions, RootPolicy) -> Conventions
 
+pub fn selected_file_policy(Conventions, SelectedFilePolicy) -> Conventions
+
 pub fn system_dir(Conventions) -> Conventions
 
 pub fn user_config_dir(Conventions) -> Conventions
@@ -137,6 +139,14 @@ pub(all) enum RootPolicy {
   NearestFile
   WorkspaceFirst(@moon-lander-config.KeyPath)
 }
+
+pub(all) enum SelectedFilePolicy {
+  Primary
+  Overlay
+} derive(Eq, @debug.Debug)
+pub fn SelectedFilePolicy::equal(Self, Self) -> Bool
+pub fn SelectedFilePolicy::not_equal(Self, Self) -> Bool
+pub fn SelectedFilePolicy::to_repr(Self) -> @debug.Repr
 
 pub struct SupplementalFile {
   // private fields

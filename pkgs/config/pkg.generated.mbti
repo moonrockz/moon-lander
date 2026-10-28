@@ -552,6 +552,7 @@ pub fn ProfileResolution::reasons(Self) -> Array[ProfileReason]
 pub fn ProfileResolution::roots(Self) -> ProfileNames
 pub fn ProfileResolution::selector(Self) -> ProfileSelector
 pub fn ProfileResolution::to_repr(Self) -> @debug.Repr
+pub fn ProfileResolution::with_control_authority(Self, Origin) -> Self
 
 pub(all) enum ProfileRule {
   NameLength(Int32)

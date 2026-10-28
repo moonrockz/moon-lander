@@ -214,6 +214,7 @@ pub struct Host[S] {
   priv shutdown_timeout : @lander_core.TimeLimit
   priv services : Array[HostedService[S]]
   priv factory : (BuildContext) -> S raise
+  priv report_writer : ReportWriter?
 }
 
 ///|
@@ -243,6 +244,7 @@ pub fn[S] build(
     configure_sources: builder.configure_sources,
     file_tree: builder.file_tree,
     timeout_key: builder.timeout_key,
+    report_writer: None,
   }
 }
 
@@ -288,4 +290,19 @@ pub type ErrorReport = async (Error, ExitCode) -> Unit
 /// A report error cannot change the outcome or make `run` raise.
 pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {
   { ..builder, report: Some(report) }
+}
+
+///|
+/// A writer of the lines of the default failure report.
+pub type ReportWriter = async (String) -> Unit
+
+///|
+/// Send each line of the default failure report, `<name>: <message>`, to
+/// `writer` instead of standard error. The run reports the same failures in the
+/// same order. An application report from `error_report` keeps its behavior and
+/// the writer gets no line. If the writer raises, the driver ignores its error
+/// and reports the next failure. The host logging bridge uses this step to
+/// write the default report through its logger.
+pub fn[S] report_writer(host : Host[S], writer : ReportWriter) -> Host[S] {
+  { ..host, report_writer: Some(writer) }
 }

@@ -1,0 +1,42 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/logging-sinks-scenarios"
+
+// Values
+pub let burst_events : Int32
+
+pub let burst_limit : Int32
+
+pub let fanout_day_one : Int64
+
+pub let fanout_day_two : Int64
+
+pub async fn run(Scenario, String) -> Unit
+
+pub let volume_batch : Int32
+
+pub let volume_events : Int32
+
+pub fn volume_line(Int32) -> String
+
+// Errors
+
+// Types and methods
+pub(all) enum Scenario {
+  Standalone
+  HostClean
+  HostWait
+  HostSlowStop
+  HostUsage
+  HostStartFailure
+  HostTimeout
+  FileFailure
+  Fanout
+  Quiet
+  Volume
+  HostConfigFailure
+}
+pub fn Scenario::parse(String) -> Self?
+
+// Type aliases
+
+// Traits

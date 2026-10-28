@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-logging/formatting",
+  "moonrockz/moon-lander-logging/rolling",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging/rolling",
+} for "test"

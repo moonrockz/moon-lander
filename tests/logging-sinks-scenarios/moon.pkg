@@ -1,0 +1,13 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/logging" @hosting_logging,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-logging/formatting",
+  "moonrockz/moon-lander-logging/rolling",
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging-hosting-async/runtime" @sink_runtime,
+  "moonbitlang/async",
+}
+
+supported_targets = "native+js"

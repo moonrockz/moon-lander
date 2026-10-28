@@ -1,0 +1,45 @@
+import {
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-logging/formatting",
+  "moonrockz/moon-lander-logging/rolling",
+  "moonbitlang/core/deque",
+  "moonbitlang/core/env",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/js_async",
+}
+
+import {
+  "moonrockz/moon-lander-logging-hosting-async/runtime",
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-logging/rolling",
+} for "test"
+
+import {
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonbitlang/core/cmp",
+} for "wbtest"
+
+// The runtime writes to process streams and files. The pinned moonbitlang/async
+// has these on native only, and the Node.js adapter gives them on js. There is
+// no process console or file system on wasm and wasm-gc, so this package does
+// not build there instead of giving a sink that drops records.
+supported_targets = "native+js"
+
+// The pinned build system cannot condition imports by target. `async/fs` and
+// `async/stdio` are used only on native and `async/js_async` only on js, so one
+// of them is unused on each target (29). Remove when imports can be
+// conditional.
+warnings = "-29"
+
+options(
+  targets: {
+    "console.native.mbt": ["native"],
+    "console.js.mbt": ["js"],
+    "files.native.mbt": ["native"],
+    "files.js.mbt": ["js"],
+    "node.generated.js.mbt": ["js"],
+  },
+)

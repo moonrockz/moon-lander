@@ -51,10 +51,16 @@ let framework : Array[(String, String, Array[String])] = [
     ["moonrockz/moon-lander-core", "moonrockz/moon-lander-logging"],
   ),
   (
+    "pkgs/logging-hosting-async",
+    "moonrockz/moon-lander-logging-hosting-async",
+    ["moonrockz/moon-lander-core", "moonrockz/moon-lander-logging"],
+  ),
+  (
     "pkgs/hosting",
     "moonrockz/moon-lander-hosting",
     [
       "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
+      "moonrockz/moon-lander-logging-hosting-async",
     ],
   ),
   (
@@ -62,7 +68,8 @@ let framework : Array[(String, String, Array[String])] = [
     "moonrockz/moon-lander",
     [
       "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
-      "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-hosting",
+      "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-logging-hosting-async",
+      "moonrockz/moon-lander-hosting",
     ],
   ),
 ]
@@ -434,6 +441,44 @@ test "each module above the bottom can import logging" {
 }
 
 ///|
+test "the logging runtime imports core, logging and async, but not config, mediator or hosting" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-core@0.4.0",
+    #|  "moonrockz/moon-lander-logging@0.4.0",
+    #|  "moonbitlang/async@0.22.5",
+    #|}
+  assert_eq(dependency_errors("pkgs/logging-hosting-async", manifest), [])
+  for
+    name in [
+      "moonrockz/moon-lander-config", "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-hosting",
+    ] {
+    assert_eq(
+      dependency_errors(
+        "pkgs/logging-hosting-async",
+        "import {\n  \"\{name}@0.4.0\",\n}\n",
+      ),
+      [
+        "moonrockz/moon-lander-logging-hosting-async imports \{name}, against the dependency direction of the framework modules",
+      ],
+    )
+  }
+}
+
+///|
+test "hosting and the umbrella can import the logging runtime" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-logging-hosting-async@0.4.0",
+    #|}
+  assert_eq(dependency_errors("pkgs/hosting", manifest), [])
+  assert_eq(dependency_errors("pkgs/lander", manifest), [])
+  assert_eq(dependency_errors("pkgs/config", manifest).length(), 1)
+  assert_eq(dependency_errors("pkgs/mediator", manifest).length(), 1)
+  assert_eq(dependency_errors("pkgs/logging", manifest).length(), 1)
+}
+
+///|
 test "a module outside the framework gives no dependency error" {
   let manifest =
     #|import {
@@ -489,8 +534,8 @@ test "the module name of a moon.mod" {
 ///|
 test "each framework module folder is a member with its module name" {
   let active = [
-    "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/hosting",
-    "pkgs/lander",
+    "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async",
+    "pkgs/hosting", "pkgs/lander",
   ]
   let names : Map[String, String] = Map([])
   for entry in framework {
@@ -518,6 +563,15 @@ test "each framework module folder is a member with its module name" {
     ),
     [
       "pkgs/logging is a framework module folder but not an active member of moon.work",
+    ],
+  )
+  assert_eq(
+    framework_member_errors(
+      active.filter(path => path != "pkgs/logging-hosting-async"),
+      names,
+    ),
+    [
+      "pkgs/logging-hosting-async is a framework module folder but not an active member of moon.work",
     ],
   )
 }

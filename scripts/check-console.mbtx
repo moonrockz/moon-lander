@@ -139,7 +139,9 @@ async fn native_tests(
 /// the folder in this repository and the folder in the isolated workspace.
 let libraries : Array[(String, String)] = [
   ("pkgs/core", "core"),
+  ("pkgs/logging", "logging"),
   ("pkgs/config", "config"),
+  ("pkgs/logging-hosting-async", "logging-hosting-async"),
   ("pkgs/hosting", "hosting"),
 ]
 
@@ -259,6 +261,6 @@ async test "the consumer copies every source file of the scenarios package" {
 test "the isolated workspace lists the consumer and each library" {
   assert_eq(
     isolated_work(),
-    "members = [\n  \".\",\n  \"./core\",\n  \"./config\",\n  \"./hosting\",\n]\n",
+    "members = [\n  \".\",\n  \"./core\",\n  \"./logging\",\n  \"./config\",\n  \"./logging-hosting-async\",\n  \"./hosting\",\n]\n",
   )
 }

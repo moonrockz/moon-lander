@@ -10,7 +10,7 @@ import {
 ----
 
 ///|
-/// Fail when a target leg of the logging tests runs zero tests.
+/// Fail when a target leg of the portable logging tests runs zero tests.
 ///
 /// `moon test` exits with 0 when a package has no test entry for a target. The logging spec says
 /// that such a leg MUST NOT count as a pass, so this check runs each logging path for each target
@@ -23,9 +23,13 @@ import {
 let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
 
 ///|
-/// The root package of the logging module and its acceptance suite, relative to the workspace
-/// root. Each supports all four targets.
-let paths : Array[String] = ["pkgs/logging", "tests/logging-acceptance"]
+/// The portable logging packages and the acceptance suite, relative to the workspace root: the
+/// root, formatting and rolling packages of the logging module, and the settings root of the
+/// optional logging runtime module. Each supports all four targets.
+let paths : Array[String] = [
+  "pkgs/logging", "pkgs/logging/formatting", "pkgs/logging/rolling", "pkgs/logging-hosting-async",
+  "tests/logging-acceptance",
+]
 
 ///|
 /// The `(path, target)` legs to run for `targets`, target by target, in path order.
@@ -95,10 +99,13 @@ async fn main {
 }
 
 ///|
-test "legs give both paths on each target" {
-  assert_eq(legs(all_targets).length(), 8)
+test "legs give each portable path on each target" {
+  assert_eq(legs(all_targets).length(), 20)
   assert_eq(legs(["wasm-gc"]), [
     ("pkgs/logging", "wasm-gc"),
+    ("pkgs/logging/formatting", "wasm-gc"),
+    ("pkgs/logging/rolling", "wasm-gc"),
+    ("pkgs/logging-hosting-async", "wasm-gc"),
     ("tests/logging-acceptance", "wasm-gc"),
   ])
 }
@@ -135,15 +142,18 @@ async test "a leg that runs zero tests fails the check" {
     "\{dir}/moon.mod",
     "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
   )
-  for path in ["pkgs", "pkgs/logging", "tests", "tests/logging-acceptance"] {
+  for path in ["pkgs", "tests"] {
     @fs.mkdir("\{dir}/\{path}")
   }
-  @fs.write_file("\{dir}/pkgs/logging/moon.pkg", "")
-  @fs.write_file(
-    "\{dir}/pkgs/logging/logging_test.mbt",
-    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
-  )
-  @fs.write_file("\{dir}/tests/logging-acceptance/moon.pkg", "")
+  for path in paths {
+    @fs.mkdir("\{dir}/\{path}")
+    @fs.write_file("\{dir}/\{path}/moon.pkg", "")
+    guard path != "tests/logging-acceptance" else { continue }
+    @fs.write_file(
+      "\{dir}/\{path}/one_test.mbt",
+      "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+    )
+  }
   @fs.write_file(
     "\{dir}/tests/logging-acceptance/core.mbt",
     "///|\npub fn answer() -> Int {\n  42\n}\n",

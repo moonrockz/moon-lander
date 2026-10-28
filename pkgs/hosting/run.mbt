@@ -33,7 +33,11 @@ async fn[S] run_with_directory_reader(host : Host[S], command : Hook[S], read_di
         try {
           match host.report {
             Some(report) => report(error, result.exit_code)
-            None => write_report_line(report_text(host.name, error))
+            None =>
+              match host.report_writer {
+                Some(writer) => writer(report_text(host.name, error))
+                None => write_report_line(report_text(host.name, error))
+              }
           }
         } catch { _ => () }
       }

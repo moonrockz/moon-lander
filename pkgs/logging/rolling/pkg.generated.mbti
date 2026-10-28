@@ -1,0 +1,183 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-logging/rolling"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-logging/formatting",
+}
+
+// Values
+
+// Errors
+pub suberror RollingError {
+  InvalidStem(input~ : String, rule~ : StemRule)
+  NotPositiveByteLimit(bytes~ : Int64)
+  NotPositiveFileCount(count~ : Int32)
+  NegativeRecordBytes(bytes~ : Int64)
+  SequenceExhausted(last~ : String)
+} derive(@debug.Debug)
+pub fn RollingError::message(Self) -> String
+pub fn RollingError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct FileByteLimit {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn FileByteLimit::bytes(Int64) -> Self raise RollingError
+pub fn FileByteLimit::compare(Self, Self) -> Int32
+pub fn FileByteLimit::default() -> Self
+pub fn FileByteLimit::equal(Self, Self) -> Bool
+pub fn FileByteLimit::hash(Self) -> Int32
+pub fn FileByteLimit::hash_combine(Self, Hasher) -> Unit
+pub fn FileByteLimit::not_equal(Self, Self) -> Bool
+pub fn FileByteLimit::op_ge(Self, Self) -> Bool
+pub fn FileByteLimit::op_gt(Self, Self) -> Bool
+pub fn FileByteLimit::op_le(Self, Self) -> Bool
+pub fn FileByteLimit::op_lt(Self, Self) -> Bool
+pub fn FileByteLimit::to_int64(Self) -> Int64
+pub fn FileByteLimit::to_repr(Self) -> @debug.Repr
+
+pub(all) enum FileFormat {
+  Text
+  JsonLines
+} derive(Eq, @debug.Debug)
+pub fn FileFormat::default() -> Self
+pub fn FileFormat::equal(Self, Self) -> Bool
+pub fn FileFormat::extension(Self) -> String
+pub fn FileFormat::not_equal(Self, Self) -> Bool
+pub fn FileFormat::to_repr(Self) -> @debug.Repr
+
+pub(all) enum FilePlan {
+  Append(LogFileName)
+  Open(LogFileName, existing_size~ : Int64)
+  Roll(LogFileName)
+} derive(Eq, @debug.Debug)
+pub fn FilePlan::equal(Self, Self) -> Bool
+pub fn FilePlan::not_equal(Self, Self) -> Bool
+pub fn FilePlan::to_repr(Self) -> @debug.Repr
+
+pub struct FileSet {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn FileSet::equal(Self, Self) -> Bool
+pub fn FileSet::format(Self) -> FileFormat
+pub fn FileSet::marker_name(Self) -> String
+pub fn FileSet::new(LogFileStem, FileFormat, RollingPolicy) -> Self
+pub fn FileSet::not_equal(Self, Self) -> Bool
+pub fn FileSet::parse_name(Self, String) -> LogFileName?
+pub fn FileSet::policy(Self) -> RollingPolicy
+pub fn FileSet::retention(Self, Retention, Array[ListedFile], LogFileName) -> Array[String]
+pub fn FileSet::stem(Self) -> LogFileStem
+pub fn FileSet::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ListedFile {
+  name : String
+  size : Int64
+  regular : Bool
+} derive(Eq, @debug.Debug)
+pub fn ListedFile::equal(Self, Self) -> Bool
+pub fn ListedFile::not_equal(Self, Self) -> Bool
+pub fn ListedFile::to_repr(Self) -> @debug.Repr
+
+pub struct LogFileName {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn LogFileName::compare(Self, Self) -> Int32
+pub fn LogFileName::epoch_day(Self) -> Int64?
+pub fn LogFileName::equal(Self, Self) -> Bool
+pub fn LogFileName::hash(Self) -> Int32
+pub fn LogFileName::hash_combine(Self, Hasher) -> Unit
+pub fn LogFileName::not_equal(Self, Self) -> Bool
+pub fn LogFileName::op_ge(Self, Self) -> Bool
+pub fn LogFileName::op_gt(Self, Self) -> Bool
+pub fn LogFileName::op_le(Self, Self) -> Bool
+pub fn LogFileName::op_lt(Self, Self) -> Bool
+pub fn LogFileName::output(Self, &Logger) -> Unit
+pub fn LogFileName::sequence(Self) -> Int32
+pub fn LogFileName::to_repr(Self) -> @debug.Repr
+pub fn LogFileName::to_string(Self) -> String
+pub impl Show for LogFileName
+
+pub struct LogFileStem {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn LogFileStem::compare(Self, Self) -> Int32
+pub fn LogFileStem::equal(Self, Self) -> Bool
+pub fn LogFileStem::hash(Self) -> Int32
+pub fn LogFileStem::hash_combine(Self, Hasher) -> Unit
+pub fn LogFileStem::not_equal(Self, Self) -> Bool
+pub fn LogFileStem::op_ge(Self, Self) -> Bool
+pub fn LogFileStem::op_gt(Self, Self) -> Bool
+pub fn LogFileStem::op_le(Self, Self) -> Bool
+pub fn LogFileStem::op_lt(Self, Self) -> Bool
+pub fn LogFileStem::output(Self, &Logger) -> Unit
+pub fn LogFileStem::parse(String) -> Self raise RollingError
+pub fn LogFileStem::to_repr(Self) -> @debug.Repr
+pub fn LogFileStem::to_string(Self) -> String
+pub impl Show for LogFileStem
+
+pub struct RetainedFileCount {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn RetainedFileCount::compare(Self, Self) -> Int32
+pub fn RetainedFileCount::count(Int32) -> Self raise RollingError
+pub fn RetainedFileCount::default() -> Self
+pub fn RetainedFileCount::equal(Self, Self) -> Bool
+pub fn RetainedFileCount::hash(Self) -> Int32
+pub fn RetainedFileCount::hash_combine(Self, Hasher) -> Unit
+pub fn RetainedFileCount::not_equal(Self, Self) -> Bool
+pub fn RetainedFileCount::op_ge(Self, Self) -> Bool
+pub fn RetainedFileCount::op_gt(Self, Self) -> Bool
+pub fn RetainedFileCount::op_le(Self, Self) -> Bool
+pub fn RetainedFileCount::op_lt(Self, Self) -> Bool
+pub fn RetainedFileCount::to_int(Self) -> Int32
+pub fn RetainedFileCount::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Retention {
+  KeepNewest(RetainedFileCount)
+  KeepAll
+} derive(Eq, @debug.Debug)
+pub fn Retention::default() -> Self
+pub fn Retention::equal(Self, Self) -> Bool
+pub fn Retention::not_equal(Self, Self) -> Bool
+pub fn Retention::to_repr(Self) -> @debug.Repr
+
+pub(all) enum RollingPolicy {
+  Daily
+  Size(FileByteLimit)
+  DailyAndSize(FileByteLimit)
+} derive(Eq, @debug.Debug)
+pub fn RollingPolicy::default() -> Self
+pub fn RollingPolicy::equal(Self, Self) -> Bool
+pub fn RollingPolicy::not_equal(Self, Self) -> Bool
+pub fn RollingPolicy::to_repr(Self) -> @debug.Repr
+
+pub struct RollingState {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn RollingState::active(Self) -> LogFileName?
+pub fn RollingState::equal(Self, Self) -> Bool
+pub fn RollingState::file_set(Self) -> FileSet
+pub fn RollingState::new(FileSet) -> Self
+pub fn RollingState::not_equal(Self, Self) -> Bool
+pub fn RollingState::opened(Self, LogFileName, Int64) -> Self
+pub fn RollingState::plan(Self, @formatting.LogTimestamp, Int64, Array[ListedFile]) -> FilePlan raise RollingError
+pub fn RollingState::size(Self) -> Int64
+pub fn RollingState::to_repr(Self) -> @debug.Repr
+pub fn RollingState::wrote(Self, Int64) -> Self
+
+pub enum StemRule {
+  Empty
+  TooLong
+  NotLetterStart
+  InvalidCharacter(Char)
+  NumericSuffix
+  ReservedDeviceName
+} derive(Eq, @debug.Debug)
+pub fn StemRule::equal(Self, Self) -> Bool
+pub fn StemRule::not_equal(Self, Self) -> Bool
+pub fn StemRule::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

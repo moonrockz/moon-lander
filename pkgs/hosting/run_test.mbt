@@ -389,3 +389,29 @@ async test "set_exit_code gives the application code after a clean command" {
     |> @hosting.run(ctx => ctx.lifetime.set_exit_code(@hosting.ExitCode::from_int(7)))
   @expect.expect(result.exit_code().to_int()).to_equal(7)
 }
+
+///|
+async test "a report writer gets the default report lines instead of standard error" {
+  let lines = []
+  let host = @hosting.builder(@lander_core.AppName::parse("acme"), [])
+    |> @hosting.build(_ => ())
+    |> @hosting.report_writer(line => lines.push(line))
+  let outcome = @hosting.run(host, _ => raise @hosting.UsageError("bad option"))
+  assert_eq(outcome.exit_code().to_int(), 2)
+  assert_eq(lines, ["acme: bad option"])
+}
+
+///|
+async test "an application report keeps its behavior with a report writer" {
+  let lines = []
+  let reported = []
+  let host = @hosting.builder(@lander_core.AppName::parse("acme"), [])
+    |> @hosting.error_report((error, code) => reported.push(
+      (error is DiskFull, code.to_int()),
+    ))
+    |> @hosting.build(_ => ())
+    |> @hosting.report_writer(line => lines.push(line))
+  ignore(@hosting.run(host, _ => raise DiskFull))
+  assert_eq(lines, [])
+  assert_eq(reported, [(true, 1)])
+}

@@ -24,6 +24,7 @@ import {
 | `Logger` | The trait that a backend implements. `log` gets each event; `enabled` filters levels and enables each level by default |
 | `Level` | `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`, from the lowest to the highest |
 | `LogEvent` | One immutable event: level, category, template, properties and error |
+| `MessageSegment` | One part of the message: literal `Text` or a bound `Value` with its JSON type |
 | Level methods | `trace`, `debug`, `info`, `warn`, `error` and `critical` on a `&Logger` |
 | `MemoryLogger` | A logger that keeps each event, for tests and examples |
 
@@ -112,6 +113,44 @@ drops the event:
 | A hole has no argument | No property; the message keeps the hole text, for example `{Target}` |
 | An argument has no hole | The argument is dropped |
 | One name in two holes | Each hole takes its own argument; the message shows the first value in both |
+
+## Message segments
+
+A renderer that shows values in a different style needs to know which part of
+the message is literal text and which part is a value. `segments` gives the
+message as ordered parts, from the same template parse as `message`:
+
+| Segment | What it holds |
+| --- | --- |
+| `Text(text)` | Literal text. A hole with no argument stays here as its text, for example `{Target}` |
+| `Value(name~, value~)` | A bound hole: its name and its JSON value |
+
+The `text` of each segment, in order, is equal to the message. A repeated name
+shows the first value in each of its holes, as in `message`. The result is a
+copy, so a change to it does not change the event:
+
+```mbt check
+///|
+test "the segments of a message" {
+  let memory = @logging.MemoryLogger::new()
+  (memory : &@logging.Logger).info("Loaded {Count} files from {Path}", [
+    3, "src",
+  ])
+  let event = memory.events()[0]
+  let segments = event.segments()
+  assert_eq(segments, [
+    Text("Loaded "),
+    Value(name="Count", value=3),
+    Text(" files from "),
+    Value(name="Path", value="src"),
+  ])
+  let text = segments.map(segment => segment.text()).join("")
+  assert_eq(text, event.message())
+}
+```
+
+The `formatting` package uses the segments to render console text, readable
+files and JSON Lines. See its guide in `formatting/README.mbt.md`.
 
 ## Built-in loggers and combinators
 

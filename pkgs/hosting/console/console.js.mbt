@@ -52,17 +52,27 @@ extern "js" fn has_node_process() -> Bool =
 /// synchronous loop must call `@async.pause()` to see a signal. The driver
 /// removes its listeners when the run ends.
 ///
+/// `finalize` runs after the run and its failure reports, before the driver
+/// sets the exit code and returns. See `Finalizer`.
+///
 /// It raises `SignalHandlersUnavailable` before it reads configuration or runs a
 /// hook when the runtime has no Node.js `process`.
-pub async fn[S] run(host : @hosting.Host[S], command : @hosting.Hook[S]) -> Unit {
+pub async fn[S] run(
+  host : @hosting.Host[S],
+  command : @hosting.Hook[S],
+  finalize? : Finalizer,
+) -> Unit {
   guard has_node_process() else { raise SignalHandlersUnavailable }
   let adapter = node_adapter()
   let listeners = adapter.install_signals()
   defer listeners.remove()
   errdefer adapter.set_exit_code(1)
   let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(() => kind_of_code(listeners.kind())))
+  let selected = selected_exit_code(outcome, kind_of_code(listeners.kind()))
+  let code = finish(selected, finalize, () => kind_of_code(
+    listeners.kind(),
+  ))
   let signal = kind_of_code(listeners.kind())
-  let code = process_exit_code(outcome, signal)
   adapter.set_exit_code(code)
   // A signal asks the process to end. A handle that a service left open must
   // not keep it running, so the process ends after a grace time. The timer

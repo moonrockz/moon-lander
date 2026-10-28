@@ -3,7 +3,7 @@
 fn show_parts(template : String) -> String {
   parse_template(template)
   .map(part => match part {
-    Text(text) => text.escape()
+    Literal(text) => text.escape()
     Hole(name) => "{\{name}}"
   })
   .join(" ")

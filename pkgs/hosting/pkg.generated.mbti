@@ -37,6 +37,8 @@ pub fn[S] files(HostBuilder[S], @moon-lander-config.FileTree) -> HostBuilder[S]
 
 pub fn map(OverrideOption, @moon-lander-config.KeyPath, action? : MappingAction, parse? : (String) -> @moon-lander-config.ConfigValue raise) -> Mapping
 
+pub fn[S] report_writer(Host[S], async (String) -> Unit) -> Host[S]
+
 pub fn[S] reserve_env(HostBuilder[S], Array[String]) -> HostBuilder[S]
 
 pub fn[S] run_embedded(Host[S], async (Context[S]) -> Unit, stop_probe? : () -> Bool) -> RunOutcome
@@ -248,6 +250,8 @@ pub fn StopToken::check_cancelled(Self) -> Unit raise StopRequested
 pub type ErrorReport = async (Error, ExitCode) -> Unit
 
 pub type Hook[S] = async (Context[S]) -> Unit
+
+pub type ReportWriter = async (String) -> Unit
 
 // Traits
 pub trait IntoEnvVars {

@@ -39,7 +39,13 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   the hosting error report and the js signal listeners of
   `moonrockz/moon-lander-hosting/console` use a TypeScript adapter over `node:*` in
   `pkgs/hosting/adapters/node/`, with the same rules, built by the same script as a
-  second entry point.
+  second entry point. The js console streams and log files of
+  `moonrockz/moon-lander-logging-hosting-async/runtime` use a TypeScript adapter over
+  `node:process` and `node:fs/promises` in `pkgs/logging-hosting-async/adapters/node/`,
+  with the same rules and the same script. It covers only stream writes and the
+  terminal check, `mkdir`, exclusive create, append, write, close, `readdir`, `lstat`
+  and `unlink`, because the pinned `moonbitlang/async` has no js `fs` or `stdio`;
+  native uses `moonbitlang/async`. Do not use it for other Node.js I/O.
 - Native signal handlers in `pkgs/hosting/console` use a C stub
   (`signal_stub.c`, a `native-stub`), because `moonbitlang/async` gives no SIGQUIT,
   no signal identity and no handler that runs during code that never yields. The
@@ -125,11 +131,13 @@ skill. Report these as problems:
 
 ## Publishing
 
-The framework is six modules: `moonrockz/moon-lander-core`,
+The framework is seven modules: `moonrockz/moon-lander-core`,
 `moonrockz/moon-lander-logging`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
-`moonrockz/moon-lander-hosting` and the umbrella `moonrockz/moon-lander`. Each imports only
-the modules below it (`mise run validate` checks this). The module names are
-provisional. There is no CLI yet.
+the optional `moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting`
+and the umbrella `moonrockz/moon-lander`. Each imports only the modules below it
+(`mise run validate` checks this). The logging module imports only the MoonBit core
+library; `logging-hosting-async` imports core, logging and `moonbitlang/async`, never
+config, mediator or hosting. The module names are provisional. There is no CLI yet.
 Do not add UI packages or a separate regolith module. One exception: the unpublished
 docs tool `apps/site` can use Rabbita. No other module can import it, and the
 published library stays UI-free. Consume `zig-cross` through

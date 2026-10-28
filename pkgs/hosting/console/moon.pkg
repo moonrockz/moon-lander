@@ -1,5 +1,6 @@
 import {
   "moonrockz/moon-lander-hosting" @hosting,
+  "moonbitlang/async",
   "moonbitlang/async/signal",
 }
 

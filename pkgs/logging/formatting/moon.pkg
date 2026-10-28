@@ -1,0 +1,15 @@
+import {
+  "moonrockz/moon-lander-logging" @logging,
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-logging/formatting" @formatting,
+  "moonbitlang/core/json",
+  "moonbitlang/core/double",
+} for "test"
+
+options(
+  "is-main": false,
+)

@@ -90,7 +90,16 @@ async fn main {
     "pkgs/hosting/adapters/node/signals.ts", "pkgs/hosting/console/node.generated.js.mbt",
     "node_adapter", "NodeAdapter",
   )
-  if !library || !fixture || !hosting || !hosting_fixture || !console {
+  let logging = bundle(
+    "pkgs/logging-hosting-async/adapters/node/index.ts", "pkgs/logging-hosting-async/runtime/node.generated.js.mbt",
+    "node_adapter", "NodeAdapter",
+  )
+  if !library ||
+    !fixture ||
+    !hosting ||
+    !hosting_fixture ||
+    !console ||
+    !logging {
     @sys.exit(1)
   }
 }
@@ -118,6 +127,10 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
   @fs.mkdir("\{dir}/pkgs/hosting/console", recursive=true)
   let console_entry = "\{dir}/pkgs/hosting/adapters/node/signals.ts"
   @fs.write_file(console_entry, "export const value = 1;\n")
+  @fs.mkdir("\{dir}/pkgs/logging-hosting-async/adapters/node", recursive=true)
+  @fs.mkdir("\{dir}/pkgs/logging-hosting-async/runtime", recursive=true)
+  let logging_entry = "\{dir}/pkgs/logging-hosting-async/adapters/node/index.ts"
+  @fs.write_file(logging_entry, "export const value = 1;\n")
   let (missing, _, _) = @process.collect_output(
     "moonx",
     [script, "--check"],
@@ -178,4 +191,21 @@ async test "freshness check rejects changed TypeScript without rewriting the bun
     msg=err.text(),
   )
   assert_eq(@fs.read_file(console_generated).text(), before)
+  @fs.write_file(console_entry, "export const value = 1;\n")
+  let logging_generated = "\{dir}/pkgs/logging-hosting-async/runtime/node.generated.js.mbt"
+  let before = @fs.read_file(logging_generated).text()
+  @fs.write_file(logging_entry, "export const value = 2;\n")
+  let (stale, out, err) = @process.collect_output(
+    "moonx",
+    [script, "--check"],
+    cwd=dir,
+  )
+  assert_true(stale != 0, msg=out.text() + err.text())
+  assert_true(
+    err
+    .text()
+    .contains("pkgs/logging-hosting-async/runtime/node.generated.js.mbt"),
+    msg=err.text(),
+  )
+  assert_eq(@fs.read_file(logging_generated).text(), before)
 }

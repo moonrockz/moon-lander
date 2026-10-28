@@ -1,0 +1,436 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.5/sys",
+}
+----
+
+///|
+/// Check the logging sinks (openspec add-console-and-rolling-file-logging, task groups 1 and 6).
+///
+/// The check builds the js test program, then runs the native acceptance suite. The suite starts
+/// each scenario as a native child and as a js child under each runtime in `js_runtimes`, and reads
+/// the log files after the child ends. A suite that runs zero tests fails the check. Then the
+/// check copies modules into isolated workspaces outside this one and proves the dependency
+/// graphs:
+///
+/// - A consumer of `moonrockz/moon-lander-logging` alone builds on all four targets and resolves no
+///   module from the registry.
+/// - A consumer of the logging runtime resolves neither config nor hosting: those modules are not
+///   in its workspace. Its settings package builds on all four targets, its runtime package on
+///   native and js.
+/// - A package that imports the runtime and claims wasm fails to build there with a target
+///   diagnostic, so no target gets a silent sink.
+///
+/// `--no-consumer` skips the isolated workspaces.
+///
+/// Usage: `mise run check:logging-sinks [-- --no-consumer]`, or
+/// `moonx scripts/toolchain.mbtx scripts/check-logging-sinks.mbtx`.
+
+///|
+/// The native acceptance suite, relative to the workspace root.
+let suite : String = "tests/logging-sinks-acceptance"
+
+///|
+/// The js package that the acceptance suite starts under each runtime.
+let js_program : String = "tests/logging-sinks-program"
+
+///|
+/// The js runtimes of the acceptance suite.
+let js_runtimes : String = "node,bun"
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
+/// the output has no such line.
+fn test_count(output : String) -> Int32? {
+  let mut count = None
+  for line in output.split("\n") {
+    let line = line.trim(chars=" \t\r")
+    guard line.strip_prefix("Total tests: ") is Some(rest) else { continue }
+    guard rest.split(",").next() is Some(number) else { continue }
+    count = Some(@string.parse_int(number) catch { _ => continue })
+  }
+  count
+}
+
+///|
+/// The `version = "X.Y.Z"` value of a `moon.mod`.
+fn workspace_version(manifest : String) -> String? {
+  for line in manifest.split("\n") {
+    if line.strip_prefix("version = \"") is Some(rest) &&
+      rest.find("\"") is Some(end) {
+      return Some(rest[:end].to_owned())
+    }
+  }
+  None
+}
+
+///|
+/// The `moon.mod` of a consumer module that imports `modules` at `version`.
+fn consumer_manifest(
+  name : String,
+  modules : Array[String],
+  version : String,
+) -> String {
+  let imports = modules.map(name => "  \"\{name}@\{version}\",\n").join("")
+  "name = \"\{name}\"\nversion = \"0.0.1\"\nimport {\n\{imports}}\n"
+}
+
+///|
+/// The `moon.work` of an isolated workspace: the consumer and each copied folder.
+fn isolated_work(folders : Array[String]) -> String {
+  let members = ["  \".\",\n"]
+  for folder in folders {
+    members.push("  \"./\{folder}\",\n")
+  }
+  "members = [\n" + members.join("") + "]\n"
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "_build" || entry == ".mooncakes" || entry == ".git" {
+      continue
+    }
+    let from = source + "/" + entry
+    let to = destination + "/" + entry
+    match @fs.kind(from) {
+      Directory => copy_tree(from, to)
+      Regular => @fs.write_file(to, @fs.read_file(from))
+      _ => fail("Unexpected source entry: " + from)
+    }
+  }
+}
+
+///|
+/// Build the js test program and give the path of its artifact.
+async fn build_js_program() -> String {
+  let (code, out, err) = @process.collect_output("moon", [
+    "run", "--build-only", "--deny-warn", "--target", "js", js_program,
+  ])
+  guard code == 0 else {
+    println(out.text() + err.text())
+    fail("❌ The js test program does not build")
+  }
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Expected one js build artifact, got " + out.text())
+  }
+  path
+}
+
+///|
+/// Run `moon` with `args` in `cwd`, and exit with a failure when it fails.
+async fn moon_ok(label : String, cwd : String, args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("moon", args, cwd~)
+  let output = out.text() + err.text()
+  guard code == 0 else {
+    println(output)
+    println("❌ \{label}")
+    @sys.exit(if code > 0 { code } else { 1 })
+    return output
+  }
+  output
+}
+
+///|
+/// The module folders that `moon` fetched into `.mooncakes` of `dir`, as `owner/name`.
+async fn fetched_modules(dir : String) -> Array[String] {
+  let root = dir + "/.mooncakes"
+  guard @fs.exists(root) else { return [] }
+  let modules = []
+  for owner in @fs.readdir(root, sort=true) {
+    guard @fs.kind(root + "/" + owner) is Directory else { continue }
+    for name in @fs.readdir(root + "/" + owner, sort=true) {
+      modules.push(owner + "/" + name)
+    }
+  }
+  modules
+}
+
+///|
+/// A consumer of the logging module alone: it builds on all four targets and fetches nothing.
+async fn check_logging_consumer(root : String, version : String) -> Unit {
+  let dir = @fs.tmpdir(prefix="lander-logging-consumer")
+  defer @fs.rmdir(dir, recursive=true)
+  copy_tree(root + "/pkgs/logging", dir + "/logging")
+  @fs.write_file(dir + "/moon.work", isolated_work(["logging"]))
+  @fs.write_file(
+    dir + "/moon.mod",
+    consumer_manifest(
+      "fixture/logging-consumer",
+      ["moonrockz/moon-lander-logging"],
+      version,
+    ),
+  )
+  @fs.write_file(
+    dir + "/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-logging\" @logging,\n}\n",
+  )
+  @fs.write_file(
+    dir + "/probe.mbt",
+    "///|\npub fn probe() -> Int {\n  let logger = @logging.MemoryLogger::new()\n  (logger : &@logging.Logger).info(\"ready\", [])\n  logger.events().length()\n}\n",
+  )
+  for target in all_targets {
+    ignore(
+      moon_ok("The logging consumer does not build on \{target}", dir, [
+        "check", "--deny-warn", "--target", target,
+      ]),
+    )
+  }
+  let fetched = fetched_modules(dir)
+  guard fetched.is_empty() else {
+    println(
+      "❌ The logging consumer resolved modules from the registry: \{fetched.join(", ")}",
+    )
+    @sys.exit(1)
+  }
+  println(
+    "✅ A consumer of moonrockz/moon-lander-logging alone resolves no other module",
+  )
+}
+
+///|
+/// The packages of the runtime consumer: a settings package for all targets and a delivery package
+/// for native and js.
+let runtime_consumer_packages : Array[(String, String, String)] = [
+  (
+    "settings", "import {\n  \"moonrockz/moon-lander-logging-hosting-async\" @sinks,\n}\n",
+    "///|\npub fn probe() -> Bool {\n  @sinks.SessionSettings::standard().console() is Some(_)\n}\n",
+  ),
+  (
+    "delivery", "import {\n  \"moonrockz/moon-lander-logging-hosting-async\" @sinks,\n  \"moonrockz/moon-lander-logging-hosting-async/runtime\" @runtime,\n  \"moonrockz/moon-lander-logging\" @logging,\n}\n\nsupported_targets = \"native+js\"\n",
+    "///|\npub async fn probe() -> Bool {\n  let report = @runtime.with_session(@sinks.SessionSettings::standard(), session => {\n    (session.logger() : &@logging.Logger).info(\"ready\", [])\n    session.close()\n  })\n  report.accepted() == 1L\n}\n",
+  ),
+]
+
+///|
+/// A consumer of the logging runtime: it resolves neither config nor hosting, its settings build
+/// on all four targets, its delivery package on native and js, and a wasm import of the runtime fails.
+async fn check_runtime_consumer(root : String, version : String) -> Unit {
+  let dir = @fs.tmpdir(prefix="lander-runtime-consumer")
+  defer @fs.rmdir(dir, recursive=true)
+  let folders = ["core", "logging", "logging-hosting-async"]
+  for folder in folders {
+    copy_tree(root + "/pkgs/" + folder, dir + "/" + folder)
+  }
+  @fs.write_file(dir + "/moon.work", isolated_work(folders))
+  @fs.write_file(
+    dir + "/moon.mod",
+    consumer_manifest(
+      "fixture/runtime-consumer",
+      [
+        "moonrockz/moon-lander-logging", "moonrockz/moon-lander-logging-hosting-async",
+      ],
+      version,
+    ),
+  )
+  for entry in runtime_consumer_packages {
+    let (name, manifest, source) = entry
+    @fs.mkdir(dir + "/" + name)
+    @fs.write_file(dir + "/" + name + "/moon.pkg", manifest)
+    @fs.write_file(dir + "/" + name + "/probe.mbt", source)
+  }
+  for target in all_targets {
+    ignore(
+      moon_ok(
+        "The settings of the logging runtime do not build on \{target}",
+        dir,
+        ["check", "--deny-warn", "--target", target, "settings"],
+      ),
+    )
+  }
+  for target in ["native", "js"] {
+    ignore(
+      moon_ok("The logging runtime consumer does not build on \{target}", dir, [
+        "check", "--deny-warn", "--target", target, "delivery",
+      ]),
+    )
+  }
+  let fetched = fetched_modules(dir)
+  for fetched_name in fetched {
+    guard !fetched_name.has_prefix("moonrockz/") else {
+      println("❌ The logging runtime consumer resolved \{fetched_name}")
+      @sys.exit(1)
+    }
+  }
+  println(
+    "✅ A consumer of the logging runtime resolves no config or hosting module (fetched: \{fetched.join(", ")})",
+  )
+  // A package that claims every target and imports the runtime must fail on wasm.
+  @fs.mkdir(dir + "/browser")
+  @fs.write_file(
+    dir + "/browser/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-logging-hosting-async/runtime\" @runtime,\n}\n",
+  )
+  @fs.write_file(
+    dir + "/browser/probe.mbt",
+    "///|\npub fn probe() -> Unit {\n  ignore(@runtime.write_diagnostic)\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    ["check", "--target", "wasm", "browser"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  guard code != 0 && unsupported_target_diagnostic(output) else {
+    println(output)
+    println(
+      "❌ An import of the logging runtime on wasm did not fail with a target diagnostic",
+    )
+    @sys.exit(1)
+  }
+  println(
+    "✅ An import of the logging runtime on wasm fails with a target diagnostic",
+  )
+}
+
+///|
+/// Whether `output` of a failed `moon check` on wasm says that the dependency graph supports only
+/// js and native.
+fn unsupported_target_diagnostic(output : String) -> Bool {
+  output.contains("'wasm'") && output.contains("supports [js, native]")
+}
+
+///|
+/// The output line of a clean standalone run.
+let standalone_summary : String = "closed accepted=3 queue_full=0 failed=false written=3,3,3"
+
+///|
+/// Run the standalone scenario of the program as an ES module under each runtime. A `.mjs`
+/// extension forces ESM, so the bundled adapter must load through `process.getBuiltinModule`.
+async fn check_esm(program : String) -> Unit {
+  let dir = @fs.tmpdir(prefix="lander-logging-esm")
+  defer @fs.rmdir(dir, recursive=true)
+  let esm = dir + "/program.mjs"
+  @fs.write_file(esm, @fs.read_file(program).text())
+  for runtime in js_runtimes.split(",") {
+    let runtime = runtime.to_owned()
+    let logs = dir + "/logs-" + runtime
+    @fs.mkdir(logs)
+    let (code, out, err) = @process.collect_output(runtime, [esm], extra_env={
+      "LANDER_LOGGING_SCENARIO": "standalone",
+      "LANDER_LOGGING_DIR": logs.replace_all(old="\\", new="/"),
+    })
+    let output = out.text() + err.text()
+    guard code == 0 && output.contains(standalone_summary) else {
+      println(output)
+      println(
+        "❌ The logging runtime does not run as an ES module under \{runtime}",
+      )
+      @sys.exit(1)
+    }
+    println("✅ The logging runtime runs as an ES module under \{runtime}")
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let program = build_js_program()
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    ["test", "--deny-warn", "--target", "native", suite],
+    extra_env={
+      "LANDER_LOGGING_JS_PROGRAM": program,
+      "LANDER_LOGGING_JS_RUNTIMES": js_runtimes,
+    },
+  )
+  let output = out.text() + err.text()
+  guard code == 0 else {
+    println(output)
+    println("❌ The logging sink acceptance tests failed")
+    @sys.exit(if code > 0 { code } else { 1 })
+  }
+  match test_count(output) {
+    Some(count) if count > 0 =>
+      println("✅ \{suite} (native and js on \{js_runtimes}): \{count} tests")
+    _ => {
+      println(output)
+      println("❌ \{suite} ran zero tests")
+      @sys.exit(1)
+    }
+  }
+  check_esm(program)
+  if @env.args().contains("--no-consumer") {
+    return
+  }
+  guard workspace_version(@fs.read_file("moon.mod").text()) is Some(version) else {
+    fail("moon.mod has no version")
+  }
+  check_logging_consumer(root, version)
+  check_runtime_consumer(root, version)
+}
+
+///|
+test "test_count reads the last total line and none without one" {
+  assert_eq(test_count("Total tests: 3, passed: 3, failed: 0.\r\n"), Some(3))
+  assert_eq(test_count("Total tests: 0, passed: 0, failed: 0.\n"), Some(0))
+  assert_eq(test_count("Finished. moon: no work to do\n"), None)
+}
+
+///|
+test "a consumer manifest imports each module at the version" {
+  assert_eq(
+    consumer_manifest("fixture/x", ["a/b", "c/d"], "0.4.0"),
+    "name = \"fixture/x\"\nversion = \"0.0.1\"\nimport {\n  \"a/b@0.4.0\",\n  \"c/d@0.4.0\",\n}\n",
+  )
+}
+
+///|
+test "the isolated workspace lists the consumer and each folder" {
+  assert_eq(
+    isolated_work(["core", "logging"]),
+    "members = [\n  \".\",\n  \"./core\",\n  \"./logging\",\n]\n",
+  )
+}
+
+///|
+test "a target diagnostic names wasm and the supported targets" {
+  assert_true(
+    unsupported_target_diagnostic(
+      "Selected backend 'wasm' is incompatible with the dependency graph. 'fixture/runtime-consumer/browser' requires 'fixture/runtime-consumer/browser' whose active dependency graph supports [js, native].",
+    ),
+  )
+  assert_false(unsupported_target_diagnostic("error: something else"))
+}
+
+///|
+async test "the check rejects a suite that runs zero tests" {
+  let script = @fs.realpath("check-logging-sinks.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-logging-sinks")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nversion = \"0.0.1\"\n",
+  )
+  for path in ["tests", suite, js_program] {
+    @fs.mkdir("\{dir}/\{path}")
+  }
+  @fs.write_file(
+    "\{dir}/\{js_program}/moon.pkg",
+    "options(\"is-main\": true)\n",
+  )
+  @fs.write_file("\{dir}/\{js_program}/main.mbt", "///|\nfn main {\n  ()\n}\n")
+  @fs.write_file("\{dir}/\{suite}/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/\{suite}/core.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "--no-consumer"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("ran zero tests"), msg=output)
+}

@@ -96,6 +96,7 @@ pub fn working_dir(ConfigBuilder, String) -> ConfigBuilder
 
 // Errors
 pub(all) suberror ConfigError {
+  Profile(failure~ : ProfileFailure)
   Parse(format~ : String, origin~ : String, message~ : String, line~ : Int32?, column~ : Int32?)
   UnsupportedYaml(origin~ : String, feature~ : String, line~ : Int32, column~ : Int32)
   InvalidRoot(origin~ : String, found~ : String)
@@ -162,6 +163,7 @@ pub fn[T : @json.FromJson] Config::bind(Self, String) -> T raise ConfigError
 pub fn[T : @json.FromJson + ToJson] Config::bind_or(Self, String, T, unknown? : UnknownKeys) -> T raise ConfigError
 pub fn Config::get(Self, KeyPath) -> ConfigValue?
 pub fn Config::origins(Self, KeyPath) -> Array[Origin]
+pub fn Config::profiles(Self) -> ProfileState
 pub fn Config::provenance(Self) -> Array[(KeyPath, Array[Origin])]
 pub fn Config::reports(Self) -> Array[SourceReport]
 pub fn[R : SecretResolver] Config::secret(Self, String, R) -> Secret raise SecretError
@@ -271,10 +273,13 @@ pub struct EnvResolver {
 pub fn EnvResolver::resolve(Self, SecretRef, Origin) -> Secret raise SecretError
 pub impl SecretResolver for EnvResolver
 
-pub(all) struct Expansion {
-  sources : Array[ConfigSource]
-  warnings : Array[ConfigWarning]
+pub struct Expansion {
+  // private fields
 }
+pub fn Expansion::new(Array[ConfigSource], warnings? : Array[ConfigWarning], profiles? : ProfileResolution) -> Self
+pub fn Expansion::profiles(Self) -> ProfileResolution?
+pub fn Expansion::sources(Self) -> Array[ConfigSource]
+pub fn Expansion::warnings(Self) -> Array[ConfigWarning]
 
 pub(all) enum FilePathRule {
   Empty
@@ -306,6 +311,7 @@ pub(all) enum FileRole {
   Workspace
   Member
   EnvironmentFile
+  ProfileFile(ProfileName)
   LocalOverride
   UserOverride
   Legacy
@@ -457,6 +463,129 @@ pub(all) enum Platform {
 pub fn Platform::equal(Self, Self) -> Bool
 pub fn Platform::not_equal(Self, Self) -> Bool
 pub fn Platform::to_repr(Self) -> @debug.Repr
+
+pub struct ProfileFailure {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ProfileFailure::cycle(Self) -> ProfileNames
+pub fn ProfileFailure::equal(Self, Self) -> Bool
+pub fn ProfileFailure::input(Self) -> String
+pub fn ProfileFailure::message(Self) -> String
+pub fn ProfileFailure::new(String, ProfileRule, origin? : ProfileOrigin, cycle? : ProfileNames) -> Self
+pub fn ProfileFailure::not_equal(Self, Self) -> Bool
+pub fn ProfileFailure::origin(Self) -> ProfileOrigin
+pub fn ProfileFailure::rule(Self) -> ProfileRule
+pub fn ProfileFailure::to_repr(Self) -> @debug.Repr
+
+pub struct ProfileName {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn ProfileName::equal(Self, Self) -> Bool
+pub fn ProfileName::hash(Self) -> Int32
+pub fn ProfileName::hash_combine(Self, Hasher) -> Unit
+pub fn ProfileName::not_equal(Self, Self) -> Bool
+pub fn ProfileName::output(Self, &Logger) -> Unit
+pub fn ProfileName::parse(String, origin? : ProfileOrigin) -> Self raise ConfigError
+pub fn ProfileName::to_repr(Self) -> @debug.Repr
+pub fn ProfileName::to_string(Self) -> String
+pub impl Show for ProfileName
+
+pub struct ProfileNames {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ProfileNames::contains(Self, ProfileName) -> Bool
+pub fn ProfileNames::equal(Self, Self) -> Bool
+pub fn ProfileNames::names(Self) -> Array[ProfileName]
+pub fn ProfileNames::new(Array[ProfileName]) -> Self
+pub fn ProfileNames::not_equal(Self, Self) -> Bool
+pub fn ProfileNames::parse_csv(String, origin? : ProfileOrigin) -> Self raise ConfigError
+pub fn ProfileNames::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileOrigin {
+  Policy
+  Discovery
+  Variable(String)
+  Control(Origin, KeyPath)
+} derive(Eq, @debug.Debug)
+pub fn ProfileOrigin::equal(Self, Self) -> Bool
+pub fn ProfileOrigin::not_equal(Self, Self) -> Bool
+pub fn ProfileOrigin::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileReason {
+  Root(ProfileName, ProfileOrigin)
+  Include(ProfileName, ProfileOrigin)
+  GroupMember(ProfileName, ProfileName, ProfileOrigin)
+} derive(Eq, @debug.Debug)
+pub fn ProfileReason::equal(Self, Self) -> Bool
+pub fn ProfileReason::not_equal(Self, Self) -> Bool
+pub fn ProfileReason::to_repr(Self) -> @debug.Repr
+
+pub struct ProfileResolution {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ProfileResolution::active(Self) -> ProfileNames
+pub fn ProfileResolution::contains(Self, ProfileName) -> Bool
+pub fn ProfileResolution::controls(Self) -> Array[ProfileOrigin]
+pub fn ProfileResolution::disabled(Self) -> Bool
+pub fn ProfileResolution::equal(Self, Self) -> Bool
+pub fn ProfileResolution::new(ProfileSelector, ProfileNames, ProfileNames, disabled? : Bool, reasons? : Array[ProfileReason], controls? : Array[ProfileOrigin], failure_origin? : ProfileOrigin) -> Self raise ConfigError
+pub fn ProfileResolution::not_equal(Self, Self) -> Bool
+pub fn ProfileResolution::reasons(Self) -> Array[ProfileReason]
+pub fn ProfileResolution::roots(Self) -> ProfileNames
+pub fn ProfileResolution::selector(Self) -> ProfileSelector
+pub fn ProfileResolution::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileRule {
+  NameLength(Int32)
+  NameStart
+  NameCharacter
+  EmptyElement
+  ExpectedList
+  ExpectedString
+  ExpectedTable
+  UnknownField
+  NonLiteral
+  ForbiddenLocation
+  Cycle
+  GroupLimit(Int32)
+  MemberLimit(Int32)
+  DepthLimit(Int32)
+  ActiveLimit(Int32)
+  CompetingProviders(String, String)
+} derive(Eq, @debug.Debug)
+pub fn ProfileRule::equal(Self, Self) -> Bool
+pub fn ProfileRule::not_equal(Self, Self) -> Bool
+pub fn ProfileRule::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileSelection {
+  Unspecified
+  Selected(ProfileNames)
+  Disabled
+} derive(Eq, @debug.Debug)
+pub fn ProfileSelection::equal(Self, Self) -> Bool
+pub fn ProfileSelection::from_variable(String, variable~ : String) -> Self raise ConfigError
+pub fn ProfileSelection::not_equal(Self, Self) -> Bool
+pub fn ProfileSelection::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileSelector {
+  Discovery
+  Variable(String)
+  BaseActive(Origin)
+  BaseDefault(Origin)
+  Fallback
+} derive(Eq, @debug.Debug)
+pub fn ProfileSelector::equal(Self, Self) -> Bool
+pub fn ProfileSelector::not_equal(Self, Self) -> Bool
+pub fn ProfileSelector::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ProfileState {
+  Off
+  Resolved(ProfileResolution)
+} derive(Eq, @debug.Debug)
+pub fn ProfileState::contains(Self, ProfileName) -> Bool
+pub fn ProfileState::equal(Self, Self) -> Bool
+pub fn ProfileState::not_equal(Self, Self) -> Bool
+pub fn ProfileState::to_repr(Self) -> @debug.Repr
 
 pub struct Secret {
   // private fields

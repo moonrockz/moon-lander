@@ -53,3 +53,21 @@ pub fn project_option() -> @core_argparse.OptionArg {
   @core_argparse.OptionArg("project", long="project", global=true,
     about="The workspace member, by path or name.")
 }
+
+///|
+/// The global repeatable `--profiles <a,b>` option. Add it to the root
+/// command together with `no_profiles_flag`. It selects profiles only when
+/// the application enables a profile policy.
+pub fn profiles_option() -> @core_argparse.OptionArg {
+  @core_argparse.OptionArg("profiles", long="profiles", global=true,
+    action=Append, conflicts_with=["no-profiles"],
+    about="Select ordered configuration profiles, separated by commas.")
+}
+
+///|
+/// The global `--no-profiles` flag. It suppresses profile includes, defaults,
+/// groups and files, and conflicts with every `--profiles` occurrence.
+pub fn no_profiles_flag() -> @core_argparse.FlagArg {
+  @core_argparse.FlagArg("no-profiles", long="no-profiles", global=true,
+    conflicts_with=["profiles"], about="Disable configuration profiles.")
+}

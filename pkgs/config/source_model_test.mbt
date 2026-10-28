@@ -228,10 +228,10 @@ fn file_provider(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
       match context.tree.listing(p("/w")) {
         Unknown => Need([ListDir(p("/w"))])
         _ =>
-          Done({
-            sources: [@config.ConfigSource::file("/w/app.toml", priority=300)],
-            warnings: [Note(source="files", message="one file")],
-          })
+          Done(@config.Expansion::new(
+            [@config.ConfigSource::file("/w/app.toml", priority=300)],
+            warnings=[Note(source="files", message="one file")],
+          ))
       }
     },
   }

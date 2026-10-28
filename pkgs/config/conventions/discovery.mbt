@@ -24,7 +24,40 @@ fn discover(
       let sources = machine.map(machine_source => {
         filtered(machine_source.source, inherited, warn=false)
       })
-      Done({ sources: [..sources, ..tier.sources], warnings: notes })
+      let resolution = match conventions.profiles {
+        None => None
+        Some(policy) => {
+          let variable_name = "\{conventions.prefix}_PROFILES"
+          let variable = context.env_vars.get(variable_name).map(text => (variable_name, text))
+          let input = @profiles.SelectionInput::new(options.profiles, variable?)
+          let mut controls : (@config.ConfigValue, @config.Origin)? = None
+          if !input.disabled() && tier.locations.get(0) is Some((path, false)) {
+            let value = match context.tree.file(path) {
+              Found(text) => @config.parse_file(context.formats, path.to_string(), text)
+              Missing => raise @config.FileNotFound(path=path.to_string())
+              Unknown => return Need([ReadFile(path)])
+            }
+            let kind = tier.sources[0].kind()
+            controls = Some((value, { kind, source: conventions.display, priority: 300, location: Some(path.to_string()) }))
+          }
+          Some(@profiles.resolve_input(policy, input, controls?))
+        }
+      }
+      let profile_sources = match resolution {
+        Some(resolution) => conventions.profile_sources(tier.locations, resolution, extensions, tier.has_member)
+        None => []
+      }
+      let ordered = [..sources]
+      let mut inserted = false
+      for source in tier.sources {
+        if !inserted && source.kind() is File(LocalOverride | UserOverride) {
+          ordered.append(profile_sources)
+          inserted = true
+        }
+        ordered.push(source)
+      }
+      if !inserted { ordered.append(profile_sources) }
+      Done(@config.Expansion::new(ordered, warnings=notes, profiles?=resolution))
     }
   }
 }
@@ -102,6 +135,7 @@ priv enum Walk {
 priv struct Layer {
   primary : @config.ConfigSource
   adjacent : Array[@config.ConfigSource?]
+  path : @config.FileTreePath?
 }
 
 ///|
@@ -110,6 +144,7 @@ priv struct Layer {
 priv struct Tier {
   sources : Array[@config.ConfigSource]
   has_member : Bool
+  locations : Array[(@config.FileTreePath, Bool)]
 }
 
 ///|
@@ -147,7 +182,7 @@ fn Conventions::project_sources(
     None => None
   }
   let alone = (sources : Array[@config.ConfigSource]) => {
-    @config.LoadStep::Done({ sources, has_member: false })
+    @config.LoadStep::Done({ sources, has_member: false, locations: [] })
   }
   let file = match project.options.config {
     Explicit(path) => self.explicit_file(path, context, extensions)
@@ -193,7 +228,7 @@ fn Conventions::project_sources(
     guard self.layer(file, project, scan, as_member=false) is Some(layer) else {
       return Need(scan.needs)
     }
-    return alone([layer.primary, ..layer.adjacent.filter_map(source => source)])
+    return Done({ sources: [layer.primary, ..layer.adjacent.filter_map(source => source)], has_member: false, locations: layer.path.map(path => [(path, false)]).unwrap_or([]) })
   }
   guard scan.enclosing(file.root, stop) is Some(enclosing) else {
     return Need(scan.needs)
@@ -246,7 +281,7 @@ fn Conventions::project_sources(
     }
   }
   guard chosen is Some(chosen) else {
-    return alone([base.primary, ..base.adjacent.filter_map(source => source)])
+    return Done({ sources: [base.primary, ..base.adjacent.filter_map(source => source)], has_member: false, locations: base.path.map(path => [(path, false)]).unwrap_or([]) })
   }
   let inherited = key_paths(self.inherited)
   let scoped = key_paths(self.member_scope)
@@ -262,7 +297,7 @@ fn Conventions::project_sources(
       sources.push(filtered(source, scoped, warn=true))
     }
   }
-  Done({ sources, has_member: true })
+  Done({ sources, has_member: true, locations: [..base.path.map(path => [(path, false)]).unwrap_or([]), ..chosen.path.map(path => [(path, true)]).unwrap_or([])] })
 }
 
 ///|
@@ -408,12 +443,13 @@ fn Conventions::layer(
               name=self.display,
             ),
             adjacent: [],
+            path: None,
           })
         Missing => raise FileNotFound(path=file.path.to_string())
         Unknown => return None
       }
   }
-  Some({ primary, adjacent: self.overrides(file.path, project) })
+  Some({ primary, adjacent: self.overrides(file.path, project), path: if self.adjacent(file.path, project.extensions) is Some(_) { Some(file.path) } else { None } })
 }
 
 ///|
@@ -440,6 +476,7 @@ fn Conventions::member_layer(
           role=Member,
         ),
         adjacent: [],
+        path: None,
       })
   }
 }
@@ -586,6 +623,9 @@ fn unread_options(
   options : DiscoveryOptions,
 ) -> Array[@config.ConfigWarning] {
   let notes = []
+  if options.profiles != Unspecified && conventions.profiles is None {
+    notes.push(note(conventions, "profiles are off, so discovery ignores the profiles option"))
+  }
   if options.environment is Some(_) && conventions.environments is None {
     notes.push(
       note(
@@ -702,4 +742,28 @@ fn parent_of(path : @config.FileTreePath) -> @config.FileTreePath {
 /// The text form of each path, for a source or a report.
 fn texts(paths : Array[@config.FileTreePath]) -> Array[String] {
   paths.map(path => path.to_string())
+}
+
+///|
+fn Conventions::profile_sources(
+  self : Conventions,
+  locations : Array[(@config.FileTreePath, Bool)],
+  resolution : @config.ProfileResolution,
+  extensions : Array[String],
+  has_member : Bool,
+) -> Array[@config.ConfigSource] raise @config.ConfigError {
+  let sources = []
+  for name in resolution.active().names() {
+    for location in locations {
+      let (path, is_member) = location
+      guard self.adjacent(path, extensions) is Some((dir, stem)) else { continue }
+      let source = @config.ConfigSource::candidates(
+        texts(extensions.map(extension => dir.child("\{stem}.profile.\{name}.\{extension}"))),
+        display=self.display, role=ProfileFile(name), name=self.display,
+      )
+      let filters = if is_member { key_paths(self.member_scope) } else if has_member { key_paths(self.inherited) } else { [] }
+      sources.push(filtered(source, filters, warn=is_member))
+    }
+  }
+  sources
 }

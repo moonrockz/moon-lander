@@ -457,6 +457,13 @@ platform, the variable set, the working directory, and the formats. It gives
 `Need(requests)` until the tree holds what it reads, then `Done` with its sources
 and warnings. A provider reads only the context, never the process.
 
+Use `Expansion::new(sources, warnings?, profiles?)` instead of a record literal.
+Ordinary providers omit `profiles`; their loaded configuration reports Off.
+Provider decorators read defensive `sources()`, `warnings()` and `profiles()`
+accessors and pass the metadata through the constructor. A successful load can
+retain only one enabled resolution. `Config::profiles()` reads that stored state;
+it does not run discovery again.
+
 ```mbt check
 ///|
 test "a provider adds the file of its directory" {
@@ -464,18 +471,15 @@ test "a provider adds the file of its directory" {
     name: "local",
     expand: context => {
       guard context.working_dir is Some(dir) else {
-        return Done({ sources: [], warnings: [] })
+        return Done(@config.Expansion::new([]))
       }
-      Done({
-        sources: [
+      Done(@config.Expansion::new([
           @config.ConfigSource::candidates(
             ["\{dir}/app.local.toml"],
             display="local",
             role=LocalOverride,
           ),
-        ],
-        warnings: [],
-      })
+        ]))
     },
   }
   let builder = @config.builder()

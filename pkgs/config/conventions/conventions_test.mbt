@@ -236,6 +236,7 @@ test "discovery options default to not given" {
     config: Discover,
     isolated: false,
     project: None,
+    profiles: Unspecified,
   })
 }
 

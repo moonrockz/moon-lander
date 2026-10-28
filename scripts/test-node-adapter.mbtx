@@ -43,7 +43,7 @@ async fn main {
     for
       pkg in [
         "pkgs/config/host", "pkgs/hosting", "pkgs/hosting/console", "pkgs/logging-hosting-async/runtime",
-        "pkgs/hosting/logging",
+        "pkgs/hosting/logging", "tests/hosting-config-acceptance",
       ] {
       println("Testing config and hosting adapters: \{pkg} on \{runtime}")
       let code = @process.run(

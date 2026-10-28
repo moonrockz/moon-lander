@@ -8,6 +8,7 @@ pub(all) enum FileRole {
   Workspace
   Member
   EnvironmentFile
+  ProfileFile(ProfileName)
   LocalOverride
   UserOverride
   Legacy
@@ -65,6 +66,7 @@ pub fn SourceKind::report_name(self : SourceKind) -> String {
     File(Workspace | Explicit | Legacy) => "project"
     File(Member) => "workspace-member"
     File(EnvironmentFile) => "environment-file"
+    File(ProfileFile(_)) => "profile-file"
     File(LocalOverride) => "local-override"
     File(UserOverride) => "user-override"
     Environment => "environment"

@@ -104,6 +104,7 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
   // Run settings own these inputs, even when an application callback sets them.
   builder = builder |> @config.env_vars(Map::from_iter(settings.variables.iter()))
     |> @config.working_dir(settings.directory.to_string())
+  let mut profile_enabled = false
   if !host.convention_steps.is_empty() {
     let mut conventions = @conventions.base(host.name.to_string(), prefix=host.prefix.to_string())
     for step in host.convention_steps {
@@ -116,17 +117,28 @@ fn[S] configuration_builder(host : Host[S], settings : RunSettings, options : @c
       Some(name) => conventions |> @conventions.environments(default=name.to_string())
       None => conventions
     }
+    profile_enabled = conventions.profiles_enabled()
     builder = builder |> @conventions.add(conventions, options~)
   } else if host.environment is Some(_) {
     builder = builder |> @config.provider({
       name: host.name.to_string(),
-      expand: _ => Done({ sources: [], warnings: [
+      expand: _ => Done(@config.Expansion::new([], warnings=[
         Note(source=host.name.to_string(), message="default_environment applies only to the host-owned conventions set; add app_dirs() or conventions(f)"),
-      ] }),
+      ])),
+    })
+  }
+  if host.convention_steps.is_empty() && options.profiles != Unspecified {
+    builder = builder |> @config.provider({
+      name: host.name.to_string(),
+      expand: _ => Done(@config.Expansion::new([], warnings=[
+        Note(source=host.name.to_string(), message="profiles are off, so the host ignores the profiles option"),
+      ])),
     })
   }
   let prefix = host.prefix.to_string()
-  builder |> @config.env(prefix~, reserved=["\{prefix}_ENVIRONMENT", "\{prefix}_HOME"] + host.reserved,
+  let reserved = ["\{prefix}_ENVIRONMENT", "\{prefix}_HOME"] + host.reserved +
+    (if profile_enabled { ["\{prefix}_PROFILES"] } else { [] })
+  builder |> @config.env(prefix~, reserved~,
     selection=if host.skip_variables { Skip } else { Discover })
 }
 

@@ -7,6 +7,7 @@ pub struct Config {
   priv notes : Array[ConfigWarning]
   priv provenance : Map[KeyPath, Array[Origin]]
   priv secret_syntax : SecretSyntax
+  priv profiles : ProfileState
 }
 
 ///|
@@ -102,3 +103,9 @@ pub fn[R : SecretResolver] Config::secret(
   resolver.resolve(reference, origin)
 }
 
+
+///|
+/// The profile state recorded by the successful load.
+pub fn Config::profiles(self : Config) -> ProfileState {
+  self.profiles
+}

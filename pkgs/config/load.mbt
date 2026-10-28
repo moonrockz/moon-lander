@@ -26,10 +26,33 @@ pub(all) struct LoadContext {
 
 ///|
 /// The sources that a provider gives, in merge order, and its warnings.
-pub(all) struct Expansion {
-  sources : Array[ConfigSource]
-  warnings : Array[ConfigWarning]
+pub struct Expansion {
+  priv sources : Array[ConfigSource]
+  priv warnings : Array[ConfigWarning]
+  priv profiles : ProfileResolution?
 }
+
+///|
+/// Provider output. Omit `profiles` for an ordinary source provider.
+pub fn Expansion::new(
+  sources : Array[ConfigSource],
+  warnings? : Array[ConfigWarning] = [],
+  profiles? : ProfileResolution,
+) -> Expansion {
+  { sources: sources.copy(), warnings: warnings.copy(), profiles }
+}
+
+///|
+/// A copy of this provider's sources, for a provider decorator.
+pub fn Expansion::sources(self : Expansion) -> Array[ConfigSource] { self.sources.copy() }
+
+///|
+/// A copy of this provider's warnings, for a provider decorator.
+pub fn Expansion::warnings(self : Expansion) -> Array[ConfigWarning] { self.warnings.copy() }
+
+///|
+/// The immutable optional resolution, for a provider decorator.
+pub fn Expansion::profiles(self : Expansion) -> ProfileResolution? { self.profiles }
 
 ///|
 /// A step of the builder that gives sources during the load. `expand` gives
@@ -68,6 +91,8 @@ pub fn load(
   let notes : Array[ConfigWarning] = []
   let needs : Array[FileRequest] = []
   let mut expanded = true
+  let mut profiles : ProfileState = Off
+  let mut profile_provider : String? = None
   for entry in builder.entries {
     match entry {
       Source(source) => sources.push(source)
@@ -78,6 +103,13 @@ pub fn load(
             expanded = false
           }
           Done(expansion) => {
+            if expansion.profiles is Some(resolution) {
+              if profile_provider is Some(previous) {
+                raise Profile(failure=ProfileFailure::new(p.name, CompetingProviders(previous, p.name)))
+              }
+              profile_provider = Some(p.name)
+              profiles = Resolved(resolution)
+            }
             sources.append(expansion.sources)
             notes.append(expansion.warnings)
           }
@@ -103,6 +135,26 @@ pub fn load(
     }
     let warnings : Array[ConfigWarning] = []
     let pieces = result.pieces.copy()
+    // Profile controls are reserved across the whole pipeline. Check each raw
+    // source before application filters can remove a forbidden subtree.
+    if profiles is Resolved(resolution) {
+      for piece_index, piece in pieces {
+        let key = KeyPath::parse("profiles")
+        if piece.0.at(key.names) is Some(_) {
+          let piece_origin = { ..origin, location: piece.1 }
+          let authoritative = resolution.controls().any(control => match control {
+            Control(control_origin, _) => control_origin == piece_origin
+            _ => false
+          })
+          if !resolution.disabled() && !authoritative {
+            raise Profile(failure=ProfileFailure::new("profiles", ForbiddenLocation, origin=Control(piece_origin, key)))
+          }
+          if remove_key(piece.0, key.names) is Some(rest) {
+            pieces[piece_index] = (rest, piece.1)
+          }
+        }
+      }
+    }
     for excluded in source.excluded {
       let (key, warn) = excluded
       let mut removed : Origin? = None
@@ -160,7 +212,7 @@ pub fn load(
       leaf_origins[leaf.0] = origins
     }
   }
-  Done({ root, reports, notes, provenance: leaf_origins, secret_syntax, })
+  Done({ root, reports, notes, provenance: leaf_origins, secret_syntax, profiles })
 }
 
 ///|
@@ -336,6 +388,7 @@ fn default_priority(kind : SourceKind) -> Int {
     File(Workspace | Explicit | Legacy) => 300
     File(Member) => 350
     File(EnvironmentFile) => 375
+    File(ProfileFile(_)) => 380
     File(LocalOverride) => 390
     File(UserOverride) => 400
     Environment => 600

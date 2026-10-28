@@ -10,6 +10,8 @@ pub(all) struct DiscoveryOptions {
   isolated : Bool
   /// The project selector, for example from `--project`.
   project : String?
+  /// Explicit profile selection; profiles remain opt-in.
+  profiles : @config.ProfileSelection
 } derive(Eq, Debug)
 
 ///|
@@ -25,8 +27,9 @@ pub fn DiscoveryOptions::new(
   config? : @config.SourceSelection[String] = Discover,
   isolated? : Bool = false,
   project? : String,
+  profiles? : @config.ProfileSelection = Unspecified,
 ) -> DiscoveryOptions {
-  { environment, config, isolated, project }
+  { environment, config, isolated, project, profiles }
 }
 
 ///|
@@ -43,6 +46,7 @@ pub struct Conventions {
   priv boundary : String?
   priv legacy : Legacy?
   priv environments : Environments?
+  priv profiles : @profiles.Policy?
   priv workspace : WorkspaceKeys?
   priv member_scope : Array[String]
   priv inherited : Array[String]
@@ -125,6 +129,7 @@ pub fn base(
     boundary: None,
     legacy: None,
     environments: None,
+    profiles: None,
     workspace: None,
     member_scope: [],
     inherited: [],
@@ -272,7 +277,7 @@ pub fn workspace(
 
 ///|
 /// Remove the key paths `paths` from each member layer: the member primary
-/// and its environment file, local override and user override. Only the
+/// and its environment and profile files, local override and user override. Only the
 /// workspace can set them. A removed key gives a `KeyRemoved` warning in the
 /// report of that source, and it has no origin. Each path is the text form
 /// of a key path, for example `workspace.out_dir`.
@@ -286,7 +291,7 @@ pub fn member_scope_keys(
 ///|
 /// Remove the keys `keys` from the layers that a selected member inherits:
 /// the system file, the global user file, the workspace primary and its
-/// environment file, local override and user override. The removal gives no
+/// environment and profile files, local override and user override. The removal gives no
 /// warning. With no selected member, every layer stays complete. Each key is
 /// the text form of a key path, usually a top-level key such as `project`.
 pub fn inherited_filter(
@@ -320,11 +325,11 @@ pub fn Conventions::display(self : Conventions) -> String {
 /// the system source (priority 100), the global user source (200), the project
 /// or workspace primary with the role `Workspace`, `Legacy`, or `Explicit`
 /// (300), the selected member primary with the role `Member` (350), the
-/// environment files (375), the local overrides (390), and the user overrides
+/// environment files (375), profile files (380), local overrides (390), and user overrides
 /// (400). Each kind of adjacent file loads for the workspace, then for the
-/// member.
+/// member, for each active name in the profile stage.
 ///
-/// Discovery reads `isolated`, `config`, `environment` and `project` from
+/// Discovery reads `isolated`, `config`, `environment`, `profiles` and `project` from
 /// `options`. In isolated mode the system, global user, and override sources
 /// report `Skipped`. `Explicit(path)` is the project primary with no walk-up,
 /// and `Skip` skips it. `project` selects a workspace member by its path or
@@ -340,3 +345,13 @@ pub fn add(
     expand: context => discover(conventions, options, context),
   })
 }
+
+///|
+/// Enable independent configuration profiles with an immutable policy.
+pub fn profiles(conventions : Conventions, policy : @profiles.Policy) -> Conventions {
+  { ..conventions, profiles: Some(policy) }
+}
+
+///|
+/// Whether this convention set reserves profile controls and its selector.
+pub fn Conventions::profiles_enabled(self : Conventions) -> Bool { self.profiles is Some(_) }

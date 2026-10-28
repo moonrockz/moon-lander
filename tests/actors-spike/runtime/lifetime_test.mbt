@@ -154,3 +154,103 @@ async test "LIFE-1: scope exit with an actor that asks a blocked sibling returns
     })
   }
 }
+
+///|
+/// A protocol where only `Request` carries a reply destination.
+enum Load {
+  Block
+  Filler
+  Request(@actors.Reply[Int])
+}
+
+///|
+async test "ASK-1: an ask blocked on a full mailbox gets the actor's failure" {
+  let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let ready : @aio.Queue[@actors.ActorRef[Load]] = @aio.Queue(kind=Unbounded)
+  let log = []
+  let outcome = @aio.with_task_group(group => {
+    // The failing scope runs in its own task, outside the caller.
+    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
+      let one = @actors.MailboxCapacity::from_int(1)
+      let worker = scope.start((), mailbox=Bounded(one), (_, load : Load) => {
+        match load {
+          Block => {
+            started.put(())
+            gate.get()
+            raise Boom
+          }
+          Filler => Continue(())
+          Request(reply) => {
+            ignore(reply.send(1))
+            Continue(())
+          }
+        }
+      })
+      ready.put(worker.to_ref())
+      worker.join()
+    }))
+    let worker = ready.get()
+    assert_eq(worker.try_send(Block), Accepted)
+    started.get()
+    // The handler waits at the gate. One queued message fills the mailbox.
+    assert_eq(worker.try_send(Filler), Accepted)
+    assert_eq(worker.try_send(Filler), Full)
+    let asked = group.spawn(() => {
+      try {
+        ignore(
+          worker.ask(reply => {
+            // `build` runs just before admission, with no suspension between.
+            log.push("built")
+            Request(reply)
+          }),
+        )
+        "reply"
+      } catch {
+        @actors.ActorFailed(address, Boom) if address == worker.address() =>
+          "failed: Boom"
+        @actors.Closed(_) => "closed"
+        _ => "other"
+      }
+    })
+    while log.is_empty() {
+      @aio.pause()
+    }
+    // The ask now waits for admission. Let the handler fail.
+    gate.put(())
+    asked.wait()
+  })
+  assert_eq(log, ["built"])
+  assert_eq(outcome, "failed: Boom")
+}
+
+///|
+async test "ASK-1: an ask to an actor that already failed gets the failure" {
+  let ready : @aio.Queue[@actors.ActorRef[Load]] = @aio.Queue(kind=Unbounded)
+  let outcome = @aio.with_task_group(group => {
+    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
+      let worker = scope.start((), (_, load : Load) => {
+        match load {
+          Block => raise Boom
+          Filler | Request(_) => Continue(())
+        }
+      })
+      ready.put(worker.to_ref())
+      worker.join()
+    }))
+    let worker = ready.get()
+    worker.send(Block)
+    while worker.try_send(Filler) != Closed {
+      @aio.pause()
+    }
+    try {
+      ignore(worker.ask(reply => Request(reply)))
+      "reply"
+    } catch {
+      @actors.ActorFailed(_, Boom) => "failed: Boom"
+      @actors.Closed(_) => "closed"
+      _ => "other"
+    }
+  })
+  assert_eq(outcome, "failed: Boom")
+}

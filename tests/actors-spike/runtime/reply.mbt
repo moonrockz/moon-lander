@@ -50,8 +50,8 @@ fn default_ask_limit() -> @lander_core.TimeLimit {
 ///|
 /// Send the message that `build` makes with a fresh reply destination and wait
 /// for the reply. One time limit, 30 seconds by default, covers admission and
-/// the reply. When the actor ends first, raise `Closed`, or `ActorFailed` with
-/// the actor's error. Cancelling the caller does not undo an admitted request.
+/// the reply. When the actor ends first, also while the ask waits for
+/// admission, raise `Closed`, or `ActorFailed` with the actor's error. Cancelling the caller does not undo an admitted request.
 pub async fn[M, R] ActorRef::ask(
   self : ActorRef[M],
   build : (Reply[R]) -> M,
@@ -72,13 +72,23 @@ pub async fn[M, R] ActorRef::ask(
   }
   let address = self.address()
   let answer = @aio.with_timeout_opt(timeout.to_millis(), () => {
-    self.send(build(reply))
+    // A closed mailbox does not end the ask at once. When the actor has
+    // ended, its watcher has already recorded the outcome in `reply`, and a
+    // failure must reach the caller with its cause, not as `Closed`.
+    let admitted = try {
+      self.send(build(reply))
+      true
+    } catch {
+      Closed(_) => false
+      other => raise other
+    }
     for ;; {
       match reply.state {
         Answered(value) => break value
         Ended(Failed(error)) => fail_unless_cancelled(ActorFailed(address, error))
         Ended(_) | Expired => fail_unless_cancelled(Closed(address))
-        Waiting => reply.changed.wait()
+        Waiting if admitted => reply.changed.wait()
+        Waiting => fail_unless_cancelled(Closed(address))
       }
     }
   })

@@ -7,7 +7,7 @@ import {
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
-  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.6/crypto",
 }
 ----
 
@@ -225,6 +225,7 @@ async fn main {
   )
   let published = @env.args().contains("--published")
   let package_only = @env.args().contains("--package")
+  let cold_cache = @env.args().contains("--cold-cache")
   let checksum_file = "_build/publish/checksums.json"
   let approved : Map[ReleaseLibrary, ArchiveDigest] = Map([])
   if published {
@@ -446,7 +447,7 @@ async fn main {
       "\{isolated}/config.json",
       (
         {
-          "registry": "https://mooncakes.io",
+          "registry": "https://download.mooncakes.io",
           "index": "https://mooncakes.io/git/index",
         } : Json).stringify(),
     )
@@ -512,11 +513,24 @@ async fn main {
               return
             }
             let cached = "\{home}/registry/cache/" + path[6:].to_owned()
-            guard @fs.exists(cached) else {
-              conn.send_response(404, "Not Found")
+            if !cold_cache && @fs.exists(cached) {
+              @fs.read_file(cached).binary()
+            } else {
+              // A module's isolated graph can choose an older transitive pin
+              // than the workspace. Fetch it without writing the shared cache.
+              println("Public dependency fallback \{request.path}")
+              conn.send_response(
+                302,
+                "Found",
+                extra_headers=Map::from_array([
+                  (
+                    @http.CaseInsensitiveString("Location"),
+                    "https://download.mooncakes.io" + request.path,
+                  ),
+                ]),
+              )
               return
             }
-            @fs.read_file(cached).binary()
           }
           conn.send_response(
             200,

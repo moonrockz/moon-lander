@@ -6,6 +6,12 @@ The framework libraries are now published to mooncakes.io. Earlier releases
 omitted them from the publication list. All nine libraries use version `0.6.0`
 and exact sibling dependency versions.
 
+### Changed
+
+- Update the direct `moonbitlang/x` dependency to `0.5.6` in configuration, the
+  docs tool and task scripts. Other direct library pins already match the latest
+  stable registry versions.
+
 ### Added
 
 - Public modules: `moonrockz/moon-lander-core`, `moonrockz/moon-lander-logging`,

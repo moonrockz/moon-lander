@@ -150,7 +150,7 @@ jobs:
       - name: Verify the packaged OpenRPC candidate through a registry consumer
         run: mise run check:openrpc-registry
       - name: Verify every release library through registry consumers
-        run: mise run check:framework-registry
+        run: mise run check:framework-registry -- --cold-cache
       - name: Test task scripts
         run: mise run test:scripts
 

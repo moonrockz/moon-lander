@@ -6,7 +6,7 @@ import {
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/env",
-  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/x@0.5.6/crypto",
 }
 ----
 
@@ -272,7 +272,7 @@ async fn main {
       "\{isolated}/config.json",
       (
         {
-          "registry": "https://mooncakes.io",
+          "registry": "https://download.mooncakes.io",
           "index": "https://mooncakes.io/git/index",
         } : Json).stringify(),
     )

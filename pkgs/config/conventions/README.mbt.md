@@ -76,6 +76,62 @@ test "inspect root evidence without selecting a member" {
 nearest-file and enclosing-member rules below. A workspace section must be an
 object; a scalar has a typed decode failure.
 
+## Order formats at each stage
+
+Opt into `FormatLayers` to merge formats at one location. Later groups win;
+extensions inside a group are alternatives, so two existing ordinary files in
+that group are ambiguous, including files in different layouts. Every declared
+extension needs a registered parser. Registration order has no precedence
+effect, and registered extensions outside the policy are not searched.
+
+An optional `SupplementalFile` belongs to its group and loads before that
+group's ordinary primary. The application owns its file name and pure
+transformation. Discovery reuses the transformed value for workspace
+classification, profile controls, and the final source. A supplemental file
+can declare a workspace by itself; it does not create a new override or profile
+stem. Its name cannot collide with an enabled ordinary primary.
+
+```mbt check
+///|
+test "declare ordered groups with an application-owned workspace file" {
+  let json = @conventions.Extension::parse("json")
+  let toml = @conventions.Extension::parse("toml")
+  let layers = @conventions.FormatLayers::new([
+    @conventions.FormatGroup::new([json], supplemental=
+      @conventions.SupplementalFile::new("acme-workspace.json", json)),
+    @conventions.FormatGroup::new([toml]),
+  ])
+  let conventions = @conventions.base("acme") |> @conventions.layouts
+    |> @conventions.format_layers(layers)
+    |> @conventions.root_policy(WorkspaceFirst(@config.KeyPath::parse("workspace")))
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing(@config.FileTreePath::parse("/w"), [
+      { name: "acme-workspace.json", kind: File },
+      { name: "acme.toml", kind: File },
+    ])
+    .with_file(@config.FileTreePath::parse("/w/acme-workspace.json"),
+      "{workspace:{}, shared:'json', retained:true}")
+    .with_file(@config.FileTreePath::parse("/w/acme.toml"), "shared='toml'")
+  let builder = @config.builder() |> @config.working_dir("/w")
+    |> @config.format(@toml.format()) |> @config.format(@json5.format())
+    |> @conventions.add(conventions)
+  guard @config.load(builder, tree) is Done(config) else { fail("complete tree") }
+  assert_eq(@config.get_text(config, "shared"), "toml")
+  assert_eq(@config.bind(config, "retained"), true)
+}
+```
+
+Group order applies inside each enabled system, global, workspace, member,
+environment, local and user stage. Stage priorities stay as listed above: even
+the first member format wins over the last workspace format. Workspace
+classification uses the merged primary documents at that location. With
+profiles enabled, all eligible base documents supply one control policy with
+each control's own origin. For each active name, workspace groups precede member
+groups at priority 380, before the next active name. Isolated mode retains
+eligible profile files and skips machine, global, local and user sources.
+
+Omitting `format_layers` retains the ambiguity rules described below.
+
 ## Walk up to the project root
 
 Discovery starts at the working directory of the run and moves to each parent. The
@@ -627,8 +683,9 @@ present empty selector variable also disables profiles. Standalone environment
 sources must reserve that exact variable, for example
 `@config.env(prefix="ACME", reserved=["ACME_PROFILES"])`.
 
-Only the standard-layout workspace primary, or the project primary without a
-workspace, supplies controls. Selected member and overlay controls fail before
+Only the standard-layout workspace primaries, or project primaries without a
+workspace, supply controls. Ordered formats and their supplemental documents
+form one base; each winning control retains its supplying source. Selected member and overlay controls fail before
 key filters. Enabled controls stay out of application values and provenance;
 `Config::profiles()` gives the recorded selector, active order and reasons.
 The [profile policy guide](../profiles/README.mbt.md) covers names, groups and

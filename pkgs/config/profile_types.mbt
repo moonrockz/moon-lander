@@ -210,6 +210,7 @@ pub struct ProfileResolution {
   priv disabled : Bool
   priv reasons : Array[ProfileReason]
   priv controls : Array[ProfileOrigin]
+  priv authorities : Array[Origin]
 } derive(Eq, Debug)
 
 ///|
@@ -222,7 +223,10 @@ pub extend ProfileResolution with @debug.Debug::{to_repr}
 /// Record a resolved ordered set. The active set has at most 128 distinct names.
 /// Repeated active names keep their last occurrence. `failure_origin` identifies
 /// the expansion input that first exceeds the active-name limit.
-pub fn ProfileResolution::new(selector : ProfileSelector, roots : ProfileNames, active : ProfileNames, disabled? : Bool = false, reasons? : Array[ProfileReason] = [], controls? : Array[ProfileOrigin] = [], failure_origin? : ProfileOrigin) -> ProfileResolution raise ConfigError {
+/// `authorities` names every eligible base source, including a base whose
+/// controls a later base fully replaces. Existing callers derive that list
+/// from `controls`. Winning control origins stay separate from eligibility.
+pub fn ProfileResolution::new(selector : ProfileSelector, roots : ProfileNames, active : ProfileNames, disabled? : Bool = false, reasons? : Array[ProfileReason] = [], controls? : Array[ProfileOrigin] = [], authorities? : Array[Origin] = [], failure_origin? : ProfileOrigin) -> ProfileResolution raise ConfigError {
   let unique : Array[ProfileName] = []
   for name in active.items.rev() {
     if !unique.contains(name) { unique.push(name) }
@@ -237,7 +241,11 @@ pub fn ProfileResolution::new(selector : ProfileSelector, roots : ProfileNames, 
     })
     raise Profile(failure=ProfileFailure::new("active profiles", ActiveLimit(unique.length()), origin~))
   }
-  { selector, roots: if disabled { ProfileNames::new([]) } else { roots }, active: ProfileNames::new(if disabled { [] } else { unique.rev() }), disabled, reasons: if disabled { [] } else { reasons.copy() }, controls: if disabled { [] } else { controls.copy() } }
+  let eligible = authorities.copy()
+  for control in controls {
+    if control is Control(origin, _) && !eligible.contains(origin) { eligible.push(origin) }
+  }
+  { selector, roots: if disabled { ProfileNames::new([]) } else { roots }, active: ProfileNames::new(if disabled { [] } else { unique.rev() }), disabled, reasons: if disabled { [] } else { reasons.copy() }, controls: if disabled { [] } else { controls.copy() }, authorities: if disabled { [] } else { eligible } }
 }
 
 ///|
@@ -263,6 +271,12 @@ pub fn ProfileResolution::reasons(self : ProfileResolution) -> Array[ProfileReas
 ///|
 /// A defensive copy of the interpreted control origins.
 pub fn ProfileResolution::controls(self : ProfileResolution) -> Array[ProfileOrigin] { self.controls.copy() }
+
+///|
+/// Whether this source is an eligible base control source. Authority is
+/// separate from winning control origins, so fully overridden bases remain
+/// eligible. Legacy constructors derive authority from their control origins.
+pub fn ProfileResolution::permits_controls(self : ProfileResolution, origin : Origin) -> Bool { self.authorities.contains(origin) }
 
 ///|
 /// Whether the parsed name is active.

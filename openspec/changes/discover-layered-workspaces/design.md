@@ -58,6 +58,8 @@ The Morphir maintainer approved configuration profiles for its adoption release 
 
 Merge the eligible workspace primary documents, or standalone project primaries, in format order before resolving profile controls. Keep the origin of each winning control and group definition. Extend the resolver input with typed control origins while retaining the existing one-base/one-origin API as a compatible adapter. Do not assign every control the origin of the highest-format file.
 
+Merge reserved control metadata literally before its one semantic parse: objects merge by field and other supplied values, including null, replace. Ordinary configuration's null-as-unset rule must not conceal an invalid control shape. Retain original document origins for empty containers as well as leaves. Authorize every eligible base identity separately from the winning control metadata, including a base whose controls were entirely replaced.
+
 Keep control authority by original discovered source identity. If that file is selected as an ordinary-value overlay, parse it once, assess its controls as part of the base, strip the controls from its ordinary values, and emit one ordinary source report at priority 325 with role Explicit. This does not grant control authority to an arbitrary selected file. Controls from member, system/global, user, profile and selected non-base layers retain the existing refusal. Disabled processing retains the published stripping behavior.
 
 ### Call: Keep active-profile order outside format order

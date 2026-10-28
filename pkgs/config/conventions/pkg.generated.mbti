@@ -24,6 +24,8 @@ pub fn environment_name(Conventions, options? : DiscoveryOptions, Map[String, St
 
 pub fn environments(Conventions, default? : String) -> Conventions
 
+pub fn format_layers(Conventions, FormatLayers) -> Conventions
+
 pub fn inherited_filter(Conventions, Array[String]) -> Conventions
 
 pub fn layouts(Conventions) -> Conventions
@@ -85,6 +87,28 @@ pub fn EnvironmentName::to_repr(Self) -> @debug.Repr
 pub fn EnvironmentName::to_string(Self) -> String
 pub impl Show for EnvironmentName
 
+pub struct Extension {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn Extension::equal(Self, Self) -> Bool
+pub fn Extension::hash(Self) -> Int32
+pub fn Extension::hash_combine(Self, Hasher) -> Unit
+pub fn Extension::not_equal(Self, Self) -> Bool
+pub fn Extension::parse(String) -> Self raise @moon-lander-config.ConfigError
+pub fn Extension::to_repr(Self) -> @debug.Repr
+pub fn Extension::to_string(Self) -> String
+
+pub struct FormatGroup {
+  // private fields
+}
+pub fn FormatGroup::extensions(Self) -> Array[Extension]
+pub fn FormatGroup::new(Array[Extension], supplemental? : SupplementalFile) -> Self raise @moon-lander-config.ConfigError
+
+pub struct FormatLayers {
+  // private fields
+}
+pub fn FormatLayers::new(Array[FormatGroup]) -> Self raise @moon-lander-config.ConfigError
+
 pub(all) enum MemberLoading {
   Automatic
   ExplicitOnly
@@ -113,6 +137,12 @@ pub(all) enum RootPolicy {
   NearestFile
   WorkspaceFirst(@moon-lander-config.KeyPath)
 }
+
+pub struct SupplementalFile {
+  // private fields
+}
+pub fn SupplementalFile::name(Self) -> String
+pub fn SupplementalFile::new(String, Extension, transform? : (@moon-lander-config.ConfigValue) -> @moon-lander-config.ConfigValue raise @moon-lander-config.ConfigError) -> Self raise @moon-lander-config.ConfigError
 
 // Type aliases
 

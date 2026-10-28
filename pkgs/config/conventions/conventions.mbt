@@ -52,6 +52,7 @@ pub struct Conventions {
   priv inherited : Array[String]
   priv root_policy : RootPolicy
   priv member_loading : MemberLoading
+  priv layers : FormatLayers?
 }
 
 ///|
@@ -137,6 +138,7 @@ pub fn base(
     inherited: [],
     root_policy: NearestFile,
     member_loading: Automatic,
+    layers: None,
   }
 }
 

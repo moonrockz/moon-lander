@@ -50,6 +50,8 @@ pub(all) suberror ConfigError {
   OutsideBoundary(start~ : String, boundary~ : String)
   /// An environment name breaks the name rules.
   InvalidEnvironmentName(name~ : String, reason~ : String)
+  /// A format-layer policy breaks a named construction or registration rule.
+  ConventionPolicy(input~ : String, rule~ : ConventionRule)
   /// No project in the workspace matches the selector.
   UnknownProject(selector~ : String, workspace~ : String)
   /// More than one project matches the selector by name.
@@ -116,6 +118,8 @@ pub fn ConfigError::message(self : ConfigError) -> String {
       "The start directory \{start} is outside the boundary \{boundary}"
     InvalidEnvironmentName(name~, reason~) =>
       "Invalid environment name \"\{name}\": \{reason}"
+    ConventionPolicy(input~, rule~) =>
+      "Invalid convention policy \{input.escape()}: \{rule.description()}"
     UnknownProject(selector~, workspace~) =>
       "No project in the workspace \{workspace} matches \{selector}"
     AmbiguousProject(selector~, matches~) =>

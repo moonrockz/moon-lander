@@ -10,7 +10,7 @@ fn on(days : Int64, millis? : Int64 = 0L) -> @formatting.LogTimestamp raise {
 ///|
 /// A regular file of the listing.
 fn regular(name : String, size : Int64) -> @rolling.ListedFile {
-  { name, size, regular: true }
+  { name, size: b(size), regular: true }
 }
 
 ///|
@@ -25,7 +25,12 @@ fn show_plan(plan : @rolling.FilePlan) -> String {
   match plan {
     Append(name) => "append \{name}"
     Open(name, existing_size~) => "open \{name} at \{existing_size}"
-    Roll(name) => "roll \{name}"
+    Roll(name, existing_size~) =>
+      if existing_size.to_int64() > 0L {
+        "roll \{name} at \{existing_size}"
+      } else {
+        "roll \{name}"
+      }
   }
 }
 
@@ -40,9 +45,9 @@ fn apply(
   let opened = match plan {
     Append(_) => state
     Open(name, existing_size~) => state.opened(name, existing_size)
-    Roll(name) => state.opened(name, 0L)
+    Roll(name, existing_size~) => state.opened(name, existing_size)
   }
-  opened.wrote(bytes)
+  opened.wrote(b(bytes))
 }
 
 ///|
@@ -56,7 +61,7 @@ fn write_all(
   let plans = []
   let mut current = state
   for size in sizes {
-    let plan = current.plan(now, size, [])
+    let plan = current.plan(now, b(size), [])
     plans.push(show_plan(plan))
     current = apply(current, plan, size)
   }
@@ -66,13 +71,13 @@ fn write_all(
 ///|
 test "the first record opens the first file of the day" {
   let state = @rolling.RollingState::new(acme(@rolling.RollingPolicy::default()))
-  inspect(show_plan(state.plan(on(0L), 10L, [])), content=(
+  inspect(show_plan(state.plan(on(0L), b(10L), [])), content=(
     #|open acme-20261027.log at 0
   ))
   let size_only = @rolling.RollingState::new(
     acme(Size(@rolling.FileByteLimit::default())),
   )
-  inspect(show_plan(size_only.plan(on(0L), 10L, [])), content="open acme.log at 0")
+  inspect(show_plan(size_only.plan(on(0L), b(10L), [])), content="open acme.log at 0")
 }
 
 ///|
@@ -85,7 +90,7 @@ test "an exact fit appends and one byte over rolls" {
     #|append acme-20261027.log
     #|roll acme-20261027_001.log
   ))
-  assert_eq(last.size(), 1L)
+  assert_eq(last.size().to_int64(), 1L)
   let (over, _) = write_all(state, on(0L), [60L, 41L])
   inspect(over, content=(
     #|open acme-20261027.log at 0
@@ -104,7 +109,7 @@ test "a record larger than the limit goes whole into an empty file" {
     #|roll acme_002.log
     #|roll acme_003.log
   ))
-  assert_eq(last.size(), 25L)
+  assert_eq(last.size().to_int64(), 25L)
 }
 
 ///|
@@ -129,11 +134,11 @@ test "a new UTC day rolls to the first file of that day" {
   let (_, day27) = write_all(state, on(0L), [90L, 90L])
   assert_eq(day27.active().map(name => name.to_string()), Some("acme-20261027_001.log"))
   let before_midnight = on(0L, millis=86399999L)
-  inspect(show_plan(day27.plan(before_midnight, 5L, [])), content=(
+  inspect(show_plan(day27.plan(before_midnight, b(5L), [])), content=(
     #|append acme-20261027_001.log
   ))
   let midnight = on(1L)
-  inspect(show_plan(day27.plan(midnight, 5L, [])), content=(
+  inspect(show_plan(day27.plan(midnight, b(5L), [])), content=(
     #|roll acme-20261028.log
   ))
 }
@@ -142,10 +147,10 @@ test "a new UTC day rolls to the first file of that day" {
 test "a clock that moves back stays in the day of the active file" {
   let state = @rolling.RollingState::new(acme(Daily))
   let (_, day28) = write_all(state, on(1L), [10L])
-  inspect(show_plan(day28.plan(on(0L), 10L, [])), content=(
+  inspect(show_plan(day28.plan(on(0L), b(10L), [])), content=(
     #|append acme-20261028.log
   ))
-  inspect(show_plan(day28.plan(on(2L), 10L, [])), content=(
+  inspect(show_plan(day28.plan(on(2L), b(10L), [])), content=(
     #|roll acme-20261029.log
   ))
 }
@@ -155,7 +160,7 @@ test "a size-only policy does not roll at a new day" {
   let limit = @rolling.FileByteLimit::bytes(100L)
   let state = @rolling.RollingState::new(acme(Size(limit)))
   let (_, opened) = write_all(state, on(0L), [10L])
-  inspect(show_plan(opened.plan(on(5L), 10L, [])), content="append acme.log")
+  inspect(show_plan(opened.plan(on(5L), b(10L), [])), content="append acme.log")
 }
 
 ///|
@@ -169,7 +174,7 @@ test "a daily-only policy does not roll at any size" {
     #|append acme-20261027.log
     #|append acme-20261027.log
   ))
-  assert_eq(last.size(), 300000000L)
+  assert_eq(last.size().to_int64(), 300000000L)
 }
 
 ///|
@@ -177,7 +182,7 @@ test "an open file does not read the listing" {
   let state = @rolling.RollingState::new(acme(Daily))
   let (_, opened) = write_all(state, on(0L), [10L])
   let listing = [regular("acme-20261027_005.log", 1L)]
-  inspect(show_plan(opened.plan(on(0L), 10L, listing)), content=(
+  inspect(show_plan(opened.plan(on(0L), b(10L), listing)), content=(
     #|append acme-20261027.log
   ))
 }
@@ -192,13 +197,13 @@ test "a restart appends to the newest file of the day when it has room" {
     regular("acme-20261027.log", 100L),
     regular("acme-old.log", 1L),
   ]
-  inspect(show_plan(state.plan(on(0L), 50L, listing)), content=(
+  inspect(show_plan(state.plan(on(0L), b(50L), listing)), content=(
     #|open acme-20261027_001.log at 50
   ))
-  inspect(show_plan(state.plan(on(0L), 51L, listing)), content=(
+  inspect(show_plan(state.plan(on(0L), b(51L), listing)), content=(
     #|open acme-20261027_002.log at 0
   ))
-  inspect(show_plan(state.plan(on(1L), 51L, listing)), content=(
+  inspect(show_plan(state.plan(on(1L), b(51L), listing)), content=(
     #|open acme-20261028.log at 0
   ))
 }
@@ -208,7 +213,7 @@ test "a restart puts an oversized record in an empty newest file" {
   let limit = @rolling.FileByteLimit::bytes(10L)
   let state = @rolling.RollingState::new(acme(Size(limit)))
   let listing = [regular("acme.log", 10L), regular("acme_001.log", 0L)]
-  inspect(show_plan(state.plan(on(0L), 50L, listing)), content=(
+  inspect(show_plan(state.plan(on(0L), b(50L), listing)), content=(
     #|open acme_001.log at 0
   ))
 }
@@ -217,7 +222,7 @@ test "a restart puts an oversized record in an empty newest file" {
 test "a restart of a daily-only set appends at any size" {
   let state = @rolling.RollingState::new(acme(Daily))
   let listing = [regular("acme-20261027.log", 999999999L)]
-  inspect(show_plan(state.plan(on(0L), 50L, listing)), content=(
+  inspect(show_plan(state.plan(on(0L), b(50L), listing)), content=(
     #|open acme-20261027.log at 999999999
   ))
 }
@@ -228,9 +233,9 @@ test "a restart does not append to a directory or a link" {
   let state = @rolling.RollingState::new(acme(Size(limit)))
   let listing = [
     regular("acme.log", 1L),
-    { name: "acme_001.log", size: 0L, regular: false },
+    { name: "acme_001.log", size: b(0L), regular: false },
   ]
-  inspect(show_plan(state.plan(on(0L), 1L, listing)), content=(
+  inspect(show_plan(state.plan(on(0L), b(1L), listing)), content=(
     #|open acme_002.log at 0
   ))
 }
@@ -239,11 +244,11 @@ test "a restart does not append to a directory or a link" {
 test "the state counts the existing size after a restart" {
   let limit = @rolling.FileByteLimit::bytes(100L)
   let state = @rolling.RollingState::new(acme(Size(limit)))
-  let plan = state.plan(on(0L), 30L, [regular("acme.log", 60L)])
+  let plan = state.plan(on(0L), b(30L), [regular("acme.log", 60L)])
   let after = apply(state, plan, 30L)
-  assert_eq(after.size(), 90L)
-  inspect(show_plan(after.plan(on(0L), 10L, [])), content="append acme.log")
-  inspect(show_plan(after.plan(on(0L), 11L, [])), content="roll acme_001.log")
+  assert_eq(after.size().to_int64(), 90L)
+  inspect(show_plan(after.plan(on(0L), b(10L), [])), content="append acme.log")
+  inspect(show_plan(after.plan(on(0L), b(11L), [])), content="roll acme_001.log")
 }
 
 ///|
@@ -251,22 +256,22 @@ test "the last sequence number is exhausted, not used again" {
   let limit = @rolling.FileByteLimit::bytes(10L)
   let set = acme(Size(limit))
   let last = set.parse_name("acme_2147483647.log").unwrap()
-  let state = @rolling.RollingState::new(set).opened(last, 10L)
+  let state = @rolling.RollingState::new(set).opened(last, b(10L))
   let now = on(0L)
   let failure = try {
-    ignore(state.plan(now, 1L, []))
+    ignore(state.plan(now, b(1L), []))
     None
   } catch {
     SequenceExhausted(last~) => Some(last)
     _ => None
   }
   assert_eq(failure, Some("acme_2147483647.log"))
-  inspect(show_plan(state.plan(on(0L), 0L, [])), content=(
+  inspect(show_plan(state.plan(on(0L), b(0L), [])), content=(
     #|append acme_2147483647.log
   ))
   let restart = try {
     ignore(
-      @rolling.RollingState::new(set).plan(now, 1L, [
+      @rolling.RollingState::new(set).plan(now, b(1L), [
         regular("acme_2147483647.log", 10L),
       ]),
     )
@@ -279,18 +284,53 @@ test "the last sequence number is exhausted, not used again" {
 }
 
 ///|
-test "a negative record size is an error" {
-  let state = @rolling.RollingState::new(acme(Daily))
-  let now = on(0L)
+test "a byte count is zero or more" {
   let failure = try {
-    ignore(state.plan(now, -1L, []))
+    ignore(@rolling.ByteCount::of(-1L))
     None
   } catch {
-    NegativeRecordBytes(bytes~) => Some(bytes)
+    NegativeByteCount(bytes~) => Some(bytes)
     _ => None
   }
   assert_eq(failure, Some(-1L))
-  inspect(show_plan(state.plan(on(0L), 0L, [])), content=(
+  assert_eq(@rolling.ByteCount::of(0L), @rolling.ByteCount::zero())
+  assert_eq(@rolling.ByteCount::of_text("é\n").to_int64(), 3L)
+  let state = @rolling.RollingState::new(acme(Daily))
+  inspect(show_plan(state.plan(on(0L), b(0L), [])), content=(
     #|open acme-20261027.log at 0
   ))
+}
+
+///|
+test "a new day reads the listing and continues the files of an earlier run" {
+  let limit = @rolling.FileByteLimit::bytes(100L)
+  let set = acme(DailyAndSize(limit))
+  let state = @rolling.RollingState::new(set).opened(
+    set.parse_name("acme-20261027.log").unwrap(),
+    b(10L),
+  )
+  assert_false(state.needs_listing(on(0L)))
+  assert_true(state.needs_listing(on(1L)))
+  assert_true(@rolling.RollingState::new(set).needs_listing(on(0L)))
+  let listing = [
+    regular("acme-20261028.log", 100L),
+    regular("acme-20261028_002.log", 40L),
+  ]
+  inspect(show_plan(state.plan(on(1L), b(10L), listing)), content=(
+    #|roll acme-20261028_002.log at 40
+  ))
+  inspect(show_plan(state.plan(on(1L), b(70L), listing)), content=(
+    #|roll acme-20261028_003.log
+  ))
+  inspect(show_plan(state.plan(on(1L), b(10L), [])), content=(
+    #|roll acme-20261028.log
+  ))
+}
+
+///|
+/// A byte count for tests.
+fn b(bytes : Int64) -> @rolling.ByteCount {
+  @rolling.ByteCount::of(bytes) catch {
+    _ => abort("a valid byte count")
+  }
 }

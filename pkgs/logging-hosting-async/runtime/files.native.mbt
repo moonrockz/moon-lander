@@ -80,7 +80,7 @@ async fn list_directory(path : String) -> Result[Array[@rolling.ListedFile], Str
   let listed = []
   for name in names {
     if inspect_entry(path + "/" + name) is Some((size, regular)) {
-      listed.push(@rolling.ListedFile::{ name, size, regular })
+      listed.push(listed_file(name, size, regular))
     }
   }
   Ok(listed)

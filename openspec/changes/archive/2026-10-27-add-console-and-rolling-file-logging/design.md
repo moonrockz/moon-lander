@@ -212,7 +212,10 @@ records. Clamp the writer period to the last opened period on clock rollback.
 For stem `acme`, daily text files are `acme-20261027.log`, then
 `acme-20261027_001.log`. Size-only starts at `acme.log`, then `acme_001.log`.
 JSON files use `.jsonl`. Sequence numbers have at least three digits and can
-grow; overflow is a typed failure rather than filename reuse. The pure policy
+grow; overflow is a typed failure rather than filename reuse. A move to a later
+UTC day reads the directory as a restart does, so a file that an earlier run
+left for that day is appended to when it has room, and else the next sequence
+opens. Byte counts are a `ByteCount` value, parsed once at the adapter. The pure policy
 returns an action plan; the adapter confirms I/O results before state advances.
 
 Count actual encoded bytes, including newline and error continuations, plus the

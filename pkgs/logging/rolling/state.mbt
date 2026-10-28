@@ -4,8 +4,8 @@
 pub(all) struct ListedFile {
   /// The entry name, with no directory part.
   name : String
-  /// The size in bytes. Only the size of a regular file has an effect.
-  size : Int64
+  /// The size. Only the size of a regular file has an effect.
+  size : ByteCount
   /// True for a regular file. False for a directory, a symbolic link and each
   /// other kind of entry: the plan never appends to them and retention never
   /// deletes them.
@@ -27,10 +27,11 @@ pub(all) enum FilePlan {
   /// No file is open: open this file to append, and then write the record. At a
   /// restart this can be an existing file with `existing_size` bytes; the
   /// adapter never truncates it.
-  Open(LogFileName, existing_size~ : Int64)
-  /// Close the active file, open this new file to append, and then write the
-  /// record. After the open, run retention.
-  Roll(LogFileName)
+  Open(LogFileName, existing_size~ : ByteCount)
+  /// Close the active file, open this file to append, and then write the
+  /// record. After the open, run retention. When the period changed, this can
+  /// be an existing file of the new period with `existing_size` bytes.
+  Roll(LogFileName, existing_size~ : ByteCount)
 } derive(Eq, Debug)
 
 ///|
@@ -47,7 +48,7 @@ pub extend FilePlan with @debug.Debug::{to_repr}
 pub struct RollingState {
   priv set : FileSet
   priv active : LogFileName?
-  priv size : Int64
+  priv size : ByteCount
 } derive(Eq, Debug)
 
 ///|
@@ -59,7 +60,7 @@ pub extend RollingState with @debug.Debug::{to_repr}
 ///|
 /// The state of a writer of `set` that has no open file.
 pub fn RollingState::new(set : FileSet) -> RollingState {
-  { set, active: None, size: 0L }
+  { set, active: None, size: ByteCount::zero() }
 }
 
 ///|
@@ -76,7 +77,7 @@ pub fn RollingState::active(self : RollingState) -> LogFileName? {
 
 ///|
 /// The bytes in the active file: its size at the open and each write after it.
-pub fn RollingState::size(self : RollingState) -> Int64 {
+pub fn RollingState::size(self : RollingState) -> ByteCount {
   self.size
 }
 
@@ -84,10 +85,29 @@ pub fn RollingState::size(self : RollingState) -> Int64 {
 /// True when a file with `size` bytes can take a record of `record_bytes`
 /// bytes: the file is empty, the policy has no size limit, or the record fits in
 /// the limit. An exact fit is allowed.
-fn FileSet::has_room(self : FileSet, size : Int64, record_bytes : Int64) -> Bool {
+fn FileSet::has_room(
+  self : FileSet,
+  size : ByteCount,
+  record_bytes : ByteCount,
+) -> Bool {
   match self.limit() {
     None => true
-    Some(limit) => size <= 0L || record_bytes <= limit.to_int64() - size
+    Some(limit) =>
+      size.bytes == 0L || record_bytes.bytes <= limit.to_int64() - size.bytes
+  }
+}
+
+///|
+/// True when the next plan at `now` reads the directory listing: no file is
+/// open yet, or a daily policy moves to a later UTC day. Read the clock once and
+/// give the same `now` to `plan`.
+pub fn RollingState::needs_listing(
+  self : RollingState,
+  now : @formatting.LogTimestamp,
+) -> Bool {
+  match self.active {
+    None => true
+    Some(active) => active.epoch_day() is Some(day) && now.epoch_day() > day
   }
 }
 
@@ -101,44 +121,52 @@ fn FileSet::has_room(self : FileSet, size : Int64, record_bytes : Int64) -> Bool
 ///   a regular file with room for the record, the plan opens it to append. When
 ///   it is not, the plan opens the next sequence number. With no owned file, it
 ///   opens the first name of the period.
-/// - With an open file, the plan does not read `listing`. A daily policy rolls
-///   when `now` is in a UTC day after the day of the active file. A clock that
-///   moves back does not roll: the writer stays in the day of the active file.
+/// - With an open file and a later UTC day, a daily policy rolls. It reads
+///   `listing` for the files of the new day, as at a restart, so a file that an
+///   earlier run left for that day is appended to when it has room, else the
+///   next sequence number opens. A clock that moves back does not roll: the
+///   writer stays in the day of the active file.
+/// - Otherwise the plan does not read `listing`; `needs_listing` tells when it
+///   does.
 /// - A size limit rolls a nonempty file when the record does not fit. An empty
 ///   file takes a record larger than the limit, and the next record rolls. The
 ///   plan never splits a record.
 ///
-/// Raises `NegativeRecordBytes` when `record_bytes` is less than zero, and
-/// `SequenceExhausted` when the period has no next name.
+/// Raises `SequenceExhausted` when the period has no next name.
 pub fn RollingState::plan(
   self : RollingState,
   now : @formatting.LogTimestamp,
-  record_bytes : Int64,
+  record_bytes : ByteCount,
   listing : Array[ListedFile],
 ) -> FilePlan raise RollingError {
-  guard record_bytes >= 0L else { raise NegativeRecordBytes(bytes=record_bytes) }
   let set = self.set
   match self.active {
-    None => set.restart_plan(now, record_bytes, listing)
+    None => {
+      let (name, existing_size) = set.period_plan(now, record_bytes, listing)
+      Open(name, existing_size~)
+    }
     Some(active) =>
       if active.epoch_day() is Some(day) && now.epoch_day() > day {
-        Roll(set.first_name(now))
+        let (name, existing_size) = set.period_plan(now, record_bytes, listing)
+        Roll(name, existing_size~)
       } else if set.has_room(self.size, record_bytes) {
         Append(active)
       } else {
-        Roll(set.next_name(active))
+        Roll(set.next_name(active), existing_size=ByteCount::zero())
       }
   }
 }
 
 ///|
-/// The plan of the first open, from the directory entries.
-fn FileSet::restart_plan(
+/// The file to open for the period of `now`, from the directory entries, and
+/// its size: the newest owned file of the period when it is regular and has
+/// room, else the next name, else the first name of the period.
+fn FileSet::period_plan(
   self : FileSet,
   now : @formatting.LogTimestamp,
-  record_bytes : Int64,
+  record_bytes : ByteCount,
   listing : Array[ListedFile],
-) -> FilePlan raise RollingError {
+) -> (LogFileName, ByteCount) raise RollingError {
   let today = now.epoch_day()
   let mut newest : (LogFileName, ListedFile)? = None
   for file in listing {
@@ -150,38 +178,38 @@ fn FileSet::restart_plan(
     }
   }
   match newest {
-    None => Open(self.first_name(now), existing_size=0L)
-    Some((name, file)) => {
-      let size = if file.size > 0L { file.size } else { 0L }
-      if file.regular && self.has_room(size, record_bytes) {
-        Open(name, existing_size=size)
+    None => (self.first_name(now), ByteCount::zero())
+    Some((name, file)) =>
+      if file.regular && self.has_room(file.size, record_bytes) {
+        (name, file.size)
       } else {
-        Open(self.next_name(name), existing_size=0L)
+        (self.next_name(name), ByteCount::zero())
       }
-    }
   }
 }
 
 ///|
 /// The state after the adapter opened `name` to append, with `size` bytes in it
-/// after the open. A size less than zero counts as zero.
+/// after the open.
 pub fn RollingState::opened(
   self : RollingState,
   name : LogFileName,
-  size : Int64,
+  size : ByteCount,
 ) -> RollingState {
-  { ..self, active: Some(name), size: if size > 0L { size } else { 0L } }
+  { ..self, active: Some(name), size }
 }
 
 ///|
-/// The state after the adapter wrote `bytes` bytes to the active file. A count
-/// less than zero counts as zero.
-pub fn RollingState::wrote(self : RollingState, bytes : Int64) -> RollingState {
-  { ..self, size: self.size + (if bytes > 0L { bytes } else { 0L }) }
+/// The state after the adapter wrote `bytes` bytes to the active file.
+pub fn RollingState::wrote(
+  self : RollingState,
+  bytes : ByteCount,
+) -> RollingState {
+  { ..self, size: { bytes: self.size.bytes + bytes.bytes } }
 }
 
 ///|
-/// The names of the files to delete under `retention`, after `active` opened.
+/// The owned files to delete under `retention`, after `active` opened.
 /// Only regular entries of `listing` whose names have the complete owned form
 /// count, so directories, links, the marker and other names stay. The active
 /// file is never in the result. `KeepNewest(n)` keeps the active file and the
@@ -192,7 +220,7 @@ pub fn FileSet::retention(
   retention : Retention,
   listing : Array[ListedFile],
   active : LogFileName,
-) -> Array[String] {
+) -> Array[LogFileName] {
   guard retention is KeepNewest(count) else { return [] }
   let owned : Array[LogFileName] = []
   for file in listing {
@@ -204,5 +232,5 @@ pub fn FileSet::retention(
   owned.sort()
   let keep = count.to_int() - 1
   let delete = if owned.length() > keep { owned.length() - keep } else { 0 }
-  owned[0:delete].iter().map(name => name.to_string()).to_array()
+  owned[0:delete].to_owned()
 }

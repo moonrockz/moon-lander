@@ -74,18 +74,23 @@ the writer time:
 | --- | --- |
 | `Open(name, existing_size~)` | No file is open. Open `name` to append (never truncate), then write |
 | `Append(name)` | Write to the open file |
-| `Roll(name)` | Close the active file, open `name` to append, write, then run retention |
+| `Roll(name, existing_size~)` | Close the active file, open `name` to append, write, then run retention |
 
 After each successful action, the adapter calls `opened(name, size)` and
-`wrote(bytes)`. A failed action does not change the state. The rules are:
+`wrote(bytes)`. A failed action does not change the state. Sizes are
+`ByteCount` values: parse a file size from the file system with `ByteCount::of`
+at the adapter, and count a record with `ByteCount::of_text`. The rules are:
 
 - The size is the UTF-8 bytes of the rendered record, including its LF and its
-  error lines. Use `@formatting.utf8_length`.
+  error lines.
 - A nonempty file rolls before a record that does not fit. An exact fit appends.
 - An empty file takes a record larger than the limit, and the next record rolls.
   A record never splits across files.
-- A daily policy rolls at the first record of a later UTC day. When the clock
-  moves back, the writer stays in the day of the active file.
+- A daily policy rolls at the first record of a later UTC day. That plan reads
+  the listing, as at a restart, so a file of the new day from an earlier run is
+  appended to when it has room. `needs_listing(now)` tells the adapter when to
+  list the directory. When the clock moves back, the writer stays in the day of
+  the active file.
 - `Size` does not roll at a new day. `Daily` does not roll at any size.
 - At the first open, the plan reads the directory listing. It appends to the
   newest owned regular file of the current period when that file has room, and
@@ -100,7 +105,8 @@ test "a day with two size rolls" {
   let now = @formatting.LogTimestamp::from_epoch_millis(1793110987024L)
   let mut state = @rolling.RollingState::new(set)
   let names = []
-  for bytes in [60L, 40L, 1L, 99L, 1L] {
+  for size in [60L, 40L, 1L, 99L, 1L] {
+    let bytes = @rolling.ByteCount::of(size)
     let plan = state.plan(now, bytes, [])
     match plan {
       Append(name) => names.push("append \{name}")
@@ -108,8 +114,8 @@ test "a day with two size rolls" {
         state = state.opened(name, existing_size)
         names.push("open \{name}")
       }
-      Roll(name) => {
-        state = state.opened(name, 0L)
+      Roll(name, existing_size~) => {
+        state = state.opened(name, existing_size)
         names.push("roll \{name}")
       }
     }
@@ -135,14 +141,18 @@ test "a restart appends to the newest file of the day" {
   let set = @rolling.FileSet::new(stem, Text, @rolling.RollingPolicy::default())
   let now = @formatting.LogTimestamp::from_epoch_millis(1793110987024L)
   let listing : Array[@rolling.ListedFile] = [
-    { name: "acme-20261027.log", size: 10485760L, regular: true },
-    { name: "acme-20261027_001.log", size: 2048L, regular: true },
-    { name: "acme.log.lock", size: 0L, regular: true },
+    { name: "acme-20261027.log", size: @rolling.ByteCount::of(10485760L), regular: true },
+    { name: "acme-20261027_001.log", size: @rolling.ByteCount::of(2048L), regular: true },
+    { name: "acme.log.lock", size: @rolling.ByteCount::zero(), regular: true },
   ]
-  let plan = @rolling.RollingState::new(set).plan(now, 120L, listing)
+  let plan = @rolling.RollingState::new(set).plan(
+    now,
+    @rolling.ByteCount::of(120L),
+    listing,
+  )
   guard plan is Open(name, existing_size~) else { fail("no open plan") }
   assert_eq(name.to_string(), "acme-20261027_001.log")
-  assert_eq(existing_size, 2048L)
+  assert_eq(existing_size.to_int64(), 2048L)
 }
 ```
 
@@ -166,7 +176,7 @@ test "keep the newest three files" {
   ]
   let listing = names.map(name => @rolling.ListedFile::{
     name,
-    size: 1L,
+    size: @rolling.ByteCount::of(1L),
     regular: true,
   })
   guard set.parse_name("acme-20261027.log") is Some(active) else {
@@ -175,7 +185,7 @@ test "keep the newest three files" {
   let retention = @rolling.Retention::KeepNewest(
     @rolling.RetainedFileCount::count(3),
   )
-  assert_eq(set.retention(retention, listing, active), ["acme-20261024.log"])
+  assert_eq(set.retention(retention, listing, active).map(name => name.to_string()), ["acme-20261024.log"])
 }
 ```
 

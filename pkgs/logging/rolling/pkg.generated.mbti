@@ -13,13 +13,34 @@ pub suberror RollingError {
   InvalidStem(input~ : String, rule~ : StemRule)
   NotPositiveByteLimit(bytes~ : Int64)
   NotPositiveFileCount(count~ : Int32)
-  NegativeRecordBytes(bytes~ : Int64)
+  NegativeByteCount(bytes~ : Int64)
   SequenceExhausted(last~ : String)
 } derive(@debug.Debug)
 pub fn RollingError::message(Self) -> String
 pub fn RollingError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct ByteCount {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn ByteCount::compare(Self, Self) -> Int32
+pub fn ByteCount::equal(Self, Self) -> Bool
+pub fn ByteCount::hash(Self) -> Int32
+pub fn ByteCount::hash_combine(Self, Hasher) -> Unit
+pub fn ByteCount::not_equal(Self, Self) -> Bool
+pub fn ByteCount::of(Int64) -> Self raise RollingError
+pub fn ByteCount::of_text(String) -> Self
+pub fn ByteCount::op_ge(Self, Self) -> Bool
+pub fn ByteCount::op_gt(Self, Self) -> Bool
+pub fn ByteCount::op_le(Self, Self) -> Bool
+pub fn ByteCount::op_lt(Self, Self) -> Bool
+pub fn ByteCount::output(Self, &Logger) -> Unit
+pub fn ByteCount::to_int64(Self) -> Int64
+pub fn ByteCount::to_repr(Self) -> @debug.Repr
+pub fn ByteCount::to_string(Self) -> String
+pub fn ByteCount::zero() -> Self
+pub impl Show for ByteCount
+
 pub struct FileByteLimit {
   // private fields
 } derive(Compare, Eq, Hash, @debug.Debug)
@@ -49,8 +70,8 @@ pub fn FileFormat::to_repr(Self) -> @debug.Repr
 
 pub(all) enum FilePlan {
   Append(LogFileName)
-  Open(LogFileName, existing_size~ : Int64)
-  Roll(LogFileName)
+  Open(LogFileName, existing_size~ : ByteCount)
+  Roll(LogFileName, existing_size~ : ByteCount)
 } derive(Eq, @debug.Debug)
 pub fn FilePlan::equal(Self, Self) -> Bool
 pub fn FilePlan::not_equal(Self, Self) -> Bool
@@ -66,13 +87,13 @@ pub fn FileSet::new(LogFileStem, FileFormat, RollingPolicy) -> Self
 pub fn FileSet::not_equal(Self, Self) -> Bool
 pub fn FileSet::parse_name(Self, String) -> LogFileName?
 pub fn FileSet::policy(Self) -> RollingPolicy
-pub fn FileSet::retention(Self, Retention, Array[ListedFile], LogFileName) -> Array[String]
+pub fn FileSet::retention(Self, Retention, Array[ListedFile], LogFileName) -> Array[LogFileName]
 pub fn FileSet::stem(Self) -> LogFileStem
 pub fn FileSet::to_repr(Self) -> @debug.Repr
 
 pub(all) struct ListedFile {
   name : String
-  size : Int64
+  size : ByteCount
   regular : Bool
 } derive(Eq, @debug.Debug)
 pub fn ListedFile::equal(Self, Self) -> Bool
@@ -158,13 +179,14 @@ pub struct RollingState {
 pub fn RollingState::active(Self) -> LogFileName?
 pub fn RollingState::equal(Self, Self) -> Bool
 pub fn RollingState::file_set(Self) -> FileSet
+pub fn RollingState::needs_listing(Self, @formatting.LogTimestamp) -> Bool
 pub fn RollingState::new(FileSet) -> Self
 pub fn RollingState::not_equal(Self, Self) -> Bool
-pub fn RollingState::opened(Self, LogFileName, Int64) -> Self
-pub fn RollingState::plan(Self, @formatting.LogTimestamp, Int64, Array[ListedFile]) -> FilePlan raise RollingError
-pub fn RollingState::size(Self) -> Int64
+pub fn RollingState::opened(Self, LogFileName, ByteCount) -> Self
+pub fn RollingState::plan(Self, @formatting.LogTimestamp, ByteCount, Array[ListedFile]) -> FilePlan raise RollingError
+pub fn RollingState::size(Self) -> ByteCount
 pub fn RollingState::to_repr(Self) -> @debug.Repr
-pub fn RollingState::wrote(Self, Int64) -> Self
+pub fn RollingState::wrote(Self, ByteCount) -> Self
 
 pub enum StemRule {
   Empty

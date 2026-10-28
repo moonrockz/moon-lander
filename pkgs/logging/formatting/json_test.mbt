@@ -143,3 +143,21 @@ test "a number that is not finite is null and number text is kept" {
   )
   ignore(@json.parse(line.trim_end(chars="\n").to_owned()))
 }
+
+///|
+test "number text must have the complete JSON number grammar" {
+  let kept = ["0", "-0", "12", "1.5", "0.25", "1e3", "1E+3", "-2.5e-7"]
+  let rejected = ["1e", "+1", "01", "--2", "1.", ".5", "1e+", "-", "0x1", "1.2.3"]
+  for text in kept + rejected {
+    let record = json_sample(logger => logger.info("{N}", [
+      Json::number(7.0, repr=text),
+    ]))
+    let line = @formatting.format_json_line(record)
+    let expected = if kept.contains(text) { text } else { "7" }
+    assert_true(
+      line.contains("{\"name\":\"N\",\"value\":\{expected}}"),
+      msg="\{text}: \{line}",
+    )
+    ignore(@json.parse(line.trim_end(chars="\n").to_owned()))
+  }
+}

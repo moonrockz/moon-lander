@@ -194,7 +194,7 @@ async fn list_directory(path : String) -> Result[Array[@rolling.ListedFile], Str
   let regular = listing.regular()
   let listed = []
   for i in 0..<names.length() {
-    listed.push(@rolling.ListedFile::{ name: names[i], size: sizes[i].to_int64(), regular: regular[i] })
+    listed.push(listed_file(names[i], sizes[i].to_int64(), regular[i]))
   }
   Ok(listed)
 }

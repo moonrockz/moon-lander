@@ -25,6 +25,61 @@ pub extend StemRule with Eq::{equal, not_equal}
 pub extend StemRule with @debug.Debug::{to_repr}
 
 ///|
+/// A count of bytes: a file size or the encoded size of a record. It is zero or
+/// more.
+pub struct ByteCount {
+  priv bytes : Int64
+} derive(Eq, Compare, Hash, Debug)
+
+///|
+pub extend ByteCount with Eq::{equal, not_equal}
+
+///|
+pub extend ByteCount with Compare::{compare, op_lt, op_le, op_ge, op_gt}
+
+///|
+pub extend ByteCount with Hash::{hash, hash_combine}
+
+///|
+pub extend ByteCount with @debug.Debug::{to_repr}
+
+///|
+/// Make a byte count, for example a file size from the file system. It raises
+/// `NegativeByteCount` when `bytes` is less than zero.
+pub fn ByteCount::of(bytes : Int64) -> ByteCount raise RollingError {
+  guard bytes >= 0L else { raise NegativeByteCount(bytes~) }
+  { bytes, }
+}
+
+///|
+/// The count of UTF-8 bytes of `text`, for example a rendered record with its
+/// LF.
+pub fn ByteCount::of_text(text : String) -> ByteCount {
+  { bytes: @formatting.utf8_length(text) }
+}
+
+///|
+/// No bytes.
+pub fn ByteCount::zero() -> ByteCount {
+  { bytes: 0L }
+}
+
+///|
+/// The count as a number.
+pub fn ByteCount::to_int64(self : ByteCount) -> Int64 {
+  self.bytes
+}
+
+///|
+/// The count as text, for example `2048`.
+pub impl Show for ByteCount with output(self, logger) {
+  logger.write_string(self.bytes.to_string())
+}
+
+///|
+pub extend ByteCount with Show::{output, to_string}
+
+///|
 /// A rolling input that breaks a rule, or a file set that has no next file
 /// name. Callers can match the cases, but only this package makes them.
 pub suberror RollingError {
@@ -34,8 +89,8 @@ pub suberror RollingError {
   NotPositiveByteLimit(bytes~ : Int64)
   /// The retained file count `count` is zero or less.
   NotPositiveFileCount(count~ : Int)
-  /// The record size `bytes` is less than zero.
-  NegativeRecordBytes(bytes~ : Int64)
+  /// The byte count `bytes` is less than zero.
+  NegativeByteCount(bytes~ : Int64)
   /// The file `last` has the largest sequence number, so the period has no
   /// next file name. The file set does not use a name again.
   SequenceExhausted(last~ : String)
@@ -65,8 +120,8 @@ pub fn RollingError::message(self : RollingError) -> String {
       "Invalid file byte limit \{bytes}: the value must be greater than zero"
     NotPositiveFileCount(count~) =>
       "Invalid retained file count \{count}: the value must be greater than zero"
-    NegativeRecordBytes(bytes~) =>
-      "Invalid record size \{bytes}: the value must not be less than zero"
+    NegativeByteCount(bytes~) =>
+      "Invalid byte count \{bytes}: the value must not be less than zero"
     SequenceExhausted(last~) =>
       "No file name after \{last.escape()}: the sequence number is at its largest value"
   }

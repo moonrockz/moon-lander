@@ -3,19 +3,44 @@
 const SCHEMA_VERSION : Int = 1
 
 ///|
-/// True when `repr` is the text of a JSON number: only digits, signs, `.`, `e`
-/// and `E`. A number with other text is written from its value, so a property
-/// cannot break the line.
+/// True when `repr` has the complete JSON number grammar:
+/// `-? (0 | [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?`. A number with other
+/// text, for example `1e`, `+1`, `01` or `--2`, is written from its value, so a
+/// property cannot break the line.
 fn is_number_text(repr : String) -> Bool {
-  !repr.is_empty() &&
-  repr
-  .iter()
-  .all(char => (char >= '0' && char <= '9') ||
-    char == '-' ||
-    char == '+' ||
-    char == '.' ||
-    char == 'e' ||
-    char == 'E')
+  let chars = repr.to_array()
+  let length = chars.length()
+  let is_digit = (char : Char) => char >= '0' && char <= '9'
+  let mut at = 0
+  // Skip the digits from `at`, and give `true` when there was at least one.
+  let digits = () => {
+    let start = at
+    while at < length && is_digit(chars[at]) {
+      at += 1
+    }
+    at > start
+  }
+  if at < length && chars[at] == '-' {
+    at += 1
+  }
+  guard at < length else { return false }
+  if chars[at] == '0' {
+    at += 1
+  } else if !(chars[at] >= '1' && chars[at] <= '9' && digits()) {
+    return false
+  }
+  if at < length && chars[at] == '.' {
+    at += 1
+    guard digits() else { return false }
+  }
+  if at < length && (chars[at] == 'e' || chars[at] == 'E') {
+    at += 1
+    if at < length && (chars[at] == '+' || chars[at] == '-') {
+      at += 1
+    }
+    guard digits() else { return false }
+  }
+  at == length
 }
 
 ///|

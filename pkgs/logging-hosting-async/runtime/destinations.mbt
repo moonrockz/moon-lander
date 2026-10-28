@@ -48,7 +48,7 @@ priv struct FileIo {
   make_directory : async (String) -> String?
   create_exclusive : async (String) -> String?
   remove_file : async (String) -> String?
-  open_append : async (String) -> Result[(OpenFile, Int64), String]
+  open_append : async (String) -> Result[(OpenFile, @rolling.ByteCount), String]
   list_directory : async (String) -> Result[Array[@rolling.ListedFile], String]
 }
 
@@ -62,16 +62,20 @@ fn system_io() -> FileIo {
     remove_file,
     open_append: async fn(path) {
       match open_append(path) {
-        Ok((handle, size)) =>
-          Ok(
-            (
-              {
-                write: async fn(text) { write_handle(handle, text) },
-                close: async fn() { close_handle(handle) },
-              },
-              size,
-            ),
-          )
+        Ok((handle, size)) => {
+          let file : OpenFile = {
+            write: async fn(text) { write_handle(handle, text) },
+            close: async fn() { close_handle(handle) },
+          }
+          // Parse the size from the file system once, at this boundary.
+          let count = @rolling.ByteCount::of(size) catch {
+            _ => {
+              ignore(close_handle(handle))
+              return Err("the file system gave the size \{size}")
+            }
+          }
+          Ok((file, count))
+        }
         Err(detail) => Err(detail)
       }
     },
@@ -164,9 +168,8 @@ async fn FileOutput::retain(
   }
   for
     name in self.sink.files().retention(self.sink.retention(), listing, active) {
-    guard self.sink.files().parse_name(name) is Some(owned) else { continue }
-    if (self.io.remove_file)(directory.file(owned)) is Some(detail) {
-      (self.warn)(self.failure(DeleteOldFile, subject=name, detail))
+    if (self.io.remove_file)(directory.file(name)) is Some(detail) {
+      (self.warn)(self.failure(DeleteOldFile, subject=name.to_string(), detail))
     }
   }
 }
@@ -200,8 +203,10 @@ async fn FileOutput::write(
   if self.acquire() is Some(failure) {
     return Some(failure)
   }
-  let bytes = @formatting.utf8_length(text)
-  let listing = if self.handle is None {
+  let bytes = @rolling.ByteCount::of_text(text)
+  // Read the writer clock once for this record.
+  let now = (self.clock)()
+  let listing = if self.state.needs_listing(now) {
     let directory = self.sink.directory().path().to_string()
     match (self.io.list_directory)(directory) {
       Ok(listing) => listing
@@ -211,7 +216,7 @@ async fn FileOutput::write(
   } else {
     []
   }
-  let plan = self.state.plan((self.clock)(), bytes, listing) catch {
+  let plan = self.state.plan(now, bytes, listing) catch {
     error => return Some(self.failure(PlanFile, error_text(error)))
   }
   match plan {
@@ -220,7 +225,7 @@ async fn FileOutput::write(
       if self.open(name) is Some(failure) {
         return Some(failure)
       }
-    Roll(name) => {
+    Roll(name, ..) => {
       if self.handle is Some(handle) {
         self.handle = None
         if (handle.close)() is Some(detail) {

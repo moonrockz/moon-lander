@@ -139,7 +139,7 @@ fn FakeFs::io(self : FakeFs) -> FileIo {
         },
         close: fn() { None },
       }
-      Ok((file, @formatting.utf8_length(entry.content.to_string())))
+      Ok((file, @rolling.ByteCount::of_text(entry.content.to_string())))
     },
     list_directory: fn(path) {
       guard self.entries.get(path) is Some({ kind: Folder, .. }) else {
@@ -152,7 +152,7 @@ fn FakeFs::io(self : FakeFs) -> FileIo {
           let entry = self.entries.get(path + "/" + name).unwrap()
           @rolling.ListedFile::{
             name,
-            size: @formatting.utf8_length(entry.content.to_string()),
+            size: @rolling.ByteCount::of_text(entry.content.to_string()),
             regular: entry.kind is Regular,
           }
         }),
@@ -503,4 +503,39 @@ async test "the writer period does not move back with the clock" {
   assert_eq(fs.names("/logs"), ["acme-20261028.log"])
   let text = fs.text("/logs/acme-20261028.log").unwrap()
   assert_true(text.contains("2026-10-27T23:59:58.000Z [INF] clock moved back"))
+}
+
+///|
+async test "a new day continues a file of that day from an earlier run" {
+  let fs = FakeFs::new()
+  fs.add("/logs", Folder)
+  fs.add("/logs/acme-20261028.log", Regular, text="earlier run\n")
+  // 2026-10-27T23:59:58.000Z, then 2026-10-28T00:00:01.000Z.
+  let times = [1793145598000L, 1793145601000L]
+  let calls = Ref(0)
+  let clock = () => {
+    let millis = times[if calls.val < 2 { 0 } else { 1 }]
+    calls.val += 1
+    @formatting.LogTimestamp::from_epoch_millis(millis) catch {
+      _ => abort("a valid time")
+    }
+  }
+  ignore(
+    with_files(
+      fs,
+      [@sinks.FileSink::new(logs(), acme(), policy=Daily)],
+      clock~,
+      session => {
+        let logger : &@logging.Logger = session.logger()
+        logger.info("day one", [])
+        ignore(session.drain())
+        logger.info("day two", [])
+        session.close()
+      },
+    ),
+  )
+  assert_eq(fs.names("/logs"), ["acme-20261027.log", "acme-20261028.log"])
+  let text = fs.text("/logs/acme-20261028.log").unwrap()
+  assert_true(text.has_prefix("earlier run\n"), msg=text)
+  assert_true(text.contains("[INF] day two"), msg=text)
 }

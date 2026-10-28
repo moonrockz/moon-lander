@@ -527,3 +527,14 @@ pub async fn write_diagnostic(
 ) -> String? {
   write_console(stream, text + "\n")
 }
+
+///|
+/// A directory entry from an adapter. The size is parsed once here; an entry
+/// with a size that is not valid is not regular, so the plan never appends to
+/// it and retention never deletes it.
+fn listed_file(name : String, size : Int64, regular : Bool) -> @rolling.ListedFile {
+  match (try { Some(@rolling.ByteCount::of(size)) } catch { _ => None }) {
+    Some(count) => { name, size: count, regular }
+    None => { name, size: @rolling.ByteCount::zero(), regular: false }
+  }
+}

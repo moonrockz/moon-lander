@@ -164,6 +164,9 @@ fn Conventions::project_sources(
   scan : Scan,
   machine : Array[MachineSource],
 ) -> @config.LoadStep[Tier] raise @config.ConfigError {
+  if self.root_policy is WorkspaceFirst(_) && project.options.config is Discover {
+    return self.workspace_first_sources(project, scan, machine)
+  }
   let context = scan.context
   let extensions = project.extensions
   let start = match context.working_dir {
@@ -242,7 +245,7 @@ fn Conventions::project_sources(
         Unknown => return Need(scan.needs)
       }
   }
-  let selected = match (project.options.project, enclosing) {
+  let selected = if self.member_loading is ExplicitOnly && project.options.project is None { Some(None) } else { match (project.options.project, enclosing) {
     // The project file is a member of the enclosing workspace.
     (None, Some(_)) => Some(Some(file.root))
     (selector, _) => {
@@ -263,7 +266,7 @@ fn Conventions::project_sources(
         (None, None) => Some(None)
       }
     }
-  }
+  } }
   guard selected is Some(member_dir) else { return Need(scan.needs) }
   guard self.layer(workspace, project, scan, as_member=false) is Some(base) else {
     return Need(scan.needs)
@@ -418,8 +421,12 @@ fn Conventions::layer(
   project : ProjectInputs,
   scan : Scan,
   as_member~ : Bool,
+  parsed? : @config.ConfigValue,
 ) -> Layer? raise @config.ConfigError {
   let primary = match file.kind {
+    Discovered if parsed is Some(value) =>
+      @config.ConfigSource::parsed_file(file.path.to_string(), value,
+        role=if as_member { Member } else { Workspace }, name=self.display)
     Discovered =>
       @config.ConfigSource::candidates(
         texts(self.candidates(file.root, project.extensions)),

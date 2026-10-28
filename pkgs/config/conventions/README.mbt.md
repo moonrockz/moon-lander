@@ -30,6 +30,52 @@ Import `moonrockz/moon-lander-config/conventions` as `@conventions`. Each
 The environment-variable source (600) of the core comes after them, so a
 variable wins over every file.
 
+## Find a declared workspace
+
+Select `WorkspaceFirst` with a parsed section path to inspect documents while
+walking up. An empty workspace object counts as a declaration. Discovery stops
+at the nearest declaration, even when that workspace excludes the project. It
+does not inspect an ancestor above that workspace or the explicit boundary.
+If no workspace is found, the nearest primary is the project fallback. An
+examined parse failure or ambiguity remains an error.
+
+`ExplicitOnly` suppresses automatic single-member selection. An explicit project
+selector still applies. The pure `roots`
+method always returns root evidence without selecting a member. It uses the
+same `Need`/`Done` file-tree protocol as `load`; the host supplies any requested
+entries. The result exposes the workspace, nearest project and parsed primary
+sources, so an application can retain its own all-member walk.
+
+```mbt check
+///|
+test "inspect root evidence without selecting a member" {
+  let root = @config.FileTreePath::parse("/w")
+  let child = @config.FileTreePath::parse("/w/a")
+  let conventions = @conventions.app_dirs("acme")
+    |> @conventions.workspace
+    |> @conventions.root_policy(WorkspaceFirst(@config.KeyPath::parse("workspace")))
+    |> @conventions.member_loading(ExplicitOnly)
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing(root, [{ name: "acme.toml", kind: File }, { name: "a", kind: Directory }])
+    .with_listing(child, [{ name: "acme.toml", kind: File }])
+    .with_file(root.child("acme.toml"), "[workspace]\nmarker='root'")
+    .with_file(child.child("acme.toml"), "project.name='a'")
+  let context : @config.LoadContext = {
+    tree, working_dir: Some(child), platform: Some(Linux),
+    env_vars: Map([]), formats: [@toml.format()],
+  }
+  guard conventions.roots(context) is Done(roots) else { fail("complete tree needs I/O") }
+  assert_eq(roots.workspace(), Some(root))
+  assert_eq(roots.nearest_project(), Some(child))
+  let config = @config.build(roots.sources())
+  assert_eq(@config.get_text(config, "workspace.marker"), "root")
+}
+```
+
+`NearestFile` and `Automatic` remain the defaults. Existing calls retain the
+nearest-file and enclosing-member rules below. A workspace section must be an
+object; a scalar has a typed decode failure.
+
 ## Walk up to the project root
 
 Discovery starts at the working directory of the run and moves to each parent. The

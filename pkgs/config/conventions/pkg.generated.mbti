@@ -32,9 +32,13 @@ pub fn legacy(Conventions, String, format~ : @moon-lander-config.Format, decode~
 
 pub fn local_overrides(Conventions) -> Conventions
 
+pub fn member_loading(Conventions, MemberLoading) -> Conventions
+
 pub fn member_scope_keys(Conventions, Array[String]) -> Conventions
 
 pub fn profiles(Conventions, @profiles.Policy) -> Conventions
+
+pub fn root_policy(Conventions, RootPolicy) -> Conventions
 
 pub fn system_dir(Conventions) -> Conventions
 
@@ -56,6 +60,7 @@ pub fn Conventions::display(Self) -> String
 pub fn Conventions::name(Self) -> String
 pub fn Conventions::prefix(Self) -> String
 pub fn Conventions::profiles_enabled(Self) -> Bool
+pub fn Conventions::roots(Self, @moon-lander-config.LoadContext, options? : DiscoveryOptions) -> @moon-lander-config.LoadStep[RootEvidence] raise @moon-lander-config.ConfigError
 
 pub(all) struct DiscoveryOptions {
   environment : String?
@@ -80,6 +85,11 @@ pub fn EnvironmentName::to_repr(Self) -> @debug.Repr
 pub fn EnvironmentName::to_string(Self) -> String
 pub impl Show for EnvironmentName
 
+pub(all) enum MemberLoading {
+  Automatic
+  ExplicitOnly
+}
+
 pub(all) enum Part {
   SystemDir
   UserConfigDir
@@ -91,6 +101,18 @@ pub(all) enum Part {
 pub fn Part::equal(Self, Self) -> Bool
 pub fn Part::not_equal(Self, Self) -> Bool
 pub fn Part::to_repr(Self) -> @debug.Repr
+
+pub struct RootEvidence {
+  // private fields
+}
+pub fn RootEvidence::nearest_project(Self) -> @moon-lander-config.FileTreePath?
+pub fn RootEvidence::sources(Self) -> Array[@moon-lander-config.ConfigSource]
+pub fn RootEvidence::workspace(Self) -> @moon-lander-config.FileTreePath?
+
+pub(all) enum RootPolicy {
+  NearestFile
+  WorkspaceFirst(@moon-lander-config.KeyPath)
+}
 
 // Type aliases
 

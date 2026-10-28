@@ -50,6 +50,8 @@ pub struct Conventions {
   priv workspace : WorkspaceKeys?
   priv member_scope : Array[String]
   priv inherited : Array[String]
+  priv root_policy : RootPolicy
+  priv member_loading : MemberLoading
 }
 
 ///|
@@ -133,6 +135,8 @@ pub fn base(
     workspace: None,
     member_scope: [],
     inherited: [],
+    root_policy: NearestFile,
+    member_loading: Automatic,
   }
 }
 
@@ -350,6 +354,19 @@ pub fn add(
 /// Enable independent configuration profiles with an immutable policy.
 pub fn profiles(conventions : Conventions, policy : @profiles.Policy) -> Conventions {
   { ..conventions, profiles: Some(policy) }
+}
+
+///|
+/// Set the root selection policy. NearestFile retains the legacy discovery
+/// behavior. WorkspaceFirst inspects documents up to the first declared section.
+pub fn root_policy(conventions : Conventions, policy : RootPolicy) -> Conventions {
+  { ..conventions, root_policy: policy }
+}
+
+///|
+/// Select automatic single-member loading or leave the member walk to the caller.
+pub fn member_loading(conventions : Conventions, loading : MemberLoading) -> Conventions {
+  { ..conventions, member_loading: loading }
 }
 
 ///|

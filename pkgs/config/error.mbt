@@ -3,6 +3,8 @@
 /// match it without a string compare. The core, conventions, and binding
 /// capabilities raise these cases and have no error type of their own.
 pub(all) suberror ConfigError {
+  /// A profile input or provider breaks a typed profile rule.
+  Profile(failure~ : ProfileFailure)
   /// A format could not parse the text of a source.
   Parse(
     format~ : String,
@@ -69,6 +71,7 @@ pub extend ConfigError with @debug.Debug::{to_repr}
 /// them; the host adapter gives them in the `/` form.
 pub fn ConfigError::message(self : ConfigError) -> String {
   match self {
+    Profile(failure~) => failure.message()
     Parse(format~, origin~, message~, line~, column~) => {
       let position = match (line, column) {
         (Some(line), Some(column)) => " at line \{line}, column \{column}"

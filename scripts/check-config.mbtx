@@ -3,17 +3,20 @@ import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/process",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/string",
 }
 ----
 
 ///|
-/// Compare the complete pure-load observation across compiler targets.
+/// Compare complete core/profile observations across targets, require nonzero
+/// profile coverage, and exercise real native and js profile files.
 
 ///|
 async fn main {
   let expected = @fs.read_file("tests/config-fixture/expected.txt")
     .text()
     .replace_all(old="\r\n", new="\n")
+  let mut profile_observation : String? = None
   for target in ["wasm", "wasm-gc", "js", "native"] {
     let (code, out, err) = @process.collect_output("moon", [
       "test", "--deny-warn", "--target", target, "pkgs/config", "pkgs/config/parsers/toml",
@@ -32,6 +35,73 @@ async fn main {
     guard observation == expected else {
       fail("Values, provenance or reports differ on \{target}:\n\{observation}")
     }
-    println("Core acceptance and complete observation agree: \{target}")
+    for
+      suite in [
+        "pkgs/config/profiles", "pkgs/config/conventions/profiles_test.mbt", "tests/config-profiles",
+      ] {
+      let (code, out, err) = @process.collect_output("moon", [
+        "test", "--deny-warn", "--target", target, suite,
+      ])
+      guard code == 0 else { fail(out.text() + err.text()) }
+      guard positive_test_count(out.text() + err.text()) else {
+        fail("No profile coverage: \{suite} on \{target}")
+      }
+    }
+    if target == "native" || target == "js" {
+      for
+        suite in [
+          "pkgs/config/host/profiles_wbtest.mbt", "tests/hosting-config-acceptance/profiles_wbtest.mbt",
+        ] {
+        let (code, out, err) = @process.collect_output("moon", [
+          "test", "--deny-warn", "--target", target, suite,
+        ])
+        guard code == 0 else { fail(out.text() + err.text()) }
+        guard positive_test_count(out.text() + err.text()) else {
+          fail("No host profile coverage: \{suite} on \{target}")
+        }
+      }
+    }
+    let (code, out, err) = @process.collect_output("moon", [
+      "run", "--release", "--deny-warn", "--target", target, "tests/config-profiles-parity",
+    ])
+    guard code == 0 else { fail(out.text() + err.text()) }
+    let observation = out.text().replace_all(old="\r\n", new="\n")
+    guard !observation.is_empty() else { fail("Empty profile observation") }
+    match profile_observation {
+      None => profile_observation = Some(observation)
+      Some(expected) => {
+        guard observation == expected else {
+          fail(
+            "Profile values, provenance, reports or resolution differ on \{target}",
+          )
+        }
+      }
+    }
+    println(
+      "Core and profile acceptance and complete observations agree: \{target}",
+    )
   }
+}
+
+///|
+fn positive_test_count(output : String) -> Bool {
+  for line in output.split("\n") {
+    if line.trim().strip_prefix("Total tests: ") is Some(rest) {
+      if rest.split(",").next() is Some(number) {
+        if (@string.parse_int(number) catch { _ => 0 }) > 0 {
+          return true
+        }
+      }
+    }
+  }
+  false
+}
+
+///|
+test "profile coverage requires an actual nonzero test summary" {
+  assert_true(
+    positive_test_count("Total tests: 12, passed: 12, failed: 0. [wasm]"),
+  )
+  assert_false(positive_test_count("Total tests: 0, passed: 0, failed: 0."))
+  assert_false(positive_test_count("Finished. no work"))
 }

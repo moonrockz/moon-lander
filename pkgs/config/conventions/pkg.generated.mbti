@@ -4,6 +4,7 @@ package "moonrockz/moon-lander-config/conventions"
 import {
   "moonbitlang/core/debug",
   "moonrockz/moon-lander-config",
+  "moonrockz/moon-lander-config/profiles",
 }
 
 // Values
@@ -33,6 +34,8 @@ pub fn local_overrides(Conventions) -> Conventions
 
 pub fn member_scope_keys(Conventions, Array[String]) -> Conventions
 
+pub fn profiles(Conventions, @profiles.Policy) -> Conventions
+
 pub fn system_dir(Conventions) -> Conventions
 
 pub fn user_config_dir(Conventions) -> Conventions
@@ -52,15 +55,17 @@ pub struct Conventions {
 pub fn Conventions::display(Self) -> String
 pub fn Conventions::name(Self) -> String
 pub fn Conventions::prefix(Self) -> String
+pub fn Conventions::profiles_enabled(Self) -> Bool
 
 pub(all) struct DiscoveryOptions {
   environment : String?
   config : @moon-lander-config.SourceSelection[String]
   isolated : Bool
   project : String?
+  profiles : @moon-lander-config.ProfileSelection
 } derive(Eq, @debug.Debug)
 pub fn DiscoveryOptions::equal(Self, Self) -> Bool
-pub fn DiscoveryOptions::new(environment? : String, config? : @moon-lander-config.SourceSelection[String], isolated? : Bool, project? : String) -> Self
+pub fn DiscoveryOptions::new(environment? : String, config? : @moon-lander-config.SourceSelection[String], isolated? : Bool, project? : String, profiles? : @moon-lander-config.ProfileSelection) -> Self
 pub fn DiscoveryOptions::not_equal(Self, Self) -> Bool
 pub fn DiscoveryOptions::to_repr(Self) -> @debug.Repr
 

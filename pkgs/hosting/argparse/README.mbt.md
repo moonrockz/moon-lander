@@ -26,7 +26,7 @@ test "build a command with global standard flags" {
 }
 ```
 
-The four standard flags are opt-in on the bare builder. Add them to the root
+The standard flags are opt-in on the bare builder. Add them to the root
 command. They are global, so they can follow a subcommand. A standard flag added
 only to a subcommand is not read by the host. The factory reads the parsed flags
 in `BuildContext.args`. Hooks and the command read the same parse result in
@@ -130,3 +130,27 @@ The host appends the real `Overrides` source at priority 700 after its environme
 source at 600. An empty mapped result still has a source report; a command with no
 mappings adds none. Custom parser errors become `UsageError` and code 2 before any
 configuration callback, file read, services factory, hook or command runs.
+
+## Profile selectors
+
+Add `profiles_option()` and `no_profiles_flag()` together on the root command.
+They are global through nested subcommands. The option appends repeated values;
+the host splits each value at commas, trims ASCII whitespace around names and
+parses names once. Empty elements and names outside the lowercase ASCII grammar
+give usage code 2. The disabling flag conflicts with every profile option.
+
+```mbt check
+test "declare repeatable profile selectors" {
+  let command = @hosting_argparse.Command("acme",
+    options=[@hosting_argparse.profiles_option()],
+    flags=[@hosting_argparse.no_profiles_flag()],
+    subcommands=[@hosting_argparse.Command("build")])
+  let matches = command.parse(argv=["--profiles", "postgres", "build", "--profiles", "metrics,tracing"], env={})
+  assert_eq(matches.values.get("profiles"), Some(["postgres", "metrics,tracing"]))
+}
+```
+
+The ids `profiles` and `no-profiles` are reserved by `OverrideOption::parse`.
+Selectors do not enable a profile policy or file discovery. Enable the policy
+with `@hosting.profiles` after `@hosting.app_dirs`. With profiles off, a valid
+selector gives a note and preserves ordinary application values named profiles.

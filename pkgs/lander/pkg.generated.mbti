@@ -2,7 +2,9 @@
 package "moonrockz/moon-lander"
 
 import {
+  "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-config/conventions",
+  "moonrockz/moon-lander-config/profiles",
   "moonrockz/moon-lander-core",
   "moonrockz/moon-lander-hosting",
 }
@@ -24,5 +26,17 @@ pub using @moon-lander-core {type AppNameError}
 pub using @moon-lander-core {type AppNameRule}
 
 pub using @conventions {type EnvironmentName}
+
+pub using @profiles {type Policy}
+
+pub using @moon-lander-config {type ProfileName}
+
+pub using @moon-lander-config {type ProfileNames}
+
+pub using @moon-lander-config {type ProfileResolution}
+
+pub using @moon-lander-config {type ProfileSelection}
+
+pub using @moon-lander-config {type ProfileState}
 
 // Traits

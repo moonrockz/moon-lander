@@ -17,6 +17,15 @@ The [format selection guide](pkgs/config/formats/README.mbt.md) shows the builde
 code, the TOML-only override, a custom combination, and the MoonBit
 virtual-package feature that enables this build-time selection.
 
+## Compose configuration profiles
+
+Opt in to ordered profiles such as `postgres` and `metrics`, with separate
+`acme.profile.metrics.toml` files, includes and reusable groups. Profiles load
+after environment files and before local overrides. The loaded configuration
+records immutable membership for factories, hooks and commands. See the
+[profile policy guide](pkgs/config/profiles/README.mbt.md) and the
+[discovery guide](pkgs/config/conventions/README.mbt.md#compose-configuration-profiles).
+
 ## Development setup
 
 The build setup follows Moonbase and smithy. Install [mise](https://mise.jdx.dev/), then run:
@@ -70,7 +79,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
 | `mise run check:logging` | Fail when a portable logging package (root, formatting, rolling, sink settings) or the acceptance suite runs zero tests on a target |
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
-| `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
+| `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |

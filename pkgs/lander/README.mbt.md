@@ -182,3 +182,10 @@ The factory and command contexts expose the run variable snapshot as an immutabl
 `@immut/sorted_map.SortedMap[String, String]` in deterministic key order. Builder
 and `env_vars` steps snapshot their inputs when applied. A missing native or js
 process working directory ends the run with code 1 before any file read or hook.
+
+Configuration profiles are opt-in through `@hosting.profiles(@lander.Policy::new())`.
+The umbrella re-exports `ProfileName`, `ProfileNames`, `ProfileSelection`,
+`ProfileState` and `ProfileResolution`. Parse each name once with
+`@lander.ProfileName::parse`, then query `ctx.config.profiles().contains(name)`
+in the factory, hooks or command. The [host guide](../hosting/README.mbt.md)
+shows a compiled service-choice example and the standard argparse selectors.

@@ -445,3 +445,32 @@ test "a factory StopRequested ends the run with code 0 before any hook" {
   assert_true(result.reason is Requested)
   assert_eq(log, [])
 }
+
+///|
+test "embedded profile membership selects services and stays identical through hooks and command" {
+  let postgres = @config.ProfileName::parse("postgres")
+  let seen = []
+  let state = Ref(@config.ProfileState::Off)
+  let host = profile_host(["--profiles", "postgres"])
+    |> profiles(@profiles.Policy::new())
+    |> files(@config.FileTree::new(complete=true))
+    |> service("database", start=ctx => {
+      assert_eq(ctx.config.profiles(), state.val)
+      assert_eq(ctx.services, "postgres")
+      seen.push("hook")
+    })
+    |> build(ctx => {
+      state.val = ctx.config.profiles()
+      seen.push("factory")
+      if state.val.contains(postgres) { "postgres" } else { "memory" }
+    })
+  let (result, reports) = embedded(host, ctx => {
+    assert_eq(ctx.config.profiles(), state.val)
+    assert_true(ctx.config.profiles().contains(postgres))
+    assert_eq(ctx.services, "postgres")
+    seen.push("command")
+  })
+  assert_eq(result.exit_code().to_int(), 0)
+  assert_eq(reports, [])
+  assert_eq(seen, ["factory", "hook", "command"])
+}

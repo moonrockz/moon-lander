@@ -170,10 +170,10 @@ async fn execute(input : Json) -> Json {
     builder = builder |> @config.platform(match platform { "Windows" => Windows; "MacOs" => MacOs; _ => Linux })
   }
   if mode == "context" {
-    builder = builder |> @config.provider({ name: "context", expand: context => Done({ sources: [@config.in_memory_pairs([
+    builder = builder |> @config.provider({ name: "context", expand: context => Done(@config.Expansion::new([@config.in_memory_pairs([
       ("cwd", @config.string(context.working_dir.map(dir => dir.to_string()).unwrap_or("none"))),
       ("platform", @config.string(match context.platform { Some(Windows) => "Windows"; Some(MacOs) => "MacOs"; Some(Linux) => "Linux"; None => "none" })),
-    ])], warnings: [] }) })
+    ])])) })
     builder = builder |> @config.env(prefix="APP")
   }
   let path = text(field(input, "path", "/workspace/acme.toml"))
@@ -185,8 +185,8 @@ async fn execute(input : Json) -> Json {
       let dir = @config.FileTreePath::parse(path)
       match context.tree.listing(dir) {
         Unknown => Need([ListDir(dir)])
-        Found(entries) => Done({ sources: [@config.in_memory_pairs([("listing", @config.string(entries.map(entry => entry.name).join(",")))])], warnings: [] })
-        Missing => Done({ sources: [@config.in_memory_pairs([("listing", @config.string(if context.tree.file(dir.child("child.toml")) is Missing { "missing-descendant" } else { "unknown" }))])], warnings: [] })
+        Found(entries) => Done(@config.Expansion::new([@config.in_memory_pairs([("listing", @config.string(entries.map(entry => entry.name).join(",")))])]))
+        Missing => Done(@config.Expansion::new([@config.in_memory_pairs([("listing", @config.string(if context.tree.file(dir.child("child.toml")) is Missing { "missing-descendant" } else { "unknown" }))])]))
       }
     } })
   }
@@ -199,7 +199,13 @@ async fn execute(input : Json) -> Json {
         let mut conventions = @conventions.app_dirs(text(field(source, "conventions", "acme")))
         if field(source, "workspace", null) is Number(index, ..) { conventions = @browser.workspace(conventions, mounts[index.to_int()]) }
         if field(source, "boundary", null) is String(dir) { conventions = conventions |> @conventions.boundary(dir) }
-        let options = @conventions.DiscoveryOptions::new(isolated=field(source, "isolated", false) == true)
+        if field(source, "profiles", false) == true { conventions = conventions |> @conventions.profiles(@profiles.Policy::new()) }
+        let selection = match field(source, "selection", null) {
+          String(text) => @config.ProfileSelection::Selected(@config.ProfileNames::parse_csv(text))
+          false => @config.ProfileSelection::Disabled
+          _ => @config.ProfileSelection::Unspecified
+        }
+        let options = @conventions.DiscoveryOptions::new(isolated=field(source, "isolated", false) == true, profiles=selection)
         builder = builder |> @conventions.add(conventions, options~)
       }
     }
@@ -224,6 +230,9 @@ async fn execute(input : Json) -> Json {
   }
   let reports = config.reports().map(report => report.path.unwrap_or("none"))
   let result : Map[String, Json] = { "values": Json(values), "origins": Json(origins), "reports": Json(reports) }
+  if field(input, "profile_state", false) == true {
+    result["profiles"] = Json(match config.profiles() { Off => []; Resolved(resolution) => resolution.active().names().map(name => name.to_string()) })
+  }
   if field(input, "statuses", false) == true {
     result["statuses"] = Json(config.reports().map(report => "\{report.path.unwrap_or("none")} \{status(report)}"))
   }

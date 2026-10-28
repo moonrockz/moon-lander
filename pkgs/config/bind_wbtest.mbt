@@ -15,6 +15,7 @@ fn with_provenance(
     notes: [],
     provenance,
     secret_syntax: Standard,
+    profiles: Off,
   }
 }
 

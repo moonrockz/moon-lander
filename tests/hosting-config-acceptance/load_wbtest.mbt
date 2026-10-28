@@ -9,8 +9,8 @@ fn[S] configured_host(argv : Array[String], directory? : String = "workspace") -
   @hosting.builder(@lander_core.AppName::parse("acme"), argv,
     env_vars=(Map([]) : Map[String, String]), working_dir=fixture(directory))
   |> @hosting_argparse.command(name => @argparse.Command(name,
-    options=[@hosting_argparse.environment_option(), @hosting_argparse.config_option(), @hosting_argparse.project_option()],
-    flags=[@hosting_argparse.isolated_flag()]))
+    options=[@hosting_argparse.environment_option(), @hosting_argparse.config_option(), @hosting_argparse.project_option(), @hosting_argparse.profiles_option()],
+    flags=[@hosting_argparse.isolated_flag(), @hosting_argparse.no_profiles_flag()]))
   // A fixed discovery platform makes the HOME candidate assertion portable.
   |> @hosting.configure(s => s |> @config.platform(Linux) |> @config.format(@toml.format()))
   |> @hosting.app_dirs()

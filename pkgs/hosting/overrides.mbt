@@ -1,5 +1,5 @@
 ///|
-/// An argument id that can supply a configuration override. The four standard
+/// An argument id that can supply a configuration override. The standard
 /// discovery ids cannot be mapped.
 pub struct OverrideOption {
   priv id : String
@@ -22,13 +22,14 @@ pub extend MappingError with @debug.Debug::{to_repr}
 
 ///|
 /// Parse a non-empty argparse id. Reject `environment`, `config`, `isolated`
-/// and `project`, which supply host discovery inputs rather than config values.
+/// `project`, `profiles` and `no-profiles`, which supply host discovery inputs
+/// rather than config values.
 pub fn OverrideOption::parse(text : String) -> OverrideOption raise MappingError {
   if text.is_empty() {
     raise InvalidOverrideOption(input=text, reason="the argument id must not be empty")
   }
   match text {
-    "environment" | "config" | "isolated" | "project" =>
+    "environment" | "config" | "isolated" | "project" | "profiles" | "no-profiles" =>
       raise InvalidOverrideOption(input=text, reason="the argument id is reserved for host discovery")
     _ => { id: text }
   }

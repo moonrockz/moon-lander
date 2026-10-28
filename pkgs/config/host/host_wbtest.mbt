@@ -23,7 +23,7 @@ fn recorder(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
     name: "recorder",
     expand: context => {
       seen.val = Some(context)
-      Done({ sources: [], warnings: [] })
+      Done(@config.Expansion::new([]))
     },
   }
 }

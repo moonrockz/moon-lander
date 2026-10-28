@@ -11,7 +11,7 @@ fn mapped_config(command : @argparse.Command, argv : Array[String], mappings : A
 
 ///|
 test "override ids parse once and reject empty and every discovery id" {
-  for id in ["", "environment", "config", "isolated", "project"] {
+  for id in ["", "environment", "config", "isolated", "project", "profiles", "no-profiles"] {
     try { ignore(OverrideOption::parse(id)); fail("expected invalid mapping id") } catch {
       InvalidOverrideOption(input~, reason~) => {
         assert_eq(input, id)

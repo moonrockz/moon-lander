@@ -1,0 +1,5 @@
+import {
+  "moonrockz/moon-lander-tests/config-profiles" @profiles_fixture,
+}
+
+pkgtype(kind: "executable")

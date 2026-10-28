@@ -542,3 +542,48 @@ test "discovery asks for the listing of the working directory first" {
 | `prefix` | The environment variable prefix; defaults to the name in upper case with `-` changed to `_` |
 | `display` | The name that the ambiguity message shows; defaults to the name |
 | `DiscoveryOptions` | The inputs that a host gives from its arguments: environment, explicit primary, isolated mode, and project |
+
+## Compose configuration profiles
+
+Enable profiles explicitly. They use files such as `acme.profile.metrics.toml`,
+independently of `acme.Production.toml`. Includes precede the selected roots;
+groups expand in order, retain the group name, and keep each name's last
+occurrence. Profile layers use priority 380, after environment files and before
+local and user overrides. Missing files leave active code-only markers.
+
+```mbt check
+///|
+test "load controls and a profile with recorded metadata" {
+  let tree = @config.FileTree::new(complete=true)
+    .with_listing(@config.FileTreePath::parse("/workspace"), [
+      { name: "acme.toml", kind: File },
+      { name: "acme.profile.metrics.toml", kind: File },
+    ])
+    .with_file(@config.FileTreePath::parse("/workspace/acme.toml"),
+      "[profiles]\nactive=['production']\n[profiles.groups]\nproduction=['metrics']")
+    .with_file(@config.FileTreePath::parse("/workspace/acme.profile.metrics.toml"),
+      "telemetry=true")
+  let builder = @config.builder()
+    |> @config.working_dir("/workspace") |> @config.env_vars({})
+    |> @config.format(@toml.format())
+    |> @conventions.add(@conventions.base("acme") |> @conventions.layouts
+      |> @conventions.profiles(@profiles.Policy::new()))
+  guard @config.load(builder,tree) is Done(config) else { fail("complete tree") }
+  assert_true(config.profiles().contains(@config.ProfileName::parse("metrics")))
+  assert_eq(config.get(@config.KeyPath::parse("profiles")),None)
+}
+```
+
+Selection precedence is discovery options, `<PREFIX>_PROFILES`, base `active`,
+base `default`, then policy fallback. Use `Selected(ProfileNames::new([]))` to
+suppress defaults while keeping includes; use `Disabled` to suppress both. A
+present empty selector variable also disables profiles. Standalone environment
+sources must reserve that exact variable, for example
+`@config.env(prefix="ACME", reserved=["ACME_PROFILES"])`.
+
+Only the standard-layout workspace primary, or the project primary without a
+workspace, supplies controls. Selected member and overlay controls fail before
+key filters. Enabled controls stay out of application values and provenance;
+`Config::profiles()` gives the recorded selector, active order and reasons.
+The [profile policy guide](../profiles/README.mbt.md) covers names, groups and
+limits. Existing applications keep their behavior until they enable profiles.

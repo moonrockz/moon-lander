@@ -16,7 +16,7 @@ Keep an explicit allowlist in the publisher. Mark every other workspace module a
 
 ### D3: Qualify registry archives, Call
 
-Use the existing task-script CI category and full local/release check for candidate consumers. Serve packaged archives through a loopback registry with isolated dependency caches and no workspace overrides. Each library has a consumer on all four targets; target-limited adapters get additional supported-target consumers. Audit archive entries, licenses and versioned sibling imports. Log archive checksums and resolved graphs. The release publisher records the approved checksums before upload. The public check compares every downloaded archive with those checksums and blocks GitHub release creation on failure. Retain the OpenRPC consumer and public format override gate.
+Use the existing task-script CI category and full local/release check for candidate consumers. Serve packaged archives through a loopback registry with isolated dependency caches and no workspace overrides. Each library has a consumer on all four targets; target-limited adapters get additional supported-target consumers. Audit archive entries, licenses and versioned sibling imports. Log archive checksums and resolved graphs. The release publisher records the approved checksums before upload. The public check compares every downloaded archive with those checksums and blocks GitHub release creation on failure. Retain the OpenRPC consumer and public format override gate. Parse library identities into the fixed release-library enum and versions and archive digests into private-field types at their input boundaries.
 
 ### D4: Recover without overwriting, Owner
 

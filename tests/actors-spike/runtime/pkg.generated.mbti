@@ -1,0 +1,147 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-tests/actors-spike/runtime"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-core",
+  "moonrockz/moon-lander-tests/actors-spike/policy",
+}
+
+// Values
+pub async fn[X] scope(async (Scope) -> X) -> X
+
+// Errors
+pub suberror ActorError {
+  ScopeClosed
+  NameInUse(@policy.ActorName)
+  Closed(ActorAddress)
+  TimedOut(@moon-lander-core.TimeLimit)
+  ActorFailed(ActorAddress, Error)
+  ActorCancelled(ActorAddress)
+  NotOwner(ActorAddress)
+} derive(@debug.Debug)
+pub fn ActorError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Actor[M, R] {
+  // private fields
+}
+pub fn[M, R] Actor::address(Self[M, R]) -> ActorAddress
+pub async fn[M, R, T] Actor::ask(Self[M, R], (Reply[T]) -> M, timeout? : @moon-lander-core.TimeLimit) -> T
+pub fn[M, R] Actor::is_ended(Self[M, R]) -> Bool
+pub async fn[M, R] Actor::join(Self[M, R]) -> R
+pub async fn[M, R] Actor::send(Self[M, R], M) -> Unit raise ActorError
+pub fn[M, R] Actor::to_ref(Self[M, R]) -> ActorRef[M]
+pub fn[M, R] Actor::try_send(Self[M, R], M) -> @policy.Admission
+
+pub struct ActorAddress {
+  // private fields
+}
+pub fn ActorAddress::equal(Self, Self) -> Bool
+pub fn ActorAddress::hash(Self) -> Int32
+pub fn ActorAddress::hash_combine(Self, Hasher) -> Unit
+pub fn ActorAddress::name(Self) -> @policy.ActorName?
+pub fn ActorAddress::not_equal(Self, Self) -> Bool
+pub fn ActorAddress::to_repr(Self) -> @debug.Repr
+pub fn ActorAddress::to_string(Self) -> String
+pub impl Eq for ActorAddress
+pub impl Hash for ActorAddress
+pub impl @debug.Debug for ActorAddress
+
+pub struct ActorRef[M] {
+  // private fields
+}
+pub fn[M] ActorRef::address(Self[M]) -> ActorAddress
+pub async fn[M, R] ActorRef::ask(Self[M], (Reply[R]) -> M, timeout? : @moon-lander-core.TimeLimit) -> R
+pub fn[M] ActorRef::queued_count(Self[M]) -> Int32
+pub async fn[M] ActorRef::send(Self[M], M) -> Unit raise ActorError
+pub fn[M] ActorRef::try_send(Self[M], M) -> @policy.Admission
+
+pub struct Directory[M] {
+  // private fields
+}
+pub fn[M] Directory::add(Self[M], ActorRef[M]) -> Self[M]
+pub fn[M] Directory::addresses(Self[M]) -> Array[ActorAddress]
+pub fn[M] Directory::difference(Self[M], Self[M]) -> Self[M]
+pub fn[M] Directory::empty() -> Self[M]
+pub fn[M] Directory::equal(Self[M], Self[M]) -> Bool
+pub fn[M] Directory::lookup(Self[M], @policy.ActorName) -> Lookup[M]
+pub fn[M] Directory::not_equal(Self[M], Self[M]) -> Bool
+pub fn[M] Directory::of(ActorRef[M]) -> Self[M]
+pub fn[M] Directory::remove(Self[M], ActorRef[M]) -> Self[M]
+pub fn[M] Directory::resolve(Self[M], ActorAddress) -> ActorRef[M]?
+pub fn[M] Directory::size(Self[M]) -> Int32
+#deprecated
+pub fn[M] Directory::sub(Self[M], Self[M]) -> Self[M]
+pub fn[M] Directory::union(Self[M], Self[M]) -> Self[M]
+pub impl[M] Add for Directory[M]
+pub impl[M] Eq for Directory[M]
+pub impl[M] Sub for Directory[M]
+
+pub struct Inbox[M] {
+  // private fields
+}
+pub fn[M] Inbox::queued_count(Self[M]) -> Int32
+pub async fn[M] Inbox::receive(Self[M]) -> M
+pub fn[M] Inbox::reenqueue(Self[M], M) -> @policy.Admission
+pub async fn[M, T] Inbox::scan(Self[M], (M) -> T? raise?, timeout? : @moon-lander-core.TimeLimit) -> T
+pub fn[M] Inbox::scope(Self[M]) -> Scope
+pub fn[M] Inbox::self_ref(Self[M]) -> ActorRef[M]
+
+pub enum Lookup[M] {
+  Missing
+  Found(ActorRef[M])
+  Ambiguous(NameConflict[M])
+}
+
+pub struct NameConflict[M] {
+  // private fields
+}
+pub fn[M] NameConflict::name(Self[M]) -> @policy.ActorName
+pub fn[M] NameConflict::refs(Self[M]) -> Array[ActorRef[M]]
+
+pub(all) enum Next[S] {
+  Continue(S)
+  Stop
+}
+
+pub struct Reply[R] {
+  // private fields
+}
+pub fn[R] Reply::send(Self[R], R) -> ReplyOutcome
+
+pub(all) enum ReplyOutcome {
+  Delivered
+  Expired
+} derive(Eq, @debug.Debug)
+pub fn ReplyOutcome::equal(Self, Self) -> Bool
+pub fn ReplyOutcome::not_equal(Self, Self) -> Bool
+pub fn ReplyOutcome::to_repr(Self) -> @debug.Repr
+
+pub struct Scope {
+  // private fields
+}
+pub fn[S] Scope::create(Self, S, mailbox? : @policy.MailboxPolicy) -> ServiceRef[S] raise ActorError
+pub fn[M, R] Scope::spawn(Self, async (Inbox[M]) -> R, mailbox? : @policy.MailboxPolicy, name? : @policy.ActorName) -> Actor[M, R] raise ActorError
+pub fn[S, M] Scope::start(Self, S, async (S, M) -> Next[S], mailbox? : @policy.MailboxPolicy, name? : @policy.ActorName) -> Actor[M, Unit] raise ActorError
+
+pub struct ServiceRef[S] {
+  // private fields
+}
+pub fn[S] ServiceRef::address(Self[S]) -> ActorAddress
+pub async fn[S, R] ServiceRef::ask(Self[S], async (S) -> R, timeout? : @moon-lander-core.TimeLimit) -> R
+pub async fn[S] ServiceRef::join(Self[S]) -> Unit
+pub async fn[S] ServiceRef::tell(Self[S], async (S) -> Unit) -> Unit raise ActorError
+
+// Type aliases
+pub using @policy {type ActorName}
+
+pub using @policy {type Admission}
+
+pub using @policy {type MailboxCapacity}
+
+pub using @policy {type MailboxPolicy}
+
+pub using @policy {type MessageCount}
+
+// Traits

@@ -9,11 +9,11 @@ Each lasting group includes its own tests and runnable documentation.
 
 Bead: lander-25h.1
 
-- [ ] 1.1 Build an unpublished actor fixture with the existing async pin; compile the ACT-2 counter example and an Ox-style service with two different ask result types, with no dynamic cast; record the compiler and target results in the design
-- [ ] 1.2 Prove idle actor scope exit, normal parent exit with a live child, and ask wakeup on termination with acknowledgement-based tests on wasm, js and native; verify no actor or waiter remains after the enclosing scope returns
-- [ ] 1.3 Prove selective receive retains non-matches in order and counts them against bounded capacity; verify scan cancellation, selector error and a blocked matching send without an uncounted stash
-- [ ] 1.4 Compile the portable policy shape on all four targets and confirm runtime target rejection on wasm-gc; revise the design if any public example or lifetime rule cannot be implemented, before starting group 2
-- [ ] 1.5 Compile the NAME-1 and DIR-1 named actor and immutable directory examples with no Any or cast; prove distinct addresses across scopes and name reuse, same-type Add/Sub operators and exact-reference removal on all runtime targets
+- [x] 1.1 Build an unpublished actor fixture with the existing async pin; compile the ACT-2 counter example and an Ox-style service with two different ask result types, with no dynamic cast; record the compiler and target results in the design
+- [x] 1.2 Prove idle actor scope exit, normal parent exit with a live child, and ask wakeup on termination with acknowledgement-based tests on wasm, js and native; verify no actor or waiter remains after the enclosing scope returns
+- [x] 1.3 Prove selective receive retains non-matches in order and counts them against bounded capacity; verify scan cancellation, selector error and a blocked matching send without an uncounted stash
+- [x] 1.4 Compile the portable policy shape on all four targets and confirm runtime target rejection on wasm-gc; revise the design if any public example or lifetime rule cannot be implemented, before starting group 2
+- [x] 1.5 Compile the NAME-1 and DIR-1 named actor and immutable directory examples with no Any or cast; prove distinct addresses across scopes and name reuse, same-type Add/Sub operators and exact-reference removal on all runtime targets
 
 ## 2. Standalone module and one state actor
 

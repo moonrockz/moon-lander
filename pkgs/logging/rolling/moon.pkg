@@ -1,0 +1,13 @@
+import {
+  "moonrockz/moon-lander-logging/formatting",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/moon-lander-logging/formatting",
+  "moonrockz/moon-lander-logging/rolling",
+} for "test"
+
+options(
+  "is-main": false,
+)

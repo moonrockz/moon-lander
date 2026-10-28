@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-tests/logging-sinks-scenarios" @scenarios,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+} for "wbtest"
+
+supported_targets = "native"
+
+options("native-stub": [ "send.c" ])

@@ -209,6 +209,10 @@ run = "moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx"
 description = "Fail when a target leg of the logging tests runs zero tests (args: targets; default: all four)"
 run = "moonx scripts/toolchain.mbtx scripts/check-logging.mbtx"
 
+
+[tasks."check:logging-sinks"]
+description = "Run the logging sink acceptance suite with native, Node.js and Bun children, and check isolated consumers (args: --no-consumer)"
+run = "moonx scripts/toolchain.mbtx scripts/check-logging-sinks.mbtx"
 [tasks."check:formats"]
 description = "Verify linked formats, parser trimming and leak rejection on all four targets"
 run = "moonx scripts/toolchain.mbtx scripts/check-formats.mbtx --verify-failures"

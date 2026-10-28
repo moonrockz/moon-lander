@@ -1,7 +1,7 @@
 ///|
 /// One part of a parsed message template: literal text or a named hole.
 priv enum Part {
-  Text(String)
+  Literal(String)
   Hole(String)
 }
 
@@ -18,7 +18,7 @@ fn parse_template(template : String) -> Array[Part] {
   let text = StringBuilder()
   let flush = () => {
     if !text.is_empty() {
-      parts.push(Text(text.to_string()))
+      parts.push(Literal(text.to_string()))
       text.reset()
     }
   }
@@ -94,7 +94,7 @@ pub fn LogEvent::message(self : LogEvent) -> String {
   let out = StringBuilder()
   for part in parse_template(self.template) {
     match part {
-      Text(text) => out.write_string(text)
+      Literal(text) => out.write_string(text)
       Hole(name) =>
         match self.find(name) {
           Some(value) => out.write_string(render_value(value))

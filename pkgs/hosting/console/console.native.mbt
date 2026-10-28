@@ -35,10 +35,18 @@ fn signal_kind() -> @hosting.SignalKind? {
 /// or event runs. The handlers are global, so run only one console host in a
 /// process.
 ///
+/// `finalize` runs after the run and its failure reports, before libc `exit`.
+/// See `Finalizer`.
+///
 /// It raises `SignalHandlersUnavailable` before it reads configuration or runs a
 /// hook when the handlers cannot be installed.
-pub async fn[S] run(host : @hosting.Host[S], command : @hosting.Hook[S]) -> Unit {
+pub async fn[S] run(
+  host : @hosting.Host[S],
+  command : @hosting.Hook[S],
+  finalize? : Finalizer,
+) -> Unit {
   install()
   let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(signal_kind))
-  libc_exit(process_exit_code(outcome, signal_kind()))
+  let selected = selected_exit_code(outcome, signal_kind())
+  libc_exit(finish(selected, finalize, signal_kind))
 }

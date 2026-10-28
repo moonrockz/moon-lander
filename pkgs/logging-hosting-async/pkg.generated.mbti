@@ -1,0 +1,248 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-logging-hosting-async"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-core",
+  "moonrockz/moon-lander-logging",
+  "moonrockz/moon-lander-logging/formatting",
+  "moonrockz/moon-lander-logging/rolling",
+}
+
+// Values
+pub fn default_drain_limit() -> @moon-lander-core.TimeLimit
+
+// Errors
+pub suberror ReportError {
+  NegativeCount(count~ : Int64)
+  TimeoutBeforeClose
+} derive(@debug.Debug)
+pub fn ReportError::message(Self) -> String
+pub fn ReportError::to_repr(Self) -> @debug.Repr
+
+pub suberror SettingsError {
+  InvalidQueueEventLimit(count~ : Int32)
+  InvalidQueueByteLimit(bytes~ : Int64)
+  InvalidRecordByteLimit(bytes~ : Int64)
+  RecordLimitAboveQueueLimit(record~ : Int64, queue~ : Int64)
+  InvalidLogDirectory(path~ : String, rule~ : LogDirectoryRule)
+  DuplicateFileSet(directory~ : String, name~ : String)
+} derive(@debug.Debug)
+pub fn SettingsError::message(Self) -> String
+pub fn SettingsError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct ColorHints {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ColorHints::equal(Self, Self) -> Bool
+pub fn ColorHints::from_env(no_color~ : String?, term~ : String?) -> Self
+pub fn ColorHints::none() -> Self
+pub fn ColorHints::not_equal(Self, Self) -> Bool
+pub fn ColorHints::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ColorMode {
+  Auto
+  Always
+  Never
+} derive(Eq, @debug.Debug)
+pub fn ColorMode::equal(Self, Self) -> Bool
+pub fn ColorMode::not_equal(Self, Self) -> Bool
+pub fn ColorMode::styles(Self, TerminalCapability, ColorHints) -> Bool
+pub fn ColorMode::to_repr(Self) -> @debug.Repr
+
+pub struct ConsoleSink {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ConsoleSink::color(Self) -> ColorMode
+pub fn ConsoleSink::equal(Self, Self) -> Bool
+pub fn ConsoleSink::minimum(Self) -> @moon-lander-logging.Level
+pub fn ConsoleSink::new(stream? : ConsoleStream, minimum? : @moon-lander-logging.Level, color? : ColorMode, theme? : @formatting.Theme) -> Self
+pub fn ConsoleSink::not_equal(Self, Self) -> Bool
+pub fn ConsoleSink::render_theme(Self, TerminalCapability, ColorHints) -> @formatting.Theme
+pub fn ConsoleSink::stream(Self) -> ConsoleStream
+pub fn ConsoleSink::theme(Self) -> @formatting.Theme
+pub fn ConsoleSink::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ConsoleStream {
+  StandardError
+  StandardOutput
+} derive(Eq, @debug.Debug)
+pub fn ConsoleStream::equal(Self, Self) -> Bool
+pub fn ConsoleStream::not_equal(Self, Self) -> Bool
+pub fn ConsoleStream::output(Self, &Logger) -> Unit
+pub fn ConsoleStream::to_repr(Self) -> @debug.Repr
+pub fn ConsoleStream::to_string(Self) -> String
+pub impl Show for ConsoleStream
+
+pub struct DestinationReport {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn DestinationReport::equal(Self, Self) -> Bool
+pub fn DestinationReport::failure(Self) -> SinkFailure?
+pub fn DestinationReport::new(SinkTarget, written~ : Int64, undelivered~ : Int64, failure? : SinkFailure, retention_failure? : SinkFailure) -> Self raise ReportError
+pub fn DestinationReport::not_equal(Self, Self) -> Bool
+pub fn DestinationReport::retention_failure(Self) -> SinkFailure?
+pub fn DestinationReport::target(Self) -> SinkTarget
+pub fn DestinationReport::to_repr(Self) -> @debug.Repr
+pub fn DestinationReport::undelivered(Self) -> Int64
+pub fn DestinationReport::written(Self) -> Int64
+
+pub struct DropCounts {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn DropCounts::closed(Self) -> Int64
+pub fn DropCounts::equal(Self, Self) -> Bool
+pub fn DropCounts::new(queue_full~ : Int64, oversized~ : Int64, closed~ : Int64, reentrant~ : Int64) -> Self raise ReportError
+pub fn DropCounts::not_equal(Self, Self) -> Bool
+pub fn DropCounts::oversized(Self) -> Int64
+pub fn DropCounts::queue_full(Self) -> Int64
+pub fn DropCounts::reentrant(Self) -> Int64
+pub fn DropCounts::to_repr(Self) -> @debug.Repr
+pub fn DropCounts::total(Self) -> Int64
+
+pub struct FileSink {
+  // private fields
+}
+pub fn FileSink::directory(Self) -> LogDirectory
+pub fn FileSink::files(Self) -> @rolling.FileSet
+pub fn FileSink::marker_path(Self) -> String
+pub fn FileSink::minimum(Self) -> @moon-lander-logging.Level
+pub fn FileSink::new(LogDirectory, @rolling.LogFileStem, format? : @rolling.FileFormat, policy? : @rolling.RollingPolicy, retention? : @rolling.Retention, minimum? : @moon-lander-logging.Level) -> Self
+pub fn FileSink::retention(Self) -> @rolling.Retention
+pub fn FileSink::target(Self) -> SinkTarget
+
+pub struct LogDirectory {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn LogDirectory::equal(Self, Self) -> Bool
+pub fn LogDirectory::file(Self, @rolling.LogFileName) -> String
+pub fn LogDirectory::from_absolute(@moon-lander-core.AbsolutePath) -> Self raise SettingsError
+pub fn LogDirectory::marker(Self, @rolling.FileSet) -> String
+pub fn LogDirectory::not_equal(Self, Self) -> Bool
+pub fn LogDirectory::output(Self, &Logger) -> Unit
+pub fn LogDirectory::path(Self) -> @moon-lander-core.AbsolutePath
+pub fn LogDirectory::to_repr(Self) -> @debug.Repr
+pub fn LogDirectory::to_string(Self) -> String
+pub impl Show for LogDirectory
+
+pub enum LogDirectoryRule {
+  NulCharacter
+} derive(Eq, @debug.Debug)
+pub fn LogDirectoryRule::equal(Self, Self) -> Bool
+pub fn LogDirectoryRule::not_equal(Self, Self) -> Bool
+pub fn LogDirectoryRule::to_repr(Self) -> @debug.Repr
+
+pub struct QueueByteLimit {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn QueueByteLimit::bytes(Int64) -> Self raise SettingsError
+pub fn QueueByteLimit::default() -> Self
+pub fn QueueByteLimit::equal(Self, Self) -> Bool
+pub fn QueueByteLimit::not_equal(Self, Self) -> Bool
+pub fn QueueByteLimit::to_int64(Self) -> Int64
+pub fn QueueByteLimit::to_repr(Self) -> @debug.Repr
+
+pub struct QueueEventLimit {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn QueueEventLimit::count(Int32) -> Self raise SettingsError
+pub fn QueueEventLimit::default() -> Self
+pub fn QueueEventLimit::equal(Self, Self) -> Bool
+pub fn QueueEventLimit::not_equal(Self, Self) -> Bool
+pub fn QueueEventLimit::to_int(Self) -> Int32
+pub fn QueueEventLimit::to_repr(Self) -> @debug.Repr
+
+pub struct RecordByteLimit {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn RecordByteLimit::bytes(Int64) -> Self raise SettingsError
+pub fn RecordByteLimit::default() -> Self
+pub fn RecordByteLimit::equal(Self, Self) -> Bool
+pub fn RecordByteLimit::not_equal(Self, Self) -> Bool
+pub fn RecordByteLimit::to_int64(Self) -> Int64
+pub fn RecordByteLimit::to_repr(Self) -> @debug.Repr
+
+pub struct SessionReport {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SessionReport::accepted(Self) -> Int64
+pub fn SessionReport::closed(Self) -> Bool
+pub fn SessionReport::delivery_failed(Self) -> Bool
+pub fn SessionReport::destinations(Self) -> Array[DestinationReport]
+pub fn SessionReport::drain_timed_out(Self) -> Bool
+pub fn SessionReport::dropped(Self) -> DropCounts
+pub fn SessionReport::equal(Self, Self) -> Bool
+pub fn SessionReport::failure_messages(Self) -> Array[String]
+pub fn SessionReport::new(accepted~ : Int64, dropped~ : DropCounts, destinations~ : Array[DestinationReport], drain_timed_out~ : Bool, closed~ : Bool) -> Self raise ReportError
+pub fn SessionReport::not_equal(Self, Self) -> Bool
+pub fn SessionReport::to_repr(Self) -> @debug.Repr
+
+pub struct SessionSettings {
+  // private fields
+}
+pub fn SessionSettings::byte_limit(Self) -> QueueByteLimit
+pub fn SessionSettings::console(Self) -> ConsoleSink?
+pub fn SessionSettings::drain_limit(Self) -> @moon-lander-core.TimeLimit
+pub fn SessionSettings::event_limit(Self) -> QueueEventLimit
+pub fn SessionSettings::files(Self) -> Array[FileSink]
+pub fn SessionSettings::new(console? : ConsoleSink, files? : Array[FileSink], event_limit? : QueueEventLimit, byte_limit? : QueueByteLimit, record_limit? : RecordByteLimit, drain_limit? : @moon-lander-core.TimeLimit) -> Self raise SettingsError
+pub fn SessionSettings::record_limit(Self) -> RecordByteLimit
+pub fn SessionSettings::standard() -> Self
+
+pub struct SinkFailure {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SinkFailure::detail(Self) -> String
+pub fn SinkFailure::equal(Self, Self) -> Bool
+pub fn SinkFailure::message(Self) -> String
+pub fn SinkFailure::new(SinkOperation, SinkTarget, subject? : String, String) -> Self
+pub fn SinkFailure::not_equal(Self, Self) -> Bool
+pub fn SinkFailure::operation(Self) -> SinkOperation
+pub fn SinkFailure::subject(Self) -> String?
+pub fn SinkFailure::target(Self) -> SinkTarget
+pub fn SinkFailure::to_repr(Self) -> @debug.Repr
+
+pub(all) enum SinkOperation {
+  CreateDirectory
+  AcquireOwnership
+  ListDirectory
+  PlanFile
+  OpenFile
+  Write
+  CloseFile
+  ReleaseOwnership
+  DeleteOldFile
+  Drain
+} derive(Eq, @debug.Debug)
+pub fn SinkOperation::equal(Self, Self) -> Bool
+pub fn SinkOperation::not_equal(Self, Self) -> Bool
+pub fn SinkOperation::output(Self, &Logger) -> Unit
+pub fn SinkOperation::to_repr(Self) -> @debug.Repr
+pub fn SinkOperation::to_string(Self) -> String
+pub impl Show for SinkOperation
+
+pub(all) enum SinkTarget {
+  Console(ConsoleStream)
+  Files(LogDirectory, @rolling.FileSet)
+} derive(Eq, @debug.Debug)
+pub fn SinkTarget::equal(Self, Self) -> Bool
+pub fn SinkTarget::not_equal(Self, Self) -> Bool
+pub fn SinkTarget::output(Self, &Logger) -> Unit
+pub fn SinkTarget::to_repr(Self) -> @debug.Repr
+pub fn SinkTarget::to_string(Self) -> String
+pub impl Show for SinkTarget
+
+pub(all) enum TerminalCapability {
+  ColorTerminal
+  PlainTerminal
+  Redirected
+  Unknown
+} derive(Eq, @debug.Debug)
+pub fn TerminalCapability::equal(Self, Self) -> Bool
+pub fn TerminalCapability::not_equal(Self, Self) -> Bool
+pub fn TerminalCapability::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

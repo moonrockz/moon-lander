@@ -137,6 +137,8 @@ jobs:
         run: mise run check:openrpc
       - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
+      - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
+        run: mise run check:logging-sinks
       - name: Run the embedded driver with help and version, and check for exit imports
         run: mise run check:embedded
       - name: Verify generated OpenRPC Unicode data
@@ -233,6 +235,11 @@ jobs:
       - name: Test the console drivers with native and js children
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:console -- --no-consumer
+      # Real console, file, drain and CTRL_BREAK_EVENT behavior of the logging sinks in native,
+      # Node.js and Bun children, and the isolated consumers.
+      - name: Test the logging sinks with native, Node.js and Bun children
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        run: mise run check:logging-sinks
 
   # The core observation must also agree on every target on macOS.
   # Reuse the existing macOS setup and retain its Node/Bun adapter coverage. zig-cross cannot
@@ -258,6 +265,8 @@ jobs:
         run: mise run check:formats
       - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
+      - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
+        run: mise run check:logging-sinks
 
   # The docs site. It runs on each pull request with no path filter, because a path-filtered
   # required check stays pending on other pull requests. It builds the site and does not deploy it.

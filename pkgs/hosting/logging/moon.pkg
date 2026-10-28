@@ -1,0 +1,19 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/console",
+  "moonrockz/moon-lander-logging" @lander_logging,
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging-hosting-async/runtime" @sink_runtime,
+  "moonbitlang/async",
+}
+
+import {
+  "moonrockz/moon-lander-hosting/logging" @hosting_logging,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-logging/rolling",
+} for "test"
+
+
+// The bridge uses the console driver and the logging runtime, which have a
+// process console and a file system only on native and js.
+supported_targets = "native+js"

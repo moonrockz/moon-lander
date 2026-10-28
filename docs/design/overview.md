@@ -319,21 +319,24 @@ A host renders the native form only for its file calls.
 
 ## The framework modules
 
-The framework is six MoonBit modules. An application imports only the modules
+The framework is seven MoonBit modules. An application imports only the modules
 that it uses. Each module imports only the modules below it. `AppName` and
 `TimeLimit` are in core, so all modules use the same rules for them. The logging
 abstraction sits beside core, so each module above can take a `&Logger`. A
-program that uses only the mediator gets no configuration parser.
+program that uses only the mediator gets no configuration parser. The optional
+logging runtime writes logs to the console and to rolling files without the host,
+so a program that only needs sinks gets no configuration or hosting module.
 
 ```text
 moonrockz/moon-lander-core          AppName, TimeLimit (MoonBit core only)
-moonrockz/moon-lander-logging       Logger, LogEvent (MoonBit core only)
-     ↑               ↑
-moon-lander-config   moon-lander-mediator   (core, logging)
+moonrockz/moon-lander-logging       Logger, LogEvent, formatting, rolling (MoonBit core only)
+     ↑               ↑                       ↑
+moon-lander-config   moon-lander-mediator   moon-lander-logging-hosting-async
+     (core, logging)                         (core, logging, async)
+     ↑                                       ↑
+moon-lander-hosting                 (core, logging, config, logging-hosting-async)
      ↑
-moon-lander-hosting                 (core, logging, config)
-     ↑
-moonrockz/moon-lander               @lander entry (all five)
+moonrockz/moon-lander               @lander entry (all six)
 ```
 
 | Module | Folder | Import as |
@@ -342,7 +345,8 @@ moonrockz/moon-lander               @lander entry (all five)
 | `moonrockz/moon-lander-logging` | `pkgs/logging` | `@logging` |
 | `moonrockz/moon-lander-config` | `pkgs/config` | `@config`, and `@conventions`, `@host`, `@browser`, `@formats` and `@toml` for its packages |
 | `moonrockz/moon-lander-mediator` | `pkgs/mediator` | `@mediator`, and `@mediator_async` for `async` |
-| `moonrockz/moon-lander-hosting` | `pkgs/hosting` | `@hosting`, and `@console` for `console` |
+| `moonrockz/moon-lander-logging-hosting-async` | `pkgs/logging-hosting-async` | `@sinks`, and `@runtime` for `runtime` |
+| `moonrockz/moon-lander-hosting` | `pkgs/hosting` | `@hosting`, `@console` for `console`, and `@hosting_logging` for `logging` |
 | `moonrockz/moon-lander` | `pkgs/lander` | `@lander` |
 
 `mise run validate` fails when a module imports against this direction. The change

@@ -1,0 +1,9 @@
+import {
+  "moonrockz/moon-lander-tests/logging-sinks-scenarios" @scenarios,
+  "moonbitlang/core/env",
+  "moonbitlang/async",
+}
+
+supported_targets = "native+js"
+
+options("is-main": true)

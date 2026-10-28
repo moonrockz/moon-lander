@@ -68,7 +68,8 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
-| `mise run check:logging` | Fail when the logging package or its acceptance suite runs zero tests on a target |
+| `mise run check:logging` | Fail when a portable logging package (root, formatting, rolling, sink settings) or the acceptance suite runs zero tests on a target |
+| `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core acceptance and compare complete values, provenance and reports on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
@@ -180,14 +181,24 @@ script. Also update the assessed versions above.
   the format parsers, the `formats` virtual package selects the linked parsers,
   and `conventions`, `host` and `browser` hold discovery and the host adapters.
   `adapters/` holds the TypeScript adapters.
+- `pkgs/logging/` also holds the pure `formatting` package (UTC timestamps, the
+  Literate console, text and JSON Lines layouts) and the pure `rolling` package
+  (file names, rolling plans and retention), on all four targets.
 - `pkgs/mediator/` contains
   [`moonrockz/moon-lander-mediator`](pkgs/mediator/README.mbt.md), imported as
   `@mediator`, and the async mediator `moonrockz/moon-lander-mediator/async`
   (`@mediator_async`).
+- `pkgs/logging-hosting-async/` contains the optional
+  [`moonrockz/moon-lander-logging-hosting-async`](pkgs/logging-hosting-async/README.mbt.md):
+  typed sink settings and reports at the root (all four targets), and bounded
+  console and rolling file sessions in `runtime` (native, and js on Node.js and
+  Bun). `adapters/node/` holds its TypeScript adapter. It imports core, logging
+  and `moonbitlang/async`, never config or hosting.
 - `pkgs/hosting/` contains
   [`moonrockz/moon-lander-hosting`](pkgs/hosting/README.mbt.md), imported as
-  `@hosting`: the host builder, hosted services and `run`, and the native console
-  signal stub in `console`.
+  `@hosting`: the host builder, hosted services and `run`, the native console
+  signal stub in `console`, and the opt-in logging bridge in `logging`, which
+  drains a logging session before the console driver ends the process.
 - `pkgs/lander/` contains the provisional `moonrockz/moon-lander` library, imported
   as `@lander`: the `cli` entry, the re-exports, and `version()`, which provides a
   build and test smoke check.

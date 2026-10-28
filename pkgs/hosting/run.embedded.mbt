@@ -69,7 +69,11 @@ fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : 
     if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
       match host.report {
         Some(report) => ignore(run_to_completion(() => report(error, result.exit_code)))
-        None => write_line(report_text(host.name, error))
+        None =>
+          match host.report_writer {
+            Some(writer) => ignore(run_to_completion(() => writer(report_text(host.name, error))))
+            None => write_line(report_text(host.name, error))
+          }
       }
     }
   }

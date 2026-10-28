@@ -48,6 +48,7 @@ pub struct LogEvent {
 pub fn LogEvent::message(Self) -> String
 pub fn LogEvent::properties(Self) -> Array[(String, Json)]
 pub fn LogEvent::property(Self, String) -> Json?
+pub fn LogEvent::segments(Self) -> Array[MessageSegment]
 pub fn LogEvent::to_line(Self) -> String
 
 pub struct MemoryLogger {
@@ -58,6 +59,15 @@ pub fn MemoryLogger::events(Self) -> Array[LogEvent]
 pub fn MemoryLogger::log(Self, LogEvent) -> Unit
 pub fn MemoryLogger::new() -> Self
 pub impl Logger for MemoryLogger
+
+pub(all) enum MessageSegment {
+  Text(String)
+  Value(name~ : String, value~ : Json)
+} derive(Eq, @debug.Debug)
+pub fn MessageSegment::equal(Self, Self) -> Bool
+pub fn MessageSegment::not_equal(Self, Self) -> Bool
+pub fn MessageSegment::text(Self) -> String
+pub fn MessageSegment::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

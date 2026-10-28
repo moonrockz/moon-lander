@@ -1,0 +1,74 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-logging/formatting"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-logging",
+}
+
+// Values
+pub fn format_console(LogRecord, Theme) -> String
+
+pub fn format_json_line(LogRecord) -> String
+
+pub fn format_text(LogRecord) -> String
+
+pub fn utf8_length(String) -> Int64
+
+// Errors
+pub suberror TimestampError {
+  TimestampOutOfRange(millis~ : Int64)
+} derive(@debug.Debug)
+pub fn TimestampError::message(Self) -> String
+pub fn TimestampError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct LogRecord {
+  // private fields
+}
+pub fn LogRecord::capture(@moon-lander-logging.LogEvent, LogTimestamp) -> Self
+pub fn LogRecord::category(Self) -> String?
+pub fn LogRecord::error_text(Self) -> String?
+pub fn LogRecord::level(Self) -> @moon-lander-logging.Level
+pub fn LogRecord::message(Self) -> String
+pub fn LogRecord::properties(Self) -> Array[(String, Json)]
+pub fn LogRecord::segments(Self) -> Array[@moon-lander-logging.MessageSegment]
+pub fn LogRecord::template(Self) -> String
+pub fn LogRecord::timestamp(Self) -> LogTimestamp
+
+pub struct LogTimestamp {
+  // private fields
+} derive(Compare, Eq, Hash, @debug.Debug)
+pub fn LogTimestamp::compact_date(Self) -> String
+pub fn LogTimestamp::compare(Self, Self) -> Int32
+pub fn LogTimestamp::earliest() -> Self
+pub fn LogTimestamp::epoch_day(Self) -> Int64
+pub fn LogTimestamp::epoch_millis(Self) -> Int64
+pub fn LogTimestamp::equal(Self, Self) -> Bool
+pub fn LogTimestamp::from_epoch_millis(Int64) -> Self raise TimestampError
+pub fn LogTimestamp::hash(Self) -> Int32
+pub fn LogTimestamp::hash_combine(Self, Hasher) -> Unit
+pub fn LogTimestamp::latest() -> Self
+pub fn LogTimestamp::not_equal(Self, Self) -> Bool
+pub fn LogTimestamp::op_ge(Self, Self) -> Bool
+pub fn LogTimestamp::op_gt(Self, Self) -> Bool
+pub fn LogTimestamp::op_le(Self, Self) -> Bool
+pub fn LogTimestamp::op_lt(Self, Self) -> Bool
+pub fn LogTimestamp::output(Self, &Logger) -> Unit
+pub fn LogTimestamp::time_of_day(Self) -> String
+pub fn LogTimestamp::to_iso8601(Self) -> String
+pub fn LogTimestamp::to_repr(Self) -> @debug.Repr
+pub fn LogTimestamp::to_string(Self) -> String
+pub impl Show for LogTimestamp
+
+pub(all) enum Theme {
+  Literate
+  Plain
+} derive(Eq, @debug.Debug)
+pub fn Theme::equal(Self, Self) -> Bool
+pub fn Theme::not_equal(Self, Self) -> Bool
+pub fn Theme::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

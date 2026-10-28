@@ -27,6 +27,34 @@ test "the console example compiles" {
 }
 ```
 
+## Finalize before the process ends
+
+`finalize` runs one time after the run and its failure reports, before the native
+driver calls libc `exit` and before the js driver sets `process.exitCode`. It also
+runs after a configuration or start failure, after a shutdown timeout that skipped
+hooks, and after a first signal. It gets the selected exit code and gives the code
+to use, protected from cancellation. A second signal still ends the process at once.
+A signal that arrives while it runs selects the signal code. When `finalize` raises,
+a selected code 0 becomes 1 and any other code stays. The logging bridge
+`moonrockz/moon-lander-hosting/logging` uses it to drain its session.
+
+```mbt check
+///|
+async fn console_with_finalizer() -> Unit {
+  let host : @hosting.Host[Unit] = "acme"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder([])
+    |> @hosting.build(_ => ())
+  // Flush application output in the finalizer, then keep the selected code.
+  @console.run(host, _ => (), finalize=selected => selected)
+}
+
+///|
+test "the finalizer example compiles" {
+  ignore(console_with_finalizer)
+}
+```
+
 ## Signals
 
 | Platform | Signal or event | Stop reason | Exit code |

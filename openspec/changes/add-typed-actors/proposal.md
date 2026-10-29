@@ -16,9 +16,12 @@ in the style of Gleam and Elixir.
 - Start an ordinary actor with an initial state and one handler. A scope owns
   its lifetime. No actor system, name, registry, trait implementation, builder
   chain or host setup is required.
-- Provide typed message references, send, non-waiting send, request/reply,
-  explicit reply destinations and receive loops. Include selective receive,
-  finite loops, state transitions and a result when an actor completes.
+- Provide typed message references, send, non-waiting send, request/reply and
+  explicit reply destinations. Describe what an actor receives as `Receive`
+  values that only the runtime runs, with combinators for sequences, selective
+  receive, finite loops, state transitions, time limits, recovery and a result
+  when an actor completes. A test can run a receive against a list of messages,
+  with no scope or task.
 - Add optional scope-reserved names and immutable typed directories for discovery.
   Directories support union, addition and removal by exact actor address.
   Each operation gives a new directory without changing actor ownership.
@@ -37,7 +40,7 @@ in the style of Gleam and Elixir.
 
 ### New Capabilities
 
-- `actors`: local typed actors, state and receive-loop entry points, mailbox
+- `actors`: local typed actors, state and receive entry points, mailbox
   policy, request/reply, serialized service calls, destinations, scoped event
   delivery, actor lifetimes, names, local addresses and algebraic typed directories.
 
@@ -82,3 +85,8 @@ lands on `main`. Actors are not part of release 0.7.0.
   for code that never yields.
 - A new effect system, a new event loop, UI integration and a blocking bridge
   that runs async actors on `wasm-gc`.
+- Direct-style receive from any async code (the F# `inbox.Receive()` form).
+  `Receive` values keep its capabilities.
+- A scheduler and scheduled message sends. A later change adds them.
+- Benchmarks in `mise run check`, CI or the release workflow. Benchmarks are a
+  manual local task.

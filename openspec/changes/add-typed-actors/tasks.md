@@ -35,19 +35,21 @@ Depends on: group 2.
 
 - [ ] 3.1 Add bounded default capacity 128, explicit unbounded policy and non-waiting admission outcomes; verify full, accepted and closed, including in-flight capacity exclusion and no silent drop
 - [ ] 3.2 Make admission cancellation-safe and wake blocked producers on close; test both sides of the admission commit point with acknowledgements and verify no stale producer waiter remains
-- [ ] 3.3 Add self reference, non-waiting reenqueue, queue count and scheduler yielding between bounded batches; verify tail order, full self mailbox and progress of another ready actor
+- [ ] 3.3 Add queue count and scheduler yielding between bounded batches; verify the count snapshot and progress of another ready actor
 - [ ] 3.4 Document admission versus processing, ownership of mutable messages and self-send deadlock with runnable examples; run check:actors on all runtime targets
 
-## 4. Receive bodies and selective receive
+## 4. Receive values, combinators and selective receive
 
 Bead: lander-25h.4
 
 Depends on: group 3.
 
-- [ ] 4.1 Add spawn, Inbox ownership, receive, timed/try receive, final results and join; verify finite completion, independent joiners, closed versus timeout and rejection of a second consumer; document that a body must not give its inbox to another task, because the runtime detects only concurrent receives and receives after the body ends
-- [ ] 4.2 Add scan and try_scan with no uncounted stash; verify oldest match, retained order, selected async closure, arrivals while waiting, selector failure and expiry or cancellation without removal
-- [ ] 4.3 Add receive_all, receive_n and receive_loop; verify close, count limits, state changes and final results through runnable receive-loop examples on all runtime targets
-- [ ] 4.4 Document the full non-matching bounded mailbox case and recovery choices; verify its timeout and cancellation acceptance scenarios and run check:actors
+- [ ] 4.1 Add the opaque Receive with receive, select, done, map, zip, zip_with, then and bind on the stack-safe encoding, the ActorContext with own reference, reenqueue and child scope, spawn and join; replace the spike's Inbox; verify finite completion, async work between receives, independent joiners, reenqueue tail order, a full self mailbox, and a compile-failure probe that no public operation takes a message outside a Receive
+- [ ] 4.2 Add selective receive through select with no uncounted stash; verify oldest match, retained order, arrivals while waiting, selector failure and expiry without removal
+- [ ] 4.3 Add within, poll, on_closed, recover, receive_loop, receive_all and receive_n, with the loop combinators as one repeat node, and run start through receive_loop; verify time limits, polling on empty and closed mailboxes, recovery without catching cancellation, count limits, state changes and final results through runnable examples that use `<|` for callbacks and method chains for Receive values, on all runtime targets
+- [ ] 4.4 Add the deterministic test runner for a Receive and a list of messages; verify the README protocol examples with it, document it as the preferred unit-test style, and verify 100,000-step loops of both kinds (state carried forward and result built after the recursive step) on wasm, js and native
+- [ ] 4.5 Add a moon bench suite for the RECV-1 shapes and a manual mise task for it; verify that mise run check, CI and the release workflow do not run it, record its results in the design, and keep each candidate optimization only when it shows a gain and the stack tests still pass
+- [ ] 4.6 Document the full non-matching bounded mailbox case and recovery choices; verify its timeout acceptance scenarios and run check:actors
 
 ## 5. Request/reply and common destinations
 
@@ -68,7 +70,7 @@ Depends on: group 5.
 
 - [ ] 6.1 Complete close with one immutable pending snapshot, drain and cancel; verify in-flight completion versus cancellation, queued-message order, repeated close and wakeup of blocked producers and callers
 - [ ] 6.2 Complete lifecycle snapshots, initializer readiness, once-only cleanup, cancellation protection and cleanup budgets; verify initializer failure, cleanup timeout and preservation of primary plus cleanup errors
-- [ ] 6.3 Complete scope failure propagation, inbox-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
+- [ ] 6.3 Complete scope failure propagation, context-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
 - [ ] 6.4 Add runnable lifetime and resource examples and document cooperative cancellation limits; run all close, join and cleanup acceptance cases plus check:actors on wasm, js and native
 
 ## 7. Serialized services and automatic responders

@@ -74,6 +74,31 @@ async test "Git fixture cleanup removes read-only files" {
 }
 
 ///|
+async test "source policy checks native canonical paths before rendering" {
+  let root = fixture()
+  defer remove_fixture(root)
+  let config = effective_configuration(root, @policy.TreePrefix::parse(""))
+  check_source_policy(root, config, true)
+}
+
+///|
+async test "source policy rejects a canonical path outside the project" {
+  let root = fixture()
+  defer remove_fixture(root)
+  let outside = @fs.tmpdir(prefix="lander-source-outside")
+  defer @fs.rmdir(outside, recursive=true)
+  write(outside, "external.md", "# External")
+  @fs.symlink(target=outside + "/external.md", root + "/docs/external.md")
+  let config = effective_configuration(root, @policy.TreePrefix::parse(""))
+  let problems = try {
+    check_source_policy(root, config, true)
+    []
+  } catch { @model.Invalid(problems) => problems; error => fail("unexpected: \{error}") }
+  assert_eq(problems.length(), 1)
+  assert_eq(problems[0].file, "docs/external.md")
+}
+
+///|
 async test "the shared host preserves content and active deployment bases" {
   let root = fixture()
   defer remove_fixture(root)

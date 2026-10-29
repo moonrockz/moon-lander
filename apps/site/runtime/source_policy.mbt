@@ -3,7 +3,14 @@
 async fn check_source_policy(root : String, configuration : String, main_build : Bool) -> Unit {
   let config = @host.configuration(configuration)
   let visible = git(root, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
-  let root = @fs.realpath(root)
+  // Join with the input root; compare canonical paths using their native separator.
+  let canonical_root = @fs.realpath(root)
+  let separator = if @async.platform is Windows { "\\" } else { "/" }
+  let prefix = if canonical_root.has_suffix(separator) {
+    canonical_root
+  } else {
+    canonical_root + separator
+  }
   let problems = []
   for path in visible.split("\u{0}") {
     let path = path.to_owned()
@@ -11,7 +18,7 @@ async fn check_source_policy(root : String, configuration : String, main_build :
     let source = "\{root}/\{path}"
     if !@fs.exists(source) { continue }
     let real = @fs.realpath(source)
-    guard real.has_prefix(root + "/") && @fs.kind(real) is Regular else {
+    guard real.has_prefix(prefix) && @fs.kind(real) is Regular else {
       raise @model.Invalid([@model.problem(path, "source must be a regular file inside the project")])
     }
     let front = @content.parse_front_matter(path, @fs.read_file(real).text())

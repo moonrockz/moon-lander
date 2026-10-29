@@ -43,9 +43,9 @@ this change adds a separate capability that depends on it.
 
 ## Tracking
 
-Proposal only, tracked by the deferred bead `lander-8fh`: the owner decided on
-2026-10-29 to record this change and not to implement it now. Task groups get
-beads when the owner approves implementation.
+Approved for implementation on 2026-10-29, as a follow-up after
+`add-typed-actors`. Epic `lander-8fh` holds stories `lander-8fh.1` to
+`lander-8fh.4`. A release of both changes follows (`lander-yvv`).
 Implementation depends on `add-typed-actors` groups 4 (receives and `within`) and
 6 (lifetimes and cleanup), epic `lander-25h`.
 

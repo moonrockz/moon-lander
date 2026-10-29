@@ -35,7 +35,7 @@ svg { max-width: 100%; height: auto; }
 <body>
 <main>
 <h1>Add actor scheduling: design</h1>
-<p class="meta">OpenSpec change add-actor-scheduling | 2026-10-29 | proposal only; implementation not approved</p>
+<p class="meta">OpenSpec change add-actor-scheduling | 2026-10-29 | approved for implementation after add-typed-actors</p>
 
 <nav class="toc" aria-label="Contents">
 <ul>
@@ -58,8 +58,8 @@ svg { max-width: 100%; height: auto; }
 
 <h2 id="decisions">Decisions</h2>
 
-<h3 id="sched-1">SCHED-1. A separate change, recorded now and implemented later (Owner, 2026-10-29)</h3>
-<p>Scheduling is its own change so that <code>add-typed-actors</code> stays reviewable. Its tasks get beads only after the owner approves implementation. It starts after <code>add-typed-actors</code> groups 4 and 6.</p>
+<h3 id="sched-1">SCHED-1. A separate change, implemented after add-typed-actors (Owner, 2026-10-29)</h3>
+<p>Scheduling is its own change so that <code>add-typed-actors</code> stays reviewable. The owner approved implementation on 2026-10-29 as a follow-up goal after <code>add-typed-actors</code>, in the same workspace. It starts after <code>add-typed-actors</code> groups 4 and 6. A release of both changes follows.</p>
 
 <h3 id="clk-1">CLK-1. One internal clock boundary (Owner: internal only, 2026-10-29)</h3>
 <p>The runtime reads time and waits only through one internal clock: the current time and a cancellable wait until a deadline. Receive time limits (<code>within</code>), ask deadlines, cleanup budgets and timers all use it. The real clock wraps <code>@aio.now</code> and <code>@aio.sleep</code>. The clock is internal; scopes and the test runner select it with an optional argument. Today the actor spike calls <code>@aio.with_timeout_opt</code> directly; group 1 replaces those calls with a race against a clock wait.</p>
@@ -142,7 +142,7 @@ let poller = scope.spawn() &lt;| ctx =&gt; {
 </table>
 
 <h2 id="migration">Migration plan</h2>
-<p>Additive. Implement after <code>add-typed-actors</code> groups 4 and 6, with owner approval. No release is part of this change.</p>
+<p>Additive. Implement after <code>add-typed-actors</code> groups 4 and 6. No release is part of this change; a separate owner-approved release PR publishes both changes.</p>
 
 <h2 id="open-questions">Open questions</h2>
 <p>Whether <code>run_script</code> should also accept the timed deliveries of a real <code>scope</code>, so one script drives both unit and acceptance tests. This can be decided in group 1 without a change to the specs.</p>

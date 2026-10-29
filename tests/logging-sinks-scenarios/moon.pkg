@@ -11,3 +11,8 @@ import {
 }
 
 supported_targets = "native+js"
+
+options(targets: {
+  "ready.js.mbt": ["js"],
+  "ready.native.mbt": ["native"],
+})

@@ -25,7 +25,22 @@ pub fn volume_line(Int32) -> String
 // Errors
 
 // Types and methods
+pub(all) enum CompletionCase {
+  Pending(@moon-lander-hosting.SignalKind)
+  Startup(@moon-lander-hosting.SignalKind)
+  Running(@moon-lander-hosting.SignalKind)
+  Clean
+  CommandFailure
+  ConfigurationFailure
+  ShutdownTimeout
+  AlreadyClosed
+  ReporterFailure(@moon-lander-hosting.SignalKind?)
+  LegacyPending(@moon-lander-hosting.SignalKind)
+  Unreported(@moon-lander-hosting.SignalKind)
+}
+
 pub(all) enum Scenario {
+  Completion(CompletionCase)
   SessionOrdered
   SessionLateFailure
   SessionStartFailure

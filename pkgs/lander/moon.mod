@@ -1,12 +1,12 @@
 name = "moonrockz/moon-lander"
 
-version = "0.7.2"
+version = "0.7.3"
 
 import {
-  "moonrockz/moon-lander-core@0.7.2",
-  "moonrockz/moon-lander-config@0.7.2",
-  "moonrockz/moon-lander-mediator@0.7.2",
-  "moonrockz/moon-lander-hosting@0.7.2",
+  "moonrockz/moon-lander-core@0.7.3",
+  "moonrockz/moon-lander-config@0.7.3",
+  "moonrockz/moon-lander-mediator@0.7.3",
+  "moonrockz/moon-lander-hosting@0.7.3",
   "moonbitlang/async@0.22.5",
 }
 

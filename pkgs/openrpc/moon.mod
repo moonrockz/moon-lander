@@ -1,6 +1,6 @@
 name = "moonrockz/openrpc"
 
-version = "0.7.2"
+version = "0.7.3"
 
 description = "Portable OpenRPC documents with exact JSON and source-preserving syntax"
 

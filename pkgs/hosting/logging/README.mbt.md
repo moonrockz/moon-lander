@@ -57,6 +57,7 @@ test "the bridge example compiles" {
 | Failure report | Without an application `error_report`, each default line `<name>: <message>` is an `Error` event with the property `Failure` |
 | Final drain | The bridge closes the session: it drains the accepted records within the drain limit, closes the files and deletes their ownership markers |
 | Sink failures | All failures go directly to standard error in one write, as `logging: <operation> failed for <target>...`, never through the failed logger |
+| Optional application completion | `completed(outcome, selected)` runs once after finalization, protected from cancellation, even if no hook or command ran |
 | Process end | Native: libc `exit`. js: the driver sets `process.exitCode` |
 
 The bridge drains also after a configuration or start failure, after a shutdown
@@ -141,3 +142,49 @@ before selecting the final exit code. Close is protected from cancellation and
 idempotent: a hosted close, a concurrent close, bridge finalization and the outer
 session cleanup share one drain and resource close. Existing `run` callers keep
 the logger factory and the open-through-stop behavior described above.
+
+## Application completion reporting
+
+Pass `completed=(outcome, selected) => ...` to `run` or `run_with_session` to
+report an application result after a returned host outcome. This also runs for a
+clean pending signal before the first hook or command, configuration/startup
+failure, command cancellation and shutdown timeout. It requires no service
+registration. The application owns its schema and can capture its invocation to
+report only when its command never entered.
+
+The callback runs after hosted cleanup, failure reports and the bridge finalizer.
+The session is closed and accepted records have been accounted for, including an
+earlier hosted close. Write the application result to its own output, not the
+closed logger. The callback receives the actual `RunOutcome` and typed selected
+`ExitCode`, including sink failures and signals observed by that point. It does
+not receive a fabricated signal reason if the first run-ending reason differed.
+
+Reporting runs once, protected from task cancellation. If it raises, selected
+success becomes failure and a selected nonzero code remains, including 130/143.
+A signal observed during reporting still wins at process exit. The selected code
+is a snapshot at callback entry; a later signal or callback failure can change
+the process code. The application owns callback time limits and partial output.
+Factory or signal-installation errors before a returned outcome retain the
+existing exception and cleanup contract. Omit `completed` to keep existing output
+and behavior. The embedded driver is unchanged and already returns its outcome.
+
+```mbt check
+///|
+async fn report_an_unstarted_command() -> Unit {
+  let entered = Ref(false)
+  @hosting_logging.run_with_session(@sinks.SessionSettings::standard(), _ => {
+    @hosting.builder(@lander_core.AppName::parse("acme"), [])
+    |> @hosting.build(_ => ())
+  }, _ => entered.val = true, completed=(outcome, selected) => {
+    if !entered.val && selected != @hosting.ExitCode::success() {
+      println("Application stopped before command entry: \{selected.to_int()}")
+    }
+    ignore(outcome.stop_reason())
+  })
+}
+
+///|
+test "the completion callback example compiles" {
+  ignore(report_an_unstarted_command)
+}
+```

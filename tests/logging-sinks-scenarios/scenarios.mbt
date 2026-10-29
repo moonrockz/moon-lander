@@ -3,6 +3,8 @@
 /// with the environment variable `LANDER_LOGGING_SCENARIO`, and gives an
 /// absolute temporary directory in `LANDER_LOGGING_DIR`.
 pub(all) enum Scenario {
+  /// Application-owned result reporting after every returned outcome.
+  Completion(CompletionCase)
   /// Hosted diagnostic close precedes telemetry; finalization repeats close.
   SessionOrdered
   /// Telemetry fails after diagnostic close; its report must bypass the logger.
@@ -60,6 +62,22 @@ pub(all) enum Scenario {
 /// The scenario named by `text`, or `None` for an unknown name.
 pub fn Scenario::parse(text : String) -> Scenario? {
   match text {
+    "completion-early-int" => Some(Completion(Pending(Interrupt)))
+    "completion-early-term" => Some(Completion(Pending(Terminate)))
+    "completion-startup" => Some(Completion(Startup(Terminate)))
+    "completion-running" => Some(Completion(Running(Interrupt)))
+    "completion-clean" => Some(Completion(Clean))
+    "completion-failure" => Some(Completion(CommandFailure))
+    "completion-config" => Some(Completion(ConfigurationFailure))
+    "completion-timeout" => Some(Completion(ShutdownTimeout))
+    "completion-closed" => Some(Completion(AlreadyClosed))
+    "completion-throws" => Some(Completion(ReporterFailure(None)))
+    "completion-throws-int" => Some(Completion(ReporterFailure(Some(Interrupt))))
+    "completion-throws-term" => Some(Completion(ReporterFailure(Some(Terminate))))
+    "completion-legacy-int" => Some(Completion(LegacyPending(Interrupt)))
+    "completion-legacy-term" => Some(Completion(LegacyPending(Terminate)))
+    "completion-default-int" => Some(Completion(Unreported(Interrupt)))
+    "completion-default-term" => Some(Completion(Unreported(Terminate)))
     "session-ordered" => Some(SessionOrdered)
     "session-late-failure" => Some(SessionLateFailure)
     "session-start-failure" => Some(SessionStartFailure)
@@ -417,7 +435,7 @@ async fn session_hosted(
     if scenario is SessionSignal { pending.val = Some(Terminate) }
     if scenario is (SessionSignal | SessionPoll) {
       // No async operation between ready and the first cancellation read.
-      println("ready")
+      announce_ready()
       let count = Ref(0UL)
       while !ctx.cancelled() { count.val += 1UL }
       polled.val = true
@@ -526,6 +544,7 @@ async fn fanout(dir : String) -> Unit {
 /// console driver; on js it ends when the event loop is empty.
 pub async fn run(scenario : Scenario, dir : String, signals? : @hosting.SignalProbe) -> Unit {
   match scenario {
+    Completion(mode) => completion_hosted(mode, dir)
     SessionOrdered | SessionLateFailure | SessionStartFailure | SessionSkipped | SessionTimedStop |
     SessionSignal | SessionPoll => session_hosted(scenario, dir, signals?)
     ProbeLegacy => legacy_probe(dir, failed_sink=false)

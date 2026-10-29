@@ -155,3 +155,18 @@ ends: about 5 seconds for a native program, and about 10 seconds for Node.js
 waits, so the stop phase can run, but the host cannot make the limit longer. Keep
 the stop phase after a console close shorter than this limit. The shutdown timeout
 of the host does not change the system limit.
+
+## Completion reporting
+
+The optional `completed` callback has type `Completion`, an async function from
+`RunOutcome` and selected `ExitCode` to `Unit`. It runs once after the host's
+failure reports and optional `finalize`, before native exit or the JS exit-code
+selection. This includes a pending signal before every service hook and command.
+The logging bridge forwards the same option after its session finalizer.
+
+The callback is protected from cancellation. If it raises, success becomes 1 and
+an existing nonzero code remains. A signal observed during reporting still selects
+its signal code. The callback's selected code is a snapshot at entry; callback
+failure or a later signal can change process exit. Applications own their output
+schema, partial writes and callback time budget. Pre-run factory or signal-setup
+exceptions retain their existing contract. Existing callers can omit the option.

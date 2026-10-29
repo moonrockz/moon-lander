@@ -37,6 +37,10 @@ fn signal_kind() -> @hosting.SignalKind? {
 ///
 /// `finalize` runs after the run and its failure reports, before libc `exit`.
 /// See `Finalizer`.
+/// Optional `completed` reports the actual outcome and selected code once after
+/// finalization, including a clean stop before all hooks and the command. It
+/// runs protected from cancellation. See `Completion` for failure precedence
+/// and the application's output/time-budget contract.
 ///
 /// With `signals`, the enclosing owner installs OS handlers and owns second-
 /// signal escalation. The driver installs no handlers and retains the first
@@ -49,6 +53,7 @@ pub async fn[S] run(
   command : @hosting.Hook[S],
   finalize? : Finalizer,
   signals? : @hosting.SignalProbe,
+  completed? : Completion,
 ) -> Unit {
   let read = match signals {
     Some(probe) => {
@@ -62,5 +67,6 @@ pub async fn[S] run(
   }
   let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
   let selected = selected_exit_code(outcome, read())
-  libc_exit(finish(selected, finalize, read))
+  let finalized = finish(selected, finalize, read)
+  libc_exit(report_completion(outcome, finalized, completed, read).to_int())
 }

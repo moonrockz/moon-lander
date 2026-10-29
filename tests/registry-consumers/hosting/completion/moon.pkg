@@ -1,0 +1,14 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/logging" @bridge,
+  "moonrockz/moon-lander-core" @core,
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging-hosting-async/runtime" @runtime,
+  "moonbitlang/core/env",
+  "moonbitlang/async",
+}
+
+// Console completion reporting uses the process driver on native and JS.
+supported_targets = "native+js"
+pkgtype(kind: "executable")

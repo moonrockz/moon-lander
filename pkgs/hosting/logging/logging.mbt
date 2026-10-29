@@ -98,7 +98,8 @@ fn final_code(
 /// limit of `settings` (5 seconds by default) plus 1 second to stop the writer
 /// and close the files after a drain timeout, and the direct report of sink
 /// failures takes at most 1 more second. So after a stop request the process
-/// can run for the shutdown timeout, plus the drain limit, plus 2 seconds. This also occurs after a configuration or start failure, after a
+/// can run for the shutdown timeout, plus the drain limit, plus 2 seconds,
+/// without an application completion callback. This also occurs after a configuration or start failure, after a
 /// shutdown timeout and after a first signal. A second signal ends the process
 /// at once, and records that are not written yet are lost.
 ///
@@ -110,14 +111,21 @@ fn final_code(
 /// session closes and the error passes out.
 /// With `signals`, the enclosing owner keeps OS signal handling and escalation;
 /// the same probe goes to the console driver. Without it, defaults stay unchanged.
+/// Optional `completed` receives the real outcome and selected code after the
+/// final drain and sink reporting, before exit, even if no hook or command ran.
+/// It runs once, protected from cancellation. Its errors change success to
+/// failure and retain nonzero/signal precedence. The session is already closed;
+/// applications own their result bytes and callback time budget. Factory or
+/// driver-setup errors before an outcome keep their raising cleanup path.
 pub async fn[S] run(
   settings : @sinks.SessionSettings,
   host : (@sink_runtime.SessionLogger) -> @hosting.Host[S] raise,
   command : @hosting.Hook[S],
   observer? : (@sinks.SinkFailure) -> Unit,
   signals? : @hosting.SignalProbe,
+  completed? : @console.Completion,
 ) -> Unit {
-  run_with_session(settings, session => host(session.logger()), command, observer?, signals?)
+  run_with_session(settings, session => host(session.logger()), command, observer?, signals?, completed?)
 }
 
 ///|
@@ -136,12 +144,15 @@ pub async fn[S] run(
 /// Sink failure reporting and exit-code precedence are the same as `run`.
 /// Optional `signals` goes unchanged to the console driver; the enclosing owner
 /// retains OS listeners and second-signal escalation.
+/// Optional `completed` has the same once-only, post-finalization reporting
+/// contract as `run`; a prior hosted close stays idempotent.
 pub async fn[S] run_with_session(
   settings : @sinks.SessionSettings,
   host : (@sink_runtime.Session) -> @hosting.Host[S] raise,
   command : @hosting.Hook[S],
   observer? : (@sinks.SinkFailure) -> Unit,
   signals? : @hosting.SignalProbe,
+  completed? : @console.Completion,
 ) -> Unit {
   @sink_runtime.with_session(
     settings,
@@ -152,7 +163,7 @@ pub async fn[S] run_with_session(
         |> @hosting.report_writer(
           report_through(logger, settings, () => session.status()),
         )
-      @console.run(built, command, signals?, finalize=selected => finalize(session, selected))
+      @console.run(built, command, signals?, completed?, finalize=selected => finalize(session, selected))
     },
   )
 }

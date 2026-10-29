@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Report host completion</title><style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style></head><body><main><h1>Report host completion</h1><p>Issue #130. See <a href="proposal.md">proposal.md</a>.</p><nav aria-label="Contents"><a href="#context">Context</a> | <a href="#goals">Goals</a> | <a href="#decisions">Decisions</a> | <a href="#risks">Risks</a> | <a href="#migration">Migration</a></nav><h2 id="context">Context</h2><p>A pending signal can end hosting.run before any hook. Console already receives the complete typed outcome and owns the process exit boundary. The logging bridge reserves its finalizer to drain the session.</p><h2 id="goals">Goals and non-goals</h2><p>Let the application report a returned outcome once without a service or command callback. Preserve defaults and embedded execution. Do not add application schemas, fake outcomes for factory exceptions or an event loop.</p><h2 id="decisions">Decisions</h2><h3>API-1. Add completed (Call)</h3><p>Console exports Completion as an async function from RunOutcome and ExitCode to Unit. Console.run and both bridge methods accept completed. Lambdas need no new construction or registration.</p><h3>ORDER-1. Finalize before reporting (Call)</h3><p>Run host cleanup and failure reports, select the code, run the existing finalizer, then invoke completed. The bridge finalizer closes diagnostics even when no service started. The callback sees the actual outcome and selected code after sink failures. An earlier hosted close remains idempotent and keeps diagnostic-before-telemetry order.</p><h3>FAIL-1. Reuse exit precedence (Call)</h3><p>Protect reporting from cancellation. Catch callback errors once: success becomes failure; a selected nonzero code remains. Poll the retained signal source after reporting so a late signal still wins. The selected code is a snapshot at callback entry; later callback failure or signal can change process exit. Applications own the callback time budget and output bytes.</p><h3>SCOPE-1. Report returned outcomes (Call)</h3><p>Configuration and lifecycle failures returned as RunOutcome are included. A factory or signal-setup exception before hosting.run returns has no outcome and keeps the existing raising cleanup path. Do not construct a false outcome.</p><h2 id="risks">Risks and trade-offs</h2><p>A reporter can raise after writing partial output or can wait indefinitely. The application owns its output and time budget. Test actual native/Node/Bun child exit and stdout, pending/startup/running stops, callback failure, existing closed sessions and cancellation protection. Keep the old no-callback cases.</p><h2 id="migration">Migration plan</h2><p>Add completed=(outcome, selected) =&gt; ... to either bridge entry point. Publish a later shared patch only through release.yml after green review and CI. Verify actual approved archives and fresh native/JS public consumers, then send proof to the coordinator. No downstream edits.</p></main></body></html>

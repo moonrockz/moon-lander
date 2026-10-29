@@ -866,7 +866,7 @@ async test "gzip size is the size of the compressed data" {
 async test "a failed step stops the build with a non-zero code" {
   let code = run_steps([
     run("fails", "moon", ["no-such-command"]),
-    run("never runs", "moon", ["version"]),
+    run("never runs", "bun", ["--eval", "void 0"]),
   ])
   assert_true(code != 0)
 }
@@ -881,5 +881,7 @@ async test "a missing bundle fails the size step" {
 
 ///|
 async test "steps that pass give 0" {
-  assert_eq(run_steps([run("ok", "moon", ["version"])]), 0)
+  // A raw child stdout stream can interleave the test runner's JSON frames.
+  // This test checks successful exit propagation, so use a quiet command.
+  assert_eq(run_steps([run("ok", "bun", ["--eval", "void 0"])]), 0)
 }

@@ -8,16 +8,18 @@ async fn legacy() -> Unit {
 ///|
 async fn main {
   ignore(legacy)
+  let completed = Ref(false)
   let captured : Ref[@runtime.Session?] = Ref(None)
   let failed = try {
     @bridge.run_with_session(@sinks.SessionSettings::standard(), session => {
       captured.val = Some(session)
       (session.logger() : &@lander_logging.Logger).info("accepted by public bridge", [])
       fail("factory failure")
-    }, (_ : @hosting.Context[Unit]) => (), signals=@hosting.SignalProbe::new(() => None))
+    }, (_ : @hosting.Context[Unit]) => (), signals=@hosting.SignalProbe::new(() => None), completed=(_, _) => completed.val = true)
     false
   } catch { _ => true }
   assert_true(failed)
+  assert_false(completed.val)
   let session = captured.val.unwrap()
   let report = session.status()
   assert_true(report.closed())

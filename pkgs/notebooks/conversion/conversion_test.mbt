@@ -119,3 +119,18 @@ test "conversion reports replaced registrations and refuses unknown cell payload
     _ => fail("expected unsupported cell refusal")
   } noraise { _ => fail("invented a source conversion for an unknown cell") }
 }
+
+///|
+test "unused notebook kernels do not block Markdown or explicit cell kernels" {
+  let metadata = @notebooks.Metadata({ "kernelspec": { "name": "uninstalled", "display_name": "Unused", }, })
+  let markdown = @nbformat.Cell::Cell(@nbformat.Markdown(source="# Notes", attachments=None))
+  let code = @nbformat.Cell::Cell(
+    @nbformat.Code(source="42", execution_count=None, outputs=[]),
+    metadata=@notebooks.Metadata({ "polyglot_notebook": { "kernelName": "fsharp", }, }),
+  )
+  let notebook = @nbformat.Notebook::Notebook([markdown, code], minor=4, metadata~)
+  let converted = @conversion.Converter::new().to_dib(notebook)
+  assert_true(converted.losses().is_empty())
+  assert_eq(converted.notebook().cells()[0].kernel(), @dib.KernelName("markdown"))
+  assert_eq(converted.notebook().cells()[1].kernel(), @dib.KernelName("fsharp"))
+}

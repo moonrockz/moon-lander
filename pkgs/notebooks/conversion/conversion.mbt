@@ -240,7 +240,14 @@ pub fn Converter::to_dib(
   notebook : @nbformat.Notebook,
 ) -> Conversion[@dib.Notebook] raise {
   let registry = self.codec.notebook([], metadata=notebook.metadata()).registry()
-  let default_kernel = notebook_default(notebook, registry)
+  let needs_default = notebook.cells().iter().any(cell => {
+    cell.cell_type() == "code" && cell.metadata().get("polyglot_notebook") is None
+  })
+  let default_kernel = if needs_default {
+    notebook_default(notebook, registry)
+  } else {
+    registry.default_kernel()
+  }
   let losses = []
   if !notebook.extensions().keys().is_empty() { losses.push(NotebookExtensions) }
   let cells = []

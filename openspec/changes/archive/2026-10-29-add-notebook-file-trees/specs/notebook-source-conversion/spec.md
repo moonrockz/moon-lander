@@ -29,6 +29,17 @@ SHALL remain subject to each target's supported metadata types.
 - **WHEN** empty MoonBit, Python and Markdown source cells are converted to Jupyter and back with explicit source-only policy
 - **THEN** their order, source and kernels are retained
 
+### Requirement: Resolve only used defaults
+
+An unused notebook execution-kernel declaration SHALL NOT prevent conversion of
+Markdown, raw cells or code cells with explicit recognized kernel metadata.
+A default kernel SHALL be resolved only when a code cell needs that default.
+
+#### Scenario: Uninstalled unused kernel
+
+- **WHEN** a notebook has Markdown and explicitly selected F# cells and an unregistered notebook kernelspec
+- **THEN** source conversion retains both cells without requiring the unused kernel
+
 ### Requirement: Explicit conversion loss
 
 Conversion results SHALL expose a typed loss list. Jupyter-to-DIB conversion SHALL

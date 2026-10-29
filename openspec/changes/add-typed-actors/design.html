@@ -35,13 +35,14 @@ svg { max-width: 100%; height: auto; }
 <body>
 <main>
 <h1>Add typed actors: design</h1>
-<p class="meta">OpenSpec change add-typed-actors | 2026-10-28 | approved for implementation; group 1 feasibility spike</p>
+<p class="meta">OpenSpec change add-typed-actors | 2026-10-28 | approved for implementation; group 1 feasibility spike complete</p>
 
 <nav class="toc" aria-label="Contents">
 <ul>
 <li><a href="#context">Context</a></li>
 <li><a href="#goals">Goals and non-goals</a></li>
 <li><a href="#decisions">Decisions</a></li>
+<li><a href="#evidence">Feasibility evidence</a></li>
 <li><a href="#baseline">Reference baseline</a></li>
 <li><a href="#risks">Risks and trade-offs</a></li>
 <li><a href="#migration">Migration plan</a></li>
@@ -64,7 +65,7 @@ svg { max-width: 100%; height: auto; }
 <p>The module imports only core and <code>moonbitlang/async</code> 0.22.5. It adds no host dependency and no reverse dependency from existing modules. The umbrella may depend on actors, but this change does not add that dependency or re-exports. Update the framework module and publication policies for the additional module. Publish actors after core and before any future dependent module.</p>
 <p>Alternative: put actors in mediator. Rejected because actors have a distinct lifetime and should be usable without mediator. A new scheduler is unnecessary.</p>
 <h3 id="act-2">ACT-2. A scope and two ordinary entry points (Call)</h3>
-<p>The following is the proposed API shape. It is not compiled evidence. Group 1 must compile these forms with the pinned compiler before implementation proceeds. The generic types should be inferred at the call sites.</p>
+<p>Group 1 compiled this form with the pinned compiler on <code>wasm</code>, <code>js</code> and <code>native</code> (see <a href="#evidence">Feasibility evidence</a>). The generic types are inferred at the call sites.</p>
 <pre><code class="language-moonbit">enum CounterMessage {
   Increment
   Read(@actors.Reply[Int])
@@ -74,24 +75,24 @@ async fn counter_example() -&gt; Int {
   @actors.scope(scope =&gt; {
     let counter = scope.start(0, (state, message) =&gt; {
       match message {
-        Increment =&gt; @actors.continue(state + 1)
+        Increment =&gt; @actors.Continue(state + 1)
         Read(reply) =&gt; {
           ignore(reply.send(state))
-          @actors.continue(state)
+          @actors.Continue(state)
         }
       }
     })
     counter.send(Increment)
-    counter.ask(Read)
+    counter.ask(reply =&gt; Read(reply))
   })
 }</code></pre>
-<p><code>start(initial, handler, mailbox?, on_stop?, name?)</code> returns <code>Actor[M, Unit]</code> once the mailbox and owner registration exist. The handler is <code>async (S, M) -&gt; Next[S]</code>. <code>continue(state)</code> supplies the next state; <code>stop()</code> ends normally and discards queued messages. A protocol can model different behavior modes in its state enum. No behavior class is required. An optional initializer form runs inside the actor task and reports startup failure before publishing a usable handle. Register cleanup after acquisition and before reporting readiness. Partial acquisition cleanup belongs to the initializer.</p>
-<p><code>spawn(inbox =&gt; body, mailbox?, name?)</code> returns <code>Actor[M, R]</code>. It supports custom receive loops and an arbitrary final result <code>R</code>. <code>Inbox</code> gives receive, scan, self, reenqueue and child creation. Only the running actor task can receive. Concurrent receive attempts fail with a typed ownership error; no public constructor can make a second consumer for the mailbox.</p>
-<p>The handle forwards message operations and exposes <code>ref()</code> for a send-only reference. A reference cannot receive, stop, cancel or join the actor. <code>join()</code> waits for completion and returns <code>R</code>, rethrows the original failure, or reports actor cancellation. Cancelling a join waiter does not cancel the actor. <code>status()</code> gives an immutable snapshot; it is not a mutable public state record.</p>
+<p><code>start(initial, handler, mailbox?, on_stop?, name?)</code> returns <code>Actor[M, Unit]</code> once the mailbox and owner registration exist. The handler is <code>async (S, M) -&gt; Next[S]</code>. <code>Continue(state)</code> supplies the next state; <code>Stop</code> ends normally and discards queued messages. <code>Next[S]</code> is a plain enum with these two cases, because <code>continue</code> is a reserved word and cannot name a function. Without an initializer, <code>start</code> does not wait and raises only a typed start error. A protocol can model different behavior modes in its state enum. No behavior class is required. An optional initializer form runs inside the actor task and reports startup failure before publishing a usable handle. Register cleanup after acquisition and before reporting readiness. Partial acquisition cleanup belongs to the initializer.</p>
+<p><code>spawn(inbox =&gt; body, mailbox?, name?)</code> returns <code>Actor[M, R]</code>. It supports custom receive loops and an arbitrary final result <code>R</code>. <code>Inbox</code> gives receive, scan, self, reenqueue and child creation. Only the actor body gets the inbox, and no public constructor can make a second consumer for the mailbox. The pinned <code>moonbitlang/async</code> gives no public task identity, so the runtime cannot see which task calls an inbox operation. It enforces the single consumer in two cases: a receive or scan while another one waits, and any receive after the body has ended. Both fail with the typed ownership error and remove no message. A body that hands its inbox to another task while it does not receive itself is outside this check; documentation must state it.</p>
+<p>The handle forwards message operations and exposes <code>to_ref()</code> for a send-only reference (<code>ref</code> is a reserved word in the pinned compiler). A reference cannot receive, stop, cancel or join the actor. <code>join()</code> waits for completion and returns <code>R</code>, rethrows the original failure, or reports actor cancellation. Cancelling a join waiter does not cancel the actor. <code>status()</code> gives an immutable snapshot; it is not a mutable public state record.</p>
 <p>Alternative: an ActorSystem plus actor classes and registration. Rejected because none of those steps are needed to create a local mailbox task.</p>
 <h3 id="recv-1">RECV-1. Receive loops and selective receive (Call)</h3>
 <p><code>Inbox::receive(timeout?)</code> takes the oldest queued message, or waits. An omitted limit waits until a message arrives or the mailbox closes. A timeout raises a typed <code>TimedOut</code>; a closed empty mailbox raises <code>MailboxClosed</code>. <code>try_receive(timeout?)</code> gives <code>None</code> only when its wait expires. With no limit it polls once. It still reports mailbox closure as an error.</p>
-<p><code>scan(select, timeout?)</code> scans oldest first. <code>select : (M) -&gt; T?</code> must be pure and must not suspend. Only the first matching message is removed. Non-matching messages keep their relative order. The selected result can itself be an async closure, so the F# form of a selected async computation is expressible. <code>try_scan</code> gives <code>None</code> on expiry or an unsuccessful poll. Selector failure leaves the message in the mailbox and propagates to the receive-loop caller.</p>
+<p><code>scan(select, timeout?)</code> scans oldest first. <code>select : (M) -&gt; T? raise?</code> must be pure and must not suspend. The error-polymorphic type accepts a named pure function as well as a selector that raises. Only the first matching message is removed. Non-matching messages keep their relative order. The selected result can itself be an async closure, so the F# form of a selected async computation is expressible. <code>try_scan</code> gives <code>None</code> on expiry or an unsuccessful poll. Selector failure leaves the message in the mailbox and propagates to the receive-loop caller.</p>
 <p>A scan checks queued messages before it waits. Wake it on new admission or closure. Continue from the first not-yet-tested message during a pending scan. A new scan starts at the oldest queued message. Use an internal deque and condition variables; do not remove messages to an uncounted stash.</p>
 <p><code>receive_all</code>, <code>receive_n</code> and <code>receive_loop</code> helpers cover processing until close, at most a checked positive count, and a state loop that can return a final result. They treat <code>MailboxClosed</code> as normal loop completion. A custom body can catch that error and return its own result.</p>
 <p>Selectors can starve other message kinds. A full bounded mailbox containing only non-matches also prevents admission of a future match. Document this case; use a time limit, consume a non-match, or opt into an unbounded mailbox. No priority message bypasses capacity.</p>
@@ -101,7 +102,7 @@ async fn counter_example() -&gt; Int {
 <p>Admission and cancellation have one commit point. Cancellation before admission leaves no message; cancellation after admission cannot retract the message. Remove cancelled producer waiters and wake all waiters on close. Self-send can deadlock while full. <code>reenqueue</code> is a non-waiting append at the tail with the same capacity result as <code>try_send</code>. Use it instead of a waiting self-send.</p>
 <p><code>queued_count()</code> is a snapshot of unprocessed messages, not a readiness test. Yield between bounded processing batches so a busy actor does not monopolize the cooperative scheduler. A synchronous handler that never yields can still block the entire runtime.</p>
 <h3 id="ask-1">ASK-1. Request/reply and destinations (Call)</h3>
-<p><code>ActorRef[M]::ask(build : (Reply[R]) -&gt; M, timeout?) -&gt; R</code> makes a fresh one-shot reply destination. The default limit is 30 seconds. A typed wait policy selects <code>Within(TimeLimit)</code> or <code>UntilStopped</code> for an explicit indefinite wait. One deadline covers mailbox admission and the reply when the wait is finite. Register the pending request before admission. Race its reply with termination so close or failure cannot strand the caller. <code>try_ask</code> gives <code>None</code> on timeout; closure and failure remain typed errors. An application rejection is a reply such as <code>Result[Value, DomainError]</code>.</p>
+<p><code>ActorRef[M]::ask(build : (Reply[R]) -&gt; M, timeout?) -&gt; R</code> makes a fresh one-shot reply destination. The default limit is 30 seconds. A typed wait policy selects <code>Within(TimeLimit)</code> or <code>UntilStopped</code> for an explicit indefinite wait. One deadline covers mailbox admission and the reply when the wait is finite. Register the pending request before admission. Race its reply with termination so close or failure cannot strand the caller. When admission fails because the actor ended, also while the ask waits for space in a full mailbox, the ask reports the recorded outcome: a failure keeps its cause. <code>try_ask</code> gives <code>None</code> on timeout; closure and failure remain typed errors. An application rejection is a reply such as <code>Result[Value, DomainError]</code>.</p>
 <p><code>Reply::send</code> is synchronous and non-waiting. It returns <code>Delivered</code> or <code>Expired</code>, where expired includes an already answered destination. The first reply wins. A late reply must not crash the receiving actor. Ask timeout and caller cancellation release the reply waiter but do not undo admitted work or cancel the actor. Normal termination without a reply reports <code>Closed</code>; failure reports a typed actor failure with the original error as its cause.</p>
 <p><code>Subject[M]</code> is a send-only destination with send and try_send. Actor references, one-shot replies, async queues and caller-supplied send functions have adapters. <code>contramap</code> adapts a message into a larger protocol before admission. It does not create a second queue or task. A reply adapter maps <code>Expired</code> to <code>Closed</code>. An ask to a general subject uses the same deadline and one-shot reply but can observe target termination only if the destination supplies that signal.</p>
 <p>Alternative: dynamic response casts or an implicit sender slot. Rejected because a typed reply in the protocol gives the compiler the reply type.</p>
@@ -114,6 +115,7 @@ async fn counter_example() -&gt; Int {
 <p><code>Actor[M, R]::close()</code> atomically rejects new admission, removes queued work and returns an immutable <code>Pending[M]</code> snapshot once. Later closes return no snapshot. The in-flight message may finish. Close does not wait for it; <code>join()</code> does. Ordinary <code>start</code> loops end after that message. Custom bodies can catch closure and finish. A separate <code>drain()</code> rejects new admission, processes the admitted queue, and waits for normal completion. It needs a caller time limit when a custom body or selective receive might never consume the queue.</p>
 <p>Fail asks attached to discarded work immediately. Let an in-flight ask reply until its actor actually terminates or its deadline ends. <code>cancel()</code> discards queued work and cancels the running task at a cooperative cancellation point. Repeated terminal operations cannot run cleanup twice.</p>
 <p><code>scope</code> wraps a task group but does not expose it. Before its body returns, it marks itself closed and cancels all live actors. It then joins actors and their cleanup. It never waits for an infinite receive loop before requesting cancellation. Escaped scope handles reject new starts with a typed error instead of calling <code>TaskGroup::spawn</code> after the group has ended.</p>
+<p>During scope exit, a waiter can wake because a peer actor ended, just before its own cancellation takes effect. Such a waiter (a send, receive or ask) observes its cancellation, not <code>Closed</code>. Otherwise an actor that asks a sibling would fail the owner scope with an error that only the teardown caused. The task group keeps the last failure even after its body completed, so this rule is necessary for a clean scope exit.</p>
 <p>A child created through the actor's inbox belongs to that actor. Parent exit, including successful completion, cancels and joins descendants. An uncaught actor error fails the owner scope and cancels siblings. Catch and recover in the body, or use a nested scope, to choose a different failure boundary. There is no automatic restart strategy in this change. A reply carrying a domain error is not an actor failure.</p>
 <p>Cleanup runs once after processing ends, including on cancellation. Synchronous cleanup can use <code>defer</code>. Optional async cleanup runs with cancellation protection and a default 5-second <code>TimeLimit</code>, which the caller can replace. Preserve the primary failure and any cleanup error in a typed combined error. Cleanup failure fails the owner scope even if the actor was cancelled. A cleanup timeout cannot preempt synchronous code that never yields.</p>
 <h3 id="topic-1">TOPIC-1. Typed subjects and scoped event delivery (Call)</h3>
@@ -123,7 +125,7 @@ async fn counter_example() -&gt; Int {
 <h3 id="type-1">TYPE-1. Domain values and evidence (Call)</h3>
 <p>Use opaque <code>MailboxCapacity</code> and <code>MessageCount</code> with positive <code>Int</code> ranges. Their smart constructors raise typed errors that hold the input and rule. Use core <code>TimeLimit</code> for all timeouts and cleanup budgets. Bounded versus unbounded policy, admission outcomes and lifecycle reasons are enums. Do not expose raw mutable queues, task groups, reply cells or state records. No names or string IDs are needed for an anonymous actor.</p>
 <p><code>ActorName</code> is also a portable root type, re-exported by the runtime for the one-import examples in <a href="#name-1">NAME-1</a>. The runtime owns address allocation and scope name reservations. It must not expose address constructors that let callers forge an existing actor identity.</p>
-<p>Group 1 must prove generic closure invocation without <code>Any</code> or runtime casts, scope exit of an idle actor, request completion during termination, and a scan that retains non-matches within capacity. Use task/queue acknowledgements for ordering tests. Sleeps are only for actual deadline tests. If the spike cannot provide these properties, revise this design before the remaining groups.</p>
+<p>Group 1 must prove generic closure invocation without <code>Any</code> or runtime casts, scope exit of an idle actor, request completion during termination, and a scan that retains non-matches within capacity. Use task/queue acknowledgements for ordering tests. Sleeps are only for actual deadline tests. If the spike cannot provide these properties, revise this design before the remaining groups. The spike provided them; <a href="#evidence">Feasibility evidence</a> lists the results and the resulting revisions.</p>
 <h3 id="name-1">NAME-1. Optional names, local addresses and typed discovery (Owner: useful names and addressing; Call: API and rules)</h3>
 <p>Actor scopes own name reservations as part of lifetime management. Directories are immutable values with the operations of <a href="#dir-1">DIR-1</a>. No separate registry is required. The proposed glossary is in <code>CONTEXT.md</code>.</p>
 <table>
@@ -139,7 +141,7 @@ async fn counter_example() -&gt; Int {
 <p>For a named actor, use the optional checked name at the start call. The example uses the protocol and handler from <a href="#act-2">ACT-2</a>. <code>handle_counter</code> names that handler.</p>
 <pre><code class="language-moonbit">let name = @actors.ActorName::parse("counter")
 let counter = scope.start(0, handle_counter, name~)
-let counters = @actors.Directory::of(counter.ref())
+let counters = @actors.Directory::of(counter.to_ref())
 let found = counters.lookup(name)
 let exact = counters.resolve(counter.address()) // ActorRef[CounterMessage]?</code></pre>
 <p>The scope reserves a name before initialization or user code runs. Only one creator can reserve the same name within that scope, across all message types. A duplicate raises typed <code>NameInUse</code> before the losing initializer runs. Other scopes may use the same name. Named child actors use their parent's child scope. Start returns a usable handle only after initialization and owner registration finish. Initializing actors cannot enter a directory because no reference has been returned yet. Startup failure returns to the creator after cleanup; a creator that catches it can retry in the same live scope. Once started, the actor follows <a href="#life-1">LIFE-1</a>'s failure rules.</p>
@@ -160,10 +162,10 @@ let exact = counters.resolve(counter.address()) // ActorRef[CounterMessage]?</co
 <tr><td><code>a.difference(b)</code> or <code>a - b</code></td><td>A new directory excluding every address in <code>b</code></td></tr>
 </tbody>
 </table>
-<p>The methods are the basic API. Add and Sub forward to union and difference. The following is a proposed actor example; the compiler spike must compile it.</p>
+<p>The methods are the basic API. Add and Sub forward to union and difference. Group 1 compiled the following example on all runtime targets.</p>
 <pre><code class="language-moonbit">let combined = dir1 + dir2
-let extended = combined.add(extra.ref())
-let restricted = extended.remove(counter.ref())
+let extended = combined.add(extra.to_ref())
+let restricted = extended.remove(counter.to_ref())
 let difference = extended - dir2</code></pre>
 <p>The algebra uses membership equality, not construction order or actor status. It has these laws for directories with the same protocol:</p>
 <pre><code class="language-text">empty + a = a = a + empty
@@ -180,6 +182,49 @@ a - a = empty
 <p><code>resolve(address)</code> returns the exact member or <code>None</code>. Lookup and resolve may return a closed actor reference because membership is independent of liveness. Stopping an actor does not change an existing directory. To expose its replacement, produce a new value such as <code>old.remove(old_ref).add(new_ref)</code>. Removing a reference does not revoke copies or cancel admitted messages. It also does not release the actor's scope name reservation.</p>
 <p>The exact requested operator spellings need a language qualification. A scratch compiler probe on MoonBit <code>0.10.17+d971670cd</code>, with all four targets, accepted same-type Add and Sub. It rejected <code>a ++ b</code> with an unbound <code>~+</code> error and rejected a heterogeneous Add implementation with an incorrect-trait-type error. The pinned Add/Sub traits have <code>Self, Self -&gt; Self</code> signatures. Thus the supported forms are <code>dir1 + dir2</code>, <code>dir1 - dir2</code>, <code>dir.add(ref)</code> and <code>dir.remove(ref)</code>. Singleton conversion also permits <code>dir + Directory::of(ref)</code> and the equivalent subtraction. Do not promise <code>dir ++ dir</code>, <code>dir + ref</code> or <code>dir - ref</code> on this pin. See the <a href="https://docs.moonbitlang.com/en/stable/language/methods.html#operator-overloading">official operator documentation</a>.</p>
 <p>Alternative: a composition of live scope registries. Rejected because membership would change as actors start or stop and removal would need a separate rule for future registrations. Another alternative is name-keyed override. That can be associative with a fixed bias but makes merge order choose an actor. Exact-address set membership keeps conflict handling in the lookup result.</p>
+<h2 id="evidence">Feasibility evidence</h2>
+<p>Group 1 (<code>lander-25h.1</code>) built an unpublished fixture in <code>tests/actors-spike/</code> with the existing pins: moon <code>0.1.20261023</code>, moonc <code>v0.10.17+d971670cd</code> and <code>moonbitlang/async</code> 0.22.5, on macOS arm64. The <code>policy</code> package is the portable root shape. The <code>runtime</code> package is the async runtime shape, with <code>supported_targets = "wasm+js+native"</code>. Group 2 moves the proven code into <code>pkgs/actors</code> and removes the fixture.</p>
+<table>
+<thead><tr><th>Task</th><th>Evidence</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>1.1 Public examples</td><td><code>counter_test.mbt</code> compiles the <a href="#act-2">ACT-2</a> counter and a protocol with an <code>Int</code> reply and a <code>String</code> reply. <code>service_test.mbt</code> compiles an Ox-style service with <code>Int</code> and <code>String</code> ask results. Neither uses <code>Any</code> or a cast: ask results and service calls cross the shared mailbox and the termination watchers as closures.</td><td>Pass on wasm, js, native</td></tr>
+<tr><td>1.2 Lifetimes</td><td><code>lifetime_test.mbt</code>: scope exit cancels an idle state actor and an idle receive body and runs cleanup before <code>scope</code> returns; a parent body that returns cancels and joins its child first; a stop without a reply wakes the in-flight and the queued ask with <code>Closed</code>; a failure wakes an ask with <code>ActorFailed</code> and the original cause, also an ask that waits for admission to a full mailbox and an ask made after the failure; sibling asks during scope exit end without error. <code>lifetime_wbtest.mbt</code> checks that no watcher, receiver, queued message or name reservation remains, and that the escaped scope raises <code>ScopeClosed</code>.</td><td>Pass on wasm, js, native</td></tr>
+<tr><td>1.3 Selective receive</td><td><code>scan_test.mbt</code>: oldest match with retained order; a waiting scan selects a later arrival; in a capacity-one mailbox a skipped message keeps <code>try_send</code> at <code>Full</code>, blocks a matching send, and survives a timed scan; a cancelled scan removes nothing; a selector error reaches the body and leaves the message; a second concurrent receiver and a receive after the body ends get <code>NotOwner</code>. The mailbox has one deque; skipped messages stay in it.</td><td>Pass on wasm, js, native</td></tr>
+<tr><td>1.4 Targets</td><td><code>policy_test.mbt</code> checks capacity and count at 0, -1, 1 and the largest <code>Int</code>, the default capacity 128, and the name rules. A consumer package without <code>supported_targets</code> that imports the runtime fails <code>moon check --target wasm-gc</code> and <code>moon build --target wasm-gc</code>: "Selected backend 'wasm-gc' is incompatible with the dependency graph … supports [js, native, wasm]". <code>moon test --target wasm-gc</code> on the runtime itself reports that the package does not support the target.</td><td>policy: 6 tests pass on wasm, wasm-gc, js, native; runtime: rejected on wasm-gc</td></tr>
+<tr><td>1.5 Names and directories</td><td><code>directory_test.mbt</code> compiles the <a href="#name-1">NAME-1</a> and <a href="#dir-1">DIR-1</a> examples; checks distinct addresses for the same name in two scopes, ambiguity in both union orders, the union and difference laws, exact removal of an old lifetime, <code>NameInUse</code> while the old actor lives, name reuse after it ends, and a directory used after its owner scope exits.</td><td>Pass on wasm, js, native (28 runtime tests per target)</td></tr>
+</tbody>
+</table>
+<p>Negative probes in a scratch consumer, checked on js and then deleted. The compiler rejected each one:</p>
+<table>
+<thead><tr><th>Probe</th><th>Compiler result</th></tr></thead>
+<tbody>
+<tr><td>Send a <code>String</code> to a counter reference</td><td>[4014] Expr Type Mismatch</td></tr>
+<tr><td>Use the <code>Read</code> ask result as a <code>String</code></td><td>[4014] Expr Type Mismatch</td></tr>
+<tr><td>Use a counter-directory lookup result as <code>ActorRef[Other]</code></td><td>[4014] Expr Type Mismatch</td></tr>
+<tr><td><code>Directory[Counter] + Directory[Other]</code></td><td>[4014] Expr Type Mismatch</td></tr>
+<tr><td><code>dir + ref</code></td><td>[4014] Expr Type Mismatch</td></tr>
+<tr><td><code>dir ++ dir</code></td><td>[4021] The value identifier ~+ is unbound</td></tr>
+<tr><td><code>counter.ask(Read)</code></td><td>[4203] Using constructors as higher order function directly is forbidden</td></tr>
+<tr><td><code>@actors.continue(1)</code></td><td>[3002] parse error at <code>continue</code> (as a definition); [4021] not found (as a call)</td></tr>
+<tr><td>Record literal for <code>ActorAddress</code>, <code>NameConflict</code> or <code>MailboxCapacity</code></td><td>[4036] Cannot create values of the read-only type</td></tr>
+</tbody>
+</table>
+<p>Revisions that the spike required. The decisions above already contain them:</p>
+<table>
+<thead><tr><th>Finding</th><th>Revision</th></tr></thead>
+<tbody>
+<tr><td><code>continue</code> is a reserved word.</td><td><code>Next[S]</code> is a public enum; examples use <code>@actors.Continue(state)</code> and <code>Stop</code> (<a href="#act-2">ACT-2</a>).</td></tr>
+<tr><td>A constructor is not a first-class function.</td><td>Examples use <code>ask(reply =&gt; Read(reply))</code> (<a href="#act-2">ACT-2</a>).</td></tr>
+<tr><td><code>ref</code> and <code>member</code> are reserved words; <code>--deny-warn</code> rejects them as names.</td><td>The handle method is <code>to_ref()</code> (<a href="#act-2">ACT-2</a>, <a href="#name-1">NAME-1</a>, <a href="#dir-1">DIR-1</a>).</td></tr>
+<tr><td>A synchronous named function does not fit the async handler type, and an <code>async fn</code> that never suspends gets the <code>unused_async</code> warning.</td><td>Documentation uses lambdas or handlers that suspend. A named handler that never suspends needs <code>#warnings("-unused_async")</code>.</td></tr>
+<tr><td>A named pure function does not fit a <code>(M) -&gt; T? raise</code> parameter. With <code>raise?</code>, the pinned compiler crashes at link time ("moonc.ml", line 121880, Assertion failed) on all three runtime targets when an async function calls the parameter.</td><td>The selector type is <code>(M) -&gt; T? raise?</code>. The async scan calls a synchronous wrapper of type <code>(M) -&gt; T? raise</code>, which links. Report the crash upstream before group 4.</td></tr>
+<tr><td>No public task identity in <code>moonbitlang/async</code>.</td><td>The ownership check covers concurrent receives and receives after the body ends (<a href="#act-2">ACT-2</a>). The spec's second-consumer scenario names these cases.</td></tr>
+<tr><td>A waiter woken by a peer's end during scope exit raised <code>Closed</code> and failed the scope (reproduced by a test that fails without the fix).</td><td>Such a waiter observes its cancellation (<a href="#life-1">LIFE-1</a>).</td></tr>
+<tr><td>The pinned compiler promotes trait methods of a public impl to methods, with a deprecation warning. An inherent <code>Directory::add(ref)</code> coexists with <code>impl Add</code>, and <code>a + b</code> uses the trait.</td><td><code>Sub</code> also gets a <code>#deprecated</code> method form, so <code>a - b</code> and <code>difference</code> stay the API. <code>Compare</code> on addresses is package-private.</td></tr>
+<tr><td>Review of PR #123: an ask that waited for admission to a full mailbox got <code>Closed</code> when the actor failed, so the cause was lost (reproduced by two tests that fail without the fix).</td><td>A closed admission makes the ask read the outcome that the termination watcher recorded (<a href="#ask-1">ASK-1</a>).</td></tr>
+<tr><td>Operations that wait on the event loop or re-raise an actor's original error cannot narrow their error type.</td><td><code>send</code> and the start calls raise <code>ActorError</code>; <code>ask</code>, <code>join</code>, <code>receive</code> and <code>scan</code> use the general <code>raise</code> and raise <code>ActorError</code> cases or the original cause.</td></tr>
+</tbody>
+</table>
 <h2 id="baseline">Reference baseline</h2>
 <p>Sources checked on 2026-10-28. This is capability coverage, not source or binary compatibility. Language-specific blocking methods and effect syntax map to MoonBit async operations. The runtime must not emulate thread blocking.</p>
 <table>

@@ -295,7 +295,9 @@ NOT expose the state or receive operations.
 An application SHALL start an actor from an async receive body. The body SHALL
 have its typed inbox, self reference and a final result. Helpers SHALL support
 processing until close, at most a checked positive count, and state transitions
-that continue or stop. Only the actor's consumer task SHALL receive.
+that continue or stop. Only the actor body SHALL get the inbox. A receive while
+another receive waits, or after the body ends, SHALL fail with a typed
+ownership error.
 
 #### Scenario: Finite actor
 
@@ -304,7 +306,7 @@ that continue or stop. Only the actor's consumer task SHALL receive.
 
 #### Scenario: Second consumer
 
-- **WHEN** another task uses an inbox captured from an actor body to receive
+- **WHEN** another task receives from an inbox captured from an actor body while the body waits in receive, or after the body has ended
 - **THEN** it gets a typed ownership error and removes no message
 
 ### Requirement: FIFO receive and polling

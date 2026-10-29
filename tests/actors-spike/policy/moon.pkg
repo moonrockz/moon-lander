@@ -1,0 +1,7 @@
+import {
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/moon-lander-tests/actors-spike/policy" @policy,
+} for "test"

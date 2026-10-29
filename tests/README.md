@@ -6,6 +6,7 @@ configuration core, and the sync and async mediators.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
+| `actors-spike/policy`, `actors-spike/runtime` | Group 1 feasibility spike of `add-typed-actors`: portable mailbox policy and actor name values; the async runtime with the ACT-2 counter, an Ox-style service with two result types, scope and parent exit, ask wakeup on termination, selective receive within bounded capacity, and the NAME-1 and DIR-1 directory examples. Group 2 moves the proven code to `pkgs/actors` and removes this fixture | policy: all four; runtime: wasm, JavaScript, native |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
 | `browser-parity`, `browser-parity-reference` | Shared explicit cases (the core fixture, a parse error, a binding error) and their reference observation; `mise run test:browser` compares it with the browser result | All four |
 | `browser-fixture`, `browser-consumer`, `browser/` | Browser acceptance application, headless consumer guide and Playwright suites; see [the browser guide](browser/README.md) | JavaScript in Chromium, Firefox and WebKit |

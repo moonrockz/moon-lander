@@ -487,6 +487,7 @@ async test "ASK-1: an ask that waits for space gets the failure cause also when 
   let ready : @aio.Queue[@actors.ActorRef[@actors.Reply[Int]?]] = @aio.Queue(
     kind=Unbounded,
   )
+  let cleanup_gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let one = @actors.MailboxCapacity::from_int(1)
   let outcome = @aio.with_task_group(group => {
     group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
@@ -501,7 +502,8 @@ async test "ASK-1: an ask that waits for space gets the failure cause also when 
           }
           Continue(())
         },
-        on_stop=() => @aio.sleep(20),
+        // The cleanup stays open until the asker has its outcome.
+        on_stop=() => cleanup_gate.get(),
       )
       ready.put(actor.to_ref())
       actor.join()
@@ -525,7 +527,9 @@ async test "ASK-1: an ask that waits for space gets the failure cause also when 
     }
     @aio.pause()
     gate.put(())
-    asked.wait()
+    let outcome = asked.wait()
+    cleanup_gate.put(())
+    outcome
   })
   assert_eq(outcome, "failed: handler")
 }
@@ -738,4 +742,44 @@ test "ASK-1: the default ask waits within 30 seconds" {
     @actors.WaitPolicy::default(),
     Within(@lander_core.TimeLimit::seconds(30)),
   )
+}
+
+///|
+async test "LIFE-1: a parent closes admission and wakes asks before its children's cleanup" {
+  let cleaning : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let events = []
+  @actors.scope(scope => {
+    let parent = scope.spawn((context : @actors.ActorContext[@actors.Reply[Int]?]) => {
+      ignore(
+        context
+        .scope()
+        .start((), (_, _ : Int) => Continue(()), on_stop=() => {
+          cleaning.put(())
+          gate.get()
+        }),
+      )
+      // Take one request, drop its reply and complete.
+      @actors.receive().map(reply => ignore(reply))
+    })
+    @aio.with_task_group(group => {
+      let asked = group.spawn(() => {
+        try {
+          ignore(parent.ask(reply => Some(reply)))
+          "answered"
+        } catch {
+          @actors.Closed(_) => "closed"
+          _ => "other"
+        }
+      })
+      cleaning.get()
+      // The child cleanup is still open.
+      events.push(asked.wait())
+      events.push(if parent.status() is Closing { "closing" } else { "other" })
+      events.push(if parent.try_send(None) is Closed { "rejects" } else { "admits" })
+      gate.put(())
+    })
+    parent.join()
+  })
+  assert_eq(events, ["closed", "closing", "rejects"])
 }

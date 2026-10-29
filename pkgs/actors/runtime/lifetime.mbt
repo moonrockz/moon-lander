@@ -134,6 +134,15 @@ fn Lifetime::end_processing(self : Lifetime, ending : ActorEnd) -> Unit {
 }
 
 ///|
+/// End processing with `ending`: wake the watchers, then close the mailbox.
+/// Only the first call has an effect.
+fn Lifetime::stop_processing(self : Lifetime, ending : ActorEnd) -> Unit {
+  guard self.ending is None else { return }
+  self.end_processing(ending)
+  (self.close_mailbox)()
+}
+
+///|
 /// Record the outcome once, after cleanup, wake every joiner, then release
 /// the name.
 fn Lifetime::finish(self : Lifetime, outcome : ActorEnd) -> Unit {
@@ -203,8 +212,7 @@ async fn Lifetime::run(
     Ok(None) => (Cancelled, None, None)
     Err(error) => (Failed(error), Some(error), None)
   }
-  self.end_processing(end)
-  (self.close_mailbox)()
+  self.stop_processing(end)
   let cleanup_error = cleanup.run(primary)
   // A cleanup failure is the final outcome; it keeps the primary failure.
   self.finish(

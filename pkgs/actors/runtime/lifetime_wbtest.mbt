@@ -55,3 +55,32 @@ async test "LIFE-1: no actor, child, watcher or waiter remains after the scope r
 test "LIFE-1: the default cleanup limit is five seconds" {
   assert_eq(default_cleanup_limit(), @lander_core.TimeLimit::seconds(5))
 }
+
+///|
+async test "TOPIC-1: ended subscriptions leave no exit hook in their scope" {
+  scope(scope => {
+    let topic : Topic[Int] = Topic::new()
+    let subject : Subject[Int] = Subject::new(
+      send=_ => Admitted,
+      try_send=_ => Accepted,
+    )
+    for _ in 0..<100 {
+      scope.subscribe(topic, subject).unsubscribe()
+    }
+    assert_eq(scope.exits.length(), 0)
+    // A pruned closed destination releases its hook too.
+    let closed : Subject[Int] = Subject::new(
+      send=_ => Rejected,
+      try_send=_ => Closed,
+    )
+    ignore(scope.subscribe(topic, closed))
+    assert_eq(scope.exits.length(), 1)
+    topic.publish(1)
+    assert_eq(scope.exits.length(), 0)
+    // Close releases every hook.
+    ignore(scope.subscribe(topic, subject))
+    ignore(scope.subscribe(topic, subject))
+    topic.close()
+    assert_eq(scope.exits.length(), 0)
+  })
+}

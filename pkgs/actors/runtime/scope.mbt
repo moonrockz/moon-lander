@@ -7,8 +7,9 @@ pub struct Scope {
   priv mut open : Bool
   /// The names that live actors of this scope hold, with their addresses.
   priv names : Map[@policy.ActorName, ActorAddress]
-  /// What runs when the body returns, such as ending subscriptions.
-  priv exits : Array[() -> Unit]
+  /// What runs when the body returns, such as ending subscriptions, by key.
+  priv exits : Map[Int, () -> Unit]
+  priv mut last_exit : Int
 }
 
 ///|
@@ -25,11 +26,14 @@ pub async fn[X] scope(body : async (Scope) -> X) -> X {
       },
       open: true,
       names: Map([]),
-      exits: [],
+      exits: Map([]),
+      last_exit: 0,
     }
     defer {
       scope.open = false
-      for exit in scope.exits {
+      let exits = scope.exits.values().collect()
+      scope.exits.clear()
+      for exit in exits {
         exit()
       }
     }
@@ -40,7 +44,22 @@ pub async fn[X] scope(body : async (Scope) -> X) -> X {
 ///|
 /// A scope that accepts no start, for an actor that has no children.
 fn Scope::closed() -> Scope {
-  { spawn_task: _ => () => (), open: false, names: Map([]), exits: [] }
+  {
+    spawn_task: _ => () => (),
+    open: false,
+    names: Map([]),
+    exits: Map([]),
+    last_exit: 0,
+  }
+}
+
+///|
+/// Run `exit` when the body returns. The result removes it again.
+fn Scope::on_exit(self : Scope, exit : () -> Unit) -> () -> Unit {
+  self.last_exit += 1
+  let key = self.last_exit
+  self.exits[key] = exit
+  () => self.exits.remove(key)
 }
 
 ///|

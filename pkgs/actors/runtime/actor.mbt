@@ -250,15 +250,40 @@ fn[M, R] Scope::run_actor(
     init() catch {
       error => return StartFailed(error)
     }
-    let receive = make({ target, children })
-    let runner = Runner::new(target.mailbox, live=true, expire=false)
-    let end = runner.run(
-      receive.build(value => {
-        result.val = Some(value)
-        Done
-      }),
+    // Processing ends here, inside the child scope: admission closes and asks
+    // wake before the children are cancelled and their cleanup runs.
+    let ran : Result[RunEnd, Error] = try {
+      let receive = make({ target, children })
+      let runner = Runner::new(target.mailbox, live=true, expire=false)
+      Ok(
+        runner.run(
+          receive.build(value => {
+            result.val = Some(value)
+            Done
+          }),
+        ),
+      )
+    } catch {
+      error => Err(error)
+    }
+    let end = match ran {
+      Ok(end) => end
+      Err(error) => {
+        target.life.stop_processing(Failed(error))
+        raise error
+      }
+    }
+    let finished = end is Finished
+    target.life.stop_processing(
+      if target.life.cancel_requested {
+        Cancelled
+      } else if finished {
+        Completed
+      } else {
+        MailboxClosed
+      },
     )
-    if end is Finished {
+    if finished {
       Result
     } else {
       ReceiveClosed

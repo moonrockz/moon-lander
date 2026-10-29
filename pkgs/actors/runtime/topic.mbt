@@ -3,6 +3,8 @@
 priv struct Subscriber[M] {
   id : Int
   subject : Subject[M]
+  /// Remove the subscription's exit hook from its scope.
+  release : () -> Unit
 }
 
 ///|
@@ -30,6 +32,11 @@ pub fn[M] Topic::subscriber_count(self : Topic[M]) -> Int {
 
 ///|
 fn[M] Topic::remove(self : Topic[M], id : Int) -> Unit {
+  for entry in self.entries {
+    if entry.id == id {
+      (entry.release)()
+    }
+  }
   self.entries = self.entries.filter(entry => entry.id != id)
 }
 
@@ -59,9 +66,9 @@ pub fn[M] Scope::subscribe(
   guard topic.open else { raise TopicClosed }
   topic.last_id += 1
   let id = topic.last_id
-  topic.entries.push({ id, subject })
   let cancel = () => topic.remove(id)
-  self.exits.push(cancel)
+  let release = self.on_exit(cancel)
+  topic.entries.push({ id, subject, release })
   { cancel, }
 }
 
@@ -88,5 +95,8 @@ pub async fn[M] Topic::publish(self : Topic[M], event : M) -> Unit {
 /// subscription.
 pub fn[M] Topic::close(self : Topic[M]) -> Unit {
   self.open = false
+  for entry in self.entries {
+    (entry.release)()
+  }
   self.entries = []
 }

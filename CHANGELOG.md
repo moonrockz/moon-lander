@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.1 - 2026-10-28
+
+All nine libraries share this patch version. Existing logging bridge callers
+and default signal handling remain compatible.
+
+### Fixed
+
+- The public hosting logging bridge now forwards an optional enclosing
+  `SignalProbe` to the console driver, retaining the actual signal reason and
+  exit code through cleanup, including non-yielding JavaScript workers.
+- Add `logging.run_with_session` so a real diagnostic hosted service can close
+  and drain its session before telemetry stops. Unconditional final cleanup,
+  repeated close, cancellation protection and direct failure reporting remain
+  safe after early hosted close. Only records accepted before close are covered
+  by its drain; later log attempts cannot reopen the session.
+- Qualify ordered drain, startup failure, skipped/timed-out stop hooks,
+  cancellation, sink failures and public bridge consumers on native and
+  JavaScript, with parent-owned worker SIGINT/SIGTERM coverage.
+
 ## 0.7.0 - 2026-10-28
 
 All nine libraries share this version. Existing discovery, DIB encoding and

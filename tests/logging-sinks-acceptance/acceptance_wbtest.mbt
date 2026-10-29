@@ -38,6 +38,7 @@ async test "helper: the child process body" {
 priv enum Child {
   Native
   Js(runtime~ : String, program~ : String)
+  Worker(launcher~ : String, program~ : String)
 }
 
 ///|
@@ -45,6 +46,7 @@ fn Child::label(self : Child) -> String {
   match self {
     Native => "native"
     Js(runtime~, ..) => runtime
+    Worker(..) => "node worker"
   }
 }
 
@@ -84,6 +86,8 @@ async fn run_child(
     Js(runtime="node", program~) =>
       ("node", ["--preserve-symlinks-main", program])
     Js(runtime~, program~) => (runtime, [program])
+    Worker(launcher~, program~) =>
+      ("node", ["--preserve-symlinks-main", launcher, program])
   }
   @async.with_timeout(30000, () => {
     @async.with_task_group(group => {
@@ -228,6 +232,109 @@ let standalone_console : Array[String] = [
   "INF] Loaded 3 files from src", "WRN] Unicode é 😀 ✓", "ERR] Compilation failed for app.mbt",
   "    CompilerError: Unknown identifier calculate_total", "      at app.mbt:42",
 ]
+
+///|
+async test "hosted session close drains before telemetry and remains idempotent" {
+  for child in children() {
+    for (scenario, code) in [("session-ordered", 0), ("session-signal", 143)] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      let label = child.label() + " " + scenario
+      assert_eq(ran.code, code, msg=label + "\n" + ran.out + ran.err)
+      assert_suffixes_in_order(ran.out, [
+        "telemetry=start", "diagnostic=start", "diagnostic=stop",
+        "diagnostic.last", "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop",
+      ], label)
+      if code == 143 {
+        assert_true(ran.out.contains("reason=Signal(Terminate)"), msg=ran.out)
+      }
+      let text = read_files(dir, "session-", ".log")
+      assert_suffixes_in_order(text, ["telemetry.start", "diagnostic.start", "command", "diagnostic.last"], label)
+      assert_false(text.contains("late-after-close") || text.contains("late-stopped"), msg=text)
+      assert_no_marker(names(dir), label)
+      assert_eq(ran.out.split("diagnostic=closed\n").count() - 1, 1, msg=ran.out)
+    }
+  }
+}
+
+///|
+async test "session-aware finalization drains after startup failure and skipped or timed-out stop hooks" {
+  for child in children() {
+    for scenario in ["session-start-failure", "session-skipped", "session-timed-stop"] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      let label = child.label() + " " + scenario
+      assert_eq(ran.code, 1, msg=label + "\n" + ran.out + ran.err)
+      let text = read_files(dir, "session-", ".log")
+      assert_true(text.contains("diagnostic.start"), msg=text)
+      assert_false(ran.out.contains("diagnostic=closed"), msg=ran.out)
+      if scenario == "session-start-failure" {
+        assert_false(text.contains("command"), msg=text)
+        assert_true(ran.err.contains("diagnostic startup failed"), msg=ran.err)
+      } else {
+        assert_true(text.contains("command"), msg=text)
+        assert_true(ran.err.contains("Shutdown"), msg=ran.err)
+      }
+      assert_no_marker(names(dir), label)
+    }
+  }
+}
+
+///|
+async test "the logger-only bridge forwards a consuming probe through its final drain" {
+  for child in children() {
+    let dir = temp_dir("probe-legacy")
+    defer @fs.rmdir(dir, recursive=true)
+    let ran = run_child(child, "probe-legacy", dir, [])
+    assert_eq(ran.code, 130, msg=ran.out + ran.err)
+    let text = read_files(dir, "legacy-", ".log")
+    assert_suffixes_in_order(text, ["legacy.accepted", "reason=Signal(Interrupt)"], child.label())
+    assert_no_marker(names(dir), child.label())
+  }
+}
+
+///|
+async test "post-close failure reports bypass the logger and signal codes survive sink failures" {
+  for child in children() {
+    let dir = temp_dir("late-failure")
+    defer @fs.rmdir(dir, recursive=true)
+    let ran = run_child(child, "session-late-failure", dir, [])
+    assert_eq(ran.code, 1, msg=ran.out + ran.err)
+    assert_suffixes_in_order(ran.out, ["diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop"], child.label())
+    assert_true(ran.err.contains("telemetry flush failed"), msg=ran.err)
+    let text = read_files(dir, "session-", ".log")
+    assert_true(text.contains("diagnostic.last"), msg=text)
+    assert_false(text.contains("telemetry flush failed"), msg=text)
+    assert_no_marker(names(dir), child.label())
+    @fs.write_file(dir + "/blocker", "regular file")
+    let signal = run_child(child, "probe-failure", dir, [])
+    assert_eq(signal.code, 130, msg=signal.out + signal.err)
+    assert_true(signal.err.contains("logging: create directory failed"), msg=signal.err)
+    assert_true(signal.out.contains("reason=Signal(Interrupt)"), msg=signal.out)
+  }
+}
+
+///|
+async test "real parent signals stop a non-yielding logging worker and drain before telemetry" {
+  guard !(@async.platform is Windows) else { return }
+  guard @env.get_env_var("LANDER_LOGGING_WORKER_LAUNCHER") is Some(launcher) else { return }
+  guard @env.get_env_var("LANDER_LOGGING_WORKER_PROGRAM") is Some(program) else { fail("missing logging worker") }
+  for (kind, name, code) in [(1, "Interrupt", 130), (2, "Terminate", 143)] {
+    let dir = temp_dir("logging-worker")
+    defer @fs.rmdir(dir, recursive=true)
+    let ran = run_child(Worker(launcher~, program~), "session-poll", dir, [Await("ready"), Send(kind)])
+    assert_eq(ran.code, code, msg=ran.out + ran.err)
+    assert_suffixes_in_order(ran.out, [
+      "ready", "diagnostic=stop", "reason=Signal(\{name})", "polled=true",
+      "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop", "owner-listeners=intact",
+    ], "logging worker")
+    let text = read_files(dir, "session-", ".log")
+    assert_suffixes_in_order(text, ["command", "diagnostic.last"], "logging worker")
+    assert_no_marker(names(dir), "logging worker")
+  }
+}
 
 ///|
 async test "a standalone session writes the console and both files, then drains before exit" {

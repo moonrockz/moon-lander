@@ -1,0 +1,10 @@
+import {
+  "moonrockz/moon-lander-tests/logging-sinks-scenarios" @scenarios,
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonbitlang/core/env",
+  "moonbitlang/async",
+}
+
+// Shared-memory worker fixture; the existing parent launcher runs on Node.js.
+supported_targets = "js"
+options("is-main": true)

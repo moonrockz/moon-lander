@@ -84,4 +84,60 @@ seconds. A second signal ends the
 process at once, as without the bridge. Records that are not written yet are then
 lost; the bridge gives no delivery guarantee for a forced end.
 
-Run one bridge in a process: the console driver installs global signal handlers.
+Run one bridge in a process. By default the console driver installs global signal
+handlers. Supply `signals=probe` to either entry point when an enclosing owner
+handles OS signals. The bridge forwards the same public `SignalProbe`; the driver
+retains its first true signal even when the probe consumes values. The owner
+keeps its listeners and second-signal escalation. On JavaScript, a shared-memory
+probe can observe a parent's signal while a worker polls without yielding.
+
+## Close diagnostic logging before telemetry
+
+Use `run_with_session` when diagnostic logging is a hosted service. Its factory
+receives the actual opaque runtime `Session`. Register telemetry first and the
+diagnostic service second. Reverse stop order then closes and drains diagnostics
+before the telemetry stop hook flushes. No copied bridge or stop notification is
+needed.
+
+```mbt check
+///|
+async fn ordered_logging_main(
+  signals : @hosting.SignalProbe,
+  flush_telemetry : async () -> Unit,
+) -> Unit {
+  @hosting_logging.run_with_session(
+    @sinks.SessionSettings::standard(),
+    session => {
+      @hosting.builder(@lander_core.AppName::parse("acme"), [])
+      |> @hosting.service("telemetry", stop=_ => flush_telemetry())
+      |> @hosting.service("diagnostic", stop=_ => {
+        ignore(session.close())
+      })
+      |> @hosting.build(_ => session.logger())
+    },
+    ctx => {
+      (ctx.services : &@lander_logging.Logger).info("ready", [])
+      while !ctx.cancelled() { @async.sleep(100) }
+    },
+    signals~,
+  )
+}
+
+///|
+test "the session-aware bridge example compiles" {
+  ignore(ordered_logging_main)
+}
+```
+
+Close stops admission and drains records accepted before the call, within the
+session's drain limit. Its report accounts for failed or undelivered records.
+Logs attempted by later hooks, stopped events or telemetry do not reopen the
+session. Direct `Logger.log` attempts are counted as closed. Default failure
+reports still reach standard error outside the closed session.
+
+The bridge's finalizer remains unconditional. It closes the same session after
+startup failure and skipped or timed-out stop hooks, and reports sink failures
+before selecting the final exit code. Close is protected from cancellation and
+idempotent: a hosted close, a concurrent close, bridge finalization and the outer
+session cleanup share one drain and resource close. Existing `run` callers keep
+the logger factory and the open-through-stop behavior described above.

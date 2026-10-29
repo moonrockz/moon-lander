@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonrockz/moon-lander-tests/logging-sinks-scenarios"
 
+import {
+  "moonrockz/moon-lander-hosting",
+}
+
 // Values
 pub let burst_events : Int32
 
@@ -10,7 +14,7 @@ pub let fanout_day_one : Int64
 
 pub let fanout_day_two : Int64
 
-pub async fn run(Scenario, String) -> Unit
+pub async fn run(Scenario, String, signals? : @moon-lander-hosting.SignalProbe) -> Unit
 
 pub let volume_batch : Int32
 
@@ -22,6 +26,15 @@ pub fn volume_line(Int32) -> String
 
 // Types and methods
 pub(all) enum Scenario {
+  SessionOrdered
+  SessionLateFailure
+  SessionStartFailure
+  SessionSkipped
+  SessionTimedStop
+  SessionSignal
+  SessionPoll
+  ProbeLegacy
+  ProbeFailure
   ObjectProperties
   Standalone
   HostClean

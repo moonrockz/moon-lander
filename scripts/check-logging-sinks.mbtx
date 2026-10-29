@@ -113,9 +113,9 @@ async fn copy_tree(source : String, destination : String) -> Unit {
 
 ///|
 /// Build the js test program and give the path of its artifact.
-async fn build_js_program() -> String {
+async fn build_js_program(program_path : String) -> String {
   let (code, out, err) = @process.collect_output("moon", [
-    "run", "--build-only", "--deny-warn", "--target", "js", js_program,
+    "run", "--build-only", "--deny-warn", "--target", "js", program_path,
   ])
   guard code == 0 else {
     println(out.text() + err.text())
@@ -335,13 +335,24 @@ async fn check_esm(program : String) -> Unit {
 ///|
 async fn main {
   let root = @fs.realpath(".")
-  let program = build_js_program()
+  let program = build_js_program(js_program)
+  let worker = build_js_program("tests/logging-bridge-worker-program")
+  let worker_dir = @fs.tmpdir(prefix="lander-logging-worker")
+  defer @fs.rmdir(worker_dir, recursive=true)
+  let launcher = worker_dir + "/launcher.cjs"
+  let (built, output, errors) = @process.collect_output("bun", [
+    "build", "tests/console-worker-program/launcher.ts", "--target=node", "--format=cjs",
+    "--outfile", launcher,
+  ])
+  guard built == 0 else { fail(output.text() + errors.text()) }
   let (code, out, err) = @process.collect_output(
     "moon",
     ["test", "--deny-warn", "--target", "native", suite],
     extra_env={
       "LANDER_LOGGING_JS_PROGRAM": program,
       "LANDER_LOGGING_JS_RUNTIMES": js_runtimes,
+      "LANDER_LOGGING_WORKER_PROGRAM": worker,
+      "LANDER_LOGGING_WORKER_LAUNCHER": launcher,
     },
   )
   let output = out.text() + err.text()
@@ -412,7 +423,9 @@ async test "the check rejects a suite that runs zero tests" {
     "\{dir}/moon.mod",
     "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
   )
-  for path in ["tests", suite, js_program] {
+  let worker = "tests/logging-bridge-worker-program"
+  let launcher = "tests/console-worker-program"
+  for path in ["tests", suite, js_program, worker, launcher] {
     @fs.mkdir("\{dir}/\{path}")
   }
   @fs.write_file(
@@ -420,6 +433,12 @@ async test "the check rejects a suite that runs zero tests" {
     "options(\"is-main\": true)\n",
   )
   @fs.write_file("\{dir}/\{js_program}/main.mbt", "///|\nfn main {\n  ()\n}\n")
+  @fs.write_file("\{dir}/\{worker}/moon.pkg", "options(\"is-main\": true)\n")
+  @fs.write_file("\{dir}/\{worker}/main.mbt", "///|\nfn main {\n  ()\n}\n")
+  @fs.write_file(
+    "\{dir}/\{launcher}/launcher.ts",
+    "// Unused launcher: the suite must fail for zero tests.\n",
+  )
   @fs.write_file("\{dir}/\{suite}/moon.pkg", "")
   @fs.write_file(
     "\{dir}/\{suite}/core.mbt",

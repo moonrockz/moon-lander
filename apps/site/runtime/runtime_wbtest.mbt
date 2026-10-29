@@ -6,6 +6,24 @@ async fn write(root : String, file : String, text : String) -> Unit {
 }
 
 ///|
+/// Git makes object files read-only on Windows; restore write access before cleanup.
+async fn remove_fixture(root : String) -> Unit {
+  async fn writable(path : String) -> Unit {
+    match @fs.kind(path, follow_symlink=false) {
+      Directory => {
+        for name in @fs.readdir(path, include_hidden=true) {
+          writable(path + "/" + name)
+        }
+      }
+      Regular => @fs.chmod(path, 0o600)
+      _ => ()
+    }
+  }
+  writable(root)
+  @fs.rmdir(root, recursive=true)
+}
+
+///|
 async fn fixture() -> String {
   let root = @fs.tmpdir(prefix="lander-telescope")
   let config = (
@@ -47,9 +65,18 @@ async fn fixture() -> String {
 }
 
 ///|
+async test "Git fixture cleanup removes read-only files" {
+  let root = fixture()
+  write(root, "readonly.bin", "fixture")
+  @fs.chmod(root + "/readonly.bin", 0o400)
+  remove_fixture(root)
+  assert_false(@fs.exists(root))
+}
+
+///|
 async test "the shared host preserves content and active deployment bases" {
   let root = fixture()
-  defer @fs.rmdir(root, recursive=true)
+  defer remove_fixture(root)
   for suffix in ["", "next/"] {
     let config = effective_configuration(root, @policy.TreePrefix::parse(suffix))
     let out = "\{root}/out-\{suffix.replace_all(old="/", new="-")}"
@@ -70,7 +97,7 @@ async test "the shared host preserves content and active deployment bases" {
 ///|
 async test "ignored pages and brand documentation are not discovered" {
   let root = fixture()
-  defer @fs.rmdir(root, recursive=true)
+  defer remove_fixture(root)
   write(root, ".git/info/exclude", "docs/ignored.md\ndocs/superpowers/\n")
   write(root, "docs/ignored.md", "# Ignored\n\n[bad](missing.md)")
   write(root, "docs/assets/brand/README.md", "# Brand\n\n[bad](missing.md)")
@@ -87,7 +114,7 @@ async test "ignored pages and brand documentation are not discovered" {
 ///|
 async test "a tracked or unexcluded scratch plan fails before rendering" {
   let root = fixture()
-  defer @fs.rmdir(root, recursive=true)
+  defer remove_fixture(root)
   write(root, "docs/superpowers/plan.md", "# Plan")
   let problems = try {
     ignore(effective_configuration(root, @policy.TreePrefix::parse("")))
@@ -107,7 +134,7 @@ async test "invalid prose and diagram inputs still fail with the source" {
     ("draft.md", "---\ndraft: true\n---\n# Draft"),
   ] {
     let root = fixture()
-    defer @fs.rmdir(root, recursive=true)
+    defer remove_fixture(root)
     write(root, "docs/" + file, body)
     let config = effective_configuration(root, @policy.TreePrefix::parse(""))
     let problems = try {

@@ -51,6 +51,15 @@ fn external_signal_reader(probe : @hosting.SignalProbe) -> () -> @hosting.Signal
 pub type Finalizer = async (@hosting.ExitCode) -> @hosting.ExitCode
 
 ///|
+/// Report one returned host outcome after failure reports and finalization,
+/// before console exit. The selected code includes finalizer and sink failures.
+/// It is a snapshot: a later signal or a callback error can change process exit.
+/// The driver runs this callback once, protected from cancellation. A callback
+/// error changes selected success to failure and preserves nonzero codes.
+/// Applications own their output schema and the callback's time budget.
+pub type Completion = async (@hosting.RunOutcome, @hosting.ExitCode) -> Unit
+
+///|
 /// Run `finalize`, if any, protected from cancellation, and give the final exit
 /// code: a signal that arrived meanwhile comes first. A finalizer that raises
 /// keeps the selected code, except that a selected code 0 becomes code 1.
@@ -58,8 +67,8 @@ async fn finish(
   selected : @hosting.ExitCode,
   finalize : Finalizer?,
   signal : () -> @hosting.SignalKind?,
-) -> Int {
-  guard finalize is Some(step) else { return selected.to_int() }
+) -> @hosting.ExitCode {
+  guard finalize is Some(step) else { return selected }
   let code = @async.protect_from_cancel(() => {
     step(selected) catch {
       _ =>
@@ -71,8 +80,38 @@ async fn finish(
     }
   })
   match signal() {
-    Some(kind) => kind.exit_code().to_int()
-    None => code.to_int()
+    Some(kind) => kind.exit_code()
+    None => code
+  }
+}
+
+///|
+/// Report only after finalization. A missing callback adds no signal reads or
+/// suspension. Keep the real outcome separate from later exit-code selection.
+async fn report_completion(
+  outcome : @hosting.RunOutcome,
+  selected : @hosting.ExitCode,
+  completed : Completion?,
+  signal : () -> @hosting.SignalKind?,
+) -> @hosting.ExitCode {
+  guard completed is Some(report) else { return selected }
+  let before = match signal() {
+    Some(kind) => kind.exit_code()
+    None => selected
+  }
+  let code = @async.protect_from_cancel(() => {
+    try {
+      report(outcome, before)
+      before
+    } catch {
+      _ => if before == @hosting.ExitCode::success() {
+        @hosting.ExitCode::failure()
+      } else { before }
+    }
+  })
+  match signal() {
+    Some(kind) => kind.exit_code()
+    None => code
   }
 }
 

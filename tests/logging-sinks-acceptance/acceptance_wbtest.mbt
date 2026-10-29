@@ -37,6 +37,7 @@ async test "helper: the child process body" {
 ///|
 priv enum Child {
   Native
+  NativeProgram(String)
   Js(runtime~ : String, program~ : String)
   Worker(launcher~ : String, program~ : String)
 }
@@ -44,7 +45,7 @@ priv enum Child {
 ///|
 fn Child::label(self : Child) -> String {
   match self {
-    Native => "native"
+    Native | NativeProgram(_) => "native"
     Js(runtime~, ..) => runtime
     Worker(..) => "node worker"
   }
@@ -85,6 +86,7 @@ async fn run_child(
   steps : Array[Step],
 ) -> Ran {
   let (command, args) = match child {
+    NativeProgram(program) => (program, [])
     Native => {
       let args = @env.args()
       guard args.length() > 1 && args[1].split(":").next() is Some(file) else {
@@ -858,5 +860,98 @@ async test "fan-out, filtering, burst drops, rolling, retention and restart thro
       fail("no rolls")
     }
     assert_true(newest > older, msg="\{label}: \{older} then \{newest}")
+  }
+}
+
+///|
+async test "completion reports a pending signal before any hook or command" {
+  let cases = completion_children()
+  for child in cases {
+    for (scenario, code) in [("completion-early-int", 130), ("completion-early-term", 143)] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      assert_eq(ran.code, code, msg=ran.out + ran.err)
+      assert_eq(ran.out.trim(), "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"closed\":true}", msg=child.label() + " stdout=" + ran.out + " stderr=" + ran.err)
+      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_no_marker(names(dir), child.label())
+    }
+  }
+}
+
+///|
+/// Real executables only: a reused moon test binary adds protocol stdout.
+fn completion_children() -> Array[Child] raise {
+  let cases = children().filter(child => !(child is Native))
+  if @env.get_env_var("LANDER_LOGGING_NATIVE_PROGRAM") is Some(program) {
+    cases.push(NativeProgram(program))
+  } else {
+    guard @env.get_env_var(js_program_var) is None else { fail("missing native completion program") }
+  }
+  cases
+}
+
+///|
+async test "completion retains real lifecycle outcomes and closes before reporting" {
+  for child in completion_children() {
+    for (scenario, exit_code, reason, hooks, commands, selected) in [
+      ("completion-startup", 143, "signal", 1, 0, 143),
+      ("completion-running", 130, "signal", 2, 1, 130),
+      ("completion-clean", 0, "completed", 2, 1, 0),
+      ("completion-failure", 1, "failed", 2, 1, 1),
+      ("completion-config", 2, "start-failed", 0, 0, 2),
+      ("completion-timeout", 1, "completed", 2, 1, 1),
+      ("completion-closed", 0, "completed", 2, 1, 0),
+      ("completion-throws", 1, "completed", 2, 1, 0),
+      ("completion-throws-int", 130, "signal", 0, 0, 130),
+      ("completion-throws-term", 143, "signal", 0, 0, 143),
+    ] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      let label = child.label() + " " + scenario + "\n" + ran.out + ran.err
+      assert_eq(ran.code, exit_code, msg=label)
+      guard @json.parse(ran.out) is Object(fields) else { fail(label) }
+      assert_eq(fields.get("reason"), Some(Json::string(reason)), msg=label)
+      assert_eq(fields.get("exit_code"), Some(Json(selected)), msg=label)
+      assert_eq(fields.get("hooks"), Some(Json(hooks)), msg=label)
+      assert_eq(fields.get("commands"), Some(Json(commands)), msg=label)
+      assert_eq(fields.get("closed"), Some(true), msg=label)
+      assert_eq(ran.out.trim().split("\n").count(), 1, msg=label)
+      let files = read_files(dir, "completion-", ".log")
+      assert_true(files.contains("factory.accepted"), msg=label)
+      if scenario == "completion-running" { assert_true(files.contains("command.cleanup"), msg=label) }
+      assert_no_marker(names(dir), label)
+    }
+  }
+}
+
+///|
+async test "logger-only completion reports an early signal exactly once" {
+  for child in completion_children() {
+    for (scenario, code) in [("completion-legacy-int", 130), ("completion-legacy-term", 143)] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      assert_eq(ran.code, code, msg=ran.out + ran.err)
+      assert_eq(ran.out.trim(), "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"legacy\":true}", msg=child.label() + ran.out + ran.err)
+      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_no_marker(names(dir), child.label())
+    }
+  }
+}
+
+///|
+async test "omitting completion preserves empty stdout and final drain on early signals" {
+  for child in completion_children() {
+    for (scenario, code) in [("completion-default-int", 130), ("completion-default-term", 143)] {
+      let dir = temp_dir(scenario)
+      defer @fs.rmdir(dir, recursive=true)
+      let ran = run_child(child, scenario, dir, [])
+      assert_eq(ran.code, code, msg=ran.out + ran.err)
+      assert_eq(ran.out, "", msg=child.label())
+      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_no_marker(names(dir), child.label())
+    }
   }
 }

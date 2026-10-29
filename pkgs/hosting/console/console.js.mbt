@@ -54,6 +54,10 @@ extern "js" fn has_node_process() -> Bool =
 ///
 /// `finalize` runs after the run and its failure reports, before the driver
 /// sets the exit code and returns. See `Finalizer`.
+/// Optional `completed` reports the actual outcome and selected code once after
+/// finalization, including a clean stop before all hooks and the command. It
+/// runs protected from cancellation. See `Completion` for failure precedence
+/// and the application's output/time-budget contract.
 ///
 /// With `signals`, the enclosing owner installs OS listeners and owns second-
 /// signal escalation. The driver installs or removes no listeners and retains
@@ -67,6 +71,7 @@ pub async fn[S] run(
   command : @hosting.Hook[S],
   finalize? : Finalizer,
   signals? : @hosting.SignalProbe,
+  completed? : Completion,
 ) -> Unit {
   guard has_node_process() else { raise SignalHandlersUnavailable }
   let adapter = node_adapter()
@@ -81,7 +86,8 @@ pub async fn[S] run(
   errdefer adapter.set_exit_code(1)
   let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
   let selected = selected_exit_code(outcome, read())
-  let code = finish(selected, finalize, read)
+  let finalized = finish(selected, finalize, read)
+  let code = report_completion(outcome, finalized, completed, read).to_int()
   let signal = read()
   adapter.set_exit_code(code)
   // A signal asks the process to end. A handle that a service left open must

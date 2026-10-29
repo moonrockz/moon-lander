@@ -372,12 +372,14 @@ async fn main {
         )
       }
       if candidate.library is Hosting {
-        @fs.mkdir("\{consumer}/logging")
-        for file in ["main.mbt", "moon.pkg"] {
-          @fs.write_file(
-            "\{consumer}/logging/\{file}",
-            @fs.read_file("\{fixture}/logging/\{file}"),
-          )
+        for fixture_package in ["logging", "completion"] {
+          @fs.mkdir("\{consumer}/\{fixture_package}")
+          for file in ["main.mbt", "moon.pkg"] {
+            @fs.write_file(
+              "\{consumer}/\{fixture_package}/\{file}",
+              @fs.read_file("\{fixture}/\{fixture_package}/\{file}"),
+            )
+          }
         }
       }
       let run = async fn(args : Array[String]) -> String {
@@ -473,6 +475,26 @@ async fn main {
           println(
             "Hosted logging registry consumer PASS @\{version}: \{target}",
           )
+          for (signal, expected) in [("interrupt", 130), ("terminate", 143)] {
+            let completion_env = consumer_env.copy()
+            completion_env["LANDER_COMPLETION_SIGNAL"] = signal
+            let (code, out, err) = @process.collect_output(
+              "moon",
+              [
+                "run", "--release", "--deny-warn", "--target", target, "completion",
+              ],
+              cwd=consumer,
+              extra_env=completion_env,
+            )
+            guard code == expected && out.text().trim() == "ok" else {
+              fail(
+                "Public completion on \{target}/\{signal}: exit=\{code}\n\{out.text()}\{err.text()}",
+              )
+            }
+            println(
+              "Hosted completion registry consumer PASS @\{version}: \{target} \{expected}",
+            )
+          }
         }
       }
       // Compile every package of the downloaded module, including limited adapters.

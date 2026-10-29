@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.3 - 2026-10-28
+
+All nine libraries share this patch version.
+
+### Fixed
+
+- Add optional `completed(outcome, selected)` reporting to console and both
+  logging bridge entry points. Applications can report clean pending stops before
+  any hook or command, after diagnostic finalization, without a copied driver.
+- Protect once-only reporting from cancellation and preserve selected signal
+  precedence when reporting raises. Default callers and embedded execution keep
+  their behavior. Qualify real native/Node/Bun lifecycle output and fresh public
+  completion consumers for selected 130/143.
+
 ## 0.7.2 - 2026-10-28
 
 All nine libraries share this patch version.

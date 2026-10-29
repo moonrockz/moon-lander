@@ -1,0 +1,8 @@
+import {
+  "moonrockz/moon-lander-actors/runtime" @actors,
+  "moonbitlang/async" @aio,
+}
+
+// No wasm-gc: the actor runtime needs the `moonbitlang/async` event loop.
+supported_targets = "wasm+js+native"
+pkgtype(kind: "executable")

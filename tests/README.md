@@ -6,7 +6,8 @@ configuration core, and the sync and async mediators.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
-| `actors-spike/policy`, `actors-spike/runtime` | Group 1 feasibility spike of `add-typed-actors`: portable mailbox policy and actor name values; the async runtime with the ACT-2 counter, an Ox-style service with two result types, scope and parent exit, ask wakeup on termination, selective receive within bounded capacity, and the NAME-1 and DIR-1 directory examples. Group 2 moves the proven code to `pkgs/actors` and removes this fixture | policy: all four; runtime: wasm, JavaScript, native |
+| `actors-acceptance` | Actor scenarios of `add-typed-actors`: the counter, concurrent producers, independent actors, finite actors, FIFO and selective receive, time limits, bounded and unbounded admission, reenqueue order and the receive test runner. `mise run check:actors` fails when a target runs zero tests | wasm, JavaScript, native |
+| `actors-bench` | Local benchmark program of the actor receive shapes. Only the manual task `mise run bench:actors` runs it; it is not a test | wasm, JavaScript, native |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
 | `browser-parity`, `browser-parity-reference` | Shared explicit cases (the core fixture, a parse error, a binding error) and their reference observation; `mise run test:browser` compares it with the browser result | All four |
 | `browser-fixture`, `browser-consumer`, `browser/` | Browser acceptance application, headless consumer guide and Playwright suites; see [the browser guide](browser/README.md) | JavaScript in Chromium, Firefox and WebKit |

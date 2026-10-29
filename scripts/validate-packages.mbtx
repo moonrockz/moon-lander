@@ -15,6 +15,8 @@ import {
 /// - No module except the unpublished docs tool `apps/site` imports a UI library.
 /// - Each framework module imports only the framework modules below it, and core imports no
 ///   module (openspec split-framework-modules, design D8).
+/// - The actors module imports no external module except `moonbitlang/async` (openspec
+///   add-typed-actors).
 ///
 /// A member is active when its line starts, after whitespace, with a quoted path (`"pkgs/x"` or
 /// `"./pkgs/x"`). A commented-out entry starts with `#`, so it does not count.
@@ -56,6 +58,11 @@ let framework : Array[(String, String, Array[String])] = [
     ["moonrockz/moon-lander-core", "moonrockz/moon-lander-logging"],
   ),
   (
+    "pkgs/actors",
+    "moonrockz/moon-lander-actors",
+    ["moonrockz/moon-lander-core"],
+  ),
+  (
     "pkgs/hosting",
     "moonrockz/moon-lander-hosting",
     [
@@ -69,9 +76,17 @@ let framework : Array[(String, String, Array[String])] = [
     [
       "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
       "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-logging-hosting-async",
-      "moonrockz/moon-lander-hosting",
+      "moonrockz/moon-lander-actors", "moonrockz/moon-lander-hosting",
     ],
   ),
+]
+
+///|
+/// The framework modules that can import only some external modules: the folder and the external
+/// modules that the module can import. A framework module that is not in this table, and is not
+/// core or logging, has no limit on its external imports.
+let external_limits : Array[(String, Array[String])] = [
+  ("pkgs/actors", ["moonbitlang/async"]),
 ]
 
 ///|
@@ -179,23 +194,32 @@ fn ui_import_errors(path : String, manifest : String) -> Array[String] {
 
 ///|
 /// One error for each import of the framework member at `path` that breaks the dependency
-/// direction: core or logging imports a module, or a framework module imports a framework module that
-/// is not below it. A member that is not a framework module gives no error.
+/// direction: core or logging imports a module, a framework module imports a framework module that
+/// is not below it, or a module of `external_limits` imports an external module that is not in its
+/// list. A member that is not a framework module gives no error.
 fn dependency_errors(path : String, manifest : String) -> Array[String] {
   guard framework.search_by(entry => entry.0 == path) is Some(index) else {
     return []
   }
   let (_, own, allowed) = framework[index]
+  let external = match external_limits.search_by(entry => entry.0 == path) {
+    Some(at) => Some(external_limits[at].1)
+    None => None
+  }
   let errors = []
   for name in imported_modules(manifest) {
+    let is_framework = framework.iter().any(other => other.1 == name)
     if allowed.is_empty() {
       errors.push(
         "\{path} imports \{name}; \{own} imports no module except moonbitlang/core",
       )
-    } else if framework.iter().any(other => other.1 == name) &&
-      !allowed.contains(name) {
+    } else if is_framework && !allowed.contains(name) {
       errors.push(
         "\{own} imports \{name}, against the dependency direction of the framework modules",
+      )
+    } else if !is_framework && external is Some(limit) && !limit.contains(name) {
+      errors.push(
+        "\{path} imports \{name}; \{own} imports no external module except \{limit.join(", ")}",
       )
     }
   }
@@ -535,7 +559,7 @@ test "the module name of a moon.mod" {
 test "each framework module folder is a member with its module name" {
   let active = [
     "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async",
-    "pkgs/hosting", "pkgs/lander",
+    "pkgs/actors", "pkgs/hosting", "pkgs/lander",
   ]
   let names : Map[String, String] = Map([])
   for entry in framework {
@@ -574,4 +598,102 @@ test "each framework module folder is a member with its module name" {
       "pkgs/logging-hosting-async is a framework module folder but not an active member of moon.work",
     ],
   )
+  assert_eq(
+    framework_member_errors(active.filter(path => path != "pkgs/actors"), names),
+    [
+      "pkgs/actors is a framework module folder but not an active member of moon.work",
+    ],
+  )
+}
+
+///|
+test "the framework has eight modules in the dependency direction" {
+  assert_eq(framework.map(entry => entry.0), [
+    "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async",
+    "pkgs/actors", "pkgs/hosting", "pkgs/lander",
+  ])
+}
+
+///|
+test "actors imports core and async, but no other framework or external module" {
+  let manifest =
+    #|name = "moonrockz/moon-lander-actors"
+    #|
+    #|import {
+    #|  "moonrockz/moon-lander-core@0.7.3",
+    #|  "moonbitlang/async@0.22.5",
+    #|}
+  assert_eq(dependency_errors("pkgs/actors", manifest), [])
+  assert_eq(
+    dependency_errors(
+      "pkgs/actors", "name = \"moonrockz/moon-lander-actors\"\n",
+    ),
+    [],
+  )
+  for
+    name in [
+      "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config", "moonrockz/moon-lander-mediator",
+      "moonrockz/moon-lander-logging-hosting-async", "moonrockz/moon-lander-hosting",
+      "moonrockz/moon-lander",
+    ] {
+    assert_eq(
+      dependency_errors("pkgs/actors", "import {\n  \"\{name}@0.7.3\",\n}\n"),
+      [
+        "moonrockz/moon-lander-actors imports \{name}, against the dependency direction of the framework modules",
+      ],
+    )
+  }
+  for name in ["moonbitlang/x", "moonrockz/ion", "moonbit-community/toml"] {
+    assert_eq(
+      dependency_errors("pkgs/actors", "import {\n  \"\{name}@0.1.0\",\n}\n"),
+      [
+        "pkgs/actors imports \{name}; moonrockz/moon-lander-actors imports no external module except moonbitlang/async",
+      ],
+    )
+  }
+}
+
+///|
+test "actors importing hosting or mediator names both modules" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-core@0.7.3",
+    #|  "moonrockz/moon-lander-hosting@0.7.3",
+    #|  "moonrockz/moon-lander-mediator@0.7.3",
+    #|}
+  assert_eq(dependency_errors("pkgs/actors", manifest), [
+    "moonrockz/moon-lander-actors imports moonrockz/moon-lander-hosting, against the dependency direction of the framework modules",
+    "moonrockz/moon-lander-actors imports moonrockz/moon-lander-mediator, against the dependency direction of the framework modules",
+  ])
+}
+
+///|
+test "only the umbrella can import actors" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-actors@0.7.3",
+    #|}
+  assert_eq(dependency_errors("pkgs/lander", manifest), [])
+  for
+    path in [
+      "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async", "pkgs/hosting",
+    ] {
+    assert_eq(dependency_errors(path, manifest).length(), 1, msg=path)
+  }
+}
+
+///|
+test "the external limit applies only to actors" {
+  let manifest =
+    #|import {
+    #|  "moonrockz/moon-lander-core@0.7.3",
+    #|  "moonbitlang/x@0.5.6",
+    #|}
+  for
+    path in [
+      "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async", "pkgs/hosting",
+      "pkgs/lander",
+    ] {
+    assert_eq(dependency_errors(path, manifest), [], msg=path)
+  }
 }

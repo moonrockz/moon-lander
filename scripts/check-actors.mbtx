@@ -1,0 +1,393 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x@0.5.6/sys",
+}
+----
+
+///|
+/// Fail when a target leg of the actor tests runs zero tests.
+///
+/// `moon test` exits with 0 when a package has no test entry for a target, and the workspace run
+/// skips a package that does not support a target. Such a leg MUST NOT count as a pass, so this
+/// check runs each actor path for each target and requires a test count above zero.
+///
+/// Each path has its own target list. The portable policy root runs on wasm, wasm-gc, js and
+/// native. The runtime and its acceptance suite run on wasm, js and native, because
+/// `moonbitlang/async` has no wasm-gc test entry.
+///
+/// Usage: `mise run check:actors [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/check-actors.mbtx`.
+/// With no target, it checks wasm, wasm-gc, js and native. A path does not run on a target that is
+/// not in its list.
+
+///|
+let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// The targets of the actor runtime paths.
+let runtime_targets : Array[String] = ["wasm", "js", "native"]
+
+///|
+/// The actor packages and their acceptance suite, relative to the workspace root, each with the
+/// targets that it supports.
+let paths : Array[(String, Array[String])] = [
+  ("pkgs/actors", all_targets),
+  ("pkgs/actors/runtime", runtime_targets),
+  ("tests/actors-acceptance", runtime_targets),
+]
+
+///|
+/// The `(path, target)` legs to run for `targets`, target by target, in path order. A path runs
+/// only on the targets in its list.
+fn legs(targets : Array[String]) -> Array[(String, String)] {
+  let result = []
+  for target in targets {
+    for entry in paths {
+      let (path, supported) = entry
+      if supported.contains(target) {
+        result.push((path, target))
+      }
+    }
+  }
+  result
+}
+
+///|
+/// The targets in `targets` that are not wasm, wasm-gc, js or native. A misspelled target would
+/// give zero legs, and zero legs must not count as a pass.
+fn unknown_targets(targets : Array[String]) -> Array[String] {
+  targets.filter(target => !all_targets.contains(target))
+}
+
+///|
+/// The count of the last `Total tests: N, ...` line in the output of `moon test`, or `None` when
+/// the output has no such line.
+fn test_count(output : String) -> Int32? {
+  let mut count = None
+  for line in output.split("\n") {
+    let line = line.trim(chars=" \t\r")
+    guard line.strip_prefix("Total tests: ") is Some(rest) else { continue }
+    guard rest.split(",").next() is Some(number) else { continue }
+    count = Some(@string.parse_int(number) catch { _ => continue })
+  }
+  count
+}
+
+///|
+async fn main {
+  let targets = @env.args()[1:].filter(arg => !arg.has_prefix("--"))
+  let targets = if targets.is_empty() { all_targets } else { targets }
+  let unknown = unknown_targets(targets)
+  guard unknown.is_empty() else {
+    println(
+      "❌ Unknown target: \{unknown.join(", ")}. Use wasm, wasm-gc, js or native.",
+    )
+    @sys.exit(1)
+  }
+  for leg in legs(targets) {
+    let (path, target) = leg
+    let (code, out, err) = @process.collect_output("moon", [
+      "test", "--deny-warn", "--target", target, path,
+    ])
+    let output = out.text() + err.text()
+    guard code == 0 else {
+      println(output)
+      println("❌ The actor tests failed: \{path} on \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+    match test_count(output) {
+      Some(count) if count > 0 =>
+        println("✅ \{path} on \{target}: \{count} tests")
+      Some(_) | None => {
+        println(output)
+        println("❌ \{path} on \{target} ran zero tests")
+        @sys.exit(1)
+      }
+    }
+  }
+}
+
+///|
+test "legs give the policy root on four targets and the runtime paths on three" {
+  let all = legs(all_targets)
+  for target in all_targets {
+    assert_true(all.contains(("pkgs/actors", target)), msg=target)
+  }
+  for target in runtime_targets {
+    assert_true(all.contains(("pkgs/actors/runtime", target)), msg=target)
+    assert_true(all.contains(("tests/actors-acceptance", target)), msg=target)
+  }
+  assert_false(all.contains(("pkgs/actors/runtime", "wasm-gc")))
+  assert_false(all.contains(("tests/actors-acceptance", "wasm-gc")))
+  assert_eq(all.length(), 10)
+  assert_eq(legs(["wasm-gc"]), [("pkgs/actors", "wasm-gc")])
+  assert_eq(legs(["native"]), [
+    ("pkgs/actors", "native"),
+    ("pkgs/actors/runtime", "native"),
+    ("tests/actors-acceptance", "native"),
+  ])
+}
+
+///|
+test "unknown_targets names each target that no path supports" {
+  assert_eq(unknown_targets(all_targets), [])
+  assert_eq(unknown_targets(["native", "natve", "wasm-gcc"]), [
+    "natve", "wasm-gcc",
+  ])
+}
+
+///|
+test "test_count reads the last total line" {
+  assert_eq(test_count("Total tests: 4, passed: 4, failed: 0.\n"), Some(4))
+  assert_eq(
+    test_count(
+      "Total tests: 2, passed: 2, failed: 0.\r\nTotal tests: 7, passed: 7, failed: 0.\r\n",
+    ),
+    Some(7),
+  )
+}
+
+///|
+test "test_count gives zero for a leg without tests and none without a total" {
+  assert_eq(
+    test_count(
+      "Warning: no test entry found.\nTotal tests: 0, passed: 0, failed: 0.\n",
+    ),
+    Some(0),
+  )
+  assert_eq(test_count("Finished. moon: no work to do\n"), None)
+}
+
+///|
+async test "a leg that runs zero tests fails the check" {
+  let script = @fs.realpath("check-actors.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-actors")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
+  )
+  for
+    path in [
+      "pkgs", "pkgs/actors", "pkgs/actors/runtime", "tests", "tests/actors-acceptance",
+    ] {
+    @fs.mkdir("\{dir}/\{path}")
+  }
+  let one_test = "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n"
+  let runtime_pkg = "supported_targets = \"wasm+js+native\"\n"
+  @fs.write_file("\{dir}/pkgs/actors/moon.pkg", "")
+  @fs.write_file("\{dir}/pkgs/actors/policy_test.mbt", one_test)
+  @fs.write_file("\{dir}/pkgs/actors/runtime/moon.pkg", runtime_pkg)
+  @fs.write_file("\{dir}/pkgs/actors/runtime/runtime_test.mbt", one_test)
+  // The acceptance package has code but no test, so its wasm leg runs zero tests.
+  @fs.write_file("\{dir}/tests/actors-acceptance/moon.pkg", runtime_pkg)
+  @fs.write_file(
+    "\{dir}/tests/actors-acceptance/acceptance.mbt",
+    "///|\npub fn answer() -> Int {\n  42\n}\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(
+    output.contains("tests/actors-acceptance on wasm ran zero tests"),
+    msg=output,
+  )
+  @fs.write_file("\{dir}/tests/actors-acceptance/acceptance_test.mbt", one_test)
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_eq(code, 0, msg=output)
+  assert_true(
+    output.contains("pkgs/actors/runtime on wasm: 1 tests"),
+    msg=output,
+  )
+  assert_true(
+    output.contains("tests/actors-acceptance on wasm: 1 tests"),
+    msg=output,
+  )
+  // On wasm-gc only the portable root runs.
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm-gc"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_eq(code, 0, msg=output)
+  assert_true(output.contains("pkgs/actors on wasm-gc: 1 tests"), msg=output)
+  assert_false(output.contains("actors/runtime"), msg=output)
+  assert_false(output.contains("actors-acceptance"), msg=output)
+  // An unknown target fails before any leg runs.
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "wasm-gcc"],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(output.contains("Unknown target: wasm-gcc"), msg=output)
+}
+
+///|
+/// Copy just the source and manifests that the isolated API consumer needs.
+async fn copy_api_package(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for entry in @fs.readdir(source) {
+    if entry == "moon.mod" ||
+      entry == "moon.pkg" ||
+      (entry.has_suffix(".mbt") && !entry.has_suffix("test.mbt")) {
+      @fs.write_file(
+        "\{destination}/\{entry}",
+        @fs.read_file("\{source}/\{entry}"),
+      )
+    }
+  }
+}
+
+///|
+/// The first `version = "..."` value of a `moon.mod` manifest.
+fn manifest_version(manifest : String) -> String {
+  let line = manifest
+    .split("\n")
+    .map(line => line.trim().to_owned())
+    .filter(line => line.has_prefix("version = "))
+    .to_array()[0]
+  line[11:line.length() - 1].to_owned()
+}
+
+///|
+/// The probe package that every case writes its `probe.mbt` into.
+let probe_prelude : String =
+  #|enum Counter {
+  #|  Increment
+  #|  Read(@actors.Reply[Int])
+  #|}
+  #|
+  #|enum Other {
+  #|  Ping
+  #|}
+  #|
+  #|async fn counter(scope : @actors.Scope) -> @actors.Actor[Counter, Unit] raise {
+  #|  scope.start(0, (state, message) => {
+  #|    match message {
+  #|      Increment => @actors.Continue(state + 1)
+  #|      Read(reply) => {
+  #|        ignore(reply.send(state))
+  #|        @actors.Continue(state)
+  #|      }
+  #|    }
+  #|  })
+  #|}
+  #|
+
+///|
+async test "external consumers cannot take a message outside a receive or break actor types" {
+  let root = @fs.realpath("..")
+  let dir = @fs.tmpdir(prefix="lander-actors-api")
+  defer @fs.rmdir(dir, recursive=true)
+  copy_api_package("\{root}/pkgs/core", "\{dir}/core")
+  copy_api_package("\{root}/pkgs/actors", "\{dir}/actors")
+  copy_api_package("\{root}/pkgs/actors/runtime", "\{dir}/actors/runtime")
+  @fs.write_file(
+    "\{dir}/moon.work",
+    "members = [\".\", \"core\", \"actors\"]\n",
+  )
+  let manifest = @fs.read_file("\{root}/pkgs/actors/moon.mod").text()
+  let version = manifest_version(manifest)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    manifest
+    .replace(
+      old="name = \"moonrockz/moon-lander-actors\"",
+      new="name = \"fixture/actors-api\"",
+    )
+    .replace(
+      old="import {",
+      new="import {\n  \"moonrockz/moon-lander-actors@\{version}\",",
+    ),
+  )
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors/runtime\" @actors,\n  \"moonrockz/moon-lander-actors\" @policy,\n}\nsupported_targets = \"wasm+js+native\"\nwarnings = \"-unused_type_declaration-unused_constructor-unused_package\"\n",
+  )
+  let valid =
+    #|async fn probe(scope : @actors.Scope) -> Int raise {
+    #|  let actor = counter(scope)
+    #|  actor.send(Increment)
+    #|  let count : Int = actor.ask(reply => Read(reply))
+    #|  let _ : @actors.Receive[Counter, Counter] = @actors.receive()
+    #|  count
+    #|}
+  @fs.write_file("\{dir}/probe.mbt", probe_prelude + valid)
+  for target in runtime_targets {
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--target", target, "."],
+      cwd=dir,
+    )
+    assert_eq(code, 0, msg=out.text() + err.text())
+  }
+  for
+    (source, diagnostic) in [
+      // A reference accepts only its protocol.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).send(\"text\") }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().send(Ping) }",
+        "4014",
+      ),
+      // A reply has the type of its protocol case.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : String = counter(scope).ask(reply => Read(reply)) }",
+        "4014",
+      ),
+      // No public operation takes a message outside a receive.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : Counter = counter(scope).receive() }",
+        "4015",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : Counter = counter(scope).to_ref().receive() }",
+        "4015",
+      ),
+      (
+        "fn probe(context : @actors.ActorContext[Counter]) -> Unit { let _ = context.receive() }",
+        "4015",
+      ),
+      (
+        "fn probe(context : @actors.ActorContext[Counter]) -> Unit { let _ = context.select(fn(m) { Some(m) }) }",
+        "4015",
+      ),
+      // Opaque values cannot be made around their constructors.
+      (
+        "fn probe() -> Unit { let _ : @policy.MailboxCapacity = { value: 0 } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.Receive[Counter, Int] = { steps: fn(_) { abort(\"x\") } } }",
+        "4036",
+      ),
+    ] {
+    @fs.write_file("\{dir}/probe.mbt", probe_prelude + source)
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--target", "js", "."],
+      cwd=dir,
+    )
+    let output = out.text() + err.text()
+    assert_true(code != 0, msg="Invalid API use compiled: " + source)
+    assert_true(output.contains(diagnostic), msg=source + "\n" + output)
+  }
+}

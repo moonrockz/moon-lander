@@ -128,7 +128,7 @@ async fn counter_example() -&gt; Int {
 <tr><td><code>r.zip(other)</code>, <code>r.zip_with(other, f)</code></td><td>Run <code>r</code>, then <code>other</code>; keep both results, or join them with <code>f</code></td></tr>
 <tr><td><code>r.then(other)</code></td><td>Run <code>r</code>, drop its result, then run <code>other</code></td></tr>
 <tr><td><code>r.bind(next)</code></td><td>Run <code>r</code>, then the receive that the async function <code>next</code> makes from its result. The name follows <code>Option::bind</code> and <code>Result::bind</code> in MoonBit core. Async work between receives goes here.</td></tr>
-<tr><td><code>r.within(limit, on_timeout~)</code></td><td>When <code>r</code> waits longer than the <code>TimeLimit</code>, continue with <code>on_timeout()</code>. Messages stay queued.</td></tr>
+<tr><td><code>r.within(limit, on_timeout~)</code></td><td>When <code>r</code> waits longer than the <code>TimeLimit</code>, continue with <code>on_timeout()</code>. Messages stay queued. Only wait time counts (Call, group 4): the waits of <code>r</code> add up against the limit, and async work in <code>bind</code> or a handler does not, so a busy loop is not ended by its limit. The test runner, which has no clock, moves its time forward by the wait time left of each expired limit, so nested and later limits expire in the same order as live.</td></tr>
 <tr><td><code>poll(on_empty~)</code></td><td>The oldest message, or <code>on_empty()</code> at once when none is queued</td></tr>
 <tr><td><code>r.on_closed(f)</code></td><td>When the mailbox closes while <code>r</code> waits, continue with <code>f()</code>. Without it, the actor ends as closed.</td></tr>
 <tr><td><code>r.recover(on_error)</code></td><td>When a step of <code>r</code> raises an ordinary error, continue with <code>on_error(error)</code>. Cancellation is not caught.</td></tr>
@@ -160,6 +160,21 @@ let login_actor = scope.spawn(name=login_name) &lt;| _ =&gt; { login() }</code><
 </tbody>
 </table>
 <p>Candidate optimizations, kept only when the local benchmark shows a gain and the stack tests still pass: put the function of <code>select(c).map(f)</code> into the select node, and let pure functions skip the bounce until a chain reaches a fixed depth. Object pools are not used.</p>
+<p>Group 4 results (<code>mise run bench:actors</code>, release builds on macOS arm64; the receive shapes use the test runner's in-memory mailbox; fastest of five rounds of 200,000 messages):</p>
+<table>
+<thead><tr><th>Shape</th><th>native</th><th>js</th><th>wasm</th></tr></thead>
+<tbody>
+<tr><td>Plain async handler call</td><td>20</td><td>9</td><td>70</td></tr>
+<tr><td><code>receive_loop</code> as one repeat node</td><td>72</td><td>25</td><td>216</td></tr>
+<tr><td><code>start</code> actor end to end (mailbox and wake-ups)</td><td>112</td><td>111</td><td>281</td></tr>
+<tr><td>State loop written with <code>bind</code></td><td>197</td><td>94</td><td>664</td></tr>
+<tr><td>Loop that builds its result on the way back</td><td>240</td><td>464</td><td>686</td></tr>
+<tr><td>One scheduler round trip (<code>@aio.pause()</code>)</td><td>about 12,900</td><td>about 1,120,000</td><td>about 12,900</td></tr>
+</tbody>
+</table>
+<p>Kept: pure steps (<code>done</code>, <code>map</code>, <code>zip_with</code>, <code>then</code> and the first step of <code>bind</code>) call their continuation directly until a chain of 32 calls, then return to the runner. Against the encoding that returns after each step, it is faster by 10% (native) and 9% (wasm) for the <code>bind</code> state loop, and by 19% (native), 17% (js) and 14% (wasm) for the loop that builds its result on the way back. The 100,000-step tests pass on wasm, js and native. Not kept: putting the function of <code>select(c).map(f)</code> into the select node. A receive is a closure, so <code>map</code> cannot see a select node to change; the fusion needs a first-order node in every combinator, and <code>map</code> already costs one direct call.</p>
+<p>Yield between batches. One scheduler round trip costs about 13 microseconds on native and wasm, and at least one millisecond on js, where <code>@aio.pause()</code> waits for <code>setTimeout</code>. A yield after each 64 messages made the <code>start</code> actor cost 17,800 nanoseconds per message on js and 301 on native. So a live runner checks the clock after each 64 messages taken without a wait and yields when the batch has run for 2 milliseconds or more. Each batch stays bounded, and a test shows that another ready actor runs while a busy actor processes slow messages that never suspend.</p>
+<p>The pinned compiler rejects async benchmarks in <code>moon bench</code> (<code>[4132] async benchmark is currently not supported</code>). The suite is therefore the unpublished program <code>tests/actors-bench</code>, which times each shape with the monotonic clock of <code>moonbitlang/core/bench</code> in release mode. The manual task <code>bench:actors</code> runs it.</p>
 <p>Selectors can starve other message kinds. A full bounded mailbox containing only non-matches also prevents admission of a future match. Document this case; use <code>within</code>, consume a non-match, or opt into an unbounded mailbox. No priority message bypasses capacity.</p>
 <h3 id="adm-1">ADM-1. Backpressure and admission (Call)</h3>
 <p>Default to <code>Bounded(MailboxCapacity::default())</code>, which is 128 queued messages. The capacity excludes the in-flight message and includes every message that a scan skips. <code>Unbounded</code> is an explicit policy. There is no silent drop or overwrite policy.</p>
@@ -198,7 +213,7 @@ let login_actor = scope.spawn(name=login_name) &lt;| _ =&gt; { login() }</code><
   assert_eq(login() |&gt; @actors.run_messages(messages), Some("ann:7"))
 }</code></pre>
 <p>The runtime owns every wait and timer, so a later change can add a test clock without a change to the <code>Receive</code> API. Acceptance tests that need a real runtime order events with acknowledgements, not sleeps; a sleep is only for a real deadline test.</p>
-<p>Benchmarks are local tools. A <code>moon bench</code> suite measures the shapes of <a href="#recv-1">RECV-1</a> on wasm, js and native through a manual mise task. It does not run in <code>mise run check</code>, in CI or in the release workflow, so it adds no time to them. Record its results in this design when a change affects the runner.</p>
+<p>Benchmarks are local tools. A benchmark suite measures the shapes of <a href="#recv-1">RECV-1</a> on wasm, js and native through a manual mise task. It does not run in <code>mise run check</code>, in CI or in the release workflow, so it adds no time to them. Record its results in this design when a change affects the runner.</p>
 <h3 id="name-1">NAME-1. Optional names, local addresses and typed discovery (Owner: useful names and addressing; Call: API and rules)</h3>
 <p>Actor scopes own name reservations as part of lifetime management. Directories are immutable values with the operations of <a href="#dir-1">DIR-1</a>. No separate registry is required. The proposed glossary is in <code>CONTEXT.md</code>.</p>
 <table>

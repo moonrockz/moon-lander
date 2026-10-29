@@ -24,6 +24,7 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/config", "moonrockz/moon-lander-config"),
   ("pkgs/mediator", "moonrockz/moon-lander-mediator"),
   ("pkgs/logging-hosting-async", "moonrockz/moon-lander-logging-hosting-async"),
+  ("pkgs/actors", "moonrockz/moon-lander-actors"),
   ("pkgs/hosting", "moonrockz/moon-lander-hosting"),
   ("pkgs/lander", "moonrockz/moon-lander"),
   ("pkgs/notebooks", "moonrockz/notebooks"),
@@ -189,7 +190,7 @@ async fn main {
   }
   if @env.args().contains("--check") {
     println(
-      "Publication policy verified: nine libraries; all tooling and tests private",
+      "Publication policy verified: ten libraries; all tooling and tests private",
     )
     return
   }
@@ -229,6 +230,16 @@ test "publish outcomes distinguish duplicates, transient and refused failures" {
   assert_eq(classify(1, "connection reset by peer"), Transient)
   assert_eq(classify(1, "HTTP 403 timeout"), Failed)
   assert_eq(classify(1, "invalid module"), Failed)
+}
+
+///|
+test "the allowlist holds ten libraries in publication order" {
+  assert_eq(publish_list.map(entry => entry.1), [
+    "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
+    "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-logging-hosting-async",
+    "moonrockz/moon-lander-actors", "moonrockz/moon-lander-hosting", "moonrockz/moon-lander",
+    "moonrockz/notebooks", "moonrockz/openrpc",
+  ])
 }
 
 ///|

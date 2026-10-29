@@ -1,0 +1,151 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-actors/runtime"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/moon-lander-actors",
+  "moonrockz/moon-lander-core",
+}
+
+// Values
+pub fn[M, R] done(R) -> Receive[M, R]
+
+pub fn[M] poll(on_empty~ : () -> Receive[M, M]) -> Receive[M, M]
+
+pub fn[M] receive() -> Receive[M, M]
+
+pub fn[M] receive_all(async (M) -> Unit) -> Receive[M, Unit]
+
+pub fn[M, S] receive_loop(S, async (S, M) -> Next[S]) -> Receive[M, S]
+
+pub fn[M] receive_n(@moon-lander-actors.MessageCount, async (M) -> Unit) -> Receive[M, Unit]
+
+pub async fn[M, R] run_messages(Receive[M, R], Array[M]) -> R?
+
+pub async fn[M, R] run_test(Receive[M, R], Array[M], at_end? : TestEnd) -> TestRun[M, R]
+
+pub async fn[X] scope(async (Scope) -> X) -> X
+
+pub fn[M, T] select((M) -> T? raise?) -> Receive[M, T]
+
+// Errors
+pub suberror ActorError {
+  ScopeClosed
+  Closed(ActorAddress)
+  TimedOut(@moon-lander-core.TimeLimit)
+  ActorFailed(ActorAddress, Error)
+  ActorCancelled(ActorAddress)
+} derive(@debug.Debug)
+pub fn ActorError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Actor[M, R] {
+  // private fields
+}
+pub fn[M, R] Actor::address(Self[M, R]) -> ActorAddress
+pub async fn[M, R, T] Actor::ask(Self[M, R], (Reply[T]) -> M, timeout? : @moon-lander-core.TimeLimit) -> T
+pub async fn[M, R] Actor::join(Self[M, R]) -> R
+pub fn[M, R] Actor::queued_count(Self[M, R]) -> Int32
+pub async fn[M, R] Actor::send(Self[M, R], M) -> Unit raise ActorError
+pub fn[M, R] Actor::to_ref(Self[M, R]) -> ActorRef[M]
+pub fn[M, R] Actor::try_send(Self[M, R], M) -> @moon-lander-actors.Admission
+
+pub struct ActorAddress {
+  // private fields
+}
+pub fn ActorAddress::equal(Self, Self) -> Bool
+pub fn ActorAddress::hash(Self) -> Int32
+pub fn ActorAddress::hash_combine(Self, Hasher) -> Unit
+pub fn ActorAddress::not_equal(Self, Self) -> Bool
+pub fn ActorAddress::to_repr(Self) -> @debug.Repr
+pub fn ActorAddress::to_string(Self) -> String
+pub impl Eq for ActorAddress
+pub impl Hash for ActorAddress
+pub impl @debug.Debug for ActorAddress
+
+pub struct ActorContext[M] {
+  // private fields
+}
+pub fn[M] ActorContext::queued_count(Self[M]) -> Int32
+pub fn[M] ActorContext::reenqueue(Self[M], M) -> @moon-lander-actors.Admission
+pub fn[M] ActorContext::scope(Self[M]) -> Scope
+pub fn[M] ActorContext::self_ref(Self[M]) -> ActorRef[M]
+
+pub struct ActorRef[M] {
+  // private fields
+}
+pub fn[M] ActorRef::address(Self[M]) -> ActorAddress
+pub async fn[M, R] ActorRef::ask(Self[M], (Reply[R]) -> M, timeout? : @moon-lander-core.TimeLimit) -> R
+pub fn[M] ActorRef::queued_count(Self[M]) -> Int32
+pub async fn[M] ActorRef::send(Self[M], M) -> Unit raise ActorError
+pub fn[M] ActorRef::try_send(Self[M], M) -> @moon-lander-actors.Admission
+
+pub(all) enum Next[S] {
+  Continue(S)
+  Stop
+}
+
+pub struct Receive[M, R] {
+  // private fields
+}
+pub fn[M, R, T] Receive::bind(Self[M, R], async (R) -> Self[M, T]) -> Self[M, T]
+pub fn[M, R, T] Receive::map(Self[M, R], (R) -> T) -> Self[M, T]
+pub fn[M, R] Receive::on_closed(Self[M, R], () -> Self[M, R]) -> Self[M, R]
+pub fn[M, R] Receive::recover(Self[M, R], (Error) -> Self[M, R]) -> Self[M, R]
+pub fn[M, R, T] Receive::then(Self[M, R], Self[M, T]) -> Self[M, T]
+pub fn[M, R] Receive::within(Self[M, R], @moon-lander-core.TimeLimit, on_timeout~ : () -> Self[M, R]) -> Self[M, R]
+pub fn[M, R, T] Receive::zip(Self[M, R], Self[M, T]) -> Self[M, (R, T)]
+pub fn[M, R, T, U] Receive::zip_with(Self[M, R], Self[M, T], (R, T) -> U) -> Self[M, U]
+
+pub struct Reply[R] {
+  // private fields
+}
+pub fn[R] Reply::send(Self[R], R) -> ReplyOutcome
+
+pub(all) enum ReplyOutcome {
+  Delivered
+  Expired
+} derive(Eq, @debug.Debug)
+pub fn ReplyOutcome::equal(Self, Self) -> Bool
+pub fn ReplyOutcome::not_equal(Self, Self) -> Bool
+pub fn ReplyOutcome::to_repr(Self) -> @debug.Repr
+
+pub struct Scope {
+  // private fields
+}
+pub fn[M, R] Scope::spawn(Self, (ActorContext[M]) -> Receive[M, R], mailbox? : @moon-lander-actors.MailboxPolicy) -> Actor[M, R] raise ActorError
+pub fn[S, M] Scope::start(Self, S, async (S, M) -> Next[S], mailbox? : @moon-lander-actors.MailboxPolicy) -> Actor[M, Unit] raise ActorError
+
+pub(all) enum TestEnd {
+  Wait
+  Expire
+  Close
+}
+
+pub enum TestOutcome[R] {
+  Finished(R)
+  Waiting
+  MailboxClosed
+}
+
+pub struct TestRun[M, R] {
+  // private fields
+}
+pub fn[M, R] TestRun::outcome(Self[M, R]) -> TestOutcome[R]
+pub fn[M, R] TestRun::remaining(Self[M, R]) -> Array[M]
+pub fn[M, R] TestRun::result(Self[M, R]) -> R?
+
+// Type aliases
+pub using @moon-lander-actors {type Admission}
+
+pub using @moon-lander-actors {type CountError}
+
+pub using @moon-lander-actors {type CountRule}
+
+pub using @moon-lander-actors {type MailboxCapacity}
+
+pub using @moon-lander-actors {type MailboxPolicy}
+
+pub using @moon-lander-actors {type MessageCount}
+
+// Traits

@@ -597,3 +597,74 @@ async test "framework modules share the root version, also in their sibling impo
   )
   assert_eq(code, 0, msg=out.text() + err.text())
 }
+
+///|
+async test "the actors module shares the root version, and set updates it and its imports" {
+  let script = @fs.realpath("versions.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-versions-actors")
+  defer @fs.rmdir(dir, recursive=true)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    "name = \"moon-lander-workspace\"\nprivate = true\nversion = \"0.7.3\"\n",
+  )
+  @fs.mkdir("\{dir}/pkgs/core", recursive=true)
+  @fs.write_file(
+    "\{dir}/pkgs/core/moon.mod",
+    "name = \"moonrockz/moon-lander-core\"\nprivate = true\nversion = \"0.7.3\"\n",
+  )
+  @fs.mkdir("\{dir}/pkgs/actors", recursive=true)
+  @fs.write_file(
+    "\{dir}/pkgs/actors/moon.mod",
+    "name = \"moonrockz/moon-lander-actors\"\nprivate = true\nversion = \"0.7.2\"\n\nimport {\n  \"moonrockz/moon-lander-core@0.7.3\",\n  \"moonbitlang/async@0.22.5\",\n}\n",
+  )
+  // `set` also writes the version files of the umbrella.
+  @fs.mkdir("\{dir}/pkgs/lander", recursive=true)
+  @fs.write_file(
+    "\{dir}/pkgs/lander/moon.mod",
+    "name = \"moonrockz/moon-lander\"\nprivate = true\nversion = \"0.7.3\"\n\nimport {\n  \"moonrockz/moon-lander-actors@0.7.3\",\n}\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/lander/version.mbt",
+    "pub fn version() -> String {\n  \"0.7.3\"\n}\n",
+  )
+  @fs.write_file(
+    "\{dir}/pkgs/lander/version_test.mbt",
+    "inspect(@lander.version(), content=\"0.7.3\")\n",
+  )
+  @fs.write_file(
+    "\{dir}/moon.work",
+    "members = [\n  \".\",\n  \"./pkgs/core\",\n  \"./pkgs/actors\",\n  \"./pkgs/lander\",\n]\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "check"],
+    cwd=dir,
+  )
+  let text = out.text() + err.text()
+  assert_not_eq(code, 0, msg=text)
+  assert_true(
+    text.contains("pkgs/actors/moon.mod: found 0.7.2, expected 0.7.3"),
+    msg=text,
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "set", "0.8.0"],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+  let actors = @fs.read_file("\{dir}/pkgs/actors/moon.mod").text()
+  assert_eq(mod_version(actors), Some("0.8.0"))
+  assert_true(actors.contains("\"moonrockz/moon-lander-core@0.8.0\""))
+  assert_true(actors.contains("\"moonbitlang/async@0.22.5\""))
+  assert_true(
+    @fs.read_file("\{dir}/pkgs/lander/moon.mod")
+    .text()
+    .contains("\"moonrockz/moon-lander-actors@0.8.0\""),
+  )
+  let (code, out, err) = @process.collect_output(
+    "moonx",
+    [script, "check"],
+    cwd=dir,
+  )
+  assert_eq(code, 0, msg=out.text() + err.text())
+}

@@ -77,12 +77,14 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run validate` | Check workspace membership and shared versions |
 | `mise run test:scripts` | Test the build tooling |
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
+| `mise run check:actors` | Fail when the actor policy root, the actor runtime or the actor acceptance suite runs zero tests on a target |
+| `mise run bench:actors` | Run the local actor receive benchmark in release mode. A manual tool: `check`, CI and the release workflow never run it |
 | `mise run check:logging` | Fail when a portable logging package (root, formatting, rolling, sink settings) or the acceptance suite runs zero tests on a target |
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
-| `mise run check:framework-registry` | Audit all nine candidate archives and build isolated registry consumers on supported targets |
-| `mise run check:framework-published` | Release-only gate for all nine public archives and approved checksums |
+| `mise run check:framework-registry` | Audit all ten candidate archives and build isolated registry consumers on supported targets |
+| `mise run check:framework-published` | Release-only gate for all ten public archives and approved checksums |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
@@ -205,6 +207,12 @@ script. Also update the assessed versions above.
   console and rolling file sessions in `runtime` (native, and js on Node.js and
   Bun). `adapters/node/` holds its TypeScript adapter. It imports core, logging
   and `moonbitlang/async`, never config or hosting.
+- `pkgs/actors/` contains the optional
+  [`moonrockz/moon-lander-actors`](pkgs/actors/README.mbt.md): local typed actors.
+  The portable policy types are at the root, imported as `@policy` (all four
+  targets). The actor runtime is in `runtime`, imported as `@actors` (wasm, js
+  and native). It imports core and `moonbitlang/async` only, never logging,
+  config, mediator or hosting.
 - `pkgs/hosting/` contains
   [`moonrockz/moon-lander-hosting`](pkgs/hosting/README.mbt.md), imported as
   `@hosting`: the host builder, hosted services and `run`, the native console
@@ -267,9 +275,10 @@ release adds `moonrockz/openrpc`, a portable OpenRPC document library. The `0.1.
 queries, runtime cell capability inspection, and Ion-backed metadata. See
 [the changelog](CHANGELOG.md) for details and API migration notes.
 
-Release versions are shared across workspace members. All seven framework
-modules listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are published
-to mooncakes.io. Install a module at an exact version, for example
+Release versions are shared across workspace members. The framework modules
+listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are in the
+publication allowlist and publish to mooncakes.io. `moonrockz/moon-lander-actors`
+is new: the next release publishes it for the first time. Install a module at an exact version, for example
 `moon add moonrockz/moon-lander@0.7.3`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
@@ -279,7 +288,7 @@ pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
 adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
 its checks on that pull request. Merging it to `main` is the owner's approval:
 the workflow then runs the full check, publishes the public modules with the
-`MOONCAKES_USER_TOKEN` organization secret, verifies all nine published archives against approved checksums, runs isolated
+`MOONCAKES_USER_TOKEN` organization secret, verifies all ten published archives against approved checksums, runs isolated
 registry consumers and the format override checks on supported targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
 

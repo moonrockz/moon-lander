@@ -57,10 +57,10 @@ Bead: lander-25h.5
 
 Depends on: group 4.
 
-- [ ] 5.1 Add Reply, ask and try_ask with a 30-second default, typed finite or indefinite wait policies and one admission-plus-response deadline; verify reply correlation, multiple reply types, duplicate and late replies, timeout while admission is blocked and termination during an indefinite ask
-- [ ] 5.2 Track pending asks through close, stop, failure and cancellation; verify discarded asks wake promptly, in-flight replies remain possible on close, original causes survive and caller cancellation leaves admitted work intact
-- [ ] 5.3 Add Subject adapters for references, replies, async queues and custom functions, plus contramap and general destination ask; verify delivery outcomes, no additional queue and custom reply completion
-- [ ] 5.4 Add runnable protocol and destination examples, wrong-reply compile failures and request-race acceptance tests; verify check:actors on all runtime targets
+- [x] 5.1 Add Reply, ask and try_ask with a 30-second default, typed finite or indefinite wait policies and one admission-plus-response deadline; verify reply correlation, multiple reply types, duplicate and late replies, timeout while admission is blocked and termination during an indefinite ask
+- [x] 5.2 Track pending asks through close, stop, failure and cancellation; verify discarded asks wake promptly, in-flight replies remain possible on close, original causes survive and caller cancellation leaves admitted work intact
+- [x] 5.3 Add Subject adapters for references, replies, async queues and custom functions, plus contramap and general destination ask; verify delivery outcomes, no additional queue and custom reply completion
+- [x] 5.4 Add runnable protocol and destination examples, wrong-reply compile failures and request-race acceptance tests; verify check:actors on all runtime targets
 
 ## 6. Close, drain, child ownership and cleanup
 
@@ -68,10 +68,10 @@ Bead: lander-25h.6
 
 Depends on: group 5.
 
-- [ ] 6.1 Complete close with one immutable pending snapshot, drain and cancel; verify in-flight completion versus cancellation, queued-message order, repeated close and wakeup of blocked producers and callers
-- [ ] 6.2 Complete lifecycle snapshots, initializer readiness, once-only cleanup, cancellation protection and cleanup budgets; verify initializer failure, cleanup timeout and preservation of primary plus cleanup errors
-- [ ] 6.3 Complete scope failure propagation, context-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
-- [ ] 6.4 Add runnable lifetime and resource examples and document cooperative cancellation limits; run all close, join and cleanup acceptance cases plus check:actors on wasm, js and native
+- [x] 6.1 Complete close with one immutable pending snapshot, drain and cancel; verify in-flight completion versus cancellation, queued-message order, repeated close and wakeup of blocked producers and callers
+- [x] 6.2 Complete lifecycle snapshots, initializer readiness, once-only cleanup, cancellation protection and cleanup budgets; verify initializer failure, cleanup timeout and preservation of primary plus cleanup errors
+- [x] 6.3 Complete scope failure propagation, context-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
+- [x] 6.4 Add runnable lifetime and resource examples and document cooperative cancellation limits; run all close, join and cleanup acceptance cases plus check:actors on wasm, js and native
 
 ## 7. Serialized services and automatic responders
 
@@ -79,9 +79,9 @@ Bead: lander-25h.7
 
 Depends on: group 6.
 
-- [ ] 7.1 Add create and ServiceRef ask/tell over the same runtime; verify serialized async closures, heterogeneous result types, ask failure with later progress, retained prior mutations and tell failure reaching the owner
-- [ ] 7.2 Add respond and RequestActor without user reply plumbing; verify automatic responses, termination on handler error, release of all pending callers and continued processing after a Result rejection
-- [ ] 7.3 Add runnable service and responder examples and the shared admission/lifetime cases for both entries; verify the examples and check:actors on all runtime targets
+- [x] 7.1 Add create and ServiceRef ask/tell over the same runtime; verify serialized async closures, heterogeneous result types, ask failure with later progress, retained prior mutations and tell failure reaching the owner
+- [x] 7.2 Add respond and RequestActor without user reply plumbing; verify automatic responses, termination on handler error, release of all pending callers and continued processing after a Result rejection
+- [x] 7.3 Add runnable service and responder examples and the shared admission/lifetime cases for both entries; verify the examples and check:actors on all runtime targets
 
 ## 8. Names, addresses and algebraic directories
 

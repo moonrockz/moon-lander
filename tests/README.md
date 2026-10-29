@@ -6,7 +6,7 @@ configuration core, and the sync and async mediators.
 
 | Suite | Coverage | Targets |
 | --- | --- | --- |
-| `actors-acceptance` | Actor scenarios of `add-typed-actors`: the counter, concurrent producers, independent actors, finite actors, FIFO and selective receive, time limits, bounded and unbounded admission, reenqueue order and the receive test runner. `mise run check:actors` fails when a target runs zero tests | wasm, JavaScript, native |
+| `actors-acceptance` | Actor scenarios of `add-typed-actors`: the counter, concurrent producers, independent actors, finite actors, FIFO and selective receive, time limits, bounded and unbounded admission, reenqueue order, the receive test runner, request races and destinations, close, drain, cancel, startup and cleanup, child ownership, services and responders. `mise run check:actors` fails when a target runs zero tests | wasm, JavaScript, native |
 | `actors-bench` | Local benchmark program of the actor receive shapes. Only the manual task `mise run bench:actors` runs it; it is not a test | wasm, JavaScript, native |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
 | `browser-parity`, `browser-parity-reference` | Shared explicit cases (the core fixture, a parse error, a binding error) and their reference observation; `mise run test:browser` compares it with the browser result | All four |

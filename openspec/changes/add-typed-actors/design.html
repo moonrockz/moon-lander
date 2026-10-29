@@ -313,6 +313,20 @@ a - a = empty
 <tr><td>Operations that wait on the event loop or re-raise an actor's original error cannot narrow their error type.</td><td><code>send</code> and the start calls raise <code>ActorError</code>; <code>ask</code>, <code>join</code> and the async parts of receives use the general <code>raise</code> and raise <code>ActorError</code> cases or the original cause.</td></tr>
 </tbody>
 </table>
+<h3 id="implementation-notes">Implementation notes (groups 2 to 7)</h3>
+<p>These Call details fill in the decisions above without a change to the requirements.</p>
+<table>
+<thead><tr><th>Area</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>Wait policy</td><td>Asks keep the <code>timeout?</code> label of ASK-1 and SVC-1. Its type is the enum <code>WaitPolicy</code> with <code>Within(TimeLimit)</code> and <code>UntilStopped</code>; <code>WaitPolicy::default()</code> is <code>Within</code> 30 seconds.</td></tr>
+<tr><td>Discarded requests</td><td>The mailbox keeps, beside each queued message, an optional discard action. An ask sets it, so a request that close removes wakes its caller at once with <code>Closed</code>. When processing ended by a failure, the discarded request reports <code>ActorFailed</code> with the cause.</td></tr>
+<tr><td>Destinations</td><td>A destination that is not an actor reports <code>DestinationClosed</code>, which has no address. <code>Subject::new(send~, try_send~)</code> takes an async <code>send</code> that gives false when closed; an error that it raises passes to the sender unchanged.</td></tr>
+<tr><td>Lifecycle values</td><td><code>status()</code> gives <code>ActorStatus</code>: <code>Running</code>, <code>Closing</code> or <code>Ended(ActorEnd)</code>; <code>ActorEnd</code> is <code>Completed</code>, <code>MailboxClosed</code>, <code>Failed(Error)</code> or <code>Cancelled</code>. <code>close()</code> gives <code>Pending[M]?</code>. A <code>cancel</code> that reaches a task before it suspends still ends the actor as <code>Cancelled</code>.</td></tr>
+<tr><td>Initializer form</td><td><code>scope.start_with(init, handler)</code> runs <code>init : async (Setup) -&gt; S</code> in the actor task. <code>Setup::on_stop</code> registers cleanup after an acquisition. A startup failure goes to the creator after cleanup and does not fail the scope. If the creator is cancelled before readiness, the actor is cancelled too, because nobody can use it.</td></tr>
+<tr><td>Cleanup</td><td><code>on_stop</code> on <code>start</code>, <code>spawn</code>, <code>create</code> and <code>respond</code>; steps run in reverse registration order within one <code>cleanup_limit</code> (5 seconds by default) under <code>protect_from_cancel</code>. The first step error gives <code>CleanupFailed(primary~, cleanup~)</code>; a timeout gives <code>CleanupTimedOut(primary~, limit~)</code>.</td></tr>
+<tr><td><code>spawn</code> function</td><td>The function that makes the first receive can raise; its error fails the actor, the same as a step error. It can start children in the context scope.</td></tr>
+</tbody>
+</table>
 <h2 id="baseline">Reference baseline</h2>
 <p>Sources checked on 2026-10-28. This is capability coverage, not source or binary compatibility. Language-specific blocking methods and effect syntax map to MoonBit async operations. The runtime must not emulate thread blocking.</p>
 <table>

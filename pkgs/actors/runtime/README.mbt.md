@@ -350,3 +350,253 @@ async test "a timed select on a full mailbox of skipped messages keeps them" {
 ```
 
 No message has a priority that bypasses the capacity.
+
+## Request and reply
+
+A protocol case that wants an answer carries a typed `Reply[R]`. `ask` builds
+that case with a fresh one-shot reply and waits for the answer. Each case can
+have its own reply type, and the compiler checks it: there is no cast and no
+lookup.
+
+```mbt check
+///|
+enum Shelf {
+  Put(String)
+  Size(@actors.Reply[Int])
+  Names(@actors.Reply[Array[String]])
+}
+
+///|
+async test "one protocol answers with an Int and an Array" {
+  @actors.scope <| scope => {
+    let shelf = scope.start([]) <| (items : Array[String], message) => {
+      match message {
+        Put(item) => @actors.Continue([..items, item])
+        Size(reply) => {
+          ignore(reply.send(items.length()))
+          @actors.Continue(items)
+        }
+        Names(reply) => {
+          ignore(reply.send(items.copy()))
+          @actors.Continue(items)
+        }
+      }
+    }
+    shelf.send(Put("tea"))
+    shelf.send(Put("rice"))
+    let size : Int = shelf.ask(reply => Size(reply))
+    let names : Array[String] = shelf.ask(reply => Names(reply))
+    assert_eq(size, 2)
+    assert_eq(names, ["tea", "rice"])
+  }
+}
+```
+
+| Rule | Behavior |
+| --- | --- |
+| Deadline | One `WaitPolicy` covers admission and the reply: `Within(limit)`, 30 seconds by default, or `UntilStopped` for an explicit wait with no deadline |
+| Timeout | `ask` raises `TimedOut`; `try_ask` gives `None`. Closure and failure stay typed errors |
+| First reply wins | `Reply::send` never waits. A second reply, or a reply after the caller timed out or was cancelled, gives `Expired` and does not fail the actor |
+| Close | A request that `close` removes from the queue fails at once with `Closed`. The request in progress can still reply until the actor ends |
+| Failure | Every pending caller wakes with `ActorFailed(address, cause)`, with the original error |
+| Normal end without a reply | The caller wakes with `Closed` |
+| Caller cancellation | The admitted request stays: the actor processes it, and its reply gives `Expired` |
+
+## Destinations
+
+`Subject[M]` is a send-only destination with `send` and `try_send`. Several
+kinds of target adapt to it:
+
+| Adapter | Destination |
+| --- | --- |
+| `actor_ref.to_subject()` | The actor's mailbox. An ask through it sees the end of the actor |
+| `Subject::from_reply(reply)` | A one-shot reply: the first message is delivered, later ones report closed |
+| `Subject::from_queue(queue)` | An `@aio.Queue` |
+| `Subject::new(send~, try_send~)` | Caller-supplied functions. The runtime cannot check that they keep the mailbox rules |
+| `subject.contramap(f)` | Maps each message with `f` before admission, with no other queue or task |
+
+`contramap` lets one actor take several event types through one protocol:
+
+```mbt check
+///|
+enum Feed {
+  Temperature(Int)
+  Total(@actors.Reply[Int])
+}
+
+///|
+async test "a mapped destination puts events in the same mailbox" {
+  @actors.scope <| scope => {
+    let feed = scope.start(0) <| (sum, message) => {
+      match message {
+        Temperature(value) => @actors.Continue(sum + value)
+        Total(reply) => {
+          ignore(reply.send(sum))
+          @actors.Continue(sum)
+        }
+      }
+    }
+    let readings : @actors.Subject[Int] = feed
+      .to_ref()
+      .to_subject()
+      .contramap(value => Temperature(value))
+    readings.send(20)
+    readings.send(22)
+    assert_eq(feed.ask(reply => Total(reply)), 42)
+  }
+}
+```
+
+`subject.ask(build)` works on any destination, with the deadline and one-shot
+rules of an actor ask. It sees the end of the target only when the target is
+an actor; a custom destination answers by sending to the reply in the request.
+
+## Close, drain and cancel
+
+| Operation | New messages | Queued messages | Message in progress | Returns |
+| --- | --- | --- | --- | --- |
+| `close()` | Rejected | Removed and given back once as `Pending[M]` | Can finish and reply | At once; later closes give `None` |
+| `drain()` | Rejected | Processed | Finishes | After the actor and its cleanup end |
+| `cancel()` | Rejected | Removed | Cancelled at its next cancellation point | At once |
+
+Blocked producers wake with `Closed` in each case. `join()` waits for the end
+and gives the result, raises the original failure, raises `Closed` when a
+receive found the mailbox closed, or raises `ActorCancelled`. Several joiners
+get the same outcome, and cancelling one joiner does not cancel the actor.
+`status()` gives an immutable snapshot: `Running`, `Closing` or `Ended(ActorEnd)`.
+
+```mbt check
+///|
+async test "close gives the queued messages, and join waits for the one in progress" {
+  @actors.scope <| scope => {
+    let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+    let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+    let printer = scope.start(0) <| (count, job : String) => {
+      if job == "slow" {
+        started.put(())
+        gate.get()
+      }
+      @actors.Continue(count + 1)
+    }
+    printer.send("slow")
+    started.get()
+    printer.send("b")
+    printer.send("c")
+    guard printer.close() is Some(pending) else { fail("no snapshot") }
+    assert_eq(pending.messages(), ["b", "c"])
+    assert_true(printer.status() is Closing)
+    gate.put(())
+    printer.join()
+    assert_true(printer.status() is Ended(Completed))
+  }
+}
+```
+
+Cancellation is cooperative. A handler stops at its next suspension point,
+such as a wait or an `@aio.pause()`. There is no hard preemption: code that
+never suspends runs to its end.
+
+## Startup and cleanup
+
+`start` and `spawn` take an optional `on_stop` cleanup. It runs once after
+processing ends: on a normal end, a failure or a cancellation. It runs with
+cancellation protection and a time limit, `cleanup_limit`, five seconds by
+default. A cleanup error, or a cleanup that passes its limit, fails the owner
+scope with `CleanupFailed` or `CleanupTimedOut`. These keep the actor's own
+failure as `primary`. The limit cannot stop cleanup code that never suspends.
+
+`start_with` runs an async initializer in the actor task and returns the handle
+only after it ends. The initializer registers the cleanup of each resource
+after it acquires it. When the initializer fails, the registered cleanup runs,
+the cause goes to the caller of `start_with`, and the owner scope stays live.
+
+```mbt check
+///|
+suberror NoDisk {
+  NoDisk
+} derive(Debug)
+
+///|
+async test "a failed initializer releases what it acquired" {
+  let released = []
+  @actors.scope <| scope => {
+    let started = try {
+      let _ : @actors.Actor[String, Unit] = scope.start_with(
+        setup => {
+          setup.on_stop(() => released.push("connection"))
+          raise NoDisk
+        },
+        (state : Int, _) => @actors.Continue(state),
+      )
+      "started"
+    } catch {
+      NoDisk => "no disk"
+      _ => "other"
+    }
+    assert_eq(started, "no disk")
+  }
+  assert_eq(released, ["connection"])
+}
+```
+
+## Children and failure
+
+An actor that `spawn` starts gets a child scope through its context. A child
+belongs to its parent: when the parent ends, also normally, the child is
+cancelled and its cleanup runs before the parent's `join` returns. An
+unhandled actor error fails the owner scope and cancels the other actors of
+that scope. To choose another boundary, use `recover` for step errors, or run
+the risky actors in a nested `@actors.scope` inside `bind` and catch its error
+there. There is no automatic restart. A saved scope rejects starts after it
+ends, with `ScopeClosed`.
+
+## Services
+
+`scope.create(service)` gives a `ServiceRef[S]`: an actor that owns a private
+service value. `ask` runs an async closure on the service task and gives its
+result, so each call can have its own result type with no message enum.
+`tell` waits only for admission.
+
+```mbt check
+///|
+struct Wallet {
+  mut coins : Int
+}
+
+///|
+async test "a service runs typed calls one at a time" {
+  @actors.scope <| scope => {
+    let wallet = scope.create({ coins: 3 })
+    wallet.tell(w => w.coins += 2)
+    let coins : Int = wallet.ask(w => w.coins)
+    let label : String = wallet.ask(w => "\{w.coins} coins")
+    assert_eq(coins, 5)
+    assert_eq(label, "5 coins")
+  }
+}
+```
+
+An error of an `ask` closure goes to its caller, and the service continues.
+Changes made before the error remain. An error of a `tell` closure fails the
+service and its owner scope. `close` releases queued callers with `Closed` and
+gives back no queued closure and no service state. A service also has `drain`,
+`cancel`, `status` and `join`.
+
+## Responders
+
+`scope.respond(handler)` gives a `RequestActor[Req, Res]`. Its `ask(request)`
+gives `handler(request)`, and the framework sends the reply.
+
+```mbt check
+///|
+async test "a responder doubles a number" {
+  @actors.scope <| scope => {
+    let doubler = scope.respond(value => value * 2)
+    assert_eq(doubler.ask(21), 42)
+  }
+}
+```
+
+A handler error ends the responder, fails its owner scope and wakes every
+pending caller with the cause. For a per-request rejection, use a reply type
+such as `Result[Value, Rejection]`; the responder then continues.

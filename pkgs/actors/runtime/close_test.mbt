@@ -407,3 +407,75 @@ async test "LIFE-1: a saved context scope rejects starts after its actor ends" {
   }
   assert_eq(outcome, "scope closed")
 }
+
+///|
+async test "LIFE-1: close wakes a blocked producer with Closed" {
+  let log = []
+  let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let one = @actors.MailboxCapacity::from_int(1)
+  let outcome = @actors.scope(scope => {
+    let worker = scope.start((), mailbox=Bounded(one), (_, task : Task) => {
+      match task {
+        Gated(name) => {
+          started.put(())
+          gate.get()
+          log.push(name)
+        }
+        Quick(name) => log.push(name)
+      }
+      Continue(())
+    })
+    worker.send(Gated("A"))
+    started.get()
+    worker.send(Quick("B"))
+    let outcome = @aio.with_task_group(group => {
+      let producer = group.spawn(() => {
+        try {
+          worker.send(Quick("C"))
+          "admitted"
+        } catch {
+          @actors.Closed(_) => "closed"
+          _ => "other"
+        }
+      })
+      @aio.pause()
+      ignore(worker.close())
+      producer.wait()
+    })
+    gate.put(())
+    worker.join()
+    outcome
+  })
+  assert_eq(outcome, "closed")
+  assert_eq(log, ["A"])
+}
+
+///|
+async test "LIFE-1: a failed parent cancels its child and runs the child cleanup first" {
+  let log = []
+  let outcome = try {
+    @actors.scope(scope => {
+      let parent = scope.spawn((context : @actors.ActorContext[Int]) => {
+        ignore(
+          context
+          .scope()
+          .start((), (_, _ : Int) => Continue(()), on_stop=() => {
+            log.push("child cleanup")
+          }),
+        )
+        let failing : @actors.Receive[Int, Unit] = @actors.receive().bind(_ => {
+          raise Broken("parent")
+        })
+        failing
+      })
+      parent.send(1)
+      parent.join()
+    })
+    "returned"
+  } catch {
+    Broken(text) => "failed: \{text}"
+    _ => "other"
+  }
+  assert_eq((outcome, log), ("failed: parent", ["child cleanup"]))
+}

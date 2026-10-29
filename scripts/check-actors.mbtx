@@ -370,7 +370,30 @@ async test "external consumers cannot take a message outside a receive or break 
         "fn probe(context : @actors.ActorContext[Counter]) -> Unit { let _ = context.select(fn(m) { Some(m) }) }",
         "4015",
       ),
+      // Services and responders keep their result types.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : String = scope.create(1).ask(fn(n) { n + 1 }) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : String = scope.respond(fn(n : Int) { n * 2 }).ask(21) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.respond(fn(n : Int) { n * 2 }).ask(\"21\")) }",
+        "4014",
+      ),
+      // A destination accepts only its message type.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().to_subject().send(Ping) }",
+        "4014",
+      ),
       // Opaque values cannot be made around their constructors.
+      (
+        "fn probe() -> Unit { let _ : @actors.Pending[Counter] = { messages: [] } }",
+        "4036",
+      ),
+      ("fn probe() -> Unit { let _ : @actors.Setup = { steps: [] } }", "4036"),
       (
         "fn probe() -> Unit { let _ : @policy.MailboxCapacity = { value: 0 } }",
         "4036",

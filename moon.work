@@ -6,6 +6,7 @@ members = [
   "./pkgs/config",
   "./pkgs/mediator",
   "./pkgs/logging-hosting-async",
+  "./pkgs/actors",
   "./pkgs/hosting",
   "./pkgs/lander",
   "./pkgs/notebooks",

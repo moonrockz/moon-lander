@@ -15,6 +15,7 @@ import {
   "moonrockz/moon-lander-mediator@0.7.3",
   "moonrockz/moon-lander-hosting@0.7.3",
   "moonrockz/moon-lander-logging-hosting-async@0.7.3",
+  "moonrockz/moon-lander-actors@0.7.3",
   "moonrockz/openrpc@0.7.3",
   "moonrockz/ion@0.6.0",
   "moonrockz/moonspec@0.11.0",

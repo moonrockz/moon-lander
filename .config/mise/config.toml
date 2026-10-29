@@ -205,6 +205,16 @@ run = "moonx scripts/toolchain.mbtx scripts/check-config.mbtx"
 description = "Fail when a target leg of the mediator tests runs zero tests (args: targets; default: all four)"
 run = "moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx"
 
+[tasks."check:actors"]
+description = "Fail when a target leg of the actor tests runs zero tests (args: targets; default: all four)"
+run = "moonx scripts/toolchain.mbtx scripts/check-actors.mbtx"
+
+
+# Manual local tool: never add it to check, CI or the release workflow.
+[tasks."bench:actors"]
+description = "Run the local actor receive benchmark in release mode (args: targets; default: wasm js native)"
+run = "moonx scripts/toolchain.mbtx scripts/bench-actors.mbtx"
+
 [tasks."check:logging"]
 description = "Fail when a target leg of the logging tests runs zero tests (args: targets; default: all four)"
 run = "moonx scripts/toolchain.mbtx scripts/check-logging.mbtx"
@@ -305,19 +315,19 @@ run = "mise tasks"
 experimental = true
 
 [tasks."validate:publication"]
-description = "Enforce the nine-library allowlist and private tooling manifests"
+description = "Enforce the ten-library allowlist and private tooling manifests"
 run = "moonx scripts/toolchain.mbtx scripts/publish.mbtx --check"
 
 [tasks."release:package"]
-description = "Package and audit all nine release libraries and record approved checksums"
+description = "Package and audit all ten release libraries and record approved checksums"
 run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx --package"
 
 [tasks."check:framework-registry"]
-description = "Verify all nine candidate archives with isolated registry consumers on supported targets"
+description = "Verify all ten candidate archives with isolated registry consumers on supported targets"
 run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx"
 
 [tasks."check:framework-published"]
-description = "Release gate: verify all nine public archives against release:package checksums"
+description = "Release gate: verify all ten public archives against release:package checksums"
 run = "moonx scripts/toolchain.mbtx scripts/check-framework-registry.mbtx --published"
 
 [tasks."openspec:check"]

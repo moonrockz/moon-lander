@@ -149,13 +149,14 @@ skill. Report these as problems:
 
 ## Publishing
 
-The framework is seven modules: `moonrockz/moon-lander-core`,
+The framework is eight modules: `moonrockz/moon-lander-core`,
 `moonrockz/moon-lander-logging`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
-the optional `moonrockz/moon-lander-logging-hosting-async`, `moonrockz/moon-lander-hosting`
-and the umbrella `moonrockz/moon-lander`. Each imports only the modules below it
+the optional `moonrockz/moon-lander-logging-hosting-async`, the optional
+`moonrockz/moon-lander-actors`, `moonrockz/moon-lander-hosting` and the umbrella
+`moonrockz/moon-lander`. Each imports only the modules below it
 (`mise run validate` checks this). The logging module imports only the MoonBit core
 library; `logging-hosting-async` imports core, logging and `moonbitlang/async`, never
-config, mediator or hosting. The module names are provisional. There is no CLI yet.
+config, mediator or hosting; `actors` imports core and `moonbitlang/async` only. The module names are provisional. There is no CLI yet.
 Do not add UI packages or a separate regolith module. One exception: the unpublished
 docs tool `apps/site` can use Rabbita. No other module can import it, and the
 published library stays UI-free. Consume `zig-cross` through

@@ -21,11 +21,11 @@ Bead: lander-25h.2
 
 Depends on: group 1.
 
-- [ ] 2.1 Add pkgs/actors with the portable root, target-limited runtime, shared version, license and workspace membership; update module/version validation, publication allowlists, packaging inventories, isolated candidate consumers and module guidance; verify mise run validate and the candidate actor consumer checks
-- [ ] 2.2 Add opaque capacity and count types, enum policies, typed errors and TimeLimit use; verify zero, negative one, one and largest-Int boundaries, constructor privacy and policy tests on all four targets
-- [ ] 2.3 Implement scope, start, private state, continue/stop, actor references, FIFO send and the thin one-shot ask path needed by the counter; verify the counter, concurrent producers and independent actors on all three runtime targets
-- [ ] 2.4 Add a minimal runnable README.mbt.md counter and an unpublished acceptance package; compile the example on all runtime targets and verify a wrong-protocol consumer fails compilation
-- [ ] 2.5 Add scripts/check-actors.mbtx and a mise task using the existing task wrapper; verify nonzero-test checks for root and runtime targets, a deliberate zero-test failure, and mise run check
+- [x] 2.1 Add pkgs/actors with the portable root, target-limited runtime, shared version, license and workspace membership; update module/version validation, publication allowlists, packaging inventories, isolated candidate consumers and module guidance; verify mise run validate and the candidate actor consumer checks
+- [x] 2.2 Add opaque capacity and count types, enum policies, typed errors and TimeLimit use; verify zero, negative one, one and largest-Int boundaries, constructor privacy and policy tests on all four targets
+- [x] 2.3 Implement scope, start, private state, continue/stop, actor references, FIFO send and the thin one-shot ask path needed by the counter; verify the counter, concurrent producers and independent actors on all three runtime targets
+- [x] 2.4 Add a minimal runnable README.mbt.md counter and an unpublished acceptance package; compile the example on all runtime targets and verify a wrong-protocol consumer fails compilation
+- [x] 2.5 Add scripts/check-actors.mbtx and a mise task using the existing task wrapper; verify nonzero-test checks for root and runtime targets, a deliberate zero-test failure, and mise run check
 
 ## 3. Admission, backpressure and cancellation
 
@@ -33,10 +33,10 @@ Bead: lander-25h.3
 
 Depends on: group 2.
 
-- [ ] 3.1 Add bounded default capacity 128, explicit unbounded policy and non-waiting admission outcomes; verify full, accepted and closed, including in-flight capacity exclusion and no silent drop
-- [ ] 3.2 Make admission cancellation-safe and wake blocked producers on close; test both sides of the admission commit point with acknowledgements and verify no stale producer waiter remains
-- [ ] 3.3 Add queue count and scheduler yielding between bounded batches; verify the count snapshot and progress of another ready actor
-- [ ] 3.4 Document admission versus processing, ownership of mutable messages and self-send deadlock with runnable examples; run check:actors on all runtime targets
+- [x] 3.1 Add bounded default capacity 128, explicit unbounded policy and non-waiting admission outcomes; verify full, accepted and closed, including in-flight capacity exclusion and no silent drop
+- [x] 3.2 Make admission cancellation-safe and wake blocked producers on close; test both sides of the admission commit point with acknowledgements and verify no stale producer waiter remains
+- [x] 3.3 Add queue count and scheduler yielding between bounded batches; verify the count snapshot and progress of another ready actor
+- [x] 3.4 Document admission versus processing, ownership of mutable messages and self-send deadlock with runnable examples; run check:actors on all runtime targets
 
 ## 4. Receive values, combinators and selective receive
 
@@ -44,12 +44,12 @@ Bead: lander-25h.4
 
 Depends on: group 3.
 
-- [ ] 4.1 Add the opaque Receive with receive, select, done, map, zip, zip_with, then and bind on the stack-safe encoding, the ActorContext with own reference, reenqueue and child scope, spawn and join; replace the spike's Inbox; verify finite completion, async work between receives, independent joiners, reenqueue tail order, a full self mailbox, and a compile-failure probe that no public operation takes a message outside a Receive
-- [ ] 4.2 Add selective receive through select with no uncounted stash; verify oldest match, retained order, arrivals while waiting, selector failure and expiry without removal
-- [ ] 4.3 Add within, poll, on_closed, recover, receive_loop, receive_all and receive_n, with the loop combinators as one repeat node, and run start through receive_loop; verify time limits, polling on empty and closed mailboxes, recovery without catching cancellation, count limits, state changes and final results through runnable examples that use `<|` for callbacks and method chains for Receive values, on all runtime targets
-- [ ] 4.4 Add the deterministic test runner for a Receive and a list of messages; verify the README protocol examples with it, document it as the preferred unit-test style, and verify 100,000-step loops of both kinds (state carried forward and result built after the recursive step) on wasm, js and native
-- [ ] 4.5 Add a moon bench suite for the RECV-1 shapes and a manual mise task for it; verify that mise run check, CI and the release workflow do not run it, record its results in the design, and keep each candidate optimization only when it shows a gain and the stack tests still pass
-- [ ] 4.6 Document the full non-matching bounded mailbox case and recovery choices; verify its timeout acceptance scenarios and run check:actors
+- [x] 4.1 Add the opaque Receive with receive, select, done, map, zip, zip_with, then and bind on the stack-safe encoding, the ActorContext with own reference, reenqueue and child scope, spawn and join; replace the spike's Inbox; verify finite completion, async work between receives, independent joiners, reenqueue tail order, a full self mailbox, and a compile-failure probe that no public operation takes a message outside a Receive
+- [x] 4.2 Add selective receive through select with no uncounted stash; verify oldest match, retained order, arrivals while waiting, selector failure and expiry without removal
+- [x] 4.3 Add within, poll, on_closed, recover, receive_loop, receive_all and receive_n, with the loop combinators as one repeat node, and run start through receive_loop; verify time limits, polling on empty and closed mailboxes, recovery without catching cancellation, count limits, state changes and final results through runnable examples that use `<|` for callbacks and method chains for Receive values, on all runtime targets
+- [x] 4.4 Add the deterministic test runner for a Receive and a list of messages; verify the README protocol examples with it, document it as the preferred unit-test style, and verify 100,000-step loops of both kinds (state carried forward and result built after the recursive step) on wasm, js and native
+- [x] 4.5 Add a moon bench suite for the RECV-1 shapes and a manual mise task for it; verify that mise run check, CI and the release workflow do not run it, record its results in the design, and keep each candidate optimization only when it shows a gain and the stack tests still pass. The pinned compiler rejects async benchmarks in `moon bench` (error 4132), so the suite is the release-mode program `tests/actors-bench` (design TEST-1)
+- [x] 4.6 Document the full non-matching bounded mailbox case and recovery choices; verify its timeout acceptance scenarios and run check:actors
 
 ## 5. Request/reply and common destinations
 

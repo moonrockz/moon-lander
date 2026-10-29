@@ -23,6 +23,7 @@ priv enum ReleaseLibrary {
   Config
   Mediator
   LoggingHostingAsync
+  Actors
   Hosting
   Lander
   Notebooks
@@ -56,6 +57,7 @@ fn ReleaseLibrary::parse_name(
     "moonrockz/moon-lander-config" => Config
     "moonrockz/moon-lander-mediator" => Mediator
     "moonrockz/moon-lander-logging-hosting-async" => LoggingHostingAsync
+    "moonrockz/moon-lander-actors" => Actors
     "moonrockz/moon-lander-hosting" => Hosting
     "moonrockz/moon-lander" => Lander
     "moonrockz/notebooks" => Notebooks
@@ -72,6 +74,7 @@ fn ReleaseLibrary::fixture_name(self : ReleaseLibrary) -> String {
     Config => "config"
     Mediator => "mediator"
     LoggingHostingAsync => "logging-hosting-async"
+    Actors => "actors"
     Hosting => "hosting"
     Lander => "lander"
     Notebooks => "notebooks"
@@ -371,15 +374,13 @@ async fn main {
           @fs.read_file("\{fixture}/\{file}"),
         )
       }
-      if candidate.library is Hosting {
-        for fixture_package in ["logging", "completion"] {
-          @fs.mkdir("\{consumer}/\{fixture_package}")
-          for file in ["main.mbt", "moon.pkg"] {
-            @fs.write_file(
-              "\{consumer}/\{fixture_package}/\{file}",
-              @fs.read_file("\{fixture}/\{fixture_package}/\{file}"),
-            )
-          }
+      for fixture_package in fixture_packages(candidate.library) {
+        @fs.mkdir("\{consumer}/\{fixture_package}")
+        for file in ["main.mbt", "moon.pkg"] {
+          @fs.write_file(
+            "\{consumer}/\{fixture_package}/\{file}",
+            @fs.read_file("\{fixture}/\{fixture_package}/\{file}"),
+          )
         }
       }
       let run = async fn(args : Array[String]) -> String {
@@ -407,6 +408,11 @@ async fn main {
         ignore(run(["add", "moonrockz/moon-lander-core@\{version}"]))
         ignore(run(["add", "moonbitlang/async@0.22.5"]))
       }
+      if candidate.library is Actors {
+        // The runtime consumer runs a counter in `async fn main`, which needs
+        // a direct import of the event loop.
+        ignore(run(["add", "moonbitlang/async@0.22.5"]))
+      }
       if candidate.library is Hosting {
         // The public stop probe consumer runs embedded or runtime hosts.
         ignore(run(["add", "moonrockz/moon-lander-core@\{version}"]))
@@ -426,6 +432,15 @@ async fn main {
       for line in graph.split("\n") {
         if line.contains("->") && line.contains("local ") {
           fail("Registry graph has a local dependency: \{line}")
+        }
+      }
+      if candidate.library is Actors {
+        // A standalone actor consumer resolves no application module or parser.
+        let leaks = actor_graph_leaks(graph)
+        guard leaks.is_empty() else {
+          fail(
+            "The actors consumer graph has \{leaks.join(", ")}; actors needs only core and async: \{graph}",
+          )
         }
       }
       // Every sibling in the graph must resolve to this release, never a workspace path.
@@ -463,6 +478,22 @@ async fn main {
         println(
           "Registry consumer PASS \{candidate.library.name()}@\{version}: \{target}",
         )
+      }
+      for fixture_package in fixture_packages(candidate.library) {
+        for
+          target in fixture_package_targets(candidate.library, fixture_package) {
+          let result = run([
+            "run", "--release", "--deny-warn", "--target", target, fixture_package,
+          ])
+          guard result.trim() == "ok" else {
+            fail(
+              "\{candidate.library.name()} \{fixture_package} on \{target}: \{result}",
+            )
+          }
+          println(
+            "Registry consumer PASS \{candidate.library.name()}@\{version} \{fixture_package}: \{target}",
+          )
+        }
       }
       if candidate.library is Hosting {
         for target in ["js", "native"] {
@@ -524,7 +555,7 @@ async fn main {
         } : Json).stringify(),
     )
     @async.with_timeout(1_800_000, verify)
-    println("All nine public registry consumers passed from \{dir}")
+    println("All ten public registry consumers passed from \{dir}")
     return
   }
   // The candidate archives are the only new registry entries. Their
@@ -636,6 +667,82 @@ async fn main {
 }
 
 ///|
+/// The consumer packages that a library fixture has below its main package. The main package runs on
+/// all four targets. Hosting runs its packages with its own steps; another library runs each package
+/// on the targets of `fixture_package_targets`.
+fn fixture_packages(library : ReleaseLibrary) -> Array[String] {
+  match library {
+    Hosting => ["logging", "completion"]
+    Actors => ["runtime"]
+    _ => []
+  }
+}
+
+///|
+/// The targets on which the generic steps run the consumer package `fixture_package` of `library`. The
+/// actor runtime uses `moonbitlang/async`, which has no wasm-gc event loop.
+fn fixture_package_targets(
+  library : ReleaseLibrary,
+  fixture_package : String,
+) -> Array[String] {
+  match (library, fixture_package) {
+    (Actors, "runtime") => ["wasm", "js", "native"]
+    _ => []
+  }
+}
+
+///|
+/// The modules in the `moon tree` output `graph` that a standalone actor consumer must not resolve:
+/// each release library except core and actors, and the configuration parsers.
+fn actor_graph_leaks(graph : String) -> Array[String] {
+  let forbidden = [
+    Logging,
+    Config,
+    Mediator,
+    LoggingHostingAsync,
+    Hosting,
+    Lander,
+    Notebooks,
+    OpenRpc,
+  ].map(library => library.name())
+  forbidden.push_iter(
+    ["moonbit-community/toml", "moonbit-community/yaml", "moonrockz/ion"].iter(),
+  )
+  forbidden.filter(name => {
+    graph.contains(name + "@") || graph.contains(name + " ->")
+  })
+}
+
+///|
+test "the actors runtime consumer runs on wasm, js and native only" {
+  assert_eq(fixture_packages(Actors), ["runtime"])
+  assert_eq(fixture_package_targets(Actors, "runtime"), ["wasm", "js", "native"])
+  assert_eq(fixture_packages(Mediator), [])
+  assert_eq(fixture_package_targets(Hosting, "logging"), [])
+}
+
+///|
+test "a standalone actor graph has no application module or parser" {
+  let standalone =
+    #|registry-consumer@0.0.1 (local /tmp/x) [workspace member]:
+    #|└─ moonrockz/moon-lander-actors -> moonrockz/moon-lander-actors@0.7.3
+    #|   ├─ moonbitlang/async -> moonbitlang/async@0.22.5
+    #|   └─ moonrockz/moon-lander-core -> moonrockz/moon-lander-core@0.7.3
+  assert_eq(actor_graph_leaks(standalone), [])
+  let leaking = standalone +
+    "\n   ├─ moonrockz/moon-lander-logging -> moonrockz/moon-lander-logging@0.7.3" +
+    "\n   └─ moonbit-community/toml -> moonbit-community/toml@0.5.0\n"
+  assert_eq(actor_graph_leaks(leaking), [
+    "moonrockz/moon-lander-logging", "moonbit-community/toml",
+  ])
+  let runtime_only = standalone +
+    "\n   └─ moonrockz/moon-lander-logging-hosting-async -> moonrockz/moon-lander-logging-hosting-async@0.7.3\n"
+  assert_eq(actor_graph_leaks(runtime_only), [
+    "moonrockz/moon-lander-logging-hosting-async",
+  ])
+}
+
+///|
 fn archive_audit(names : Array[String]) -> Array[String] {
   let errors = []
   for required in ["moon.mod", "moon.pkg", "LICENSE"] {
@@ -692,6 +799,7 @@ test "candidate identity parses one fixed library with its matching folder" {
       Config,
       Mediator,
       LoggingHostingAsync,
+      Actors,
       Hosting,
       Lander,
       Notebooks,

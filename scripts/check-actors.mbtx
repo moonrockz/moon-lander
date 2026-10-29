@@ -337,8 +337,35 @@ async test "external consumers cannot take a message outside a receive or break 
     )
     assert_eq(code, 0, msg=out.text() + err.text())
   }
+  // A consumer without a target limit cannot use the runtime on wasm-gc: the
+  // build rejects the package instead of giving operations that abort.
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors/runtime\" @actors,\n  \"moonrockz/moon-lander-actors\" @policy,\n}\nwarnings = \"-unused_type_declaration-unused_constructor-unused_package\"\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    ["check", "--target", "wasm-gc", "."],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg="The runtime compiled on wasm-gc")
+  assert_true(output.contains("wasm-gc"), msg=output)
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors/runtime\" @actors,\n  \"moonrockz/moon-lander-actors\" @policy,\n}\nsupported_targets = \"wasm+js+native\"\nwarnings = \"-unused_type_declaration-unused_constructor-unused_package\"\n",
+  )
   for
     (source, diagnostic) in [
+      // A reference has no lifecycle control.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { ignore(counter(scope).to_ref().close()) }",
+        "4015",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().cancel() }",
+        "4015",
+      ),
       // A reference accepts only its protocol.
       (
         "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).send(\"text\") }",

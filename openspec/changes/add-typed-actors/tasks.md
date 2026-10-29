@@ -89,11 +89,11 @@ Bead: lander-25h.8
 
 Depends on: group 7.
 
-- [ ] 8.1 Add opaque ActorName and typed parse errors in the portable root with runtime re-exports; verify empty, invalid first character, invalid later character, non-ASCII, 1, 128 and 129 character inputs and case-sensitive equality on all four targets
-- [ ] 8.2 Add per-lifetime ActorAddress and optional scope-named start/spawn; verify address equality, cross-scope uniqueness, duplicate creators running only one initializer, failed startup releasing names after cleanup, closing actors retaining reservations and old refs staying closed after reuse
-- [ ] 8.3 Add immutable typed Directory empty/of, union, add, remove, difference, membership equality and supported Add/Sub operators; verify identity, associativity, commutativity, idempotence, input preservation, absent removal and exact-address removal with focused property tests on all runtime targets
-- [ ] 8.4 Add directory name lookup and exact-address resolution; verify duplicate-name behavior, same-address deduplication, removal resolving a name conflict, closed-member retention, explicit refresh after replacement and wrong-protocol compile failures
-- [ ] 8.5 Add runnable composition, named discovery and name-reuse examples and record the pinned compiler's rejected operator forms; verify composition across scopes does not change actor ownership, removal does not cancel the actor or release its name reservation, old snapshots remain usable after scope exit and check:actors passes on all runtime targets
+- [x] 8.1 Add opaque ActorName and typed parse errors in the portable root with runtime re-exports; verify empty, invalid first character, invalid later character, non-ASCII, 1, 128 and 129 character inputs and case-sensitive equality on all four targets
+- [x] 8.2 Add per-lifetime ActorAddress and optional scope-named start/spawn; verify address equality, cross-scope uniqueness, duplicate creators running only one initializer, failed startup releasing names after cleanup, closing actors retaining reservations and old refs staying closed after reuse
+- [x] 8.3 Add immutable typed Directory empty/of, union, add, remove, difference, membership equality and supported Add/Sub operators; verify identity, associativity, commutativity, idempotence, input preservation, absent removal and exact-address removal with focused property tests on all runtime targets
+- [x] 8.4 Add directory name lookup and exact-address resolution; verify duplicate-name behavior, same-address deduplication, removal resolving a name conflict, closed-member retention, explicit refresh after replacement and wrong-protocol compile failures
+- [x] 8.5 Add runnable composition, named discovery and name-reuse examples and record the pinned compiler's rejected operator forms; verify composition across scopes does not change actor ownership, removal does not cancel the actor or release its name reservation, old snapshots remain usable after scope exit and check:actors passes on all runtime targets
 
 ## 9. Scoped event delivery and integration
 
@@ -101,9 +101,9 @@ Bead: lander-25h.9
 
 Depends on: group 8.
 
-- [ ] 9.1 Add Topic, scoped subscriptions, unsubscribe and close; verify subscriber order, snapshot behavior, closed-destination pruning, backpressure, partial delivery and scope cleanup on all runtime targets
-- [ ] 9.2 Add runnable fan-out and worker-pool examples using subjects and direct send, update the docs index and explain the difference from mediator publish; verify examples compile and docs links pass
-- [ ] 9.3 Compare acceptance evidence with every row of the design's reference baseline and every actors requirement; verify no required capability is represented only by prose or an unchecked test target
+- [x] 9.1 Add Topic, scoped subscriptions, unsubscribe and close; verify subscriber order, snapshot behavior, closed-destination pruning, backpressure, partial delivery and scope cleanup on all runtime targets
+- [x] 9.2 Add runnable fan-out and worker-pool examples using subjects and direct send, update the docs index and explain the difference from mediator publish; verify examples compile and docs links pass
+- [x] 9.3 Compare acceptance evidence with every row of the design's reference baseline and every actors requirement; verify no required capability is represented only by prose or an unchecked test target
 - [ ] 9.4 Generate and review public pkg.generated.mbti files, run mise run format, mise run check and mise exec -- openspec validate --all --strict; verify all pass and isolated candidate consumers use the intended actor archive
 
 ## Workflow follow-up

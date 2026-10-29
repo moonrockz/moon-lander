@@ -348,3 +348,113 @@ async test "NAME-1: names are case sensitive in lookup and in reservations" {
     assert_eq(upper.address().to_string().has_suffix("(Counter)"), true)
   })
 }
+
+///|
+async test "NAME-1: a cancelled named startup releases the name for a retry in the same scope" {
+  let counter = name("counter")
+  let initializing : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  @actors.scope(scope => {
+    @aio.with_task_group(group => {
+      let creator = group.spawn(() => {
+        ignore(
+          scope.start_with(
+            _ => {
+              initializing.put(())
+              never.get()
+              0
+            },
+            handle_counter,
+            name=counter,
+          ),
+        )
+      })
+      initializing.get()
+      creator.cancel()
+    })
+    let again = scope.start(0, handle_counter, name=counter)
+    again.send(Increment)
+    assert_eq(again.ask(reply => Read(reply)), 1)
+  })
+}
+
+///|
+async test "NAME-1: a duplicate name fails also with another protocol, and its initializer does not run" {
+  let counter = name("counter")
+  let initialized = Ref(false)
+  @actors.scope(scope => {
+    ignore(scope.start(0, handle_counter, name=counter))
+    let outcome = try {
+      let _ : @actors.Actor[String, Unit] = scope.start_with(
+        _ => {
+          initialized.val = true
+          ""
+        },
+        (state, _ : String) => Continue(state),
+        name=counter,
+      )
+      "started"
+    } catch {
+      @actors.NameInUse(taken) if taken == counter => "name in use"
+      _ => "other"
+    }
+    assert_eq(outcome, "name in use")
+  })
+  assert_false(initialized.val)
+}
+
+///|
+async test "NAME-1: an anonymous actor's handle and copied references share one address" {
+  @actors.scope(scope => {
+    let actor = scope.start(0, handle_counter)
+    let first = actor.to_ref()
+    let copy = first
+    assert_true(actor.address() == first.address())
+    assert_true(first.address() == copy.address())
+    assert_true(actor.address().name() is None)
+  })
+}
+
+///|
+async test "DIR-1: a reference from lookup reports closed after its actor closes" {
+  @actors.scope(scope => {
+    let actor = scope.start(0, handle_counter, name=name("counter"))
+    let directory = @actors.Directory::of(actor.to_ref())
+    guard directory.lookup(name("counter")) is Found(found) else {
+      fail("not found")
+    }
+    ignore(actor.close())
+    assert_eq(found.try_send(Increment), Closed)
+    let sent = try {
+      found.send(Increment)
+      "sent"
+    } catch {
+      @actors.Closed(_) => "closed"
+      _ => "other"
+    }
+    assert_eq(sent, "closed")
+  })
+}
+
+///|
+async test "DIR-1: an escaped directory still resolves and looks up its members" {
+  let worker = name("worker")
+  let (saved, address) = @actors.scope(scope => {
+    let actor = scope.start(0, handle_counter, name=worker)
+    (@actors.Directory::of(actor.to_ref()), actor.address())
+  })
+  guard saved.resolve(address) is Some(resolved) else { fail("not resolved") }
+  assert_true(saved.lookup(worker) is Found(_))
+  assert_eq(resolved.try_send(Increment), Closed)
+}
+
+///|
+async test "DIR-1: the same named reference through both inputs gives one member and no ambiguity" {
+  @actors.scope(scope => {
+    let actor = scope.start(0, handle_counter, name=name("counter"))
+    let copy = actor.to_ref()
+    let combined = @actors.Directory::of(actor.to_ref()) + @actors.Directory::of(copy)
+    assert_eq(combined.size(), 1)
+    assert_true(combined.lookup(name("counter")) is Found(_))
+  })
+}

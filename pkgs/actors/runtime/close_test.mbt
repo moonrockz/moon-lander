@@ -677,3 +677,65 @@ async test "LIFE-1: join and status report a cleanup failure with the primary fa
   assert_eq(joined.try_get(), Some("cleanup"))
   assert_eq(statuses, ["failed"])
 }
+
+///|
+async test "LIFE-1: a cleanup timeout keeps the primary failure" {
+  let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let ten_ms = @lander_core.TimeLimit::millis(10)
+  let outcome = try {
+    @actors.scope(scope => {
+      let actor = scope.start(
+        (),
+        (_, _ : Int) => raise Broken("handler"),
+        on_stop=() => @aio.sleep(10000),
+        cleanup_limit=ten_ms,
+      )
+      actor.send(1)
+      never.get()
+    })
+    "returned"
+  } catch {
+    @actors.CleanupTimedOut(primary=Some(Broken(text)), limit~) if limit == ten_ms =>
+      "timed out after \{text}"
+    _ => "other"
+  }
+  assert_eq(outcome, "timed out after handler")
+}
+
+///|
+async test "LIFE-1: a parent that completes ends its descendants first" {
+  let log = []
+  @actors.scope(scope => {
+    let parent = scope.spawn((context : @actors.ActorContext[Int]) => {
+      let child = context
+        .scope()
+        .spawn(
+          (inner : @actors.ActorContext[Int]) => {
+            ignore(
+              inner
+              .scope()
+              .start((), (_, _ : Int) => Continue(()), on_stop=() => {
+                log.push("grandchild cleanup")
+              }),
+            )
+            let waiting : @actors.Receive[Int, Int] = @actors.receive()
+            waiting
+          },
+          on_stop=() => log.push("child cleanup"),
+        )
+      ignore(child)
+      @actors.done(1)
+    })
+    assert_eq(parent.join(), 1)
+    log.push("parent joined")
+  })
+  assert_eq(log, ["grandchild cleanup", "child cleanup", "parent joined"])
+}
+
+///|
+test "ASK-1: the default ask waits within 30 seconds" {
+  assert_eq(
+    @actors.WaitPolicy::default(),
+    Within(@lander_core.TimeLimit::seconds(30)),
+  )
+}

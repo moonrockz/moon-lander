@@ -50,3 +50,8 @@ async test "LIFE-1: no actor, child, watcher or waiter remains after the scope r
   }
   assert_eq(restart, "scope closed")
 }
+
+///|
+test "LIFE-1: the default cleanup limit is five seconds" {
+  assert_eq(default_cleanup_limit(), @lander_core.TimeLimit::seconds(5))
+}

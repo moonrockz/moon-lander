@@ -13,6 +13,33 @@ fn release_line(
 fn tags(releases : Array[Release]) -> Array[String] {
   releases.map(release => release.tag)
 }
+///|
+async test "the retained v0.7.3 archive assembles without changing its browser assets" {
+  let dir = @fs.tmpdir(prefix="lander-retained-site")
+  defer @fs.rmdir(dir, recursive=true)
+  unpack("v0.7.3", "fixtures/versioned/site-0.7.tar.gz", dir + "/v/0.7")
+  let js = @fs.read_file(dir + "/v/0.7/assets/islands.js").binary()
+  let search = @fs.read_file(dir + "/v/0.7/search-index.json").binary()
+  assert_eq(@host.check(dir + "/v/0.7", "/moon-lander/v/0.7/"), [])
+  write_text(dir + "/next/index.html",
+    tree_page("/moon-lander/next/", "").replace_all(old="data-site-root=\"/m/\"", new="data-site-root=\"/moon-lander/\""))
+  write_text(dir + "/next/assets/site.css", "a{}")
+  write_text(dir + "/next/search-index.json", "[]")
+  assemble_site(dir, { base: "/moon-lander/", site_url: "https://moonrockz.github.io/moon-lander/", lines: ["0.7"] })
+  assert_eq(@host.check(dir, "/moon-lander/"), [])
+  for tree in ["", "latest/", "v/0.7/"] {
+    assert_eq(@fs.read_file(dir + "/" + tree + "assets/islands.js").binary(), js)
+    assert_eq(@fs.read_file(dir + "/" + tree + "search-index.json").binary(), search)
+    let api = @fs.read_file(dir + "/" + tree + "api/moonrockz/notebooks/index.html").text()
+    assert_true(api.contains("id=\"CellKind\""))
+    let home = @fs.read_file(dir + "/" + tree + "index.html").text()
+    assert_true(home.contains("data-base=\"/moon-lander/\{tree}\""))
+  }
+  let next = @fs.read_file(dir + "/next/index.html").text()
+  assert_true(next.contains("which is not released. The latest is 0.7"))
+  assert_true(next.contains("https://moonrockz.github.io/moon-lander/latest/"))
+  assert_eq(@fs.read_file(dir + "/next/search-index.json").text(), "[]")
+}
 
 ///|
 test "Patch release" {

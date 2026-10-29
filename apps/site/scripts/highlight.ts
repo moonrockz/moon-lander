@@ -35,6 +35,11 @@ function unescape(text: string) {
 
 /** Highlight every fenced code block in one HTML string. */
 export async function highlightHtml(html: string) {
+  // Moon-Lander keeps signatures for unselected packages as plain text. The
+  // shared renderer supplies external registry links for those packages.
+  html = html.replace(/(<pre class="api-signature"><code>)([\s\S]*?)(<\/code><\/pre>)/g,
+    (_, open: string, signature: string, close: string) =>
+      open + signature.replace(/<a href="https?:\/\/[^\"]*">([\s\S]*?)<\/a>/g, '$1') + close);
   const h = await shiki();
   const warnings: string[] = [];
   const out = html.replace(block, (whole: string, lang: string, code: string) => {

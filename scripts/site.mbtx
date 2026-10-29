@@ -6,6 +6,7 @@ import {
   "moonbitlang/async@0.22.5/stdio",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
   "moonbitlang/x@0.5.6/sys",
 }
 ----
@@ -14,10 +15,10 @@ import {
 /// Build, check and test the docs site of `apps/site`. The site is written to `_site/`.
 ///
 /// Usage: `mise run build:site [-- --main] [--tree <tree>]`, `mise run check:site [-- --tree <tree>]`,
-/// `mise run test:site [-- --tree <tree>]` and `mise run assemble:site`, or the same commands of
+/// `mise run test:site [-- --tree <tree>] [--port <n>]` and `mise run assemble:site`, or the same commands of
 /// `moonx scripts/toolchain.mbtx scripts/site.mbtx`.
-/// `build` removes `_site/`, then runs the steps of design D6 in order. Each task stops at the first
-/// step that fails, prints the name of that step, and exits with a non-zero code. `check` checks the
+/// Build renders through the shared host, then highlights and checks its output.
+/// Each task stops at the first failed step and exits with a non-zero code. `check` checks the
 /// built `_site/`. `test` runs the tests of the site packages and of the TypeScript highlight step,
 /// installs Chromium, and runs the browser smoke test against the built `_site/` (design D16).
 /// `--tree next` builds, checks or tests the `main` tree in `_site/next/`, and `--tree <minor>` the
@@ -26,7 +27,7 @@ import {
 /// Run it from the workspace root.
 
 ///|
-let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] | assemble"
+let usage : String = "Usage: moonx scripts/toolchain.mbtx scripts/site.mbtx build [--main] [--tree <tree>] | check [--tree <tree>] | test [--tree <tree>] [--port <n>] | assemble"
 
 ///|
 /// The arguments without `--tree <tree>`, and the tree, or `None` without `--tree`.
@@ -122,10 +123,6 @@ fn tree_dir(path : String) -> String {
 let out_dir : String = "_site"
 
 ///|
-/// The islands bundle that `moon build` writes, relative to the workspace root.
-let islands_build : String = "_build/js/release/build/moonrockz/moon-lander-site/islands/islands.js"
-
-///|
 /// The directory of the `moon doc` output of the API pages, relative to the workspace root. The
 /// output of the module directory `pkgs/notebooks` is in `_build/site-api/pkgs/notebooks/doc/`.
 let api_dir : String = "_build/site-api"
@@ -179,12 +176,35 @@ enum Action {
   GzipBudget(String)
   /// Serve `_site/` on the port with `serve-site.mbtx --no-watch`, run the browser smoke test against
   /// the tree at the path below the base path (`""` for the whole site), and stop the server.
-  BrowserTest(Int32, String)
+  BrowserTest(BrowserPort, String)
 } derive(Eq, Debug)
 
 ///|
 /// The port of the preview server during the browser smoke test (design D16).
-let browser_test_port : Int32 = 4174
+let browser_test_port : BrowserPort = { value: 4174, }
+
+///|
+/// A validated loopback port for a browser acceptance run.
+struct BrowserPort {
+  value : Int32
+} derive(Eq, Debug)
+
+///|
+suberror BrowserPortError {
+  InvalidBrowserPort(String)
+}
+
+///|
+fn BrowserPort::parse(text : String) -> BrowserPort raise BrowserPortError {
+  guard text != "" && text.iter().all(c => c >= '0' && c <= '9') else {
+    raise InvalidBrowserPort(text)
+  }
+  let value = @string.parse_int(text) catch {
+    _ => raise InvalidBrowserPort(text)
+  }
+  guard value >= 1 && value <= 65535 else { raise InvalidBrowserPort(text) }
+  { value, }
+}
 
 ///|
 /// The browser smoke test, run by the pinned Node.
@@ -228,6 +248,7 @@ fn build_steps(
   args : Array[String],
   api~ : Array[String] = [],
   tree~ : String = "",
+  base~ : String = "/moon-lander/",
 ) -> Array[Step] raise Failure {
   for arg in args {
     if arg != "--main" {
@@ -236,8 +257,8 @@ fn build_steps(
   }
   let out = tree_dir(tree)
   let generate_args = [
-    "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
-    ".", "--out", out,
+    "run", "--target", "native", "--release", "apps/site/driver", "--", "build",
+    "--root", ".", "--out", out,
   ]
   if tree != "" {
     generate_args.push("--tree-path")
@@ -248,24 +269,11 @@ fn build_steps(
   }
   [
     install_step,
-    run("build islands", "moon", [
-      "build", "--target", "js", "--release", "apps/site/islands",
-    ]),
-    run("bundle islands", "bun", [
-      "build",
-      islands_build,
-      "--minify",
-      "--format",
-      "esm",
-      "--target",
-      "browser",
-      "--outdir",
-      "\{out}/assets",
-    ]),
-    { name: "check islands size", action: GzipBudget(islands_bundle(out)), },
     ..api.map(api_doc_step),
     run("generate", "moon", generate_args),
+    { name: "check islands size", action: GzipBudget(islands_bundle(out)), },
     run("highlight", "bun", ["apps/site/scripts/highlight.ts", out]),
+    ..check_steps([], tree~, base~),
   ]
 }
 
@@ -286,8 +294,9 @@ fn check_steps(
     "--target",
     "native",
     "--release",
-    "apps/site/check",
+    "apps/site/driver",
     "--",
+    "check",
     "--root",
     ".",
     "--dir",
@@ -351,8 +360,17 @@ fn test_steps(
   packages : Array[String],
   tree~ : String = "",
 ) -> Array[Step] raise Failure {
-  if args is [arg, ..] {
-    raise Failure("unknown option `\{arg}`. \{usage}")
+  let port = match args {
+    [] => browser_test_port
+    ["--port", text] =>
+      BrowserPort::parse(text) catch {
+        InvalidBrowserPort(text) =>
+          raise Failure(
+            "bad browser port `\{text}`; expected 1 through 65535. \{usage}",
+          )
+      }
+    [arg, ..] =>
+      raise Failure("unknown or incomplete option `\{arg}`. \{usage}")
   }
   [
     install_step,
@@ -361,8 +379,8 @@ fn test_steps(
       "moon",
       ["test", "--target", "native", "-p", ..packages],
     ),
-    run("test site model (js)", "moon", [
-      "test", "--target", "js", "-p", "moonrockz/moon-lander-site/model",
+    run("test site policy (js)", "moon", [
+      "test", "--target", "js", "-p", "moonrockz/moon-lander-site/policy",
     ]),
     run("test highlight", "node", [
       "--test", "apps/site/scripts/highlight.test.ts",
@@ -372,10 +390,7 @@ fn test_steps(
     run("install chromium", "node", [
       "apps/site/node_modules/playwright/cli.js", "install", "chromium",
     ]),
-    {
-      name: "browser smoke test",
-      action: BrowserTest(browser_test_port, tree),
-    },
+    { name: "browser smoke test", action: BrowserTest(port, tree), },
   ]
 }
 
@@ -488,6 +503,7 @@ async fn run_step(step : Step) -> Int32 {
       }
     }
     BrowserTest(port, tree) => {
+      let port = port.value
       let site = site_base(@fs.read_file("site/site.json").text()) catch {
         error => {
           eprintln("❌ \{step.name}: \{error}")
@@ -573,6 +589,7 @@ async fn main {
             rest,
             api=api_dirs(@fs.read_file("site/site.json").text()),
             tree~,
+            base=site_base(@fs.read_file("site/site.json").text()),
           ),
           "✅ Built \{tree_dir(tree)}/",
         )
@@ -610,9 +627,6 @@ async fn main {
       return
     }
   }
-  if command == "build" && @fs.exists(out_dir) {
-    @fs.rmdir(out_dir, recursive=true)
-  }
   let code = run_steps(steps)
   if code != 0 {
     @sys.exit(code)
@@ -621,30 +635,29 @@ async fn main {
 }
 
 ///|
-test "build runs the steps of design D6 in order" {
+test "build uses the shared islands after generation and checks the highlighted output" {
   assert_eq(build_steps([]).map(step => step.name), [
-    "install site dependencies", "build islands", "bundle islands", "check islands size",
-    "generate", "highlight",
+    "install site dependencies", "generate", "check islands size", "highlight", "check",
   ])
-  assert_eq(build_steps([])[4], {
+  assert_eq(build_steps([])[1], {
     name: "generate",
     action: Run("moon", [
-      "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
-      ".", "--out", "_site",
+      "run", "--target", "native", "--release", "apps/site/driver", "--", "build",
+      "--root", ".", "--out", "_site",
     ]),
   })
-  assert_eq(build_steps([])[3].action, GzipBudget("_site/assets/islands.js"))
+  assert_eq(build_steps([])[2].action, GzipBudget("_site/assets/islands.js"))
 }
 
 ///|
 test "moon doc runs in each API module before generate" {
   let steps = build_steps([], api=["pkgs/lander", "pkgs/notebooks"])
   assert_eq(steps.map(step => step.name), [
-    "install site dependencies", "build islands", "bundle islands", "check islands size",
-    "moon doc pkgs/lander", "moon doc pkgs/notebooks", "generate", "highlight",
+    "install site dependencies", "moon doc pkgs/lander", "moon doc pkgs/notebooks",
+    "generate", "check islands size", "highlight", "check",
   ])
   assert_eq(
-    steps[5].action,
+    steps[2].action,
     Run("moon", [
       "-C", "pkgs/notebooks", "doc", "--target-dir", "../../_build/site-api/pkgs/notebooks",
     ]),
@@ -662,11 +675,11 @@ test "the api key gives the module directories" {
 
 ///|
 test "--main reaches generate" {
-  guard build_steps(["--main"])[4].action is Run(_, args) else {
+  guard build_steps(["--main"])[1].action is Run(_, args) else {
     fail("generate is not a command")
   }
   assert_eq(args[args.length() - 1], "--main")
-  guard build_steps([])[4].action is Run(_, args) else {
+  guard build_steps([])[1].action is Run(_, args) else {
     fail("generate is not a command")
   }
   assert_false(args.contains("--main"))
@@ -688,8 +701,8 @@ test "check runs the check executable on _site" {
     {
       name: "check",
       action: Run("moon", [
-        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
-        ".", "--dir", "_site",
+        "run", "--target", "native", "--release", "apps/site/driver", "--", "check",
+        "--root", ".", "--dir", "_site",
       ]),
     },
   ])
@@ -702,43 +715,67 @@ test "check runs the check executable on _site" {
 }
 
 ///|
-test "test runs the site package tests, the highlight test and the browser test" {
-  let steps = test_steps([], ["moonrockz/moon-lander-site/model"])
+test "test runs native consumer tests, portable policy, highlight and browser tests" {
+  let steps = test_steps([], ["moonrockz/moon-lander-site/policy"])
   assert_eq(steps.map(step => step.name), [
-    "install site dependencies", "test site packages (native)", "test site model (js)",
+    "install site dependencies", "test site packages (native)", "test site policy (js)",
     "test highlight", "install chromium", "browser smoke test",
   ])
   assert_eq(
     steps[1].action,
     Run("moon", [
-      "test", "--target", "native", "-p", "moonrockz/moon-lander-site/model",
+      "test", "--target", "native", "-p", "moonrockz/moon-lander-site/policy",
     ]),
   )
-  assert_eq(steps[5].action, BrowserTest(4174, ""))
-  let next = test_steps([], [], tree="next/")
-  assert_eq(next[5].action, BrowserTest(4174, "next/"))
+  assert_eq(steps[5].action, BrowserTest(browser_test_port, ""))
+  assert_eq(
+    test_steps([], [], tree="next/")[5].action,
+    BrowserTest(browser_test_port, "next/"),
+  )
+}
+
+///|
+test "browser acceptance can use a free loopback port" {
+  for text in ["1", "4178", "65535"] {
+    let port = BrowserPort::parse(text)
+    assert_eq(
+      test_steps(["--port", text], [], tree="next/")[5].action,
+      BrowserTest(port, "next/"),
+    )
+  }
+  for text in ["", "0", "65536", "-1", "+1", "x", "9999999999999999999999"] {
+    let failed = try {
+      ignore(BrowserPort::parse(text))
+      false
+    } catch {
+      InvalidBrowserPort(_) => true
+    }
+    assert_true(failed)
+  }
+  for args in [["--port"], ["--port", "4178", "extra"], ["--unknown"]] {
+    let failed = try {
+      ignore(test_steps(args, []))
+      false
+    } catch {
+      Failure(_) => true
+    }
+    assert_true(failed)
+  }
 }
 
 ///|
 test "Minor line tree: a tree build writes below its tree" {
   let steps = build_steps(["--main"], tree="next/")
   assert_eq(
-    steps[2].action,
-    Run("bun", [
-      "build", islands_build, "--minify", "--format", "esm", "--target", "browser",
-      "--outdir", "_site/next/assets",
-    ]),
-  )
-  assert_eq(steps[3].action, GzipBudget("_site/next/assets/islands.js"))
-  assert_eq(
-    steps[4].action,
+    steps[1].action,
     Run("moon", [
-      "run", "--target", "native", "--release", "apps/site/generate", "--", "--root",
-      ".", "--out", "_site/next", "--tree-path", "next/", "--main",
+      "run", "--target", "native", "--release", "apps/site/driver", "--", "build",
+      "--root", ".", "--out", "_site/next", "--tree-path", "next/", "--main",
     ]),
   )
+  assert_eq(steps[2].action, GzipBudget("_site/next/assets/islands.js"))
   assert_eq(
-    steps[5].action,
+    steps[3].action,
     Run("bun", ["apps/site/scripts/highlight.ts", "_site/next"]),
   )
   assert_eq(tree_path("next", line="0.2"), "next/")
@@ -787,8 +824,8 @@ test "check and assemble run their executables on _site" {
     {
       name: "check",
       action: Run("moon", [
-        "run", "--target", "native", "--release", "apps/site/check", "--", "--root",
-        ".", "--dir", "_site/next", "--base", "/moon-lander/next/",
+        "run", "--target", "native", "--release", "apps/site/driver", "--", "check",
+        "--root", ".", "--dir", "_site/next", "--base", "/moon-lander/next/",
       ]),
     },
   ])

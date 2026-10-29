@@ -1,0 +1,8 @@
+import {
+  "moonrockz/telescope/extensions",
+  "moonrockz/telescope/content",
+  "bobzhang/beautiful_mermaid" @mermaid,
+}
+
+// The diagram renderer uses native Markdown support; published framework code stays portable.
+supported_targets = "native"

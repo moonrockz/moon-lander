@@ -1,6 +1,85 @@
-<section class="hero">
-  <h1>Moon-Lander</h1>
-  <p>An application framework for MoonBit. Build an application one time and land it on a host: the web, WebAssembly or a native process.</p>
-  <p><a href="/docs/design/overview/">Read the Design overview</a>. It explains the proposed hosting and configuration design, in the order that one run uses it.</p>
-  <p>Install the framework with <code>moon add moonrockz/moon-lander@0.6.0</code>, or choose the core, logging, config, mediator, logging-hosting-async and hosting modules separately. All seven framework modules, notebooks and OpenRPC are available from mooncakes.io at the same release version.</p>
-</section>
+<link rel="stylesheet" href="/assets/landing.css">
+<div class="ml-home">
+  <section class="ml-hero" aria-labelledby="landing-title">
+    <div class="ml-intro">
+      <p class="ml-eyebrow">An application framework for MoonBit</p>
+      <h1 id="landing-title">Build once.<br><em>Land anywhere.</em></h1>
+      <p class="ml-lead">Compose configuration, logging and application lifecycle.
+        Run on the web, WebAssembly or a native host.</p>
+      <div class="ml-actions">
+        <a class="ml-button ml-primary" href="/docs/">Read the docs <span aria-hidden="true">→</span></a>
+        <!-- The native compatibility adapter resolves this to the active tree's /api/. -->
+        <a class="ml-button" href="moon-lander-route://api-index">Explore the API</a>
+      </div>
+      <ul class="ml-facts" aria-label="Project facts">
+        <li>wasm · wasm-gc · js · native</li>
+        <li>Apache-2.0</li>
+      </ul>
+      <div class="ml-install">
+        <p>Add the framework</p>
+        <div class="code-block"><pre><code>moon add moonrockz/moon-lander</code></pre></div>
+        <p class="ml-install-note">Or select individual modules for your application.</p>
+      </div>
+    </div>
+    <div class="ml-art">
+      <img src="/assets/brand/mascot.png" width="512" height="512"
+        alt="The pink Moonrockz bunny piloting a gold lunar lander" fetchpriority="high" decoding="async">
+    </div>
+  </section>
+
+  <section class="ml-section" aria-labelledby="modules-title">
+    <p class="ml-eyebrow">Choose the modules you need</p>
+    <h2 id="modules-title">Start with your application.</h2>
+    <p class="ml-section-lead">Use the framework together, or bring just the parts your application needs.</p>
+    <div class="ml-modules">
+      <a class="ml-card" href="/docs/packages/config/">
+        <span class="ml-card-number" aria-hidden="true">01</span>
+        <h3>Configuration</h3>
+        <p>Load typed settings with profiles, layered sources and the parsers you choose.</p>
+        <span class="ml-card-link">Configuration guide <span aria-hidden="true">→</span></span>
+      </a>
+      <a class="ml-card" href="/docs/packages/logging/">
+        <span class="ml-card-number" aria-hidden="true">02</span>
+        <h3>Logging</h3>
+        <p>Write structured events through your logger, with optional console and rolling files.</p>
+        <span class="ml-card-link">Logging guide <span aria-hidden="true">→</span></span>
+      </a>
+      <a class="ml-card" href="/docs/packages/hosting/">
+        <span class="ml-card-number" aria-hidden="true">03</span>
+        <h3>Hosting</h3>
+        <p>Compose startup, commands and shutdown. Keep the application separate from its host.</p>
+        <span class="ml-card-link">Hosting guide <span aria-hidden="true">→</span></span>
+      </a>
+      <a class="ml-card" href="/docs/packages/mediator/">
+        <span class="ml-card-number" aria-hidden="true">04</span>
+        <h3>Mediator</h3>
+        <p>Route requests, notifications and streams through typed handlers and pipelines.</p>
+        <span class="ml-card-link">Mediator guide <span aria-hidden="true">→</span></span>
+      </a>
+      <a class="ml-card" href="/docs/packages/actors/">
+        <span class="ml-card-number" aria-hidden="true">05</span>
+        <h3>Actors</h3>
+        <p>Describe receives as values. Coordinate mailboxes, lifecycle and supervision explicitly.</p>
+        <span class="ml-card-link">Actors guide <span aria-hidden="true">→</span></span>
+      </a>
+      <a class="ml-card" href="/docs/packages/core/">
+        <span class="ml-card-number" aria-hidden="true">06</span>
+        <h3>A small shared core</h3>
+        <p>Start with application names, time limits and the domain values shared by the modules.</p>
+        <span class="ml-card-link">Core guide <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
+  </section>
+
+  <section class="ml-next" aria-labelledby="next-title">
+    <div>
+      <p class="ml-eyebrow">Make the host explicit</p>
+      <h2 id="next-title">See how the pieces fit.</h2>
+      <p>Follow an application run from configuration to shutdown, or go straight to the package APIs.</p>
+    </div>
+    <div class="ml-actions">
+      <a class="ml-button ml-primary" href="/docs/design/overview/">Read the design</a>
+      <a class="ml-button" href="/docs/packages/lander/">Framework guide</a>
+    </div>
+  </section>
+</div>

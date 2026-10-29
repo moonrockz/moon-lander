@@ -4,12 +4,65 @@
   "base_path": "/moon-lander/",
   "site_url": "https://moonrockz.github.io/moon-lander/",
   "repo_url": "https://github.com/moonrockz/moon-lander",
-  "versions": { "since": "0.3" },
-  "packages": ["lander", "core", "logging", "config", "mediator", "actors", "hosting", "notebooks", "openrpc"],
-  "api": ["pkgs/lander", "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/actors", "pkgs/hosting", "pkgs/notebooks", "pkgs/openrpc"],
+  "versions": {
+    "since": "0.3"
+  },
+  "packages": [
+    "lander",
+    "core",
+    "logging",
+    "config",
+    "mediator",
+    "actors",
+    "hosting",
+    "notebooks",
+    "openrpc"
+  ],
+  "api": [
+    "pkgs/lander",
+    "pkgs/core",
+    "pkgs/logging",
+    "pkgs/config",
+    "pkgs/mediator",
+    "pkgs/actors",
+    "pkgs/hosting",
+    "pkgs/notebooks",
+    "pkgs/openrpc"
+  ],
   "nav": [
-    { "group": "Design", "items": ["design/"] },
-    { "group": "Packages", "items": ["packages/"] },
-    { "group": "Contribute", "items": ["WRITING_FOR_THE_SITE.md"] }
+    {
+      "group": "Design",
+      "items": [
+        "design/"
+      ]
+    },
+    {
+      "group": "Packages",
+      "items": [
+        "packages/"
+      ]
+    },
+    {
+      "group": "Contribute",
+      "items": [
+        "WRITING_FOR_THE_SITE.md"
+      ]
+    }
+  ],
+  "schema_version": 1,
+  "source_roots": [
+    "docs",
+    "site/pages",
+    "site/articles",
+    "pkgs",
+    "tests"
+  ],
+  "header_logo": "assets/brand/logo-64.png",
+  "favicon": "assets/brand/favicon.ico",
+  "static": [
+    {
+      "from": "site/assets",
+      "to": "assets"
+    }
   ]
 }

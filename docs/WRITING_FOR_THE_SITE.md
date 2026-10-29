@@ -17,9 +17,33 @@ prose with tables, code and diagrams. Do not write long walls of text.
 | Article | a dated file in `site/articles/` | `/articles/<name>/` |
 | Landing page | `site/pages/index.html` | `/` |
 | Site settings and sidebar | `site/site.json` | none |
+| Static deployment assets | `site/assets/` | `/assets/<path>` |
 
 The build reads only these sources. A file below `docs/` is a page. A link from a
 page to a file that is not a page goes to the file on GitHub.
+
+The shared site engine is `moonrockz/telescope@0.4.0`. Moon-Lander supplies its
+landing content, scoped landing styles, Mermaid/layers adapters and source rules.
+The shared shell supplies the Smithy palette, navigation, search and theme controls.
+
+## Landing page and brand assets
+
+Edit `site/pages/index.html` for landing content and `site/assets/landing.css` for
+its layout. Scope styles below the landing root and use Telescope's existing theme
+tokens so the documentation and landing page keep the same light/dark colors.
+Use logical routes such as `/docs/`; the build adds the active tree base.
+
+For the API index only, use `moon-lander-route://api-index` until Telescope fixes
+its 0.4.0 content-link resolver. The native compatibility pass turns that marker
+into the active tree's `/api/` link and checks the generated target. Ordinary API
+package and item links keep the `api:` syntax described below.
+
+Keep full-size brand originals and generation notes in `docs/assets/brand/`.
+Files below `docs/assets/` are assets, not documentation pages. Deployment copies
+live in `site/assets/brand/`, outside that excluded directory. Keep icon copies
+byte-identical to their originals and use a smaller mascot image for the landing
+page. Configure the header and favicon with `header_logo` and `favicon` in
+`site/site.json`. Do not copy brand prompts or the local brand preview into the site.
 
 ## Front matter
 
@@ -244,7 +268,10 @@ Run these tasks from the repository root.
 | `mise run dev:site` | Builds the site, serves it at `http://127.0.0.1:4173/moon-lander/` and builds again when a source file changes |
 | `mise run build:site -- --main` | Builds the site as `main` does, into `_site/` |
 | `mise run check:site` | Checks the built site: links, titles, the feed and planning documents |
-| `mise run test:site` | Runs the tests of the site packages |
+| `mise run test:site` | Tests the site packages, highlighting and browser behavior against the built site |
+
+Use `mise run test:site -- --port 4178` if another project uses the default browser
+test port, 4174.
 
 Before you open a pull request, run `mise run build:site -- --main` and
 `mise run check:site`. CI runs them too.

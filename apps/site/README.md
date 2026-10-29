@@ -1,67 +1,56 @@
 # Moon-Lander docs site
 
-`moonrockz/moon-lander-site` builds the static docs site of this repository. It is a
-docs tool and is not published.
+`moonrockz/moon-lander-site` is a private native consumer of the published
+`moonrockz/telescope@0.4.0` package. Telescope supplies the shell, Smithy palette,
+Markdown planner, API pages, search, browser controls, checks, serving and version
+assembly. The published framework has no site or UI dependency.
 
-| Package | Content | Targets |
+## Consumer packages
+
+| Package | Responsibility | Targets |
 | --- | --- | --- |
-| `model` | Site configuration, routes, search entries, build problems, and the `moon doc` reader and signature links of the API pages | all four |
-| `content` | Front matter, Markdown, heading anchors and the HTML passes of the building blocks | `native` |
-| `views` | Rabbita components for each page kind | `native` |
-| `site` | Sources to outputs: pages, links, sidebar, articles, feed, search index and API pages | `native` |
-| `generate` | Executable that reads the repository and writes `_site/` | `native` |
-| `check` | Executable that checks the links of a built `_site/`, tree by tree when it is assembled, and warns about API items without a docstring | `native` |
-| `assemble` | Executable that adds the release trees to a `next` build and writes the versioned site: root, `/latest/`, banners, canonical links and `versions.json` | `native` |
-| `islands` | Client islands, bundled with Bun into `_site/assets/islands.js` | `js` |
+| `policy` | Typed paths, ports, tree prefixes and CLI commands | all four |
+| `providers` | Mermaid SVG and layers fence adapters | native |
+| `runtime` | Git source policy and calls to the shared native host | native |
+| `driver` | Build, check and serve executable | native |
+| `assemble` | GitHub release selection, downloads and the shared assembly call | native |
 
-`scripts/highlight.ts` highlights code blocks with Shiki after `generate`. It is the
-only TypeScript step.
+`scripts/highlight.ts` keeps dual-theme Shiki highlighting and the existing rule
+that unselected packages in API signatures appear as plain text. The source
+preflight rejects untested MoonBit examples and drafts in main builds. These are
+consumer policies; common site infrastructure stays in Telescope.
 
-## Content
+Telescope 0.4.0 omits `/api/` from content-link route resolution. The landing
+source uses the single `moon-lander-route://api-index` compatibility marker.
+The native adapter requires a generated API index, resolves the marker using
+the active base and checks the finished output. Unknown marker URLs fail. Published
+links use ordinary paths and work without JavaScript. Remove this pass
+when a pinned Telescope release accepts normal API-index content links.
+
+## Content and assets
 
 | Source | Route |
 | --- | --- |
 | `docs/<path>.md` or `.html` | `/docs/<path>/` |
-| `site/articles/YYYY-MM-DD-slug.md` | `/articles/slug/`, also in `/articles/atom.xml` |
-| `README.md` or `README.mbt.md` of a package in `packages` | `/docs/packages/<name>/` |
+| Package READMEs selected in `site/site.json` | `/docs/packages/<name>/` |
+| Compiler metadata for the selected `api` modules | `/api/<package path>/` |
+| `site/articles/YYYY-MM-DD-slug.md` | `/articles/<slug>/` and the Atom feed |
 | `site/pages/index.html` | `/` |
-| `moon doc` output of a module directory in `api` | `/api/<package path>/`, and the index `/api/` |
+| `site/assets/` | `/assets/` through an explicit static mapping |
 
-The sidebar groups come from `nav` in `site/site.json`. Each page below `docs/` must
-match a `nav` item, or the build fails.
+Brand originals, prompts and the brand preview stay in `docs/assets/brand/`.
+They do not become docs pages. Small deployment copies live in
+`site/assets/brand/`; the icon bytes match the originals. The landing page's
+`site/assets/landing.css` uses scoped selectors and Telescope's theme tokens.
+The header and favicon paths come from `site/site.json`.
 
-## API pages
+Source roots include `tests/` so links to browser consumer examples can resolve
+to GitHub. These files do not become pages. The runtime includes only Git-visible
+content and rejects a tracked or unexcluded `docs/superpowers/` plan.
 
-`build:site` runs `moon doc` in each module directory of `api` in `site/site.json`, with
-the output below `_build/site-api/<module directory>/`. `generate` reads
-`module_index.json` and `package_data.json` and writes one page for each package. The
-sections are Types, Errors, Traits, Type aliases and Values; an empty section is not
-shown. Each item has the anchor `#<name>`. A method has `#<Type>.<method>`, and a method
-of a trait implementation has `#<Type>.<Trait>.<method>`, or `#<Trait>.<Type>.<method>`
-below a trait. A signature link to a package on the site goes to its API page; any other
-target is plain text. `check:site` prints a warning for each item and method without a
-docstring.
+## Build and preview
 
-## Building blocks
-
-| Block | Write | Build output |
-| --- | --- | --- |
-| Table | GitHub Markdown table | `<table>` |
-| Code | fenced block with a language | Shiki colors for the light and dark themes |
-| Diagram | ```` ```mermaid ```` block | inline SVG in `figure.diagram`; a diagram that does not render fails the build |
-| Image | relative image link | a copy below the route of the page |
-| Callout | `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` | `aside.callout.<kind>` with a label |
-| Status | `status: proposed` in the front matter | the banner "Proposed — not implemented" and a sidebar badge |
-| Layer stack | ```` ```layers ```` block, one `name \| detail` line for each layer | `figure.layer-stack` |
-
-A `moonbit` or `mbt` fence outside a `.mbt.md` file must say `notest`, for example
-```` ```moonbit notest ````, because `moon test` does not compile it. Put an example
-that a reader can copy in a `.mbt.md` file of its package.
-
-The site configuration is `site/site.json` at the repository root. The landing page
-is `site/pages/index.html`. Static assets are in `apps/site/assets/`.
-
-Build, check and preview the site from the repository root:
+Run from the repository root:
 
 ```shell
 mise run build:site
@@ -70,32 +59,56 @@ mise run test:site
 mise run dev:site
 ```
 
-`dev:site` serves the site at `http://127.0.0.1:4173/moon-lander/` and builds it
-again after a source file changes.
+The build writes `_site/`. Preview serves
+`http://127.0.0.1:4173/moon-lander/`. A MoonBit polling loop rebuilds after source
+changes; Telescope owns the loopback server and path containment. Use
+`mise run dev:site -- --no-watch --port 4175` for a fixed preview on another port.
 
-`check:site` checks the built `_site/`: internal links, page titles, the Atom feed,
-and that no file is below `docs/superpowers/`. `test:site` runs the tests of the
-site packages and then a Chromium smoke test (`apps/site/scripts/browser-test.ts`)
-against `_site/`, served on port 4174, so build the site first.
+`build:site` runs `moon doc` for the selected modules, calls the released host,
+measures its shared island bundle, applies highlighting and checks the final
+output. Host failures preserve the prior tree. `test:site` runs native consumer
+tests, portable CLI policy tests, highlight tests and the browser acceptance
+checks against an already built site.
+Use `mise run test:site -- --port 4178` when another project uses the default
+browser acceptance port, 4174.
 
-The output is `_site/`. Each route is a directory with `index.html`, and each link
-starts with the `base_path` of `site/site.json`.
+The installed shared island bundle measures 24,740 bytes with the task's gzip
+measurement, below the 25 KiB warning threshold and 27 KiB limit. Python's level-9
+gzip measurement is 24,432 bytes. No browser editor or gallery is enabled.
 
-## Versions
+## Version trees
 
-The deployed site is versioned. CI builds `main` as the `next` tree with
-`mise run build:site -- --main --tree next`, so its pages are in `_site/next/` and
-each link starts with `/moon-lander/next/`. A release builds the tree of its minor
-line with `--tree <minor>`, in `_site/v/<minor>/`, and attaches it as
-`site-<minor>.tar.gz`. `--tree` fails for a minor line that is not the line of the
-root `moon.mod`. A source page cannot have a route below `v`, `next` or `latest`.
+Keep the existing task interface:
 
-On `main`, `mise run assemble:site` reads the releases with `gh`, downloads the
-asset of the newest release of each minor line from `versions.since` in
-`site/site.json` on, and writes the root, `/latest/`, the version banners, the
-canonical links and `versions.json`. Then `mise run check:site` checks each tree:
-a link that leaves its tree fails, except the banner link and the canonical link.
-The version switcher in the header reads `versions.json`.
+```shell
+mise run build:site -- --main --tree next
+mise run check:site -- --tree next
+mise run test:site -- --tree next
+mise run build:site -- --main --tree 0.7
+```
 
-The design is in `openspec/changes/archive/2026-10-22-add-docs-site/design.md`,
-and the requirements are in `openspec/specs/docs-site/spec.md`.
+A minor-line build must match the root `moon.mod`. Main lives below `/next/`,
+release lines below `/v/<minor>/`, and assembly writes root and `/latest/` copies.
+Release discovery remains paginated and skips drafts, prereleases and lines below
+`versions.since`. Missing or corrupt site archives fail before deployment.
+
+`assemble` stages supplied trees outside the destination and calls Telescope's
+offline assembler. A small metadata pass retains Moon-Lander's banner wording,
+canonical policy and missing-page fallback links. Historical assets are copied
+byte for byte, without rebuilding the release from source. The existing GitHub
+Pages workflow remains the deployment path.
+
+## Migration evidence
+
+The public package compiles on the repository's MoonBit pin without a local
+override. Before deleting the old engine, its 72 content routes and all heading
+and API anchors matched the shared-host output. SVG marker IDs now have per-block
+prefixes to prevent collisions. Consumer fixtures cover root/next bases, content
+errors, ignored files, scratch plans and retained version trees.
+
+The build-master review keeps the existing workflow graph. Pull requests and the
+merge queue call `site-build.yml` with `pages: false`, and `ci-ok` requires that
+job to succeed. Main builds and checks the assembled artifact before the separate
+Pages deployment job can write. Release assets keep their minor-line archive name
+and read-only build permissions. The Playwright cache still uses the unchanged
+`apps/site/bun.lock`; Telescope resolves from the published MoonBit dependency pin.

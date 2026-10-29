@@ -1,0 +1,63 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-site/policy"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror ArgumentError {
+  InvalidArgument(String, ArgumentRule)
+} derive(@debug.Debug)
+pub fn ArgumentError::message(Self) -> String
+pub fn ArgumentError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub enum ArgumentRule {
+  PathSyntax
+  PortDigits
+  PortRange
+  TreeSyntax
+  BaseSyntax
+  CommandExpected
+  OptionValue
+  UnknownOption
+} derive(@debug.Debug)
+pub fn ArgumentRule::to_repr(Self) -> @debug.Repr
+
+pub struct BasePath {
+  value : String
+}
+pub fn BasePath::parse(String) -> Self raise ArgumentError
+pub fn BasePath::text(Self) -> String
+
+pub(all) enum Command {
+  Build(LocalPath, LocalPath, TreePrefix, Bool)
+  Check(LocalPath, LocalPath, BasePath?)
+  Serve(LocalPath, LocalPath, Port)
+}
+pub fn Command::parse(Array[String]) -> Self raise ArgumentError
+
+pub struct LocalPath {
+  value : String
+}
+pub fn LocalPath::parse(String) -> Self raise ArgumentError
+pub fn LocalPath::text(Self) -> String
+
+pub struct Port {
+  value : Int32
+}
+pub fn Port::number(Self) -> Int32
+pub fn Port::parse(String) -> Self raise ArgumentError
+
+pub struct TreePrefix {
+  value : String
+}
+pub fn TreePrefix::parse(String) -> Self raise ArgumentError
+pub fn TreePrefix::text(Self) -> String
+
+// Type aliases
+
+// Traits

@@ -293,3 +293,35 @@ async test "ADM-1: a busy actor yields between batches so another ready actor ma
   })
   assert_eq(order, ["other", "busy done"])
 }
+
+///|
+/// A receive that takes one message, puts it back and starts again, with no
+/// suspension.
+fn cycle(
+  context : @actors.ActorContext[Int],
+  one : @actors.MessageCount,
+) -> @actors.Receive[Int, Unit] {
+  @actors.receive_n(one, value => ignore(context.reenqueue(value))).bind(_ => {
+    cycle(context, one)
+  })
+}
+
+///|
+async test "ADM-1: chained one-message loops still yield to another ready actor" {
+  let order = []
+  @actors.scope(scope => {
+    let one = @actors.MessageCount::from_int(1)
+    let busy = scope.spawn(context => cycle(context, one))
+    let other = scope.start((), (_, _ : Int) => {
+      order.push("other")
+      Continue(())
+    })
+    assert_eq(busy.try_send(0), Accepted)
+    assert_eq(other.try_send(1), Accepted)
+    // Without a yield between batches, this wait never ends.
+    while order.is_empty() {
+      @aio.pause()
+    }
+  })
+  assert_eq(order, ["other"])
+}

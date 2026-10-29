@@ -246,13 +246,15 @@ async fn[M] Runner::repeat(self : Runner[M], repeat : Repeat[M]) -> Turn[M] {
   for ;; {
     if mailbox.queue.length() > 0 {
       let message = mailbox.take_at(0)
+      // Count the message before the handler, also when it ends the loop, so
+      // chained loops still yield between batches.
+      self.count_taken()
       let next = (repeat.handle)(message) catch {
         error => return Go(self.recover(error))
       }
       if next is Some(step) {
         return Go(step)
       }
-      self.count_taken()
     } else if !mailbox.admitting {
       return Go(Bounce(repeat.finish))
     } else if self.wait() is Some(turn) {

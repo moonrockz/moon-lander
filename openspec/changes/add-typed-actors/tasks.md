@@ -44,7 +44,7 @@ Bead: lander-25h.4
 
 Depends on: group 3.
 
-- [ ] 4.1 Add spawn, Inbox ownership, receive, timed/try receive, final results and join; verify finite completion, independent joiners, closed versus timeout and rejection of a second consumer
+- [ ] 4.1 Add spawn, Inbox ownership, receive, timed/try receive, final results and join; verify finite completion, independent joiners, closed versus timeout and rejection of a second consumer; document that a body must not give its inbox to another task, because the runtime detects only concurrent receives and receives after the body ends
 - [ ] 4.2 Add scan and try_scan with no uncounted stash; verify oldest match, retained order, selected async closure, arrivals while waiting, selector failure and expiry or cancellation without removal
 - [ ] 4.3 Add receive_all, receive_n and receive_loop; verify close, count limits, state changes and final results through runnable receive-loop examples on all runtime targets
 - [ ] 4.4 Document the full non-matching bounded mailbox case and recovery choices; verify its timeout and cancellation acceptance scenarios and run check:actors

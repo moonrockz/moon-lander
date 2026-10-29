@@ -6,6 +6,7 @@ package "moonrockz/moon-lander-tests/registry-consumers/notebooks"
 // Errors
 
 // Types and methods
+type Python
 
 // Type aliases
 

@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/notebooks/files/ipynb"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/notebooks/files",
+  "moonrockz/notebooks/nbformat",
+}
+
+// Values
+
+// Errors
+pub(all) suberror MappingError {
+  InvalidMetadata(path~ : String, expected~ : String)
+  UnsupportedCell(index~ : Int32, cell_type~ : String)
+} derive(Eq, @debug.Debug)
+pub fn MappingError::equal(Self, Self) -> Bool
+pub fn MappingError::not_equal(Self, Self) -> Bool
+pub fn MappingError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+type Format
+pub fn Format::from_notebook(Self, @nbformat.Notebook) -> @files.FileTree raise
+pub fn Format::new() -> Self
+pub fn Format::read(Self, String) -> @files.FileTree raise
+pub fn Format::to_notebook(Self, @files.FileTree) -> @nbformat.Notebook raise
+pub fn Format::write(Self, @files.FileTree) -> String raise
+pub impl @files.TreeFormat for Format
+
+// Type aliases
+
+// Traits

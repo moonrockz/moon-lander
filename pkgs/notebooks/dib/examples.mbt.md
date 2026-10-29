@@ -328,3 +328,21 @@ test "example: DIB empty cells and whitespace" {
   })
 }
 ```
+
+## Reuse a configured codec
+
+```mbt check
+///|
+test "example: configured lossless codec" {
+  let codec = @dib.Codec::lossless(
+    default=@dib.KernelInfo(@dib.KernelName("moonbit")),
+  ).with_kernel(@dib.KernelInfo(
+    @dib.KernelName("python"), aliases=[@dib.KernelName("py")],
+  ))
+  let book = codec.notebook([
+    codec.cell(""),
+    codec.cell("\nprint(42)\n", kernel=@dib.KernelName("py")),
+  ])
+  assert_eq(codec.parse(codec.write(book)), book)
+}
+```

@@ -66,9 +66,14 @@ fn registry_from_metadata(
   let mut info = registry_metadata_field(metadata, "kernelInfo")
   if info is None {
     info = registry_metadata_field(metadata, "polyglot_notebook")
-  }
-  if info is None {
-    info = registry_metadata_field(metadata, "dotnet_interactive")
+    if info is None {
+      info = registry_metadata_field(metadata, "dotnet_interactive")
+    }
+    // Polyglot notebooks nest registrations under kernelInfo; retain the
+    // existing flat namespace form as well as the top-level form.
+    if info is Some(Object(fields)) && fields.get("kernelInfo") is Some(nested) {
+      info = Some(nested)
+    }
   }
   if info is Some(value) {
     guard value is Object(fields) else {

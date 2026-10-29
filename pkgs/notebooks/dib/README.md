@@ -162,3 +162,15 @@ Use `book.cursor()`, `node.at(path)`, `walk`, `walk_cursor` and `book.fold`, or
 pass `book.root()` to the shared `@notebooks` functions. Cursors retain
 `@dib.Node`, so a caller can pattern match `Directive(directive)` and inspect
 its arguments during otherwise generic traversal.
+
+## Reuse a configured codec
+
+`KernelDescriptor` returns a typed `KernelInfo`; `KernelInfo` itself implements
+the trait. `Codec::lossless(default=descriptor)` starts a custom registry with
+that kernel and Markdown. With no descriptor it uses the standard registry.
+`with_kernel` returns a new codec and reports typed name or alias collisions.
+The codec's `cell`, `notebook`, `parse` and `write` operations share its policy.
+See the [compiled codec example](examples.mbt.md#reuse-a-configured-codec).
+
+For virtual text trees, use the [DIB file-tree format](../files/dib/README.mbt.md)
+or [Jupyter VFS metadata](../files/ipynb/README.mbt.md).

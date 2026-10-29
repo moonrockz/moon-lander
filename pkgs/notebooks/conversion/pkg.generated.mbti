@@ -1,0 +1,58 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/notebooks/conversion"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/notebooks/dib",
+  "moonrockz/notebooks/nbformat",
+}
+
+// Values
+
+// Errors
+pub(all) suberror ConversionError {
+  Lossy(ReadOnlyArray[Loss])
+  UnsupportedCell(cell~ : Int32, cell_type~ : String)
+  InvalidKernelMetadata(path~ : String)
+} derive(Eq, @debug.Debug)
+pub fn ConversionError::equal(Self, Self) -> Bool
+pub fn ConversionError::not_equal(Self, Self) -> Bool
+pub fn ConversionError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+type Conversion[T]
+pub fn[T] Conversion::losses(Self[T]) -> ReadOnlyArray[Loss]
+pub fn[T] Conversion::notebook(Self[T]) -> T
+pub fn[T] Conversion::text(Self[T]) -> String
+
+type Converter
+pub fn Converter::new(default? : &@dib.KernelDescriptor, policy? : LossPolicy) -> Self raise @dib.FormatError
+pub fn Converter::to_dib(Self, @nbformat.Notebook) -> Conversion[@dib.Notebook] raise
+pub fn Converter::to_jupyter(Self, @dib.Notebook) -> Conversion[@nbformat.Notebook] raise
+pub fn Converter::with_kernel(Self, &@dib.KernelDescriptor) -> Self raise @dib.FormatError
+
+pub(all) enum Loss {
+  CellIdentity(cell~ : Int32)
+  CellMetadata(cell~ : Int32)
+  Outputs(cell~ : Int32)
+  ExecutionCount(cell~ : Int32)
+  Attachments(cell~ : Int32)
+  CellExtensions(cell~ : Int32)
+  NotebookExtensions
+  NotebookKernelMetadata
+} derive(Eq, @debug.Debug)
+pub fn Loss::equal(Self, Self) -> Bool
+pub fn Loss::not_equal(Self, Self) -> Bool
+pub fn Loss::to_repr(Self) -> @debug.Repr
+
+pub(all) enum LossPolicy {
+  Reject
+  SourceOnly
+} derive(Eq, @debug.Debug)
+pub fn LossPolicy::equal(Self, Self) -> Bool
+pub fn LossPolicy::not_equal(Self, Self) -> Bool
+pub fn LossPolicy::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

@@ -39,6 +39,17 @@ pub fn Cell::source(Self) -> String
 pub fn Cell::to_repr(Self) -> @debug.Repr
 pub impl @notebooks.CellView for Cell
 
+type Codec
+pub fn Codec::cell(Self, String, kernel? : KernelName) -> Cell raise FormatError
+pub fn Codec::lossless(default? : &KernelDescriptor) -> Self raise FormatError
+pub fn Codec::new(default? : &KernelDescriptor, source_mode? : SourceMode) -> Self raise FormatError
+pub fn Codec::notebook(Self, ReadOnlyArray[Cell], metadata? : @notebooks.Metadata) -> Notebook raise FormatError
+pub fn Codec::parse(Self, String) -> Notebook raise FormatError
+pub fn Codec::registry(Self) -> KernelRegistry
+pub fn Codec::source_mode(Self) -> SourceMode
+pub fn Codec::with_kernel(Self, &KernelDescriptor) -> Self raise FormatError
+pub fn Codec::write(Self, Notebook) -> String raise FormatError
+
 type Directive derive(Eq, @debug.Debug)
 pub fn Directive::arguments(Self) -> String
 pub fn Directive::equal(Self, Self) -> Bool
@@ -52,10 +63,12 @@ type KernelInfo derive(Eq, @debug.Debug)
 pub fn KernelInfo::KernelInfo(KernelName, aliases? : ReadOnlyArray[KernelName], language? : String?) -> Self
 pub fn KernelInfo::aliases(Self) -> ReadOnlyArray[KernelName]
 pub fn KernelInfo::equal(Self, Self) -> Bool
+pub fn KernelInfo::kernel_info(Self) -> Self
 pub fn KernelInfo::language(Self) -> String?
 pub fn KernelInfo::name(Self) -> KernelName
 pub fn KernelInfo::not_equal(Self, Self) -> Bool
 pub fn KernelInfo::to_repr(Self) -> @debug.Repr
+pub impl KernelDescriptor for KernelInfo
 
 type KernelName derive(Eq, @debug.Debug)
 pub fn KernelName::KernelName(String) -> Self raise FormatError
@@ -132,3 +145,6 @@ pub using @notebooks {type Metadata}
 pub using @notebooks {type NodePath}
 
 // Traits
+pub(open) trait KernelDescriptor {
+  fn kernel_info(Self) -> KernelInfo
+}

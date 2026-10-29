@@ -233,3 +233,19 @@ Replace metadata arguments built with `@nbformat.JsonObject(json)` with
 `@dib.Metadata(json)` calls use the shared constructor and now raise
 `MetadataError`; DIB parsing continues to report `FormatError::InvalidMetadata`
 with the source line. Jupyter codecs retain field-path validation errors.
+
+## Describe virtual file trees
+
+The pure [file-tree model](files/README.mbt.md) represents LF-normalized text
+files and explicit empty directories with typed relative paths. DIB uses
+first-line file declarations and a directory manifest. Jupyter uses the neutral
+`metadata.vfs` version-1 convention and keeps file source free of directives.
+Both formats map to the same immutable tree and perform no filesystem I/O.
+
+## Convert notebook formats
+
+The [source converter](conversion/README.mbt.md) converts ordinary DIB and
+Jupyter source cells with explicit typed loss reports. Strict policy refuses
+unsupported state; SourceOnly is an explicit choice. Use `files.convert_tree`
+with file-tree formats when paths and directory declarations must change
+between DIB directives and `metadata.vfs`.

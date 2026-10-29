@@ -1,0 +1,13 @@
+import {
+  "moonrockz/notebooks",
+  "moonrockz/notebooks/dib",
+  "moonrockz/notebooks/nbformat",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/notebooks/conversion",
+  "moonrockz/notebooks/files",
+  "moonrockz/notebooks/files/dib" @tree_dib,
+  "moonrockz/notebooks/files/ipynb" @tree_ipynb,
+} for "test"

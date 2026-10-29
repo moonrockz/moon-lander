@@ -1,5 +1,9 @@
 # Moon-Lander
 
+<p align="center">
+  <img src="docs/assets/moon-lander-badge.png" alt="The pink Moonrockz bunny piloting a gold lunar lander above the moon-lander wordmark" width="360" />
+</p>
+
 Moon-Lander is an application framework for MoonBit. It has no user interface.
 
 Build an application once and land it on a host. A host can be the web, WebAssembly, or a native process.

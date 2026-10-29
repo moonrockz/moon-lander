@@ -233,8 +233,9 @@ pub fn[M] Inbox::queued_count(self : Inbox[M]) -> Int {
 
 ///|
 /// Give `select` the error effect `raise`. The pinned compiler fails to link an
-/// async function that calls a `raise?` parameter, so the async code calls this
-/// synchronous wrapper instead.
+/// async function that calls a `raise?` parameter after a suspension
+/// (moonbitlang/moonbit-docs#1340), so the async code calls this synchronous
+/// wrapper instead. Remove it when a pinned compiler fixes the crash.
 fn[M, T] lift_selector(select : (M) -> T? raise?) -> (M) -> T? raise {
   message => select(message)
 }

@@ -65,6 +65,16 @@ states unrepresentable.
 - Public values that can change after construction. Builder steps must give a new
   value and leave the earlier value unchanged.
 
+### Testability
+
+- A design that a unit test cannot check without real time, real I/O or a running
+  event loop, when a value-based design would work: work described as values that
+  a small runtime runs, with time, randomness and I/O as explicit inputs or host
+  adapters.
+- An async test that uses a sleep for ordering instead of an acknowledgement.
+- A benchmark that runs in `mise run check`, CI or the release workflow. Benchmarks
+  run only through a manual mise task.
+
 ### Public API and interfaces
 
 - A changed public API without its updated `pkg.generated.mbti`.

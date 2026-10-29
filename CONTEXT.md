@@ -2,6 +2,20 @@
 
 ## Actors (proposed)
 
+**Actor**:
+A unit that owns private state and one mailbox and handles one message at a
+time. It is like a lightweight BEAM process, but it is cooperative and shares
+memory with other actors. It is not an operating-system process.
+
+**Receive**:
+An immutable description of what an actor takes from its mailbox next and of
+its final result. Only the runtime and the test runner run it; no other code
+takes messages from a mailbox.
+
+**Actor context**:
+What an actor's receives can use: its own reference, its child scope and its
+queue length. It cannot take messages, so it is safe to pass to other tasks.
+
 **Actor name**:
 A reusable label reserved within an actor's owner scope. Separate scopes can
 have actors with the same label, which a combined directory must distinguish.

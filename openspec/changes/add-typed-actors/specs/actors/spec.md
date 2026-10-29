@@ -290,68 +290,117 @@ NOT expose the state or receive operations.
 - **WHEN** one actor waits for a message or async operation
 - **THEN** a second actor can process its own messages
 
-### Requirement: Receive-loop actors and results
+### Requirement: Receive actors and results
 
-An application SHALL start an actor from an async receive body. The body SHALL
-have its typed inbox, self reference and a final result. Helpers SHALL support
-processing until close, at most a checked positive count, and state transitions
-that continue or stop. Only the actor body SHALL get the inbox. A receive while
-another receive waits, or after the body ends, SHALL fail with a typed
-ownership error.
+An application SHALL start an actor from a receive: an immutable opaque value
+that describes what the actor receives next and its final result. Only the
+runtime and the test runner SHALL run a receive. No public operation SHALL take
+a message from an actor's mailbox outside a receive. A receive SHALL support the
+next message, selective receive, async work between receives and a final result.
 
 #### Scenario: Finite actor
 
-- **WHEN** a body receives three messages and returns their total
+- **WHEN** an actor's receive takes three messages and finishes with their total
 - **THEN** joining the actor returns the total and the actor accepts no more messages
 
-#### Scenario: Second consumer
+#### Scenario: No receive outside a receive value
 
-- **WHEN** another task receives from an inbox captured from an actor body while the body waits in receive, or after the body has ended
-- **THEN** it gets a typed ownership error and removes no message
+- **WHEN** a consumer tries to take a message through an actor's context, reference or handle
+- **THEN** the compiler rejects the consumer, because no such operation exists
+
+#### Scenario: Async work between receives
+
+- **WHEN** a receive takes a message, awaits an async operation and then takes the next message
+- **THEN** the actor processes both messages in order and finishes with the combined result
+
+### Requirement: Receive combinators
+
+Combinators SHALL join receives in sequence, change a result, continue from an
+earlier result, process messages until close, process at most a checked positive
+count, run a state loop that continues or stops, limit the wait of one receive,
+poll without waiting, continue after mailbox close, and recover from an ordinary
+step error. A combinator MUST NOT catch cancellation.
+
+#### Scenario: Two independent steps
+
+- **WHEN** a receive selects the first Hello and then the first Credentials, and joins both values
+- **THEN** it finishes with both values and other messages stay queued in order
+
+#### Scenario: State loop
+
+- **WHEN** a state loop adds the values of messages until a stop message
+- **THEN** the actor finishes with the final state
+
+#### Scenario: Recover from a step error
+
+- **WHEN** a step raises an ordinary error inside a recovering combinator
+- **THEN** the actor continues with the recovery receive and the owner scope stays live
+
+### Requirement: Receive test runner
+
+A test SHALL be able to run a receive against a list of messages and get its
+result and the messages that remain, with no actor scope, task group or real
+time.
+
+#### Scenario: Unit test of a protocol
+
+- **WHEN** a test runs a login receive against Noise, Credentials, Hello and Noise
+- **THEN** it gets the joined Hello and Credentials result, and the two Noise messages remain in order
+
+### Requirement: Stack-safe receives
+
+Running a receive SHALL NOT make the call stack grow with the number of its
+steps, joined receives or loop iterations.
+
+#### Scenario: Long loops
+
+- **WHEN** a loop that carries its state forward and a loop that builds its result after the recursive step each run 100,000 steps on wasm, js and native
+- **THEN** both finish with the correct result
 
 ### Requirement: FIFO receive and polling
 
-An ordinary receive SHALL take the oldest admitted message and wait when empty.
-A receive with a time limit SHALL report a typed timeout when the limit expires.
-A try receive SHALL return no value on timeout and poll once without a limit.
-Both forms SHALL report a closed empty mailbox as closed, separately from timeout.
+A receive of the next message SHALL take the oldest admitted message and wait
+when the mailbox is empty. A receive with a time limit SHALL continue with its
+timeout receive when the limit expires. A poll SHALL continue with its empty
+receive when no message is queued. On a closed empty mailbox a receive SHALL
+continue with its closed receive, or end the actor as closed.
 
 #### Scenario: Receive order
 
 - **WHEN** messages A, B and C are admitted in that order
-- **THEN** ordinary receives return A, B and C in that order
+- **THEN** three receives of the next message give A, B and C in that order
 
 #### Scenario: Timeout preserves the mailbox
 
 - **WHEN** a timed receive expires on an empty mailbox and a message is then admitted
-- **THEN** the next receive returns that message
+- **THEN** the next receive gives that message
 
 #### Scenario: Poll after close
 
-- **WHEN** a caller polls a closed empty inbox
-- **THEN** it gets a typed closed error rather than an empty-poll result
+- **WHEN** a poll runs on a closed empty mailbox
+- **THEN** it continues with its closed receive rather than its empty receive
 
 ### Requirement: Selective receive
 
-An actor SHALL select the oldest message for which a synchronous selector gives
-a result. Unselected messages MUST remain queued in their relative order and
-count toward capacity. A waiting scan SHALL inspect newly admitted messages.
-Timed and try forms SHALL leave the mailbox unchanged on expiry or no match.
+A select SHALL take the oldest message for which a synchronous selector gives a
+result. Unselected messages MUST remain queued in their relative order and count
+toward capacity. A waiting select SHALL inspect newly admitted messages. A timed
+select SHALL leave the mailbox unchanged when it expires.
 
 #### Scenario: Skip an earlier message
 
-- **WHEN** the queue holds A, B and C, and a scan selects B
-- **THEN** the scan returns its selected result and ordinary receives still return A then C
+- **WHEN** the queue holds A, B and C, and a select chooses B
+- **THEN** the select gives its selected value and later receives still give A then C
 
 #### Scenario: Match after waiting
 
-- **WHEN** a scan waits with only non-matching messages queued and a matching message is admitted
+- **WHEN** a select waits with only non-matching messages queued and a matching message is admitted
 - **THEN** it selects the new message and retains the earlier non-matches
 
-#### Scenario: Scan timeout
+#### Scenario: Select timeout
 
-- **WHEN** a timed scan expires with only non-matching messages queued
-- **THEN** a later ordinary receive still gets the oldest original message
+- **WHEN** a timed select expires with only non-matching messages queued
+- **THEN** a later receive of the next message still gives the oldest original message
 
 ### Requirement: Mailbox bounds and backpressure
 
@@ -367,8 +416,8 @@ drop or overwrite a message. The in-flight message SHALL not count as queued.
 
 #### Scenario: Non-matches still occupy capacity
 
-- **WHEN** a capacity-one mailbox holds a non-match for a pending scan
-- **THEN** another send waits and cancelling the scan does not remove the non-match
+- **WHEN** a capacity-one mailbox holds a non-match for a pending select
+- **THEN** another send waits, and when the select's time limit expires the non-match stays queued
 
 #### Scenario: Unbounded opt-in
 
@@ -399,9 +448,9 @@ The runtime MUST NOT retry or deliver one admitted message more than once.
 
 ### Requirement: Self messaging and queue observation
 
-An actor SHALL obtain its own typed send reference. A non-waiting reenqueue SHALL
+An actor SHALL obtain its own typed send reference through its context. A non-waiting reenqueue SHALL
 append to the same mailbox tail under its capacity rule. Queue length SHALL be
-a snapshot of queued messages, including scan non-matches and excluding in-flight
+a snapshot of queued messages, including select non-matches and excluding in-flight
 work. The runtime SHALL yield between bounded batches of ready messages.
 
 #### Scenario: Reenqueue keeps FIFO order
@@ -572,18 +621,19 @@ All affected pending callers SHALL be released. No hard preemption is promised.
 
 Scope exit SHALL cancel live actors and join their cleanup before it returns.
 Parent actor exit SHALL also cancel and join its children. Uncaught actor failure
-SHALL fail the owner scope and cancel siblings. A body SHALL be able to catch
-ordinary errors or use a nested scope as a failure boundary. No automatic restart
+SHALL fail the owner scope and cancel siblings. An actor SHALL be able to catch
+ordinary step errors with a recovering receive or use a nested scope as a failure
+boundary. No automatic restart
 SHALL occur.
 
 #### Scenario: Idle actor on normal scope exit
 
-- **WHEN** a scope body returns while an actor waits forever on an empty inbox
+- **WHEN** a scope body returns while an actor waits forever on an empty mailbox
 - **THEN** the scope cancels that actor and returns after its cleanup rather than waiting for a message
 
 #### Scenario: Parent completes normally
 
-- **WHEN** a parent body returns a result while its child waits for messages
+- **WHEN** a parent actor's receive finishes with a result while its child waits for messages
 - **THEN** the child and its descendants are cancelled and cleaned up before the parent join completes
 
 #### Scenario: Failure cancels siblings
@@ -591,9 +641,9 @@ SHALL occur.
 - **WHEN** an actor raises an unhandled error while a sibling waits
 - **THEN** the sibling is cancelled and the scope reports the error after cleanup
 
-#### Scenario: Recovered body
+#### Scenario: Recovered receive
 
-- **WHEN** a body catches an ordinary handler error and continues receiving
+- **WHEN** a step raises an ordinary error inside a recovering receive and the actor continues receiving
 - **THEN** the owner scope remains live and another message can be processed
 
 #### Scenario: Escaped scope handle
@@ -622,7 +672,7 @@ failure SHALL retain any primary failure and fail the owner scope.
 ### Requirement: Observe actor termination
 
 A handle SHALL provide a lifecycle snapshot and awaitable completion. Join SHALL
-return the body result, rethrow its failure or report actor cancellation. Multiple
+return the final result, rethrow its failure or report actor cancellation. Multiple
 joiners SHALL observe the same terminal outcome. Cancelling one join waiter MUST
 NOT cancel the actor or another waiter.
 

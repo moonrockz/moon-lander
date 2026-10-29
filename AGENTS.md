@@ -99,6 +99,22 @@ unrepresentable.
 - A parse failure is a typed `suberror` that names the input and the rule it breaks.
 - Test each rule of a smart constructor with values on each side of the limit.
 
+## Testable design
+
+Prefer designs that are naturally testable. A unit test should check behavior
+through public values, without real time, real I/O or a running event loop where
+possible.
+
+- Describe work as values and let one small runtime run them, so a test can run
+  the same value with a deterministic runner. Actor receives are the model.
+- Give time, randomness and I/O as explicit inputs or host adapters.
+- In async tests, use acknowledgements for ordering. Use a sleep only for a real
+  deadline test.
+- When two designs are otherwise equal, choose the one that a test can check
+  without a scope, a task group or a host.
+- Benchmarks are local tools. Run them through a manual mise task, never in
+  `mise run check`, CI or the release workflow.
+
 ## Verification
 
 Run `mise run check` after changes. It runs lint, workspace and version validation,
@@ -128,6 +144,8 @@ skill. Report these as problems:
   or a `warnings` override in `moon.pkg` without a comment that gives the reason and
   when to remove it.
 - A changed public API without its `pkg.generated.mbti` update.
+- A design that is not naturally testable, or a benchmark in `mise run check`, CI or
+  the release workflow (Testable design).
 
 ## Publishing
 

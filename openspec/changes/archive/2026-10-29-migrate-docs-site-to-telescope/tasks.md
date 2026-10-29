@@ -8,7 +8,7 @@ adapter for Telescope 0.4.0's API-index content-link gap; see UI-1 in design.htm
 
 Bead: lander-weo.1
 
-- [x] 1.1 Pin published `moonrockz/telescope@0.4.0` in the private site tool and add a thin native host driver; verify resolution and compilation on the repository's current MoonBit pin without a sibling-worktree override.
+- [x] 1.1 Pin published `moonrockz/telescope@0.5.1` in the private site tool and add a thin native host driver; verify resolution and compilation on the repository's current MoonBit pin without a sibling-worktree override.
 - [x] 1.2 Register pure Mermaid and layers fence adapters around the current renderers; verify valid SVG/layer output, unique diagram IDs and source/ordinal diagnostics with focused adapter tests.
 - [x] 1.3 Build a real package guide and the notebooks API from current `moon doc` output at `/moon-lander/` and `/moon-lander/next/`; verify `CellKind`, method anchors, source links, header assets and both fence providers through Telescope check.
 - [x] 1.4 Measure the released shared island bundle against the existing 25 KiB warning and 27 KiB failure budget, and verify a selected existing code block keeps dual-theme highlighting; record compatibility results in the site tool README before broad migration.

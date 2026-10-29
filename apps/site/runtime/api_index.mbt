@@ -1,5 +1,5 @@
 ///|
-// Telescope 0.4.0 generates /api/ but omits it from content route resolution.
+// Telescope generates /api/ but omits it from content route resolution.
 // Remove this marker/pass once a pinned release accepts ordinary /api/ links.
 let api_index_marker : String = "moon-lander-route://api-index"
 

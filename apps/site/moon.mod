@@ -6,7 +6,7 @@ private = true
 version = "0.7.3"
 
 import {
-  "moonrockz/telescope@0.4.0",
+  "moonrockz/telescope@0.5.1",
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.6",
   "bobzhang/beautiful_mermaid@0.2.0",

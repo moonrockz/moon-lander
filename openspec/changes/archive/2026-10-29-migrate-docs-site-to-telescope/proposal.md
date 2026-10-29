@@ -9,7 +9,7 @@ starting point and move common site behavior into Telescope.
 
 ## What Changes
 
-- Build the unpublished docs tool on the published `moonrockz/telescope@0.4.0`
+- Build the unpublished docs tool on the published `moonrockz/telescope@0.5.1`
   package, with its shared shell, theme, search, navigation and site checks.
 - Add a landing page with a large headline, the bunny-and-lander mark, direct
   documentation and API links, installation instructions and package guides.
@@ -22,7 +22,7 @@ starting point and move common site behavior into Telescope.
 - Remove the common generator and browser code that Telescope replaces.
 
 Out of scope: framework API changes, new published modules, a playground or
-tutorial engine, a Telescope release, changes to Smithy, rebuilding past release
+tutorial engine, changes to Smithy, rebuilding past release
 assets, and publishing from a workstation.
 
 ## Capabilities
@@ -50,3 +50,7 @@ dependency order. Keep these stories open until their implementation PRs merge.
 site build/release workflows. The writing guide and package validation must
 describe the smaller site tool. The published framework remains UI-free and
 keeps its current dependency graph.
+
+The owner approved the upstream Windows repair and Telescope 0.5.1 publication
+as a follow-up. This change pins that real release after public qualification;
+Moon-Lander does not copy or patch Telescope source.

@@ -1,7 +1,7 @@
 # Moon-Lander docs site
 
 `moonrockz/moon-lander-site` is a private native consumer of the published
-`moonrockz/telescope@0.4.0` package. Telescope supplies the shell, Smithy palette,
+`moonrockz/telescope@0.5.1` package. Telescope supplies the shell, Smithy palette,
 Markdown planner, API pages, search, browser controls, checks, serving and version
 assembly. The published framework has no site or UI dependency.
 
@@ -20,7 +20,7 @@ that unselected packages in API signatures appear as plain text. The source
 preflight rejects untested MoonBit examples and drafts in main builds. These are
 consumer policies; common site infrastructure stays in Telescope.
 
-Telescope 0.4.0 omits `/api/` from content-link route resolution. The landing
+The pinned Telescope release omits `/api/` from content-link route resolution. The landing
 source uses the single `moon-lander-route://api-index` compatibility marker.
 The native adapter requires a generated API index, resolves the marker using
 the active base and checks the finished output. Unknown marker URLs fail. Published
@@ -72,9 +72,8 @@ checks against an already built site.
 Use `mise run test:site -- --port 4178` when another project uses the default
 browser acceptance port, 4174.
 
-The installed shared island bundle measures 24,740 bytes with the task's gzip
-measurement, below the 25 KiB warning threshold and 27 KiB limit. Python's level-9
-gzip measurement is 24,432 bytes. No browser editor or gallery is enabled.
+The installed shared island bundle measures 24,915 bytes with the task's gzip
+measurement, below the 25 KiB warning threshold and 27 KiB limit. No browser editor or gallery is enabled.
 
 ## Version trees
 
@@ -112,3 +111,8 @@ job to succeed. Main builds and checks the assembled artifact before the separat
 Pages deployment job can write. Release assets keep their minor-line archive name
 and read-only build permissions. The Playwright cache still uses the unchanged
 `apps/site/bun.lock`; Telescope resolves from the published MoonBit dependency pin.
+
+Telescope 0.5.1 repairs Windows canonical paths and sibling staging. The site
+source preflight compares canonical paths with native separators, and test
+cleanup restores write access to Git fixture files. The Windows workspace job
+verifies this consumer against the actual published dependency.

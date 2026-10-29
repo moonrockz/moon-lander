@@ -73,9 +73,9 @@ svg, img { max-width: 100%; height: auto; }
 The current <code>apps/site</code> implements content discovery, rendering, API metadata,
 search, browser islands, link checks and version assembly. Its landing fragment has stale
 installation text, including a fixed 0.6.0 version and module count.</p>
-<p>Telescope 0.4.0 is the current published release. It provides the same core static-site
+<p>Telescope 0.5.1 is the published release selected for this change. It provides the same core static-site
 model, the Smithy palette, optional header and favicon paths, native host operations,
-and explicit consumer fence providers. Telescope's candidate 0.5.0 is not part of this design.
+and explicit consumer fence providers. Optional gallery and editor feature adoption remains outside this design.
 The current Moon-Lander compiler pin differs from Telescope's qualified patch, so the first
 story must prove public-package compatibility with real API metadata before the old generator is removed.</p>
 
@@ -122,7 +122,7 @@ in the lander artwork. The actual page also links the mediator, actors and the o
 <h2 id="decisions">Decisions</h2>
 <h3 id="site-1">SITE-1. Owner: use Telescope and the Smithy visual family</h3>
 <p>The user selected Telescope, a Smithy-like landing page and matching colors.
-Use the published <code>moonrockz/telescope@0.4.0</code> package. Do not consume a sibling
+Use the published <code>moonrockz/telescope@0.5.1</code> package. Do not consume a sibling
 worktree or unpublished candidate. Keeping the present engine and recoloring it would
 leave the duplicated site infrastructure in place.</p>
 
@@ -193,9 +193,9 @@ to produce a supplied-tree assembly manifest. Telescope performs offline assembl
 Keep <code>/moon-lander/</code>, <code>/next/</code>, <code>/v/&lt;minor&gt;/</code>,
 <code>/latest/</code>, canonical links, static banners and <code>versions.json</code>.</p>
 <p>Retain the current 25 KiB warning and 27 KiB failure threshold for the island bundle.
-The embedded island asset from the v0.4.0 release source measures 98,602 bytes,
-or 24,432 bytes with gzip, below the warning threshold. Repeat that measurement on
-the installed public package in the first story. Do not silently drop or increase
+The installed 0.5.1 shared island asset measures 24,915 bytes with the task's gzip
+measurement, below the warning threshold. The build measures the installed public
+package on each build. Do not silently drop or increase
 the limit. Optional gallery/editor assets must not be loaded on ordinary docs pages.
 If the released host cannot meet an existing contract, record the concrete failure and
 revise the proposal before broad migration.</p>
@@ -210,6 +210,7 @@ contrast, stored/system theme choice, keyboard focus, search, copy, a rendered d
 API anchors, source links and no-script navigation. Check local and next bases and a
 fixture assembled from a retained historical archive.</p>
 
+<h3 id="win-1">WIN-1. Owner: consume the published Windows host repair</h3><p>Windows CI exposed slash-only canonical-path handling in Telescope 0.4.0. The owner approved an upstream repair and 0.5.1 publication from source <code>1b0808634f9a173f6368e5e3b9ac6edde662dc16</code>. Pin that actual release and verify the Windows consumer before merge. Keep native source-preflight separators and read-only Git fixture cleanup in Moon-Lander. No dependency source is copied or patched.</p>
 <h2 id="risks">Risks and trade-offs</h2>
 <table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
 <tr><td>The compiler patch or API metadata differs from Telescope's released qualification.</td><td>First build a real package README and notebooks API page from the public package on the current compiler. Stop on an incompatibility before deleting the old path.</td></tr>

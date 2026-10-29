@@ -22,7 +22,7 @@ prose with tables, code and diagrams. Do not write long walls of text.
 The build reads only these sources. A file below `docs/` is a page. A link from a
 page to a file that is not a page goes to the file on GitHub.
 
-The shared site engine is `moonrockz/telescope@0.4.0`. Moon-Lander supplies its
+The shared site engine is `moonrockz/telescope@0.5.1`. Moon-Lander supplies its
 landing content, scoped landing styles, Mermaid/layers adapters and source rules.
 The shared shell supplies the Smithy palette, navigation, search and theme controls.
 
@@ -34,7 +34,7 @@ tokens so the documentation and landing page keep the same light/dark colors.
 Use logical routes such as `/docs/`; the build adds the active tree base.
 
 For the API index only, use `moon-lander-route://api-index` until Telescope fixes
-its 0.4.0 content-link resolver. The native compatibility pass turns that marker
+its content-link resolver. The native compatibility pass turns that marker
 into the active tree's `/api/` link and checks the generated target. Ordinary API
 package and item links keep the `api:` syntax described below.
 

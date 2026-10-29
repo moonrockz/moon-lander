@@ -237,7 +237,7 @@ script. Also update the assessed versions above.
   Smithy consumes the published `0.2.0`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
   builds the static site at `https://moonrockz.github.io/moon-lander/` with
-  `moonrockz/telescope@0.4.0`. It owns the Moon-Lander landing page and content adapters.
+  `moonrockz/telescope@0.5.1`. It owns the Moon-Lander landing page and content adapters.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress

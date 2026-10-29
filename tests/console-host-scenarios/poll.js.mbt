@@ -3,7 +3,8 @@
 extern "js" fn poll_foreign(read : () -> Bool, stopped : () -> Unit) -> @js_async.Promise[Unit] =
   #|(read, stopped) => new Promise((resolve, reject) => setTimeout(() => {
   #|  try {
-  #|    console.log("ready");
+  #|    const ready = globalThis.landerWorkerReady;
+  #|    if (typeof ready === "function") ready(); else console.log("ready");
   #|    while (!read()) {}
   #|    stopped();
   #|    resolve();

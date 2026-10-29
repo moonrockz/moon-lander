@@ -235,7 +235,10 @@ async test "parent signals stop a non-yielding worker and drain once with true s
   for (kind, name, expected) in [(1, "Interrupt", 130), (2, "Terminate", 143)] {
     let (code, output) = run_child(Worker(launcher~, program~), "poll", [Await("ready"), Send(kind)])
     assert_eq(code, expected, msg=output)
-    assert_in_order(output, start_hooks + ["ready"] + stop_hooks + [
+    // Readiness uses a control channel; buffered worker stdout can arrive later.
+    assert_true(output.contains("worker-stdout-pending"), msg=output)
+    assert_eq(output.split("ready\n").count() - 1, 1, msg=output)
+    assert_in_order(output, start_hooks + stop_hooks + [
       "finalizer=begin", "drained=true", "finalizer=end", "owner-listeners=intact",
     ])
     assert_in_order(output, ["reason=Signal(\{name})", "polled=true"])

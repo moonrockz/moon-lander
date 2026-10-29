@@ -1,4 +1,4 @@
-import { Worker, isMainThread, workerData } from "node:worker_threads";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 // Unpublished acceptance fixture. MoonBit owns build and process lifecycle.
 if (isMainThread) {
@@ -9,6 +9,14 @@ if (isMainThread) {
   process.on("SIGTERM", publishTerminate);
   const worker = new Worker(process.argv[1], {
     workerData: { signals, program: process.argv[2] },
+  });
+  let ready = false;
+  worker.on("message", message => {
+    if (message !== "lander:ready" || ready) {
+      throw new Error("Unexpected worker readiness message");
+    }
+    ready = true;
+    console.log("ready");
   });
   worker.on("error", error => { throw error; });
   worker.on("exit", code => {
@@ -23,6 +31,12 @@ if (isMainThread) {
   });
 } else {
   (globalThis as any).landerSignals = new Int32Array(workerData.signals);
+  (globalThis as any).landerWorkerReady = () => {
+    // Keep stdout pending when the worker enters its non-yielding loop. Its
+    // write acknowledgement needs the worker event loop; readiness must not.
+    console.log("worker-stdout-pending");
+    parentPort!.postMessage("lander:ready");
+  };
   const originalOn = process.on;
   process.on = function (event: string, ...args: any[]) {
     if (["SIGINT", "SIGTERM", "SIGQUIT", "SIGBREAK", "SIGHUP"].includes(event)) {

@@ -356,8 +356,11 @@ async test "real parent signals stop a non-yielding logging worker and drain bef
     defer @fs.rmdir(dir, recursive=true)
     let ran = run_child(Worker(launcher~, program~), "session-poll", dir, [Await("ready"), Send(kind)])
     assert_eq(ran.code, code, msg=ran.out + ran.err)
+    // Readiness uses a control channel; buffered worker stdout can arrive later.
+    assert_true(ran.out.contains("worker-stdout-pending"), msg=ran.out)
+    assert_eq(ran.out.split("ready\n").count() - 1, 1, msg=ran.out)
     assert_suffixes_in_order(ran.out, [
-      "ready", "diagnostic=stop", "reason=Signal(\{name})", "polled=true",
+      "diagnostic=stop", "reason=Signal(\{name})", "polled=true",
       "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop", "owner-listeners=intact",
     ], "logging worker")
     let text = read_files(dir, "session-", ".log")

@@ -435,7 +435,7 @@ async fn session_hosted(
     if scenario is SessionSignal { pending.val = Some(Terminate) }
     if scenario is (SessionSignal | SessionPoll) {
       // No async operation between ready and the first cancellation read.
-      println("ready")
+      announce_ready()
       let count = Ref(0UL)
       while !ctx.cancelled() { count.val += 1UL }
       polled.val = true

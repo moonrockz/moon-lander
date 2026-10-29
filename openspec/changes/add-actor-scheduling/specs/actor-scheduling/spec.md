@@ -25,9 +25,10 @@ scope and the receive test runner SHALL accept a test clock instead.
 
 ### Requirement: Deterministic test clock
 
-A test clock SHALL start at zero and change only when a test advances it. Advancing
-it SHALL fire due timers and expire due waits in deadline order, with ties in the
-order they were scheduled.
+A test clock SHALL start at zero and change only when a test advances it. It MUST
+NOT advance on its own, also when every task waits. Advancing it SHALL fire due
+timers and expire due waits in deadline order, with ties in the order they were
+scheduled.
 
 #### Scenario: Ordered firing
 
@@ -36,7 +37,7 @@ order they were scheduled.
 
 #### Scenario: No advance
 
-- **WHEN** a timer is due at one second and the test does not advance the clock
+- **WHEN** a timer is due at one second, every task waits, and the test does not advance the clock
 - **THEN** the timer does not fire, however long the test runs
 
 ### Requirement: Scheduled send
@@ -85,13 +86,19 @@ destination is closed, the timer SHALL end without an error to the scope.
 
 A schedule SHALL be an immutable opaque value that gives a sequence of delays. It
 SHALL support a fixed delay, a delay that doubles from a first value up to a
-maximum, and a checked limit on the count of sends. A test SHALL be able to list
-the delays of a schedule without a runtime.
+maximum, and a checked limit on the count of sends. Without a count limit, a
+schedule SHALL repeat until it is cancelled. A test SHALL be able to list the
+delays of a schedule without a runtime.
 
 #### Scenario: Exponential schedule
 
 - **WHEN** a test lists the delays of an exponential schedule from one second with a maximum of five seconds, limited to five sends
 - **THEN** it gets one, two, four, five and five seconds
+
+#### Scenario: No count limit
+
+- **WHEN** a test takes the first 1,000 delays of a fixed one-second schedule with no count limit
+- **THEN** it gets 1,000 delays of one second, and the schedule has more
 
 #### Scenario: Schedule on all targets
 
@@ -120,12 +127,28 @@ when its scope exits, or when the target closes.
 An actor SHALL start single and repeated timers through its context, keyed by a
 value of an application type with equality. Starting a timer with an existing key
 SHALL cancel and replace the old timer. All timers of an actor SHALL stop when
-the actor ends.
+the actor ends. A message that a cancelled or replaced actor timer has already
+queued SHALL NOT reach any receive; the runtime removes it from the mailbox.
 
 #### Scenario: Replace by key
 
 - **WHEN** an actor starts a five-second timer with key Poll and then starts a two-second timer with key Poll, and the test clock advances by ten seconds
 - **THEN** only the two-second timer fires
+
+#### Scenario: Stale message after replacement
+
+- **WHEN** a repeated timer with key Poll has queued Tick, and the actor starts a new Poll timer before it receives that Tick
+- **THEN** the actor never receives the old Tick and receives the Tick messages of the new timer
+
+#### Scenario: Stale message after cancel
+
+- **WHEN** an actor cancels its Expire timer after the timer queued Shutdown but before the actor received it
+- **THEN** the actor never receives that Shutdown, and other queued messages keep their order
+
+#### Scenario: Scheduled sends keep admitted messages
+
+- **WHEN** a scope cancels a send_after timer after its message was admitted
+- **THEN** the message stays queued and the actor receives it, because only actor-owned keyed timers remove stale messages
 
 #### Scenario: Actor end stops timers
 

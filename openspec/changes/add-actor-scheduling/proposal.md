@@ -21,8 +21,11 @@ can move time forward by hand.
 - Add repeated sends on pure `Schedule` values (fixed delay, exponential growth,
   a checked count limit). A test can list the delays of a schedule without a
   runtime.
+- Add `send_repeated`: repeated sends on a schedule, each delay measured from the
+  admission of the previous message.
 - Add actor-owned timers with typed keys. A timer with an existing key replaces
-  the old one. All timers of an actor stop when the actor ends.
+  the old one. A message that a cancelled or replaced keyed timer already queued
+  is never received. All timers of an actor stop when the actor ends.
 - Timer sends follow the actor admission rules: they wait for space in a full
   mailbox, never drop or overwrite a message, and stop when the target closes.
 

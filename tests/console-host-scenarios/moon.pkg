@@ -4,17 +4,21 @@ import {
   "moonrockz/moon-lander-hosting/argparse" @hosting_argparse,
   "moonrockz/moon-lander-core" @lander_core,
   "moonbitlang/async",
+  "moonbitlang/async/js_async",
   "moonbitlang/async/stdio",
 }
 
 supported_targets = "native+js"
 
-// `moonbitlang/async/stdio` writes the lines only on native. The pinned build
-// system cannot condition imports by target, so it is unused on js (29).
+// stdio writes lines only on native; js_async drives the foreign callback only
+// on JS. The pinned build system cannot condition imports by target, so each
+// is unused on the other target (29).
 // Remove when the imports can be conditional.
 warnings = "-29"
 
 options(targets: {
   "emit.native.mbt": ["native"],
   "emit.js.mbt": ["js"],
+  "poll.native.mbt": ["native"],
+  "poll.js.mbt": ["js"],
 })

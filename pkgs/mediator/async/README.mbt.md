@@ -24,9 +24,23 @@ name of the package, so they import `moonbitlang/async` as `@aio`. Write
 
 | Target | Supported | Note |
 | --- | --- | --- |
-| `native`, `js` | Yes | |
-| `wasm` | Yes | The host must supply the `moonbitlang/async` event-loop imports. `moonrun` supplies them for tests |
-| `wasm-gc` | No | `moonbitlang/async` has no event loop there. Use the sync `@mediator` |
+| `native`, `js` | All operations | A suspending handler uses the application's async runtime |
+| `wasm` | All operations | Runtime operations require `moonbitlang/async` event-loop imports. Non-suspending composition also works under `hosting.run_embedded` |
+| `wasm-gc` | Sender and basic middleware | `sender`, `Sender::from_sync`, `use_`, `send`, `middleware`, `before`, `after` and `finally_` need no event loop. Timeout and Topic operations are unavailable |
+
+An import of this public package can now be planned on all four targets. The
+sender and basic middleware use one implementation on every target. Timeout and
+topic operations stay in files restricted to their existing runtime targets.
+No event loop is provided or claimed for wasm-gc.
+
+On wasm and wasm-gc, call a non-suspending send from the async command or hook
+that `hosting.run_embedded` executes. It waits for that call to complete before
+the embedded step returns. A handler or middleware that actually suspends is
+still the embedded driver's typed suspension failure, not successful completion.
+Use the async sender itself around a native/JS Promise or other async handler;
+dispatching through a sync sender before awaiting that work would finish
+middleware scopes too early. The four-target compiled examples and real Promise
+acceptance are in `tests/mediator-composition-acceptance`.
 
 Each `mbt check` block on this page runs as a test with `mise run test` on
 `wasm`, `js`, and `native`.
@@ -45,9 +59,11 @@ request, can wait, and gives the reply. `Sender::send` waits for the reply.
 
 ```mbt check
 ///|
+#cfg(not(target="wasm-gc"))
 struct Ping(String)
 
 ///|
+#cfg(not(target="wasm-gc"))
 async test "send a ping to a handler that waits" {
   let ping : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
     _,
@@ -87,6 +103,7 @@ sender, because its `next` step is sync.
 
 ```mbt check
 ///|
+#cfg(not(target="wasm-gc"))
 async test "log middleware around an async send" {
   let log = []
   let ping : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
@@ -143,14 +160,17 @@ work starts its own task group.
 
 ```mbt check
 ///|
+#cfg(not(target="wasm-gc"))
 struct Joined(String)
 
 ///|
+#cfg(not(target="wasm-gc"))
 suberror AuditError {
   AuditClosed(String)
 }
 
 ///|
+#cfg(not(target="wasm-gc"))
 async test "a concurrent publish runs every handler and lists the failure" {
   let log = []
   let joined : @mediator_async.Topic[Unit, Joined] = @mediator_async.topic((
@@ -223,6 +243,7 @@ at the call to `moonbitlang/async`.
 
 ```mbt check
 ///|
+#cfg(not(target="wasm-gc"))
 async test "a timeout stops a slow send, and a caller cancellation is not an error" {
   let log = []
   let slow : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
@@ -272,27 +293,32 @@ There is no way to call an async sender from sync code.
 
 ```mbt check
 ///|
+#cfg(not(target="wasm-gc"))
 struct Store {
   users : Array[String]
 }
 
 ///|
+#cfg(not(target="wasm-gc"))
 struct Services {
   store : Store
   greeting : String
 }
 
 ///|
+#cfg(not(target="wasm-gc"))
 struct Register(String)
 
 ///|
 /// A sync handler that the service already has.
+#cfg(not(target="wasm-gc"))
 fn greet(services : Services, req : Register) -> String {
   let Register(name) = req
   services.greeting + " " + name
 }
 
 ///|
+#cfg(not(target="wasm-gc"))
 async test "a service registers a user and greets through the core sender" {
   let greeter : @mediator.Sender[Services, Register, String] = @mediator.sender((
     services,

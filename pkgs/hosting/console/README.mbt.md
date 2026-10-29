@@ -125,7 +125,10 @@ test "the enclosing owner example compiles" {
 
 A Node parent can record SIGINT or SIGTERM in shared memory while its worker is
 busy. A probe that reads that memory lets `ctx.cancelled()` or
-`ctx.check_cancelled()` see the signal without yielding. The parent must remain
+`ctx.check_cancelled()` see the signal without yielding.
+For synchronous foreign callbacks on the host thread, use
+`ctx.stop_requested()` or `ctx.lifetime.stop_token().stop_requested()`. These
+checks poll the same probe without a current-task query. The parent must remain
 able to receive signals and decide when a second signal ends the worker.
 
 ## Windows console events

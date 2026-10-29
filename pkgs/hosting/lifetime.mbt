@@ -152,8 +152,26 @@ pub fn Lifetime::set_exit_code(self : Lifetime, code : ExitCode) -> Unit { self.
 pub fn Lifetime::stop_reason(self : Lifetime) -> StopReason? { self.reason }
 
 ///|
+/// Poll registered stop probes and read the retained host stop request.
+/// Safe in synchronous foreign callbacks on the host thread. This does not
+/// query current-task cancellation, yield or run shutdown. Probes must be
+/// cheap and must not raise, as for the task-aware cancellation checks.
+pub fn Lifetime::stop_requested(self : Lifetime) -> Bool { self.probe_stop() }
+
+///|
+/// Poll this context's lifetime without querying current-task cancellation.
+/// Safe in synchronous foreign callbacks on the host thread.
+pub fn[S] Context::stop_requested(self : Context[S]) -> Bool { self.lifetime.stop_requested() }
+
+///|
+/// Poll the token's lifetime without querying current-task cancellation.
+/// Safe in synchronous foreign callbacks on the host thread.
+pub fn StopToken::stop_requested(self : StopToken) -> Bool { self.lifetime.stop_requested() }
+
+///|
 /// A handle with the same stop checks as its lifetime.
-/// During a run on native and js, read its checks inside an async task of the run.
+/// During a run on native and js, use cancelled/check_cancelled inside an async
+/// task of the run. Use stop_requested in a synchronous foreign callback.
 pub struct StopToken { priv lifetime : Lifetime }
 
 ///|

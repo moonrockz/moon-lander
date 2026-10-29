@@ -178,7 +178,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.7.1`.
+- `moon.mod` holds the shared version, currently `0.7.2`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -243,6 +243,10 @@ publishes releases.
 
 ## Releases
 
+The `0.7.2` patch makes async sender and basic middleware composition portable
+to wasm-gc, including non-suspending sends under the embedded host. See the
+[async mediator guide](pkgs/mediator/async/README.mbt.md).
+
 The `0.7.1` patch adds enclosing signal probes and real hosted session shutdown
 to the console logging bridge. See the [bridge guide](pkgs/hosting/logging/README.mbt.md).
 
@@ -266,7 +270,7 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 Release versions are shared across workspace members. All seven framework
 modules listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are published
 to mooncakes.io. Install a module at an exact version, for example
-`moon add moonrockz/moon-lander@0.7.1`. The workspace root, docs site, `tests`
+`moon add moonrockz/moon-lander@0.7.2`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 

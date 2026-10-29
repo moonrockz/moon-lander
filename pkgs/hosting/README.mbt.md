@@ -122,6 +122,29 @@ Use `ctx.cancelled()` to read the stop state, or `ctx.check_cancelled()` to rais
 does not receive the context. These checks read stop requests, registered host
 probes, and, on native and js, the current async task's cancellation state.
 On native and js, read these checks inside an async task of the run.
+Use `ctx.stop_requested()`, `ctx.lifetime.stop_requested()` or
+`token.stop_requested()` in a synchronous foreign callback on the host thread,
+including a JavaScript Promise or setTimeout callback. These methods poll the
+same registered probes and read the retained host stop request. They return
+false before a request, without querying a current task. They do not report
+task-only cancellation, yield or run shutdown. Keep task-aware checks inside
+an async task of the run. This API does not add cross-thread access guarantees.
+Reading `stop_reason()` alone does not poll the probes.
+
+```mbt check
+///|
+test "a foreign helper receives the shared host stop probe" {
+  let command : @hosting.Hook[Unit] = ctx => {
+    let token = ctx.lifetime.stop_token()
+    let callback : () -> Bool = () => token.stop_requested()
+    assert_false(callback())
+    ctx.lifetime.stop_application()
+    assert_true(callback())
+  }
+  ignore(command)
+}
+```
+
 A probe stop reaches a suspended command only through the driver that owns the probe.
 A command or hook that raises `StopRequested` ends as a stop and adds no failure.
 A service whose starting or start hook raises it does not count as started.

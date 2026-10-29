@@ -1,0 +1,23 @@
+import {
+  "moonrockz/moon-lander-mediator/async" @mediator_async,
+}
+
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-core" @lander_core,
+  "moonrockz/moon-lander-mediator" @mediator,
+  "moonbitlang/async" @aio,
+  "moonbitlang/async/js_async",
+} for "wbtest"
+
+// The pinned build system cannot condition test imports by target. Embedded
+// tests do not use the event-loop imports; runtime tests do not use hosting.
+// Remove unused-import (29) suppression when imports can be conditional.
+warnings = "-29"
+
+options(targets: {
+  "embedded_wbtest.mbt": ["wasm", "wasm-gc"],
+  "runtime_wbtest.mbt": ["native", "js"],
+  "await.native_wbtest.mbt": ["native"],
+  "await.js_wbtest.mbt": ["js"],
+})

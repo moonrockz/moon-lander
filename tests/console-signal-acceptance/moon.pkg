@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/debug",
   "moonrockz/moon-lander-tests/console-host-scenarios" @scenarios,
   "moonbitlang/async",
   "moonbitlang/async/process",

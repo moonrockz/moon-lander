@@ -61,6 +61,16 @@ priv enum Step {
 }
 
 ///|
+/// The phase retained if a bounded child wait times out.
+priv enum ChildPhase {
+  Starting
+  Awaiting(String)
+  Signalling(Int)
+  ReadingOutput
+  WaitingForExit
+} derive(Debug)
+
+///|
 /// Start `child` in `scenario`, do the steps in order, read the rest of the
 /// output, and give the exit code and the full output. Every wait is bounded,
 /// and the task group ends the child when a step fails.
@@ -82,7 +92,9 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
     Worker(launcher~, program~) =>
       ("node", ["--preserve-symlinks-main", launcher, program])
   }
-  @async.with_timeout(20000, () => {
+  let output = StringBuilder()
+  let phase = Ref(ChildPhase::Starting)
+  try @async.with_timeout(20000, () => {
     @async.with_task_group(group => {
       let (reader, writer) = @process.read_from_process()
       let process = @process.spawn(
@@ -93,22 +105,36 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
         stdout=writer,
       )
       writer.close()
-      let output = StringBuilder()
+      let received : @async.Queue[String?] = @async.Queue(kind=Unbounded)
+      let stdout = group.spawn(() => {
+        while reader.read_until("\n") is Some(line) {
+          let line = line.trim_end(chars="\r").to_owned()
+          output.write_string(line + "\n")
+          received.put(Some(line))
+        }
+        received.put(None)
+      })
       let mut exit_code : Int? = None
       for step in steps {
         match step {
           Await(line) => {
-            guard reader.read_until(line + "\n") is Some(before) else {
-              fail("\{child.label()} \{scenario}: no line \{line} in\n\{output}")
+            phase.val = Awaiting(line)
+            for ;; {
+              match received.get() {
+                Some(actual) if actual.has_suffix(line) => break
+                Some(_) => ()
+                None => fail("\{child.label()} \{scenario}: no line \{line} in\n\{output}")
+              }
             }
-            output.write_string(before + line + "\n")
           }
           Send(kind) => {
+            phase.val = Signalling(kind)
             let sent = send_signal(process.pid, kind)
             guard sent == 0 else { fail("sending kind \{kind} failed: \{sent}") }
           }
           SendUntilExit(kind) =>
             while exit_code is None {
+              phase.val = Signalling(kind)
               // A send can fail after the child ends and before the wait sees it.
               ignore(send_signal(process.pid, kind))
               @async.sleep(100)
@@ -116,14 +142,19 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
             }
         }
       }
-      output.write_string(reader.read_all().text())
+      phase.val = ReadingOutput
+      stdout.wait()
+      phase.val = WaitingForExit
       let code = match exit_code {
         Some(code) => code
         None => process.wait()
       }
       (code, output.to_string().replace_all(old="\r\n", new="\n"))
     })
-  })
+  }) catch {
+    @async.TimeoutError => fail("\{child.label()} \{scenario} timed out in \{@debug.to_string(phase.val)}; captured stdout:\n\{output}")
+    other => raise other
+  }
 }
 
 ///|

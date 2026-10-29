@@ -18,7 +18,9 @@ import {
 /// above zero.
 ///
 /// Each path has its own target list. The core paths run on wasm, wasm-gc, js and native. The async
-/// paths run on wasm, js and native, because `moonbitlang/async` has no wasm-gc test entry.
+/// runtime paths run on wasm, js and native, because `moonbitlang/async` has no wasm-gc
+/// test entry. Portable composition acceptance runs on all four targets under the
+/// embedded host or a real native/JS async runtime.
 ///
 /// Usage: `mise run check:mediator [-- <target>...]`, or `moonx scripts/toolchain.mbtx scripts/check-mediator.mbtx`.
 /// With no target, it checks wasm, wasm-gc, js and native. A path does not run on a target that is
@@ -39,6 +41,7 @@ let paths : Array[(String, Array[String])] = [
   ("tests/mediator-acceptance", all_targets),
   ("pkgs/mediator/async", async_targets),
   ("tests/mediator-async-acceptance", async_targets),
+  ("tests/mediator-composition-acceptance", all_targets),
 ]
 
 ///|
@@ -126,6 +129,7 @@ test "legs give the core paths on four targets and the async paths on three" {
   assert_eq(legs(["wasm-gc"]), [
     ("pkgs/mediator", "wasm-gc"),
     ("tests/mediator-acceptance", "wasm-gc"),
+    ("tests/mediator-composition-acceptance", "wasm-gc"),
   ])
 }
 
@@ -171,7 +175,7 @@ async test "a leg that runs zero tests fails the check" {
   for
     path in [
       "pkgs", "pkgs/mediator", "pkgs/mediator/async", "tests", "tests/mediator-acceptance",
-      "tests/mediator-async-acceptance",
+      "tests/mediator-async-acceptance", "tests/mediator-composition-acceptance",
     ] {
     @fs.mkdir("\{dir}/\{path}")
   }
@@ -197,6 +201,11 @@ async test "a leg that runs zero tests fails the check" {
     "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
   )
   @fs.write_file("\{dir}/tests/mediator-acceptance/moon.pkg", "")
+  @fs.write_file("\{dir}/tests/mediator-composition-acceptance/moon.pkg", "")
+  @fs.write_file(
+    "\{dir}/tests/mediator-composition-acceptance/core_test.mbt",
+    "///|\ntest \"one\" {\n  assert_eq(1, 1)\n}\n",
+  )
   @fs.write_file(
     "\{dir}/tests/mediator-acceptance/core.mbt",
     "///|\npub fn answer() -> Int {\n  42\n}\n",
@@ -288,6 +297,45 @@ async test "external callers cannot bypass mediator error invariants" {
     "\{dir}/moon.pkg",
     "import {\n  \"moonrockz/moon-lander-core\" @core,\n  \"moonrockz/moon-lander-mediator\" @mediator,\n  \"moonrockz/moon-lander-mediator/async\" @mediator_async,\n}\nsupported_targets = \"wasm+js+native\"\n",
   )
+  // The same import must plan on every target without a target restriction.
+  let portable_pkg = "import {\n  \"moonrockz/moon-lander-core\" @core,\n  \"moonrockz/moon-lander-mediator\" @mediator,\n  \"moonrockz/moon-lander-mediator/async\" @mediator_async,\n}\n"
+  @fs.write_file("\{dir}/moon.pkg", portable_pkg)
+  let portable =
+    #|pub fn probe() -> @mediator_async.Sender[Unit, Int, Int] {
+    #|  @mediator_async.sender((_, request) => request + 1)
+    #|  .use_(@mediator_async.before((_, _) => ()))
+    #|  .use_(@mediator_async.after((_, _, _) => ()))
+    #|  .use_(@mediator_async.finally_((_, _) => ()))
+    #|}
+  @fs.write_file("\{dir}/probe.mbt", portable)
+  for target in all_targets {
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--target", target, "."],
+      cwd=dir,
+    )
+    assert_eq(code, 0, msg=out.text() + err.text())
+  }
+  for
+    (source, name) in [
+      (
+        "pub fn probe() -> Unit raise { let _ : @mediator_async.Middleware[Unit, Int, Int] = @mediator_async.timeout(@core.TimeLimit::millis(1)) }",
+        "timeout",
+      ),
+      (
+        "pub fn probe() -> Unit { let _ = @mediator_async.topic((_:Unit, _:Int) => ()) }",
+        "topic",
+      ),
+    ] {
+    @fs.write_file("\{dir}/probe.mbt", source)
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--target", "wasm-gc", "."],
+      cwd=dir,
+    )
+    let output = out.text() + err.text()
+    assert_true(code != 0 && output.contains(name), msg=output)
+  }
   let valid =
     #|pub fn probe() -> Unit raise {
     #|  let limit = @core.TimeLimit::millis(1)

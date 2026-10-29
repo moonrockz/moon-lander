@@ -1,2 +1,17 @@
-import { "moonrockz/moon-lander-mediator" @library }
+import {
+  "moonrockz/moon-lander-mediator" @library,
+  "moonrockz/moon-lander-mediator/async" @composition,
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-core" @core,
+  "moonbitlang/async" @aio,
+}
+
+// The build system cannot condition imports. The embedded entry does not use
+// aio; the runtime entry does not use hosting/core. Remove (29) when imports
+// can be conditional. Every entry executes the same public composition API.
+warnings = "-29"
+options(targets: {
+  "main.embedded.mbt": ["wasm", "wasm-gc"],
+  "main.runtime.mbt": ["native", "js"],
+})
 pkgtype(kind: "executable")

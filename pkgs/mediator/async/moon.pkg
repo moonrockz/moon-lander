@@ -8,6 +8,22 @@ import {
   "moonrockz/moon-lander-mediator/async" @mediator_async,
 } for "test"
 
-// No wasm-gc: `moonbitlang/async` has no event loop there (see README.mbt.md).
-// Add wasm-gc when `moonbitlang/async` gives one.
-supported_targets = "wasm+js+native"
+// The build system cannot condition imports by target. Timeouts and topics use
+// these imports only on wasm/js/native; keep them unused on wasm-gc (29).
+// Remove this override when imports can be conditional.
+warnings = "-29"
+
+// Only sender and basic middleware composition are event-loop independent.
+// The runtime operations and their async-test harness need moonbitlang/async.
+options(targets: {
+  "timeout.runtime.mbt": ["wasm", "js", "native"],
+  "topic.mbt": ["wasm", "js", "native"],
+  "mediator_test.mbt": ["wasm", "js", "native"],
+  "middleware_test.mbt": ["wasm", "js", "native"],
+  "topic_test.mbt": ["wasm", "js", "native"],
+  "topic_wbtest.mbt": ["wasm", "js", "native"],
+  "interop_test.mbt": ["wasm", "js", "native"],
+  "cancel_test.mbt": ["wasm", "js", "native"],
+  "context_test.mbt": ["wasm", "js", "native"],
+  "README.mbt.md": ["wasm", "js", "native"],
+})

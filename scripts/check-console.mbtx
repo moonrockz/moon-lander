@@ -36,7 +36,8 @@ let suite_files : Array[String] = ["moon.pkg", "send.c", "signal_wbtest.mbt"]
 ///|
 /// The files of the test host scenarios that the consumer module reuses.
 let scenario_files : Array[String] = [
-  "moon.pkg", "scenarios.mbt", "emit.native.mbt", "emit.js.mbt",
+  "moon.pkg", "scenarios.mbt", "emit.native.mbt", "emit.js.mbt", "poll.native.mbt",
+  "poll.js.mbt",
 ]
 
 ///|

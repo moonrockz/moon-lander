@@ -113,3 +113,48 @@ async test "a signal wins over a failure before the engine starts" {
   @expect.expect(result.reason is StartFailed(HookFailed(0))).to_be_true()
   @expect.expect(result.exit_code().to_int()).to_equal(143)
 }
+
+///|
+async test "stop_requested polls a native or JS signal before the watcher can run" {
+  let signal : Ref[SignalKind?] = Ref(None)
+  let outcome = builder(@lander_core.AppName::parse("stop-poll"), [])
+    |> build(_ => ())
+    |> run(signals=SignalProbe::new(() => signal.val), ctx => {
+      let token = ctx.lifetime.stop_token()
+      assert_false(ctx.stop_requested())
+      assert_false(ctx.lifetime.stop_requested())
+      assert_false(token.stop_requested())
+      signal.val = Some(Quit)
+      assert_true(token.stop_requested())
+      assert_true(ctx.stop_requested())
+      assert_true(ctx.lifetime.stop_requested())
+    })
+  assert_true(outcome.stop_reason() is Signal(Quit))
+  assert_eq(outcome.exit_code().to_int(), 131)
+}
+
+///|
+async test "stop_requested remains distinct from current task cancellation" {
+  let observed = []
+  let outcome = builder(@lander_core.AppName::parse("task-only"), [])
+    |> build(_ => ())
+    |> run(ctx => {
+      @async.with_task_group(group => {
+        let ready : @async.Queue[Unit] = @async.Queue(kind=Unbounded)
+        let waiting : @async.Queue[Unit] = @async.Queue(kind=Unbounded)
+        let task = group.spawn(() => {
+          defer {
+            observed.push(ctx.cancelled())
+            observed.push(ctx.stop_requested())
+            observed.push(ctx.lifetime.stop_token().stop_requested())
+          }
+          ready.put(())
+          ignore(waiting.get())
+        })
+        ignore(ready.get())
+        task.cancel()
+      })
+    })
+  assert_eq(observed, [true, false, false])
+  assert_true(outcome.stop_reason() is Completed)
+}

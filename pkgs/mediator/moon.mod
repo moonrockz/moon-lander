@@ -1,9 +1,9 @@
 name = "moonrockz/moon-lander-mediator"
 
-version = "0.7.1"
+version = "0.7.2"
 
 import {
-  "moonrockz/moon-lander-core@0.7.1",
+  "moonrockz/moon-lander-core@0.7.2",
   "moonbitlang/async@0.22.5",
 }
 

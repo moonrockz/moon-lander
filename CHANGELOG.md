@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.2 - 2026-10-28
+
+All nine libraries share this patch version.
+
+### Fixed
+
+- Add `Context.stop_requested()`, `Lifetime.stop_requested()` and
+  `StopToken.stop_requested()` for synchronous foreign callbacks on the host
+  thread. They poll the existing registered probes and retained stop request
+  without querying the current coroutine. Task-aware cancellation, first stop
+  reason and signal exit-code precedence remain compatible.
+- `mediator/async` sender and before/after/finally middleware composition can
+  be imported on all four targets. Non-suspending async sends work under the
+  embedded host on wasm and wasm-gc, with no event loop. Timeout and topic
+  operations retain their existing wasm/JS/native behavior and target boundary.
+- Qualify real native/JS asynchronous completion, including a JavaScript
+  Promise, typed failure, cancellation, finalization and timeout compatibility.
+  Fresh registry consumers execute the same public composition through the
+  embedded or runtime host path on each target.
+- Worker acceptance timeouts now report their typed child phase and streamed
+  output. Existing deadlines, true signal reasons/codes and drain assertions
+  stay in place; this adds evidence for the intermittent worker follow-up.
+
 ## 0.7.1 - 2026-10-28
 
 All nine libraries share this patch version. Existing logging bridge callers

@@ -1,2 +1,17 @@
-import { "moonrockz/moon-lander-hosting" @library }
+import {
+  "moonrockz/moon-lander-hosting" @library,
+  "moonrockz/moon-lander-core" @core,
+  "moonbitlang/async/js_async",
+  "moonbitlang/async",
+}
+
+// The pinned build cannot condition imports. js_async is unused outside JS;
+// remove (29) when target-specific imports are available.
+warnings = "-29"
+options(targets: {
+  "main.embedded.mbt": ["wasm", "wasm-gc"],
+  "main.runtime.mbt": ["native", "js"],
+  "probe.js.mbt": ["js"],
+  "probe.native.mbt": ["native"],
+})
 pkgtype(kind: "executable")

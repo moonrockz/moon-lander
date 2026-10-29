@@ -6,20 +6,21 @@ async fn write(root : String, file : String, text : String) -> Unit {
 }
 
 ///|
-/// Git makes object files read-only on Windows; restore write access before cleanup.
-async fn remove_fixture(root : String) -> Unit {
-  async fn writable(path : String) -> Unit {
-    match @fs.kind(path, follow_symlink=false) {
-      Directory => {
-        for name in @fs.readdir(path, include_hidden=true) {
-          writable(path + "/" + name)
-        }
-      }
-      Regular => @fs.chmod(path, 0o600)
-      _ => ()
-    }
+/// Windows async chmod is unsupported; use the OS attribute tool on owned fixtures.
+async fn fixture_attributes(args : Array[String]) -> Unit {
+  let (code, stdout, stderr) = @process.collect_output("attrib.exe", args)
+  guard code == 0 else {
+    fail("fixture attrib failed (\{code}): \{stdout.text()}\{stderr.text()}")
   }
-  writable(root)
+}
+
+///|
+/// Clear Git's Windows file attributes without following fixture symlink targets.
+async fn remove_fixture(root : String) -> Unit {
+  if @async.platform is Windows {
+    let root = root.replace_all(old="/", new="\\")
+    fixture_attributes(["-R", "-H", "-S", root + "\\*", "/S", "/D", "/L"])
+  }
   @fs.rmdir(root, recursive=true)
 }
 
@@ -68,7 +69,11 @@ async fn fixture() -> String {
 async test "Git fixture cleanup removes read-only files" {
   let root = fixture()
   write(root, "readonly.bin", "fixture")
-  @fs.chmod(root + "/readonly.bin", 0o400)
+  if @async.platform is Windows {
+    fixture_attributes(["+R", root.replace_all(old="/", new="\\") + "\\readonly.bin"])
+  } else {
+    @fs.chmod(root + "/readonly.bin", 0o400)
+  }
   remove_fixture(root)
   assert_false(@fs.exists(root))
 }
@@ -78,7 +83,10 @@ async test "source policy checks native canonical paths before rendering" {
   let root = fixture()
   defer remove_fixture(root)
   let config = effective_configuration(root, @policy.TreePrefix::parse(""))
-  check_source_policy(root, config, true)
+  check_source_policy(root, config, true) catch {
+    @model.Invalid(problems) => fail(problems.map(p => p.render()).join("\n"))
+    error => raise error
+  }
 }
 
 ///|
@@ -105,7 +113,10 @@ async test "the shared host preserves content and active deployment bases" {
   for suffix in ["", "next/"] {
     let config = effective_configuration(root, @policy.TreePrefix::parse(suffix))
     let out = "\{root}/out-\{suffix.replace_all(old="/", new="-")}"
-    let warnings = build(root, config, out, main_build=true)
+    let warnings = build(root, config, out, main_build=true) catch {
+      @model.Invalid(problems) => fail(problems.map(p => p.render()).join("\n"))
+      error => raise error
+    }
     assert_eq(warnings, [])
     assert_eq(@host.check(out, "/fixture/" + suffix), [])
     let html = @fs.read_file(out + "/docs/guide/index.html").text()
@@ -130,7 +141,10 @@ async test "ignored pages and brand documentation are not discovered" {
   write(root, "docs/superpowers/local.md", "# Local plan")
   let config = effective_configuration(root, @policy.TreePrefix::parse(""))
   let out = root + "/out"
-  ignore(build(root, config, out))
+  ignore(build(root, config, out)) catch {
+    @model.Invalid(problems) => fail(problems.map(p => p.render()).join("\n"))
+    error => raise error
+  }
   assert_false(@fs.exists(out + "/docs/ignored/index.html"))
   assert_false(@fs.exists(out + "/docs/assets/brand/index.html"))
   assert_false(@fs.exists(out + "/docs/superpowers/local/index.html"))

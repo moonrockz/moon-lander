@@ -104,7 +104,7 @@ Depends on: group 8.
 - [x] 9.1 Add Topic, scoped subscriptions, unsubscribe and close; verify subscriber order, snapshot behavior, closed-destination pruning, backpressure, partial delivery and scope cleanup on all runtime targets
 - [x] 9.2 Add runnable fan-out and worker-pool examples using subjects and direct send, update the docs index and explain the difference from mediator publish; verify examples compile and docs links pass
 - [x] 9.3 Compare acceptance evidence with every row of the design's reference baseline and every actors requirement; verify no required capability is represented only by prose or an unchecked test target
-- [ ] 9.4 Generate and review public pkg.generated.mbti files, run mise run format, mise run check and mise exec -- openspec validate --all --strict; verify all pass and isolated candidate consumers use the intended actor archive
+- [x] 9.4 Generate and review public pkg.generated.mbti files, run mise run format, mise run check and mise exec -- openspec validate --all --strict; verify all pass and isolated candidate consumers use the intended actor archive
 
 ## Workflow follow-up
 

@@ -9,17 +9,15 @@ module that uses them.
 
 ### Requirement: Framework module set
 
-The workspace SHALL provide seven framework modules: `moonrockz/moon-lander-core` in
-`pkgs/core`, `moonrockz/moon-lander-logging` in `pkgs/logging`,
-`moonrockz/moon-lander-config` in `pkgs/config`, `moonrockz/moon-lander-mediator` in
-`pkgs/mediator`, `moonrockz/moon-lander-hosting` in `pkgs/hosting`,
-`moonrockz/moon-lander-logging-hosting-async` in `pkgs/logging-hosting-async`, and
-`moonrockz/moon-lander` in `pkgs/lander`. Each MUST be a member of `moon.work`.
+The workspace SHALL provide eight framework modules: `moonrockz/moon-lander-<name>`
+in `pkgs/<name>` for core, logging, config, mediator, hosting,
+logging-hosting-async and actors, and `moonrockz/moon-lander` in `pkgs/lander`.
+Each MUST be a member of `moon.work`.
 
 #### Scenario: Members of the workspace
 
 - **WHEN** `mise run validate` reads `moon.work`
-- **THEN** it finds the seven framework modules in their folders, each with a `moon.mod` that gives its module name
+- **THEN** it finds the eight framework modules in their folders, each with a `moon.mod` that gives its module name
 
 #### Scenario: Old package paths are gone
 
@@ -35,6 +33,11 @@ The workspace SHALL provide seven framework modules: `moonrockz/moon-lander-core
 
 - **WHEN** `moon.work` does not list `./pkgs/logging-hosting-async`
 - **THEN** `mise run validate` fails and names the folder `pkgs/logging-hosting-async`
+
+#### Scenario: Optional actors module is missing from the workspace
+
+- **WHEN** `moon.work` does not list `./pkgs/actors`
+- **THEN** `mise run validate` fails and names the folder `pkgs/actors`
 
 ### Requirement: Main package at the module root
 
@@ -59,12 +62,12 @@ Other packages of the module SHALL be below it, for example
 
 ### Requirement: Dependency direction
 
-A framework module SHALL import only the framework modules below it. Core and
-logging import none. Config, mediator, and logging-hosting-async import only core
-and logging. Hosting imports only core, logging, config, and logging-hosting-async.
-`moonrockz/moon-lander` can import all six. Core and logging MUST import no
-module except `moonbitlang/core`. Logging-hosting-async MAY import
-`moonbitlang/async`, but MUST NOT import config, mediator, or hosting.
+A framework module SHALL import only the framework modules below it: config,
+mediator and logging-hosting-async import core and logging; actors imports core;
+hosting imports core, logging, config and logging-hosting-async;
+`moonrockz/moon-lander` can import all seven. Core and logging MUST import no
+module except `moonbitlang/core`. Logging-hosting-async and actors MAY import
+`moonbitlang/async`; actors MUST NOT import another external module.
 
 #### Scenario: Mediator without configuration parsers
 
@@ -116,9 +119,19 @@ module except `moonbitlang/core`. Logging-hosting-async MAY import
 - **WHEN** `pkgs/hosting` imports `moonrockz/moon-lander-logging-hosting-async`
 - **THEN** dependency validation accepts that direction and the logging runtime module does not import hosting
 
+#### Scenario: Standalone actor consumer
+
+- **WHEN** an isolated consumer imports `moonrockz/moon-lander-actors/runtime`
+- **THEN** its dependency graph has no hosting, config, mediator, logging or parser module
+
+#### Scenario: Actors imports against the direction
+
+- **WHEN** `pkgs/actors/moon.mod` imports hosting or mediator
+- **THEN** `mise run validate` fails and names both modules
+
 ### Requirement: One version for the framework modules
 
-The seven framework modules SHALL have the version of the root `moon.mod`. Each import
+The eight framework modules SHALL have the version of the root `moon.mod`. Each import
 of one framework module by another MUST use that version.
 
 #### Scenario: Version drift
@@ -129,11 +142,16 @@ of one framework module by another MUST use that version.
 #### Scenario: Set the version
 
 - **WHEN** a maintainer runs `moonx scripts/versions.mbtx set 0.4.0`
-- **THEN** the seven framework modules and each import of one by another get `0.4.0`
+- **THEN** the eight framework modules and each import of one by another get `0.4.0`
 
 #### Scenario: Optional logging runtime version drift
 
 - **WHEN** `pkgs/logging-hosting-async/moon.mod` has another version than the root `moon.mod`
+- **THEN** `mise run validate:versions` fails and names the file and both versions
+
+#### Scenario: Actors version drift
+
+- **WHEN** `pkgs/actors/moon.mod` has another version than the root `moon.mod`
 - **THEN** `mise run validate:versions` fails and names the file and both versions
 
 ### Requirement: Shared names live in core

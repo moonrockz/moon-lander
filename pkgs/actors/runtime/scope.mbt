@@ -5,6 +5,10 @@ pub struct Scope {
   /// Start a task that the scope owns. The result cancels the task.
   priv spawn_task : (async () -> Unit) -> () -> Unit
   priv mut open : Bool
+  /// The names that live actors of this scope hold, with their addresses.
+  priv names : Map[@policy.ActorName, ActorAddress]
+  /// What runs when the body returns, such as ending subscriptions.
+  priv exits : Array[() -> Unit]
 }
 
 ///|
@@ -20,9 +24,14 @@ pub async fn[X] scope(body : async (Scope) -> X) -> X {
         () => task.cancel()
       },
       open: true,
+      names: Map([]),
+      exits: [],
     }
     defer {
       scope.open = false
+      for exit in scope.exits {
+        exit()
+      }
     }
     body(scope)
   })
@@ -31,12 +40,31 @@ pub async fn[X] scope(body : async (Scope) -> X) -> X {
 ///|
 /// A scope that accepts no start, for an actor that has no children.
 fn Scope::closed() -> Scope {
-  { spawn_task: _ => () => (), open: false }
+  { spawn_task: _ => () => (), open: false, names: Map([]), exits: [] }
 }
 
 ///|
-/// Make the lifetime record of a new actor.
-fn Scope::begin(self : Scope, close_mailbox : () -> Unit) -> Lifetime raise ActorError {
+/// Reserve `name` and make the lifetime record of a new actor. The name stays
+/// reserved until the actor and its cleanup end; then only this actor's
+/// reservation is released.
+fn Scope::begin(
+  self : Scope,
+  name : @policy.ActorName?,
+  close_mailbox : () -> Unit,
+) -> Lifetime raise ActorError {
   guard self.open else { raise ScopeClosed }
-  Lifetime::new(close_mailbox)
+  if name is Some(name) && self.names.contains(name) {
+    raise NameInUse(name)
+  }
+  let address = ActorAddress::next(name)
+  if name is Some(name) {
+    self.names[name] = address
+  }
+  Lifetime::new(address, close_mailbox, () => {
+    if name is Some(name) &&
+      self.names.get(name) is Some(owner) &&
+      owner == address {
+      self.names.remove(name)
+    }
+  })
 }

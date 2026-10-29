@@ -6,4 +6,7 @@ pub using @policy {
   type CountError,
   type CountRule,
   type Admission,
+  type ActorName,
+  type NameError,
+  type NameRule,
 }

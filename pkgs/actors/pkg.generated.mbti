@@ -14,7 +14,23 @@ pub suberror CountError {
 } derive(@debug.Debug)
 pub fn CountError::to_repr(Self) -> @debug.Repr
 
+pub suberror NameError {
+  InvalidName(input~ : String, rule~ : NameRule)
+} derive(@debug.Debug)
+pub fn NameError::to_repr(Self) -> @debug.Repr
+
 // Types and methods
+pub struct ActorName {
+  // private fields
+} derive(Eq, Hash, @debug.Debug)
+pub fn ActorName::equal(Self, Self) -> Bool
+pub fn ActorName::hash(Self) -> Int32
+pub fn ActorName::hash_combine(Self, Hasher) -> Unit
+pub fn ActorName::not_equal(Self, Self) -> Bool
+pub fn ActorName::parse(String) -> Self raise NameError
+pub fn ActorName::to_repr(Self) -> @debug.Repr
+pub fn ActorName::to_string(Self) -> String
+
 pub(all) enum Admission {
   Accepted
   Full
@@ -62,6 +78,16 @@ pub fn MessageCount::hash_combine(Self, Hasher) -> Unit
 pub fn MessageCount::not_equal(Self, Self) -> Bool
 pub fn MessageCount::to_int(Self) -> Int32
 pub fn MessageCount::to_repr(Self) -> @debug.Repr
+
+pub enum NameRule {
+  Empty
+  TooLong
+  FirstNotLetter(Char)
+  InvalidCharacter(Char)
+} derive(Eq, @debug.Debug)
+pub fn NameRule::equal(Self, Self) -> Bool
+pub fn NameRule::not_equal(Self, Self) -> Bool
+pub fn NameRule::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

@@ -225,9 +225,10 @@ fn default_cleanup_limit() -> @lander_core.TimeLimit {
 fn[M] Scope::new_ref(
   self : Scope,
   mailbox : @policy.MailboxPolicy,
+  name : @policy.ActorName?,
 ) -> ActorRef[M] raise ActorError {
   let mailbox = Mailbox::new(mailbox)
-  { mailbox, life: self.begin(() => ignore(mailbox.close())) }
+  { mailbox, life: self.begin(name, () => ignore(mailbox.close())) }
 }
 
 ///|
@@ -281,7 +282,8 @@ fn[M, R] Scope::run_actor(
 /// `on_stop` runs once after processing ends, also after a failure or a
 /// cancellation, with cancellation protection and the `cleanup_limit`
 /// (5 seconds by default). The actor belongs to this scope. This runs
-/// `receive_loop(initial, handler)`.
+/// `receive_loop(initial, handler)`. With `name`, the scope reserves the name
+/// first; a name that a live actor of this scope holds raises `NameInUse`.
 pub fn[S, M] Scope::start(
   self : Scope,
   initial : S,
@@ -289,8 +291,9 @@ pub fn[S, M] Scope::start(
   mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  name? : @policy.ActorName,
 ) -> Actor[M, Unit] raise ActorError {
-  let target = self.new_ref(mailbox)
+  let target = self.new_ref(mailbox, name)
   let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
   self.run_actor(target, cleanup, children=false, _ => {
     receive_loop(initial, handler).map(_ => ())
@@ -323,8 +326,9 @@ pub async fn[S, M] Scope::start_with(
   handler : async (S, M) -> Next[S],
   mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  name? : @policy.ActorName,
 ) -> Actor[M, Unit] {
-  let target = self.new_ref(mailbox)
+  let target = self.new_ref(mailbox, name)
   let setup : Setup = { steps: [] }
   let state = Ref(None)
   let ready : @aio.Queue[Error?] = @aio.Queue(kind=Unbounded)
@@ -381,8 +385,9 @@ pub fn[M, R] Scope::spawn(
   mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  name? : @policy.ActorName,
 ) -> Actor[M, R] raise ActorError {
-  let target = self.new_ref(mailbox)
+  let target = self.new_ref(mailbox, name)
   let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
   self.run_actor(target, cleanup, children=true, make)
 }

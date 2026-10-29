@@ -67,9 +67,13 @@ priv struct Lifetime {
 }
 
 ///|
-fn Lifetime::new(close_mailbox : () -> Unit) -> Lifetime {
+fn Lifetime::new(
+  address : ActorAddress,
+  close_mailbox : () -> Unit,
+  release : () -> Unit,
+) -> Lifetime {
   {
-    address: ActorAddress::next(),
+    address,
     ending: None,
     outcome: None,
     closing: false,
@@ -79,7 +83,7 @@ fn Lifetime::new(close_mailbox : () -> Unit) -> Lifetime {
     close_mailbox,
     cancel_task: () => (),
     cancel_requested: false,
-    release: () => (),
+    release,
   }
 }
 

@@ -355,7 +355,17 @@ async fn main {
         "name = \"registry-consumer\"\nprivate = true\nversion = \"0.0.1\"\n",
       )
       let fixture = "\{root}/tests/registry-consumers/\{candidate.library.fixture_name()}"
-      for file in ["main.mbt", "moon.pkg"] {
+      let fixture_files = if candidate.library is Mediator {
+        ["main.mbt", "moon.pkg", "main.embedded.mbt", "main.runtime.mbt"]
+      } else if candidate.library is Hosting {
+        [
+          "main.mbt", "moon.pkg", "main.embedded.mbt", "main.runtime.mbt", "probe.js.mbt",
+          "probe.native.mbt",
+        ]
+      } else {
+        ["main.mbt", "moon.pkg"]
+      }
+      for file in fixture_files {
         @fs.write_file(
           "\{consumer}/\{file}",
           @fs.read_file("\{fixture}/\{file}"),
@@ -388,7 +398,16 @@ async fn main {
         ignore(run(["update"]))
       }
       ignore(run(["add", "\{candidate.library.name()}@\{version}"]))
+      if candidate.library is Mediator {
+        // The four-target consumer runs the public async sender under the real
+        // embedded host or a real native/JS runtime, outside this workspace.
+        ignore(run(["add", "moonrockz/moon-lander-hosting@\{version}"]))
+        ignore(run(["add", "moonrockz/moon-lander-core@\{version}"]))
+        ignore(run(["add", "moonbitlang/async@0.22.5"]))
+      }
       if candidate.library is Hosting {
+        // The public stop probe consumer runs embedded or runtime hosts.
+        ignore(run(["add", "moonrockz/moon-lander-core@\{version}"]))
         // The bridge consumer names the session and logger modules directly.
         // Moon requires these direct imports even though hosting also uses them.
         ignore(

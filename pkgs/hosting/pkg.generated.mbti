@@ -122,6 +122,7 @@ pub struct Context[S] {
 }
 pub fn[S] Context::cancelled(Self[S]) -> Bool
 pub fn[S] Context::check_cancelled(Self[S]) -> Unit raise StopRequested
+pub fn[S] Context::stop_requested(Self[S]) -> Bool
 
 pub struct ExitCode {
   // private fields
@@ -177,6 +178,7 @@ pub fn Lifetime::set_exit_code(Self, ExitCode) -> Unit
 pub fn Lifetime::stop_application(Self, exit_code? : ExitCode) -> Unit
 pub fn Lifetime::stop_from_embedder(Self, exit_code? : ExitCode) -> Unit
 pub fn Lifetime::stop_reason(Self) -> StopReason?
+pub fn Lifetime::stop_requested(Self) -> Bool
 pub fn Lifetime::stop_token(Self) -> StopToken
 
 pub struct Mapping {
@@ -251,6 +253,7 @@ pub struct StopToken {
 }
 pub fn StopToken::cancelled(Self) -> Bool
 pub fn StopToken::check_cancelled(Self) -> Unit raise StopRequested
+pub fn StopToken::stop_requested(Self) -> Bool
 
 // Type aliases
 pub type ErrorReport = async (Error, ExitCode) -> Unit

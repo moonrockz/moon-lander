@@ -6,7 +6,7 @@ pub(all) enum Scenario {
   Clean
   /// The command writes `ready` and waits until a signal cancels it.
   Wait
-  /// The command writes `ready` and polls `ctx.cancelled()` in a loop with no
+  /// The command writes `ready` and polls `ctx.stop_requested()` in a loop with no
   /// suspension point.
   Poll
   /// The command writes `ready` and loops with no suspension point and no
@@ -152,16 +152,7 @@ pub async fn run(
         @async.sleep(60000)
         emit("command must be cancelled")
       }
-      Poll => {
-        emit("ready")
-        let count = Ref(0UL)
-        while !ctx.cancelled() {
-          count.val = count.val + 1UL
-        }
-        // The stop request cancelled this task, so the next write would end
-        // with cancellation. A stop hook writes the result.
-        polled.val = true
-      }
+      Poll => poll_stop(ctx, () => polled.val = true)
       Spin => {
         emit("ready")
         let count = Ref(0UL)

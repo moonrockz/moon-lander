@@ -474,3 +474,21 @@ test "embedded profile membership selects services and stays identical through h
   assert_eq(reports, [])
   assert_eq(seen, ["factory", "hook", "command"])
 }
+
+///|
+test "embedded stop_requested reads the same context lifetime and token" {
+  let host = builder(@lander_core.AppName::parse("embedded-stop-poll"), [])
+    |> build(_ => ())
+  let result = run_embedded(host, ctx => {
+    let token = ctx.lifetime.stop_token()
+    assert_false(ctx.stop_requested())
+    assert_false(ctx.lifetime.stop_requested())
+    assert_false(token.stop_requested())
+    ctx.lifetime.stop_application(exit_code=ExitCode::from_int(7))
+    assert_true(ctx.stop_requested())
+    assert_true(ctx.lifetime.stop_requested())
+    assert_true(token.stop_requested())
+  })
+  assert_true(result.stop_reason() is Requested)
+  assert_eq(result.exit_code().to_int(), 7)
+}

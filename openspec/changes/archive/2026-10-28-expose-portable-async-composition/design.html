@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expose portable async composition</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Expose portable async composition</h1><p class="meta">Issue #127 | accepted addition to the active Morphir support goal</p>
+<nav class="toc" aria-label="Contents"><ul><li><a href="#context">Context</a></li><li><a href="#goals">Goals and non-goals</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#risks">Risks and trade-offs</a></li><li><a href="#migration">Migration plan</a></li></ul></nav>
+<h2 id="context">Context</h2><p>See <a href="proposal.md">proposal.md</a>. The old package-wide target declaration prevents planning before target-gated uses can be removed. The pinned compiler accepts basic async composition on wasm-gc after that declaration is removed. The embedded driver already runs async hooks until completion or first suspension.</p>
+<h2 id="goals">Goals and non-goals</h2><p>Keep one sender and middleware implementation and the existing import path. Do not start an embedded scheduler, replace a real async send with a synchronous send, or change timeout and topic behavior on their current targets.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="pkg-1">PKG-1. Remove the package-wide restriction (Call)</h3><p>Expose Sender, middleware, before, after, finally_ and synchronous-sender wrapping through the existing mediator/async package on all four targets. A second composition namespace would add migration and type bridging without a need. Keep the same implementation and opaque types.</p>
+<h3 id="run-1">RUN-1. Gate runtime operations by file (Call)</h3><p>Move timeout to timeout.runtime.mbt. Gate that file and Topic operations to wasm/js/native. Keep old event-loop tests and README async tests on those targets. The build system cannot condition imports, so explain a narrow unused-import warning exception for wasm-gc. This follows the existing hosting package boundary. Do not implement a wasm-gc timeout or concurrent scheduler.</p>
+<h3 id="emb-1">EMB-1. Use the existing embedded driver (Owner)</h3><p>A non-suspending handler and middleware complete under hosting.run_embedded. Actual suspension remains that driver's typed failure. Native and JS handlers must really await completion; tests cover a JS Promise, success, failure, cancellation and finalization around the real handler. No downstream dispatcher is copied.</p>
+<h2 id="risks">Risks and trade-offs</h2><table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody><tr><td>Users infer an embedded event loop</td><td>Document operation-specific target support and verify suspension is still rejected.</td></tr><tr><td>Runtime exports or timeout behavior regress</td><td>Run all existing async tests on three targets and explicit native/JS timeout compatibility cases.</td></tr><tr><td>A zero-test wasm-gc leg looks green</td><td>Add a required nonzero portable acceptance leg on every target.</td></tr></tbody></table>
+<h2 id="migration">Migration plan</h2><p>No source change for existing async imports. Embedded callers use the same typed async sender inside run_embedded. Finish the running 0.7.1 publication and proof first, then publish a later owner-authorized patch through release.yml. Qualify fresh public consumers and approved archive checksums; do not overwrite versions or tags.</p>
+</main>
+</body>
+</html>

@@ -5,9 +5,14 @@
 /// queue and count against the capacity; there is no second store.
 priv struct Mailbox[M] {
   queue : @deque.Deque[M]
+  /// For each queued message, what to do when close discards it. An ask uses
+  /// it to wake its caller at once.
+  discards : @deque.Deque[(() -> Unit)?]
   limit : Int?
   /// False after close or drain: no message can enter.
   mut admitting : Bool
+  /// True after the first close.
+  mut closed : Bool
   /// The runner waits here for an arrival or for close.
   arrivals : @cond_var.Cond
   /// Producers wait here for free space or for close.
@@ -24,8 +29,10 @@ fn[M] Mailbox::new(policy : @policy.MailboxPolicy) -> Mailbox[M] {
   }
   {
     queue: @deque.Deque([]),
+    discards: @deque.Deque([]),
     limit,
     admitting: true,
+    closed: false,
     arrivals: @cond_var.Cond(),
     space: @cond_var.Cond(),
     waiting_producers: 0,
@@ -37,8 +44,10 @@ fn[M] Mailbox::new(policy : @policy.MailboxPolicy) -> Mailbox[M] {
 fn[M] Mailbox::fixed(messages : Array[M], admitting~ : Bool) -> Mailbox[M] {
   {
     queue: @deque.Deque(messages),
+    discards: @deque.Deque(Array::make(messages.length(), None)),
     limit: None,
     admitting,
+    closed: false,
     arrivals: @cond_var.Cond(),
     space: @cond_var.Cond(),
     waiting_producers: 0,
@@ -56,11 +65,16 @@ fn[M] Mailbox::has_space(self : Mailbox[M]) -> Bool {
 ///|
 /// Append `message` when there is space. This is the admission commit point:
 /// it does not suspend, so a cancellation cannot interrupt it.
-fn[M] Mailbox::admit(self : Mailbox[M], message : M) -> @policy.Admission {
+fn[M] Mailbox::admit(
+  self : Mailbox[M],
+  message : M,
+  discard : (() -> Unit)?,
+) -> @policy.Admission {
   if !self.admitting {
     Closed
   } else if self.has_space() {
     self.queue.push_back(message)
+    self.discards.push_back(discard)
     self.arrivals.broadcast()
     Accepted
   } else {
@@ -75,9 +89,10 @@ async fn[M] Mailbox::put(
   self : Mailbox[M],
   address : ActorAddress,
   message : M,
+  discard? : () -> Unit,
 ) -> Unit raise ActorError {
   for ;; {
-    match self.admit(message) {
+    match self.admit(message, discard) {
       Accepted => return
       Closed => fail_unless_cancelled(Closed(address))
       Full => {
@@ -92,21 +107,45 @@ async fn[M] Mailbox::put(
 }
 
 ///|
-/// Reject later admission, remove the queued messages and wake all waiters.
-/// The result is the removed messages, oldest first.
-fn[M] Mailbox::close(self : Mailbox[M]) -> Array[M] {
+/// Reject later admission and wake all waiters, but keep the queued messages
+/// for the runner. Drain uses it.
+fn[M] Mailbox::seal(self : Mailbox[M]) -> Unit {
   self.admitting = false
-  let pending = self.queue.iter().collect()
-  self.queue.clear()
   self.arrivals.broadcast()
   self.space.broadcast()
-  pending
+}
+
+///|
+/// Reject later admission, remove the queued messages, wake their askers and
+/// all waiters. The first close gives the removed messages, oldest first;
+/// later closes give `None`.
+fn[M] Mailbox::close(self : Mailbox[M]) -> Array[M]? {
+  self.admitting = false
+  let first = !self.closed
+  self.closed = true
+  let pending = self.queue.iter().collect()
+  let discards = self.discards.iter().collect()
+  self.queue.clear()
+  self.discards.clear()
+  self.arrivals.broadcast()
+  self.space.broadcast()
+  for discard in discards {
+    if discard is Some(discard) {
+      discard()
+    }
+  }
+  if first {
+    Some(pending)
+  } else {
+    None
+  }
 }
 
 ///|
 /// Remove and give the queued message at `index`.
 fn[M] Mailbox::take_at(self : Mailbox[M], index : Int) -> M {
   let message = self.queue.remove(index)
+  ignore(self.discards.remove(index))
   if self.waiting_producers > 0 {
     self.space.broadcast()
   }

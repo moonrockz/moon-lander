@@ -11,6 +11,13 @@ pub suberror ActorError {
   ActorFailed(ActorAddress, Error)
   /// The actor was cancelled before it gave a result.
   ActorCancelled(ActorAddress)
+  /// A destination that is not an actor admits no more messages.
+  DestinationClosed
+  /// A cleanup step raised `cleanup`; `primary` is the actor's own failure.
+  CleanupFailed(primary~ : Error?, cleanup~ : Error)
+  /// The cleanup did not end within `limit`; `primary` is the actor's own
+  /// failure.
+  CleanupTimedOut(primary~ : Error?, limit~ : @lander_core.TimeLimit)
 } derive(Debug)
 
 ///|

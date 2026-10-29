@@ -337,8 +337,35 @@ async test "external consumers cannot take a message outside a receive or break 
     )
     assert_eq(code, 0, msg=out.text() + err.text())
   }
+  // A consumer without a target limit cannot use the runtime on wasm-gc: the
+  // build rejects the package instead of giving operations that abort.
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors/runtime\" @actors,\n  \"moonrockz/moon-lander-actors\" @policy,\n}\nwarnings = \"-unused_type_declaration-unused_constructor-unused_package\"\n",
+  )
+  let (code, out, err) = @process.collect_output(
+    "moon",
+    ["check", "--target", "wasm-gc", "."],
+    cwd=dir,
+  )
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg="The runtime compiled on wasm-gc")
+  assert_true(output.contains("wasm-gc"), msg=output)
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors/runtime\" @actors,\n  \"moonrockz/moon-lander-actors\" @policy,\n}\nsupported_targets = \"wasm+js+native\"\nwarnings = \"-unused_type_declaration-unused_constructor-unused_package\"\n",
+  )
   for
     (source, diagnostic) in [
+      // A reference has no lifecycle control.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { ignore(counter(scope).to_ref().close()) }",
+        "4015",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().cancel() }",
+        "4015",
+      ),
       // A reference accepts only its protocol.
       (
         "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).send(\"text\") }",
@@ -370,7 +397,59 @@ async test "external consumers cannot take a message outside a receive or break 
         "fn probe(context : @actors.ActorContext[Counter]) -> Unit { let _ = context.select(fn(m) { Some(m) }) }",
         "4015",
       ),
+      // Services and responders keep their result types.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : String = scope.create(1).ask(fn(n) { n + 1 }) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let _ : String = scope.respond(fn(n : Int) { n * 2 }).ask(21) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.respond(fn(n : Int) { n * 2 }).ask(\"21\")) }",
+        "4014",
+      ),
+      // A destination accepts only its message type.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().to_subject().send(Ping) }",
+        "4014",
+      ),
+      // Directories keep one protocol and support only same-type operators.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let d = @actors.Directory::of(counter(scope).to_ref()); match d.lookup(@actors.ActorName::parse(\"c\")) { Found(r) => { let _ : @actors.ActorRef[Other] = r } _ => () } }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let a = @actors.Directory::of(counter(scope).to_ref()); let b : @actors.Directory[Other] = @actors.Directory::empty(); ignore(a + b) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let c = counter(scope).to_ref(); ignore(@actors.Directory::of(c) + c) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let d = @actors.Directory::of(counter(scope).to_ref()); ignore(d ++ d) }",
+        "4021",
+      ),
       // Opaque values cannot be made around their constructors.
+      (
+        "fn probe() -> Unit { let _ : @actors.ActorAddress = { id: 1L, name: None } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.NameConflict[Counter] = { name: abort(\"x\"), refs: [] } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @policy.ActorName = { text: \"9bad\" } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.Pending[Counter] = { messages: [] } }",
+        "4036",
+      ),
+      ("fn probe() -> Unit { let _ : @actors.Setup = { steps: [] } }", "4036"),
       (
         "fn probe() -> Unit { let _ : @policy.MailboxCapacity = { value: 0 } }",
         "4036",

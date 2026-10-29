@@ -2,31 +2,88 @@
 /// The owner of actor lifetimes. `scope` makes it. When the body of `scope`
 /// returns, the scope cancels its live actors and waits for them to end.
 pub struct Scope {
-  priv spawn_task : (async () -> Unit) -> Unit
+  /// Start a task that the scope owns. The result cancels the task.
+  priv spawn_task : (async () -> Unit) -> () -> Unit
   priv mut open : Bool
+  /// The names that live actors of this scope hold, with their addresses.
+  priv names : Map[@policy.ActorName, ActorAddress]
+  /// What runs when the body returns, such as ending subscriptions, by key.
+  priv exits : Map[Int, () -> Unit]
+  priv mut last_exit : Int
 }
 
 ///|
 /// Run `body` with a new scope. Actors that `body` starts belong to the scope.
 /// When `body` returns, the scope stops accepting starts, cancels its live
-/// actors and returns after they end. An actor that fails fails the scope and
-/// cancels the other actors and `body`.
+/// actors and returns after they and their cleanup end. An actor that fails
+/// fails the scope and cancels the other actors and `body`.
 pub async fn[X] scope(body : async (Scope) -> X) -> X {
   @aio.with_task_group(group => {
     let scope = {
-      spawn_task: task => group.spawn_bg(task, no_wait=true),
+      spawn_task: task => {
+        let task = group.spawn(task, no_wait=true)
+        () => task.cancel()
+      },
       open: true,
+      names: Map([]),
+      exits: Map([]),
+      last_exit: 0,
     }
     defer {
       scope.open = false
+      let exits = scope.exits.values().collect()
+      scope.exits.clear()
+      for exit in exits {
+        exit()
+      }
     }
     body(scope)
   })
 }
 
 ///|
-/// Make the lifetime record of a new actor.
-fn Scope::begin(self : Scope, close_mailbox : () -> Unit) -> Lifetime raise ActorError {
+/// A scope that accepts no start, for an actor that has no children.
+fn Scope::closed() -> Scope {
+  {
+    spawn_task: _ => () => (),
+    open: false,
+    names: Map([]),
+    exits: Map([]),
+    last_exit: 0,
+  }
+}
+
+///|
+/// Run `exit` when the body returns. The result removes it again.
+fn Scope::on_exit(self : Scope, exit : () -> Unit) -> () -> Unit {
+  self.last_exit += 1
+  let key = self.last_exit
+  self.exits[key] = exit
+  () => self.exits.remove(key)
+}
+
+///|
+/// Reserve `name` and make the lifetime record of a new actor. The name stays
+/// reserved until the actor and its cleanup end; then only this actor's
+/// reservation is released.
+fn Scope::begin(
+  self : Scope,
+  name : @policy.ActorName?,
+  close_mailbox : () -> Unit,
+) -> Lifetime raise ActorError {
   guard self.open else { raise ScopeClosed }
-  Lifetime::new(close_mailbox)
+  if name is Some(name) && self.names.contains(name) {
+    raise NameInUse(name)
+  }
+  let address = ActorAddress::next(name)
+  if name is Some(name) {
+    self.names[name] = address
+  }
+  Lifetime::new(address, close_mailbox, () => {
+    if name is Some(name) &&
+      self.names.get(name) is Some(owner) &&
+      owner == address {
+      self.names.remove(name)
+    }
+  })
 }

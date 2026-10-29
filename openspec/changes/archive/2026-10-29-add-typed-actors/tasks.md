@@ -57,10 +57,10 @@ Bead: lander-25h.5
 
 Depends on: group 4.
 
-- [ ] 5.1 Add Reply, ask and try_ask with a 30-second default, typed finite or indefinite wait policies and one admission-plus-response deadline; verify reply correlation, multiple reply types, duplicate and late replies, timeout while admission is blocked and termination during an indefinite ask
-- [ ] 5.2 Track pending asks through close, stop, failure and cancellation; verify discarded asks wake promptly, in-flight replies remain possible on close, original causes survive and caller cancellation leaves admitted work intact
-- [ ] 5.3 Add Subject adapters for references, replies, async queues and custom functions, plus contramap and general destination ask; verify delivery outcomes, no additional queue and custom reply completion
-- [ ] 5.4 Add runnable protocol and destination examples, wrong-reply compile failures and request-race acceptance tests; verify check:actors on all runtime targets
+- [x] 5.1 Add Reply, ask and try_ask with a 30-second default, typed finite or indefinite wait policies and one admission-plus-response deadline; verify reply correlation, multiple reply types, duplicate and late replies, timeout while admission is blocked and termination during an indefinite ask
+- [x] 5.2 Track pending asks through close, stop, failure and cancellation; verify discarded asks wake promptly, in-flight replies remain possible on close, original causes survive and caller cancellation leaves admitted work intact
+- [x] 5.3 Add Subject adapters for references, replies, async queues and custom functions, plus contramap and general destination ask; verify delivery outcomes, no additional queue and custom reply completion
+- [x] 5.4 Add runnable protocol and destination examples, wrong-reply compile failures and request-race acceptance tests; verify check:actors on all runtime targets
 
 ## 6. Close, drain, child ownership and cleanup
 
@@ -68,10 +68,10 @@ Bead: lander-25h.6
 
 Depends on: group 5.
 
-- [ ] 6.1 Complete close with one immutable pending snapshot, drain and cancel; verify in-flight completion versus cancellation, queued-message order, repeated close and wakeup of blocked producers and callers
-- [ ] 6.2 Complete lifecycle snapshots, initializer readiness, once-only cleanup, cancellation protection and cleanup budgets; verify initializer failure, cleanup timeout and preservation of primary plus cleanup errors
-- [ ] 6.3 Complete scope failure propagation, context-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
-- [ ] 6.4 Add runnable lifetime and resource examples and document cooperative cancellation limits; run all close, join and cleanup acceptance cases plus check:actors on wasm, js and native
+- [x] 6.1 Complete close with one immutable pending snapshot, drain and cancel; verify in-flight completion versus cancellation, queued-message order, repeated close and wakeup of blocked producers and callers
+- [x] 6.2 Complete lifecycle snapshots, initializer readiness, once-only cleanup, cancellation protection and cleanup budgets; verify initializer failure, cleanup timeout and preservation of primary plus cleanup errors
+- [x] 6.3 Complete scope failure propagation, context-owned child scopes and closed-scope rejection; verify normal and failed parent exit, sibling cancellation, nested recovery, escaped handles and zero remaining children
+- [x] 6.4 Add runnable lifetime and resource examples and document cooperative cancellation limits; run all close, join and cleanup acceptance cases plus check:actors on wasm, js and native
 
 ## 7. Serialized services and automatic responders
 
@@ -79,9 +79,9 @@ Bead: lander-25h.7
 
 Depends on: group 6.
 
-- [ ] 7.1 Add create and ServiceRef ask/tell over the same runtime; verify serialized async closures, heterogeneous result types, ask failure with later progress, retained prior mutations and tell failure reaching the owner
-- [ ] 7.2 Add respond and RequestActor without user reply plumbing; verify automatic responses, termination on handler error, release of all pending callers and continued processing after a Result rejection
-- [ ] 7.3 Add runnable service and responder examples and the shared admission/lifetime cases for both entries; verify the examples and check:actors on all runtime targets
+- [x] 7.1 Add create and ServiceRef ask/tell over the same runtime; verify serialized async closures, heterogeneous result types, ask failure with later progress, retained prior mutations and tell failure reaching the owner
+- [x] 7.2 Add respond and RequestActor without user reply plumbing; verify automatic responses, termination on handler error, release of all pending callers and continued processing after a Result rejection
+- [x] 7.3 Add runnable service and responder examples and the shared admission/lifetime cases for both entries; verify the examples and check:actors on all runtime targets
 
 ## 8. Names, addresses and algebraic directories
 
@@ -89,11 +89,11 @@ Bead: lander-25h.8
 
 Depends on: group 7.
 
-- [ ] 8.1 Add opaque ActorName and typed parse errors in the portable root with runtime re-exports; verify empty, invalid first character, invalid later character, non-ASCII, 1, 128 and 129 character inputs and case-sensitive equality on all four targets
-- [ ] 8.2 Add per-lifetime ActorAddress and optional scope-named start/spawn; verify address equality, cross-scope uniqueness, duplicate creators running only one initializer, failed startup releasing names after cleanup, closing actors retaining reservations and old refs staying closed after reuse
-- [ ] 8.3 Add immutable typed Directory empty/of, union, add, remove, difference, membership equality and supported Add/Sub operators; verify identity, associativity, commutativity, idempotence, input preservation, absent removal and exact-address removal with focused property tests on all runtime targets
-- [ ] 8.4 Add directory name lookup and exact-address resolution; verify duplicate-name behavior, same-address deduplication, removal resolving a name conflict, closed-member retention, explicit refresh after replacement and wrong-protocol compile failures
-- [ ] 8.5 Add runnable composition, named discovery and name-reuse examples and record the pinned compiler's rejected operator forms; verify composition across scopes does not change actor ownership, removal does not cancel the actor or release its name reservation, old snapshots remain usable after scope exit and check:actors passes on all runtime targets
+- [x] 8.1 Add opaque ActorName and typed parse errors in the portable root with runtime re-exports; verify empty, invalid first character, invalid later character, non-ASCII, 1, 128 and 129 character inputs and case-sensitive equality on all four targets
+- [x] 8.2 Add per-lifetime ActorAddress and optional scope-named start/spawn; verify address equality, cross-scope uniqueness, duplicate creators running only one initializer, failed startup releasing names after cleanup, closing actors retaining reservations and old refs staying closed after reuse
+- [x] 8.3 Add immutable typed Directory empty/of, union, add, remove, difference, membership equality and supported Add/Sub operators; verify identity, associativity, commutativity, idempotence, input preservation, absent removal and exact-address removal with focused property tests on all runtime targets
+- [x] 8.4 Add directory name lookup and exact-address resolution; verify duplicate-name behavior, same-address deduplication, removal resolving a name conflict, closed-member retention, explicit refresh after replacement and wrong-protocol compile failures
+- [x] 8.5 Add runnable composition, named discovery and name-reuse examples and record the pinned compiler's rejected operator forms; verify composition across scopes does not change actor ownership, removal does not cancel the actor or release its name reservation, old snapshots remain usable after scope exit and check:actors passes on all runtime targets
 
 ## 9. Scoped event delivery and integration
 
@@ -101,10 +101,10 @@ Bead: lander-25h.9
 
 Depends on: group 8.
 
-- [ ] 9.1 Add Topic, scoped subscriptions, unsubscribe and close; verify subscriber order, snapshot behavior, closed-destination pruning, backpressure, partial delivery and scope cleanup on all runtime targets
-- [ ] 9.2 Add runnable fan-out and worker-pool examples using subjects and direct send, update the docs index and explain the difference from mediator publish; verify examples compile and docs links pass
-- [ ] 9.3 Compare acceptance evidence with every row of the design's reference baseline and every actors requirement; verify no required capability is represented only by prose or an unchecked test target
-- [ ] 9.4 Generate and review public pkg.generated.mbti files, run mise run format, mise run check and mise exec -- openspec validate --all --strict; verify all pass and isolated candidate consumers use the intended actor archive
+- [x] 9.1 Add Topic, scoped subscriptions, unsubscribe and close; verify subscriber order, snapshot behavior, closed-destination pruning, backpressure, partial delivery and scope cleanup on all runtime targets
+- [x] 9.2 Add runnable fan-out and worker-pool examples using subjects and direct send, update the docs index and explain the difference from mediator publish; verify examples compile and docs links pass
+- [x] 9.3 Compare acceptance evidence with every row of the design's reference baseline and every actors requirement; verify no required capability is represented only by prose or an unchecked test target
+- [x] 9.4 Generate and review public pkg.generated.mbti files, run mise run format, mise run check and mise exec -- openspec validate --all --strict; verify all pass and isolated candidate consumers use the intended actor archive
 
 ## Workflow follow-up
 

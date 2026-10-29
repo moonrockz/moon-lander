@@ -5,6 +5,7 @@ import {
   "moonbitlang/async/cond_var",
   "moonbitlang/core/debug",
   "moonbitlang/core/deque",
+  "moonbitlang/core/immut/sorted_map",
 }
 
 import {

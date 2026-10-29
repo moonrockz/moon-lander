@@ -388,7 +388,36 @@ async test "external consumers cannot take a message outside a receive or break 
         "async fn probe(scope : @actors.Scope) -> Unit raise { counter(scope).to_ref().to_subject().send(Ping) }",
         "4014",
       ),
+      // Directories keep one protocol and support only same-type operators.
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let d = @actors.Directory::of(counter(scope).to_ref()); match d.lookup(@actors.ActorName::parse(\"c\")) { Found(r) => { let _ : @actors.ActorRef[Other] = r } _ => () } }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let a = @actors.Directory::of(counter(scope).to_ref()); let b : @actors.Directory[Other] = @actors.Directory::empty(); ignore(a + b) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let c = counter(scope).to_ref(); ignore(@actors.Directory::of(c) + c) }",
+        "4014",
+      ),
+      (
+        "async fn probe(scope : @actors.Scope) -> Unit raise { let d = @actors.Directory::of(counter(scope).to_ref()); ignore(d ++ d) }",
+        "4021",
+      ),
       // Opaque values cannot be made around their constructors.
+      (
+        "fn probe() -> Unit { let _ : @actors.ActorAddress = { id: 1L, name: None } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.NameConflict[Counter] = { name: abort(\"x\"), refs: [] } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @policy.ActorName = { text: \"9bad\" } }",
+        "4036",
+      ),
       (
         "fn probe() -> Unit { let _ : @actors.Pending[Counter] = { messages: [] } }",
         "4036",

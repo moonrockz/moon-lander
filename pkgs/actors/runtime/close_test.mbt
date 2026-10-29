@@ -479,3 +479,201 @@ async test "LIFE-1: a failed parent cancels its child and runs the child cleanup
   }
   assert_eq((outcome, log), ("failed: parent", ["child cleanup"]))
 }
+
+///|
+async test "ASK-1: an ask that waits for space gets the failure cause also when the actor has cleanup" {
+  let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let ready : @aio.Queue[@actors.ActorRef[@actors.Reply[Int]?]] = @aio.Queue(
+    kind=Unbounded,
+  )
+  let one = @actors.MailboxCapacity::from_int(1)
+  let outcome = @aio.with_task_group(group => {
+    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
+      let actor = scope.start(
+        (),
+        mailbox=Bounded(one),
+        (_, message : @actors.Reply[Int]?) => {
+          if message is None {
+            started.put(())
+            gate.get()
+            raise Broken("handler")
+          }
+          Continue(())
+        },
+        on_stop=() => @aio.sleep(20),
+      )
+      ready.put(actor.to_ref())
+      actor.join()
+    }))
+    let actor = ready.get()
+    actor.send(None)
+    started.get()
+    actor.send(None)
+    let asked = group.spawn(() => {
+      try {
+        ignore(actor.ask(reply => Some(reply)))
+        "answered"
+      } catch {
+        @actors.ActorFailed(_, Broken(text)) => "failed: \{text}"
+        @actors.Closed(_) => "closed"
+        _ => "other"
+      }
+    })
+    while actor.queued_count() < 1 {
+      @aio.pause()
+    }
+    @aio.pause()
+    gate.put(())
+    asked.wait()
+  })
+  assert_eq(outcome, "failed: handler")
+}
+
+///|
+async test "ASK-1: an in-flight ask wakes with the failure before a slow cleanup ends" {
+  let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let ready : @aio.Queue[@actors.ActorRef[@actors.Reply[Int]]] = @aio.Queue(
+    kind=Unbounded,
+  )
+  let limit : @actors.WaitPolicy = Within(@lander_core.TimeLimit::millis(150))
+  let outcome = @aio.with_task_group(group => {
+    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
+      let actor = scope.start(
+        (),
+        (_, reply : @actors.Reply[Int]) => {
+          ignore(reply)
+          started.put(())
+          raise Broken("handler")
+        },
+        on_stop=() => @aio.sleep(600),
+      )
+      ready.put(actor.to_ref())
+      actor.join()
+    }))
+    let actor = ready.get()
+    try {
+      ignore(actor.ask(reply => reply, timeout=limit))
+      "answered"
+    } catch {
+      @actors.ActorFailed(_, Broken(text)) => "failed: \{text}"
+      @actors.TimedOut(_) => "timed out"
+      _ => "other"
+    }
+  })
+  assert_eq(outcome, "failed: handler")
+}
+
+///|
+async test "LIFE-1: start_with reports a cancelled initializer to its creator" {
+  let saved : @aio.Queue[@actors.Scope] = @aio.Queue(kind=Unbounded)
+  let initializing : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let release : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let outcome = @aio.with_task_group(group => {
+    group.spawn_bg(() => @actors.scope(scope => {
+      saved.put(scope)
+      release.get()
+    }))
+    let scope = saved.get()
+    let creator = group.spawn(() => {
+      try {
+        let _ : @actors.Actor[Int, Unit] = scope.start_with(
+          _ => {
+            initializing.put(())
+            never.get()
+            0
+          },
+          (state : Int, _) => Continue(state),
+        )
+        "started"
+      } catch {
+        @actors.ActorCancelled(_) => "cancelled"
+        _ => "other"
+      }
+    })
+    initializing.get()
+    // The scope body returns, so the scope cancels the initializing actor.
+    release.put(())
+    @aio.with_timeout_opt(2000, () => creator.wait()).unwrap_or("hung")
+  })
+  assert_eq(outcome, "cancelled")
+}
+
+///|
+async test "LIFE-1: a creator cancelled during start_with cancels the actor" {
+  let initializing : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
+  let cleanups = Ref(0)
+  @actors.scope(scope => {
+    @aio.with_task_group(group => {
+      let creator = group.spawn(() => {
+        let _ : @actors.Actor[Int, Unit] = scope.start_with(
+          setup => {
+            setup.on_stop(() => cleanups.val += 1)
+            initializing.put(())
+            never.get()
+            0
+          },
+          (state : Int, _) => Continue(state),
+        )
+      })
+      initializing.get()
+      creator.cancel()
+    })
+  })
+  assert_eq(cleanups.val, 1)
+}
+
+///|
+async test "LIFE-1: cancel before the actor task runs still ends it as cancelled" {
+  @actors.scope(scope => {
+    let actor = scope.start(0, (count, _ : Int) => Continue(count + 1))
+    actor.cancel()
+    let joined = try {
+      actor.join()
+      "result"
+    } catch {
+      @actors.ActorCancelled(_) => "cancelled"
+      _ => "other"
+    }
+    assert_eq(joined, "cancelled")
+    assert_true(actor.status() is Ended(Cancelled))
+  })
+}
+
+///|
+async test "LIFE-1: join and status report a cleanup failure with the primary failure" {
+  let joined : @aio.Queue[String] = @aio.Queue(kind=Unbounded)
+  let statuses = []
+  ignore(
+    @actors.scope(scope => {
+      let actor = scope.start(
+        (),
+        (_, _ : Int) => Continue(()),
+        on_stop=() => raise Broken("cleanup"),
+      )
+      ignore(actor.close())
+      let outcome = try {
+        actor.join()
+        "result"
+      } catch {
+        @actors.CleanupFailed(primary=None, cleanup=Broken(text)) => text
+        _ => "other"
+      }
+      statuses.push(
+        if actor.status() is Ended(Failed(@actors.CleanupFailed(..))) {
+          "failed"
+        } else {
+          "other"
+        },
+      )
+      joined.put(outcome)
+    })
+    catch {
+      _ => ()
+    },
+  )
+  assert_eq(joined.try_get(), Some("cleanup"))
+  assert_eq(statuses, ["failed"])
+}

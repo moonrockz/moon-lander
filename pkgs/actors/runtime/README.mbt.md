@@ -398,7 +398,7 @@ async test "one protocol answers with an Int and an Array" {
 | Timeout | `ask` raises `TimedOut`; `try_ask` gives `None`. Closure and failure stay typed errors |
 | First reply wins | `Reply::send` never waits. A second reply, or a reply after the caller timed out or was cancelled, gives `Expired` and does not fail the actor |
 | Close | A request that `close` removes from the queue fails at once with `Closed`. The request in progress can still reply until the actor ends |
-| Failure | Every pending caller wakes with `ActorFailed(address, cause)`, with the original error |
+| Failure | Every pending caller wakes with `ActorFailed(address, cause)`, with the original error, when processing ends; it does not wait for the cleanup |
 | Normal end without a reply | The caller wakes with `Closed` |
 | Caller cancellation | The admitted request stays: the actor processes it, and its reply gives `Expired` |
 
@@ -412,7 +412,7 @@ kinds of target adapt to it:
 | `actor_ref.to_subject()` | The actor's mailbox. An ask through it sees the end of the actor |
 | `Subject::from_reply(reply)` | A one-shot reply: the first message is delivered, later ones report closed |
 | `Subject::from_queue(queue)` | An `@aio.Queue` |
-| `Subject::new(send~, try_send~)` | Caller-supplied functions. The runtime cannot check that they keep the mailbox rules |
+| `Subject::new(send~, try_send~)` | Caller-supplied functions: `send` gives `Admitted` or `Rejected`. The runtime cannot check that they keep the mailbox rules |
 | `subject.contramap(f)` | Maps each message with `f` before admission, with no other queue or task |
 
 `contramap` lets one actor take several event types through one protocol:
@@ -503,12 +503,15 @@ processing ends: on a normal end, a failure or a cancellation. It runs with
 cancellation protection and a time limit, `cleanup_limit`, five seconds by
 default. A cleanup error, or a cleanup that passes its limit, fails the owner
 scope with `CleanupFailed` or `CleanupTimedOut`. These keep the actor's own
-failure as `primary`. The limit cannot stop cleanup code that never suspends.
+failure as `primary`, and `join` and `status` report them too. The limit
+cannot stop cleanup code that never suspends.
 
 `start_with` runs an async initializer in the actor task and returns the handle
 only after it ends. The initializer registers the cleanup of each resource
 after it acquires it. When the initializer fails, the registered cleanup runs,
 the cause goes to the caller of `start_with`, and the owner scope stays live.
+When the scope cancels the initializer, the caller gets `ActorCancelled`. When
+the caller is cancelled first, the actor is cancelled too.
 
 ```mbt check
 ///|
@@ -600,3 +603,146 @@ async test "a responder doubles a number" {
 A handler error ends the responder, fails its owner scope and wakes every
 pending caller with the cause. For a per-request rejection, use a reply type
 such as `Result[Value, Rejection]`; the responder then continues.
+
+## Names, addresses and directories
+
+Every actor has an `ActorAddress`: the identity of one actor lifetime. Copies of
+a handle or a reference have the same address. Another actor, also one that
+reuses a name, has another address. An address cannot send to or control an
+actor, and its text, such as `actor#7(counter)`, is only for diagnostics.
+
+A name is optional. `ActorName::parse` accepts 1 to 128 ASCII characters: a
+letter first, then letters, digits, `_`, `-` or `.`. Names are case sensitive.
+`start(..., name~)` and `spawn(..., name~)` reserve the name in the owner scope
+before any initializer runs. A second start with a name that a live actor of
+the scope holds raises `NameInUse`. The name stays reserved until the actor and
+its cleanup end; then a new actor can reuse it with a new address. Other scopes
+can use the same name.
+
+| Value | Meaning | After a replacement |
+| --- | --- | --- |
+| `ActorName` | A label that a scope reserves for one live actor | Free for reuse |
+| `ActorAddress` | The identity of one actor lifetime | Still the old actor |
+| `ActorRef[M]` | Typed authority to send to that actor | Reports `Closed`; never moves to the new actor |
+| `Directory[M]` | An immutable set of references with protocol `M` | Keeps its members until you make a new value |
+
+A `Directory[M]` is a value, not a registry. It holds only the references that
+you put in it, and lookup reads only that value: it does not search a scope or
+a global table, and it does not check if an actor is live.
+
+| Operation | Result |
+| --- | --- |
+| `Directory::empty()`, `Directory::of(ref)` | No member, or one member |
+| `a.union(b)` or `a + b` | All members of both, one for each address |
+| `a.add(ref)` | `a` with one more member |
+| `a.remove(ref)` | `a` without that exact address |
+| `a.difference(b)` or `a - b` | `a` without the addresses of `b` |
+| `a.lookup(name)` | `Missing`, `Found(ref)` or `Ambiguous(conflict)` |
+| `a.resolve(address)` | The exact member, or `None` |
+
+```mbt check
+///|
+enum Gauge {
+  Add(Int)
+  Total(@actors.Reply[Int])
+}
+
+///|
+fn gauge_handler(total : Int, message : Gauge) -> @actors.Next[Int] {
+  match message {
+    Add(value) => @actors.Continue(total + value)
+    Total(reply) => {
+      ignore(reply.send(total))
+      @actors.Continue(total)
+    }
+  }
+}
+
+///|
+async test "find a named actor in a directory" {
+  @actors.scope <| scope => {
+    let name = @actors.ActorName::parse("gauge")
+    let gauge = scope.start(0, (total, message) => gauge_handler(total, message), name~)
+    let spare = scope.start(0, (total, message) => gauge_handler(total, message))
+    let gauges = @actors.Directory::of(gauge.to_ref()) + @actors.Directory::of(spare.to_ref())
+    guard gauges.lookup(name) is Found(found) else { fail("no gauge") }
+    found.send(Add(5))
+    assert_eq(gauges.resolve(gauge.address()).unwrap().ask(reply => Total(reply)), 5)
+    // Removal gives a new value; the actor keeps running.
+    let fewer = gauges - @actors.Directory::of(spare.to_ref())
+    assert_eq((gauges.size(), fewer.size()), (2, 1))
+    assert_eq(spare.to_ref().try_send(Add(1)), Accepted)
+  }
+}
+```
+
+Union keeps two actors with the same name, for example from two scopes, and
+`lookup` then reports `Ambiguous` with both references. Union is total,
+associative, commutative and idempotent, with `empty()` as its identity.
+Removing one of the two makes the lookup unambiguous again.
+
+To replace an actor, make a new directory: `old.remove(old_ref).add(new_ref)`.
+The old directory still resolves the old address, and sends to it report
+`Closed`. A directory stays usable after the scopes of its members end.
+Directory operations never start, stop, cancel or move an actor, and removal
+does not release a name reservation.
+
+The pinned compiler accepts `a + b` and `a - b` for two directories, and
+`dir + Directory::of(ref)`. It rejects `dir + ref`, `dir - ref` and `dir ++ dir`,
+so use `add` and `remove` for one reference.
+
+## Events to several actors
+
+`Topic[M]` sends each event to the destinations that are subscribed when the
+publication starts, in subscription order. `publish` waits for the admission
+of each event, not for the handlers. A full destination makes it wait. A
+destination that reports closed is removed. `scope.subscribe(topic, subject)`
+gives a `Subscription`; it ends on `unsubscribe` or when that scope ends.
+`close` rejects later publications and subscriptions.
+
+When the publisher is cancelled, or a custom destination raises, the earlier
+admissions stay and the later destinations are not called. There is no atomic
+broadcast.
+
+This is not the mediator's topic. A mediator topic calls its handlers and
+waits for them in the caller's task. An actor topic only admits events to
+mailboxes, and each actor handles them later on its own task.
+
+| | Mediator topic | Actor topic |
+| --- | --- | --- |
+| Who runs the handler | The publisher's task | Each subscriber's actor task |
+| `publish` returns | After all handlers end | After each admission |
+| Handler errors | Go to the publisher | Fail the subscriber actor |
+
+The example sends work to a pool of workers with direct `send`, and the
+workers report observations through a topic:
+
+```mbt check
+///|
+async test "a worker pool with direct send for work and a topic for observations" {
+  let seen = []
+  @actors.scope <| scope => {
+    let observations : @actors.Topic[String] = @actors.Topic::new()
+    let observer = scope.start(0) <| (count, note : String) => {
+      seen.push(note)
+      @actors.Continue(count + 1)
+    }
+    ignore(scope.subscribe(observations, observer.to_ref().to_subject()))
+    let workers = Array::makei(2, index => {
+      scope.start(index) <| (id, job : Int) => {
+        observations.publish("worker \{id} did job \{job}")
+        @actors.Continue(id)
+      }
+    })
+    for job in 0..<4 {
+      workers[job % 2].send(job)
+    }
+    for worker in workers {
+      worker.drain()
+    }
+    observer.drain()
+  }
+  assert_eq(seen.length(), 4)
+  assert_true(seen.contains("worker 1 did job 3"))
+}
+```

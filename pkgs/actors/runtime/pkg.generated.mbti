@@ -200,6 +200,14 @@ pub fn[S, M] Scope::start(Self, S, async (S, M) -> Next[S], mailbox? : @moon-lan
 pub async fn[S, M] Scope::start_with(Self, async (Setup) -> S, async (S, M) -> Next[S], mailbox? : @moon-lander-actors.MailboxPolicy, cleanup_limit? : @moon-lander-core.TimeLimit, name? : @moon-lander-actors.ActorName) -> Actor[M, Unit]
 pub fn[M] Scope::subscribe(Self, Topic[M], Subject[M]) -> Subscription raise ActorError
 
+pub(all) enum SendOutcome {
+  Admitted
+  Rejected
+} derive(Eq, @debug.Debug)
+pub fn SendOutcome::equal(Self, Self) -> Bool
+pub fn SendOutcome::not_equal(Self, Self) -> Bool
+pub fn SendOutcome::to_repr(Self) -> @debug.Repr
+
 pub struct ServiceRef[S] {
   // private fields
 }
@@ -224,7 +232,7 @@ pub async fn[M, R] Subject::ask(Self[M], (Reply[R]) -> M, timeout? : WaitPolicy)
 pub fn[M, N] Subject::contramap(Self[M], (N) -> M) -> Self[N]
 pub fn[M] Subject::from_queue(@aqueue.Queue[M]) -> Self[M]
 pub fn[M] Subject::from_reply(Reply[M]) -> Self[M]
-pub fn[M] Subject::new(send~ : async (M) -> Bool, try_send~ : (M) -> @moon-lander-actors.Admission) -> Self[M]
+pub fn[M] Subject::new(send~ : async (M) -> SendOutcome, try_send~ : (M) -> @moon-lander-actors.Admission) -> Self[M]
 pub async fn[M] Subject::send(Self[M], M) -> Unit
 pub async fn[M, R] Subject::try_ask(Self[M], (Reply[R]) -> M, timeout? : WaitPolicy) -> R?
 pub fn[M] Subject::try_send(Self[M], M) -> @moon-lander-actors.Admission

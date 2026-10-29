@@ -87,7 +87,8 @@ pub fn[M, R] Actor::queued_count(self : Actor[M, R]) -> Int {
 ///|
 /// Wait until the actor and its cleanup end. Give its result, raise its
 /// original failure, raise `Closed` when its receive found the mailbox closed,
-/// or raise `ActorCancelled`. Several joiners get the same outcome.
+/// or raise `ActorCancelled`. A cleanup failure is raised as `CleanupFailed`
+/// or `CleanupTimedOut`, which keep the primary failure. Several joiners get the same outcome.
 /// Cancelling this wait does not cancel the actor or another joiner.
 pub async fn[M, R] Actor::join(self : Actor[M, R]) -> R {
   match self.target.life.wait_end() {
@@ -329,6 +330,7 @@ pub async fn[S, M] Scope::start_with(
   name? : @policy.ActorName,
 ) -> Actor[M, Unit] {
   let target = self.new_ref(mailbox, name)
+  target.life.started = false
   let setup : Setup = { steps: [] }
   let state = Ref(None)
   let ready : @aio.Queue[Error?] = @aio.Queue(kind=Unbounded)
@@ -338,6 +340,7 @@ pub async fn[S, M] Scope::start_with(
     children=false,
     init=() => {
       state.val = Some(init(setup))
+      target.life.started = true
       ignore(ready.try_put(None) catch { _ => false })
     },
     on_start_failure=error => {

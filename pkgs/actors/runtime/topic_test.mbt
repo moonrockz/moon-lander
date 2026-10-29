@@ -4,7 +4,7 @@ fn recorder(label : String, log : Array[String]) -> @actors.Subject[Int] {
   @actors.Subject::new(
     send=event => {
       log.push("\{label} \{event}")
-      true
+      Admitted
     },
     try_send=event => {
       log.push("\{label} \{event}")
@@ -59,7 +59,7 @@ async test "TOPIC-1: a publication uses the snapshot taken when it starts" {
         log.push("blocking \{event}")
         started.put(())
         gate.get()
-        true
+        Admitted
       },
       try_send=_ => Accepted,
     )

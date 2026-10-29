@@ -90,17 +90,32 @@ pub fn[M] Subject::from_queue(queue : @aio.Queue[M]) -> Subject[M] {
 }
 
 ///|
+/// The result of a waiting send of a custom destination.
+pub(all) enum SendOutcome {
+  /// The destination admitted the message.
+  Admitted
+  /// The destination admits no more messages.
+  Rejected
+} derive(Eq, Debug)
+
+///|
+pub extend SendOutcome with Eq::{equal, not_equal}
+
+///|
+pub extend SendOutcome with @debug.Debug::{to_repr}
+
+///|
 /// A destination of caller-supplied functions. `send` waits for admission
-/// and gives false when the destination admits no more messages; `try_send`
-/// does not wait. The runtime cannot check that the functions keep the rules
-/// of a mailbox.
+/// and gives `Rejected` when the destination admits no more messages;
+/// `try_send` does not wait. The runtime cannot check that the functions keep
+/// the rules of a mailbox.
 pub fn[M] Subject::new(
-  send~ : async (M) -> Bool,
+  send~ : async (M) -> SendOutcome,
   try_send~ : (M) -> @policy.Admission,
 ) -> Subject[M] {
   {
     admit: (message, _) => {
-      guard send(message) else { raise DestinationClosed }
+      guard send(message) is Admitted else { raise DestinationClosed }
     },
     offer: try_send,
     life: None,

@@ -192,7 +192,7 @@ async test "Ask a custom destination: the ask returns the typed response" {
   let custom : @actors.Subject[@actors.Reply[String]] = @actors.Subject::new(
     send=reply => {
       ignore(reply.send("custom"))
-      true
+      Admitted
     },
     try_send=_ => Accepted,
   )

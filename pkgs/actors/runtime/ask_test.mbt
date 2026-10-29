@@ -392,18 +392,18 @@ async test "ASK-1: an ask through a custom destination gets the response that it
         }
         _ => seen.push("other")
       }
-      true
+      Admitted
     },
     try_send=_ => Closed,
   )
   assert_eq(custom.ask(reply => Count(reply)), 42)
   let silent : @actors.Subject[Desk] = @actors.Subject::new(
-    send=_ => true,
+    send=_ => Admitted,
     try_send=_ => Accepted,
   )
   assert_eq(silent.try_ask(reply => Count(reply), timeout=ms_limit(10)), None)
   let refusing : @actors.Subject[Desk] = @actors.Subject::new(
-    send=_ => false,
+    send=_ => Rejected,
     try_send=_ => Closed,
   )
   let outcome = try {

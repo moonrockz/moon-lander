@@ -62,6 +62,8 @@ priv struct Lifetime {
   /// True after `cancel`. The task can end before the cancellation reaches
   /// it, for example when it has not run yet; it still ends as cancelled.
   mut cancel_requested : Bool
+  /// False while an initializer of `start_with` runs.
+  mut started : Bool
   /// Release the name reservation of the actor, after cleanup.
   release : () -> Unit
 }
@@ -83,6 +85,7 @@ fn Lifetime::new(
     close_mailbox,
     cancel_task: () => (),
     cancel_requested: false,
+    started: true,
     release,
   }
 }
@@ -97,11 +100,12 @@ fn Lifetime::status(self : Lifetime) -> ActorStatus {
 }
 
 ///|
-/// Call `notify` when the actor ends, or now when it has already ended. The
+/// Call `notify` when the actor's processing ends, before its cleanup, or now
+/// when it has already ended. Asks use it: no reply can come after that. The
 /// result is the key for `unwatch`.
 fn Lifetime::watch(self : Lifetime, notify : (ActorEnd) -> Unit) -> Int {
-  if self.outcome is Some(outcome) {
-    notify(outcome)
+  if self.ending is Some(ending) {
+    notify(ending)
     // No key is stored, so `unwatch` of this key does nothing.
     return 0
   }
@@ -116,17 +120,25 @@ fn Lifetime::unwatch(self : Lifetime, key : Int) -> Unit {
 }
 
 ///|
-/// Record the outcome once, wake every watcher and joiner, then release the
-/// name.
-fn Lifetime::finish(self : Lifetime, outcome : ActorEnd) -> Unit {
-  guard self.outcome is None else { return }
+/// Record how processing ended once and wake every watcher. The mailbox
+/// closes after this, so an ask that waits for space reads the end.
+fn Lifetime::end_processing(self : Lifetime, ending : ActorEnd) -> Unit {
+  guard self.ending is None else { return }
+  self.ending = Some(ending)
   self.closing = true
-  self.outcome = Some(outcome)
   let watchers = self.watchers.values().collect()
   self.watchers.clear()
   for notify in watchers {
-    notify(outcome)
+    notify(ending)
   }
+}
+
+///|
+/// Record the outcome once, after cleanup, wake every joiner, then release
+/// the name.
+fn Lifetime::finish(self : Lifetime, outcome : ActorEnd) -> Unit {
+  guard self.outcome is None else { return }
+  self.outcome = Some(outcome)
   self.ended.broadcast()
   (self.release)()
 }
@@ -178,26 +190,34 @@ async fn Lifetime::run(
   catch {
     error => Err(error)
   }
-  let (end, primary, started) = match ended {
+  // `primary` is the actor's own failure. `start_error` is what the creator
+  // of an actor that never became ready gets.
+  let (end, primary, start_error) = match ended {
     Ok(Some(Result | ReceiveClosed)) if self.cancel_requested =>
-      (Cancelled, None, true)
-    Ok(Some(Result)) => (Completed, None, true)
-    Ok(Some(ReceiveClosed)) => (MailboxClosed, None, true)
-    Ok(Some(StartFailed(error))) => (Failed(error), Some(error), false)
-    Ok(None) => (Cancelled, None, true)
-    Err(error) => (Failed(error), Some(error), true)
+      (Cancelled, None, None)
+    Ok(Some(Result)) => (Completed, None, None)
+    Ok(Some(ReceiveClosed)) => (MailboxClosed, None, None)
+    Ok(Some(StartFailed(error))) => (Failed(error), Some(error), Some(error))
+    Ok(None) if !self.started =>
+      (Cancelled, None, Some(ActorCancelled(self.address)))
+    Ok(None) => (Cancelled, None, None)
+    Err(error) => (Failed(error), Some(error), None)
   }
-  self.ending = Some(end)
-  self.closing = true
+  self.end_processing(end)
   (self.close_mailbox)()
   let cleanup_error = cleanup.run(primary)
-  self.finish(end)
-  match (started, cleanup_error, primary) {
-    (false, Some(error), _) | (false, None, Some(error)) =>
+  // A cleanup failure is the final outcome; it keeps the primary failure.
+  self.finish(
+    match cleanup_error {
+      Some(error) => Failed(error)
+      None => end
+    },
+  )
+  match (start_error, cleanup_error, primary) {
+    (Some(_), Some(error), _) | (Some(error), None, _) =>
       on_start_failure(error)
-    (false, None, None) => ()
-    (true, Some(error), _) | (true, None, Some(error)) => raise error
-    (true, None, None) => ()
+    (None, Some(error), _) | (None, None, Some(error)) => raise error
+    (None, None, None) => ()
   }
 }
 

@@ -1,4 +1,29 @@
 ///|
+async test "session-aware factory failure still closes and drains its real session" {
+  let captured : Ref[@sink_runtime.Session?] = Ref(None)
+  let failed = try {
+    run_with_session(
+      @sinks.SessionSettings::standard(),
+      session => {
+        captured.val = Some(session)
+        (session.logger() : &@lander_logging.Logger).info("before factory failure", [])
+        fail("factory failed")
+      },
+      (_ : @hosting.Context[Unit]) => (),
+      signals=@hosting.SignalProbe::new(() => None),
+    )
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(failed)
+  let report = captured.val.unwrap().status()
+  assert_true(report.closed())
+  assert_eq(report.accepted(), 1L)
+  assert_eq(report.destinations()[0].written(), 1L)
+}
+
+///|
 fn report(failed~ : Bool) -> @sinks.SessionReport raise {
   @sinks.SessionReport::new(
     accepted=1L,

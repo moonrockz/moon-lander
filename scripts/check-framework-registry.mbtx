@@ -361,6 +361,15 @@ async fn main {
           @fs.read_file("\{fixture}/\{file}"),
         )
       }
+      if candidate.library is Hosting {
+        @fs.mkdir("\{consumer}/logging")
+        for file in ["main.mbt", "moon.pkg"] {
+          @fs.write_file(
+            "\{consumer}/logging/\{file}",
+            @fs.read_file("\{fixture}/logging/\{file}"),
+          )
+        }
+      }
       let run = async fn(args : Array[String]) -> String {
         let (code, out, err) = @process.collect_output(
           "moon",
@@ -379,6 +388,15 @@ async fn main {
         ignore(run(["update"]))
       }
       ignore(run(["add", "\{candidate.library.name()}@\{version}"]))
+      if candidate.library is Hosting {
+        // The bridge consumer names the session and logger modules directly.
+        // Moon requires these direct imports even though hosting also uses them.
+        ignore(
+          run(["add", "moonrockz/moon-lander-logging-hosting-async@\{version}"]),
+        )
+        ignore(run(["add", "moonrockz/moon-lander-logging@\{version}"]))
+        ignore(run(["add", "moonbitlang/async@0.22.5"]))
+      }
       let graph = run(["tree"])
       guard graph.contains("\{candidate.library.name()}@\{version}") &&
         !graph.contains(root) else {
@@ -424,6 +442,19 @@ async fn main {
         println(
           "Registry consumer PASS \{candidate.library.name()}@\{version}: \{target}",
         )
+      }
+      if candidate.library is Hosting {
+        for target in ["js", "native"] {
+          let result = run([
+            "run", "--release", "--deny-warn", "--target", target, "logging",
+          ])
+          guard result.trim() == "ok" else {
+            fail("Public hosted logging on \{target}: \{result}")
+          }
+          println(
+            "Hosted logging registry consumer PASS @\{version}: \{target}",
+          )
+        }
       }
       // Compile every package of the downloaded module, including limited adapters.
       // This uses its archived manifest, not workspace resolution.

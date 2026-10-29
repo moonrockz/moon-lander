@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compose hosted logging lifecycle</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Compose hosted logging lifecycle</h1>
+<p class="meta">Issues #124 and #125 | approved implementation scope</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li><li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li><li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li></ul></nav>
+<h2 id="context">Context</h2><p>See <a href="proposal.md">proposal.md</a>. The console driver already owns probe retention and protected finalization. Runtime Session already owns idempotent, protected close. The bridge omits both composition points.</p>
+<h2 id="goals">Goals and non-goals</h2><p>Reuse those two implementations. Add no second lifecycle or signal owner. See <a href="specs/logging-sinks/spec.md">requirements</a> and <a href="tasks.md">tasks</a>.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="sig-1">SIG-1. Forward the probe (Owner)</h3><p>Both bridge entries accept optional signals and pass the same probe to console.run. Do not add a bridge latch, listener or fabricated reason. The driver retains consuming observations; the enclosing owner controls escalation.</p>
+<h3 id="ses-1">SES-1. Expose the existing session (Call)</h3><p>Add run_with_session(settings, host, command, observer?, signals?). Its factory takes the existing opaque runtime Session. Existing run delegates and supplies session.logger() to its old factory. A new context wrapper would duplicate existing methods. Adding a second callback to run would complicate a simple default path.</p>
+<h3 id="ses-2">SES-2. Keep finalization unconditional (Owner)</h3><p>A diagnostic service calls session.close() in its real stop hook. A previous telemetry service then stops after that close. Close ends admission; only records accepted before it are covered. Later hook or stopped-event log attempts do not reopen the session. The unchanged bridge finalizer calls close again, reads the same report and writes failures directly to standard error. The outer with_session also closes after an exception or cancellation.</p>
+<h2 id="risks">Risks and trade-offs</h2><table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody><tr><td>Telemetry tries to log after diagnostic close</td><td>Document the admission boundary; retain direct default failure diagnostics.</td></tr><tr><td>Host deadline skips or cancels a stop hook</td><td>Keep unconditional protected finalization and verify it with real child processes.</td></tr><tr><td>A consuming reader loses signal identity</td><td>Use the existing console latch and test real parent signals with a worker that does not yield.</td></tr></tbody></table>
+<h2 id="migration">Migration plan</h2><p>Publish shared 0.7.1 through release.yml after green checks and reviewed merge. Existing callers need no source changes. Session-aware callers opt in. Roll back consumption to 0.7.0 if needed; never replace registry archives or tags. Qualify all nine public archives with approved checksums and fresh consumers.</p>
+</main>
+</body>
+</html>

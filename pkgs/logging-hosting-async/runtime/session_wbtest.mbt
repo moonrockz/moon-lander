@@ -322,6 +322,29 @@ async test "close is idempotent and a late event is counted as closed" {
 }
 
 ///|
+async test "cancelling hosted close still drains once and concurrent finalization waits" {
+  let output = Recorder::new(Console(StandardError))
+  output.stalled = true
+  let report = with_test_session(settings(), [output.sink()], session => {
+    info(session.logger(), "accepted before close", [])
+    @async.with_task_group(group => {
+      let hosted_close = group.spawn(() => session.close())
+      while !session.status().closed() { @async.pause() }
+      hosted_close.cancel()
+      let final_close = group.spawn(() => session.close())
+      output.release()
+      let report = final_close.wait()
+      assert_true(report.closed())
+      assert_eq(report.destinations()[0].written(), 1L)
+    })
+    session.close()
+  })
+  assert_false(report.delivery_failed())
+  assert_eq(output.closes, 1)
+  assert_eq(output.written.length(), 1)
+}
+
+///|
 async test "drain waits for its barrier while producers continue" {
   let output = Recorder::new(Console(StandardError))
   let report = with_test_session(settings(), [output.sink()], session => {

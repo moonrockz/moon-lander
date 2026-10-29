@@ -1,0 +1,12 @@
+import {
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/logging" @bridge,
+  "moonrockz/moon-lander-logging-hosting-async" @sinks,
+  "moonrockz/moon-lander-logging-hosting-async/runtime" @runtime,
+  "moonrockz/moon-lander-logging" @lander_logging,
+  "moonbitlang/async",
+}
+
+// The public bridge uses native/Node console and file adapters.
+supported_targets = "native+js"
+pkgtype(kind: "executable")

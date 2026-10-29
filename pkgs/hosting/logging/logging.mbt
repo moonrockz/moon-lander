@@ -108,22 +108,51 @@ fn final_code(
 ///
 /// When `host` raises, or the driver cannot install its signal handlers, the
 /// session closes and the error passes out.
+/// With `signals`, the enclosing owner keeps OS signal handling and escalation;
+/// the same probe goes to the console driver. Without it, defaults stay unchanged.
 pub async fn[S] run(
   settings : @sinks.SessionSettings,
   host : (@sink_runtime.SessionLogger) -> @hosting.Host[S] raise,
   command : @hosting.Hook[S],
   observer? : (@sinks.SinkFailure) -> Unit,
+  signals? : @hosting.SignalProbe,
+) -> Unit {
+  run_with_session(settings, session => host(session.logger()), command, observer?, signals?)
+}
+
+///|
+/// Run a console host whose factory receives the actual logging session.
+/// Register telemetry before the diagnostic service, and close this session in
+/// the diagnostic stop hook to drain accepted records before telemetry stops.
+/// Close stops admission. Later hooks and stopped events cannot log through
+/// this session; direct default failure reports still reach standard error.
+/// The drain guarantees cover only records accepted before close and account
+/// for failures within the session limit.
+///
+/// The bridge always closes the same session again before process exit, also
+/// after startup failure or skipped/timed-out stop hooks. Session close is
+/// idempotent and protected from cancellation, so an earlier hosted close is
+/// safe. Factory errors and cancellation also close it through `with_session`.
+/// Sink failure reporting and exit-code precedence are the same as `run`.
+/// Optional `signals` goes unchanged to the console driver; the enclosing owner
+/// retains OS listeners and second-signal escalation.
+pub async fn[S] run_with_session(
+  settings : @sinks.SessionSettings,
+  host : (@sink_runtime.Session) -> @hosting.Host[S] raise,
+  command : @hosting.Hook[S],
+  observer? : (@sinks.SinkFailure) -> Unit,
+  signals? : @hosting.SignalProbe,
 ) -> Unit {
   @sink_runtime.with_session(
     settings,
     observer?,
     session => {
       let logger = session.logger()
-      let built = host(logger)
+      let built = host(session)
         |> @hosting.report_writer(
           report_through(logger, settings, () => session.status()),
         )
-      @console.run(built, command, finalize=selected => finalize(session, selected))
+      @console.run(built, command, signals?, finalize=selected => finalize(session, selected))
     },
   )
 }

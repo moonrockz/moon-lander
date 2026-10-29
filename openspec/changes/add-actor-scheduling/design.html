@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add actor scheduling: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Add actor scheduling: design</h1>
+<p class="meta">OpenSpec change add-actor-scheduling | 2026-10-29 | approved for implementation after add-typed-actors</p>
+
+<nav class="toc" aria-label="Contents">
+<ul>
+<li><a href="#context">Context</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+<li><a href="#open-questions">Open questions</a></li>
+</ul>
+</nav>
+
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">proposal.md</a> for the motivation. This change builds on <code>add-typed-actors</code>, which is not yet implemented. That change makes actor logic a <code>Receive</code> value that only the runtime or a test runner runs, and its TEST-1 decision gives every wait to the runtime. Its runtime uses <code>moonbitlang/async</code> 0.22.5 on wasm, js and native. That library gives <code>sleep</code>, <code>now</code>, <code>with_timeout_opt</code> and task groups; it has no scheduler, no virtual time and no way to run ready tasks until they are idle.</p>
+<p>Labels identify the source of a decision. <strong>Owner</strong> means the user requested it. <strong>Call</strong> means this proposal chooses it for review.</p>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p><strong>Goals:</strong> scheduled and repeated sends that belong to actor lifetimes, follow the admission rules, and can be tested with no real waiting. The basic forms use the shared Erlang, Elixir and Gleam name <code>send_after</code>.</p>
+<p><strong>Non-goals:</strong> the items under "Out of scope" in the proposal, and any change to the public API of <code>add-typed-actors</code>.</p>
+
+<h2 id="decisions">Decisions</h2>
+
+<h3 id="sched-1">SCHED-1. A separate change, implemented after add-typed-actors (Owner, 2026-10-29)</h3>
+<p>Scheduling is its own change so that <code>add-typed-actors</code> stays reviewable. The owner approved implementation on 2026-10-29 as a follow-up goal after <code>add-typed-actors</code>, in the same workspace. It starts after <code>add-typed-actors</code> groups 4 and 6. A release of both changes follows.</p>
+
+<h3 id="clk-1">CLK-1. One internal clock boundary (Owner: internal only, 2026-10-29)</h3>
+<p>The runtime reads time and waits only through one internal clock: the current time and a cancellable wait until a deadline. Receive time limits (<code>within</code>), ask deadlines, cleanup budgets and timers all use it. The real clock wraps <code>@aio.now</code> and <code>@aio.sleep</code>. The clock is internal; scopes and the test runner select it with an optional argument. Today the actor spike calls <code>@aio.with_timeout_opt</code> directly; group 1 replaces those calls with a race against a clock wait.</p>
+<p>Alternative: give each operation its own <code>sleep</code>. Rejected because a test clock could then not control all waits, and TEST-1 of <code>add-typed-actors</code> requires that tests need no real time.</p>
+<p>Alternative: a public clock interface that applications implement. Rejected by the owner on 2026-10-29: the real clock and <code>TestClock</code> are the only clocks, which keeps the API small.</p>
+
+<h3 id="clk-2">CLK-2. A deterministic test clock (Owner: explicit advance only, 2026-10-29; Call: API)</h3>
+<p><code>TestClock</code> starts at zero and changes only through <code>advance(limit)</code>. Advancing fires due waits one at a time, in deadline order, ties in schedule order. After each firing it lets the woken tasks run before it fires the next one, so effects happen in the same order as with real time.</p>
+<pre><code class="language-moonbit">async test "a session expires after thirty seconds" {
+  let clock = @actors.TestClock::new()
+  @actors.scope(clock~) &lt;| scope =&gt; {
+    let session = scope.spawn() &lt;| _ =&gt; { session_receive() }
+    let timer = scope.send_after(session.to_ref(), thirty_seconds, Expire)
+    clock.advance(thirty_seconds)
+    assert_eq(session.join(), Expired)
+    ignore(timer)
+  }
+}</code></pre>
+<p>The receive test runner also takes a script of deliveries and clock advances, so a protocol with time limits is a unit test with no scope:</p>
+<pre><code class="language-moonbit">async test "login times out after five seconds" {
+  let result = login() |&gt; @actors.run_script([
+    Deliver(Hello("ann")),
+    Advance(five_seconds),
+  ])
+  assert_eq(result, Some("timed out"))
+}</code></pre>
+<p>The clock never advances on its own, also when every task waits. Alternative: jump to the next deadline when all tasks wait, which makes some tests shorter. Rejected by the owner on 2026-10-29, because a test could then pass through a time jump at a moment that the test did not choose.</p>
+<p>The pinned <code>moonbitlang/async</code> has no "run until idle" operation. "Let the woken tasks run" therefore needs a proof: group 1 starts with a spike that shows deterministic ordering on wasm, js and native, or revises this decision before the rest.</p>
+
+<h3 id="send-1">SEND-1. Scope-owned scheduled send (Call; Owner: admitted messages stay, 2026-10-29)</h3>
+<p><code>scope.send_after(target, delay, message)</code> sends one message to a <code>Subject[M]</code> or <code>ActorRef[M]</code> after a <code>TimeLimit</code> and returns a <code>Timer</code>. <code>Timer::cancel()</code> returns <code>Stopped</code> when the message was not sent, or <code>AlreadyFired</code> when it was admitted; an admitted message stays queued, as the admission rules of <code>add-typed-actors</code> require. The scope cancels its timers before it cancels its actors, and an escaped scope rejects new timers with the typed closed-scope error.</p>
+
+<h3 id="sched-2">SCHED-2. Pure schedule values (Owner: these forms and the default, 2026-10-29)</h3>
+<p><code>Schedule</code> is an opaque, immutable value in the portable root, so it builds and tests on all four targets. It has these constructors and limits:</p>
+<table>
+<thead><tr><th>Form</th><th>Delays</th></tr></thead>
+<tbody>
+<tr><td><code>Schedule::fixed_delay(limit)</code></td><td>The same delay each time</td></tr>
+<tr><td><code>Schedule::exponential(first~, maximum~)</code></td><td>Doubles from <code>first</code> and stays at <code>maximum</code></td></tr>
+<tr><td><code>schedule.up_to(count)</code></td><td>At most a <code>MessageCount</code> of sends</td></tr>
+<tr><td><code>schedule.delays()</code></td><td>The delays as an iterator, for tests and documentation</td></tr>
+</tbody>
+</table>
+<p>The growth factor is fixed at two, so no unchecked factor enters the API. Delays use <code>TimeLimit</code>; doubling stops at <code>maximum</code>, so no delay leaves its range. Without <code>up_to</code>, a schedule repeats until it is cancelled, as Erlang, Elixir and Akka timers do. Other forms, such as a linear step or an explicit list of delays, can come later without a breaking change.</p>
+<p>Alternative: reuse <code>@aio.RetryMethod</code>. Rejected because it holds raw <code>Int</code> milliseconds and a raw <code>Double</code> factor, and it describes retries, not message sends.</p>
+
+<h3 id="send-2">SEND-2. Repeated sends with fixed delay and admission backpressure (Owner: fixed delay only and the name <code>send_repeated</code>, 2026-10-29)</h3>
+<p><code>scope.send_repeated(target, schedule, message)</code> returns a <code>Timer</code>. The name matches <code>start_repeated</code> of actor timers. Each delay starts after the previous message is admitted. When the mailbox is full, the send waits, so ticks never pile up and no message is dropped. The repeated send stops at the end of the schedule, on cancel, at scope exit, or when the target closes; a closed target is a normal end, not a scope failure.</p>
+<p>Alternatives: fixed rate, which catches up after a delay and can send bursts into a slow actor; and skip or merge a tick when the mailbox is full, which would silently drop a message against the actor admission rules. Both are rejected for this change. Other names considered: <code>send_on</code>, which is unclear, <code>send_on_schedule</code>, which is long, and Erlang's <code>send_interval</code>, which suggests a fixed interval although a schedule can grow.</p>
+
+<h3 id="timer-1">TIMER-1. Actor-owned keyed timers (Call; Owner: stale messages never received, 2026-10-29)</h3>
+<p>Through its context, an actor gets a timer table typed by its protocol and by an application key type <code>K : Eq + Hash</code>, usually a small enum. The table belongs to the actor lifetime: all its timers stop when the actor ends.</p>
+<pre><code class="language-moonbit">enum TimerKey {
+  Poll
+  Expire
+} derive(Eq, Hash)
+
+let poller = scope.spawn() &lt;| ctx =&gt; {
+  let timers : @actors.Timers[Feed, TimerKey] = ctx.timers()
+  timers.start_repeated(Poll, @actors.Schedule::fixed_delay(five_seconds), Tick)
+  timers.start_single(Expire, one_hour, Shutdown)
+  @actors.receive_loop(0) &lt;| (count, message) =&gt; { ... }
+}</code></pre>
+<p>Starting a timer with a key that is already in use cancels the old timer first. A message that a cancelled or replaced keyed timer has already queued never reaches a receive, as in Akka. Stale ticks after a replacement are a common timer bug, and only the runtime can remove them reliably. <code>send_after</code> and <code>send_repeated</code> keep the plain rule: their admitted messages stay queued.</p>
+<p>To find stale messages, each mailbox entry gets an internal tag: no tag for ordinary sends, and a timer identity and generation for keyed timer sends. Cancel and replace mark that generation stale. The runtime removes stale entries at once when no select is waiting; otherwise it skips and removes them when a receive reaches them, so the index of a waiting select stays valid. A stale entry counts toward capacity and <code>queued_count</code> until the runtime removes it. This is a cancellation that the application asked for, not a mailbox policy, so the "no silent drop" admission rule of <code>add-typed-actors</code> still holds for every other message. The tag is an internal change to the <code>add-typed-actors</code> mailbox; no public API of that change changes.</p>
+<p>Alternatives: keep admitted messages and let the application ignore stale ones, which repeats the same check in every actor; or report the count of queued stale messages from <code>cancel</code>, which still leaves the work to the application. The owner chose removal for keyed timers on 2026-10-29.</p>
+<p>Typed keys follow the domain-type rule: no string keys. Group 1 compiles this shape; an explicit type annotation at <code>ctx.timers()</code> may be necessary because the key type does not appear in the arguments.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table>
+<thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>The pinned async library cannot run ready tasks until idle, so a test clock could fire timers in a different order than real time.</td><td>A group 1 spike proves deterministic ordering on wasm, js and native before the rest; revise CLK-2 if it cannot.</td></tr>
+<tr><td>A timer fires late when a handler does not yield.</td><td>State the cooperative limit; no hard real-time promise.</td></tr>
+<tr><td>A repeated send to a slow actor delays its later ticks.</td><td>Fixed delay from admission is the documented behavior; applications that need a deadline use <code>within</code>.</td></tr>
+<tr><td>Timers that outlive their scope would leak tasks.</td><td>Scopes own timers and cancel them first at exit; actor timer tables end with the actor; tests check that no timer task remains.</td></tr>
+<tr><td>The tagged mailbox entry for keyed timers adds work to every receive and could break the selective-receive index.</td><td>Remove stale entries at once only when no select waits; otherwise skip them when a receive reaches them. Run the <code>add-typed-actors</code> admission, selective-receive and stack tests unchanged, and compare the local benchmark before and after.</td></tr>
+<tr><td>The clock boundary changes internal code of <code>add-typed-actors</code>.</td><td>No public API changes; that change's acceptance tests run unchanged on the real clock.</td></tr>
+</tbody>
+</table>
+
+<h2 id="migration">Migration plan</h2>
+<p>Additive. Implement after <code>add-typed-actors</code> groups 4 and 6. No release is part of this change; a separate owner-approved release PR publishes both changes.</p>
+
+<h2 id="open-questions">Open questions</h2>
+<p>Whether <code>run_script</code> should also accept the timed deliveries of a real <code>scope</code>, so one script drives both unit and acceptance tests. This can be decided in group 1 without a change to the specs.</p>
+
+</main>
+</body>
+</html>

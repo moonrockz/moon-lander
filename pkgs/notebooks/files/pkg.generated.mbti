@@ -1,0 +1,70 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/notebooks/files"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/notebooks/dib",
+}
+
+// Values
+pub fn convert_tree(String, source~ : &TreeFormat, target~ : &TreeFormat) -> String raise
+
+// Errors
+pub(all) suberror TreeError {
+  InvalidPath(input~ : String, rule~ : PathRule)
+  DuplicatePath(TreePath)
+  FileDirectoryConflict(TreePath)
+} derive(Eq, @debug.Debug)
+pub fn TreeError::equal(Self, Self) -> Bool
+pub fn TreeError::not_equal(Self, Self) -> Bool
+pub fn TreeError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+type FileTree derive(Eq, @debug.Debug)
+pub fn FileTree::directories(Self) -> ReadOnlyArray[TreePath]
+pub fn FileTree::equal(Self, Self) -> Bool
+pub fn FileTree::explicit_directories(Self) -> ReadOnlyArray[TreePath]
+pub fn FileTree::file(Self, TreePath) -> TextFile?
+pub fn FileTree::files(Self) -> ReadOnlyArray[TextFile]
+pub fn FileTree::new(ReadOnlyArray[TextFile], directories? : ReadOnlyArray[TreePath]) -> Self raise TreeError
+pub fn FileTree::not_equal(Self, Self) -> Bool
+pub fn FileTree::to_repr(Self) -> @debug.Repr
+
+pub(all) enum PathRule {
+  Empty
+  Absolute
+  Backslash
+  ControlCharacter
+  EmptySegment
+  DotSegment
+} derive(Eq, @debug.Debug)
+pub fn PathRule::equal(Self, Self) -> Bool
+pub fn PathRule::not_equal(Self, Self) -> Bool
+pub fn PathRule::to_repr(Self) -> @debug.Repr
+
+type TextFile derive(Eq, @debug.Debug)
+pub fn TextFile::equal(Self, Self) -> Bool
+pub fn TextFile::kernel(Self) -> @dib.KernelName
+pub fn TextFile::new(TreePath, String, kernel~ : @dib.KernelName) -> Self
+pub fn TextFile::not_equal(Self, Self) -> Bool
+pub fn TextFile::path(Self) -> TreePath
+pub fn TextFile::source(Self) -> String
+pub fn TextFile::to_repr(Self) -> @debug.Repr
+
+type TreePath derive(Eq, Hash, @debug.Debug)
+pub fn TreePath::equal(Self, Self) -> Bool
+pub fn TreePath::hash(Self) -> Int32
+pub fn TreePath::hash_combine(Self, Hasher) -> Unit
+pub fn TreePath::not_equal(Self, Self) -> Bool
+pub fn TreePath::parent(Self) -> Self?
+pub fn TreePath::parse(String) -> Self raise TreeError
+pub fn TreePath::to_repr(Self) -> @debug.Repr
+pub fn TreePath::to_string(Self) -> String
+
+// Type aliases
+
+// Traits
+pub(open) trait TreeFormat {
+  fn read(Self, String) -> FileTree raise
+  fn write(Self, FileTree) -> String raise
+}

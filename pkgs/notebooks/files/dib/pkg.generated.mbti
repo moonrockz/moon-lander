@@ -1,0 +1,35 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/notebooks/files/dib"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/notebooks/files",
+}
+
+// Values
+
+// Errors
+pub(all) suberror DeclarationError {
+  InvalidDeclaration(cell~ : Int32, line~ : Int32, text~ : String)
+  ReservedKernel(@moonrockz/notebooks/dib.KernelName)
+  NonCanonicalKernel(name~ : @moonrockz/notebooks/dib.KernelName, canonical~ : @moonrockz/notebooks/dib.KernelName)
+} derive(Eq, @debug.Debug)
+pub fn DeclarationError::equal(Self, Self) -> Bool
+pub fn DeclarationError::not_equal(Self, Self) -> Bool
+pub fn DeclarationError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+type Format
+pub fn Format::file(Self, @files.TreePath, String, kernel? : @moonrockz/notebooks/dib.KernelName) -> @files.TextFile raise @moonrockz/notebooks/dib.FormatError
+pub fn Format::from_notebook(Self, @moonrockz/notebooks/dib.Notebook) -> @files.FileTree raise
+pub fn Format::new(default? : &@moonrockz/notebooks/dib.KernelDescriptor) -> Self raise @moonrockz/notebooks/dib.FormatError
+pub fn Format::read(Self, String) -> @files.FileTree raise
+pub fn Format::registry(Self) -> @moonrockz/notebooks/dib.KernelRegistry
+pub fn Format::to_notebook(Self, @files.FileTree) -> @moonrockz/notebooks/dib.Notebook raise
+pub fn Format::with_kernel(Self, &@moonrockz/notebooks/dib.KernelDescriptor) -> Self raise @moonrockz/notebooks/dib.FormatError
+pub fn Format::write(Self, @files.FileTree) -> String raise
+pub impl @files.TreeFormat for Format
+
+// Type aliases
+
+// Traits

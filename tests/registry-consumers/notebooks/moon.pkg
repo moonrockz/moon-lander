@@ -1,5 +1,9 @@
 import {
   "moonrockz/notebooks" @library,
   "moonrockz/notebooks/dib",
+  "moonrockz/notebooks/files",
+  "moonrockz/notebooks/files/dib" @tree_dib,
+  "moonrockz/notebooks/files/ipynb" @tree_ipynb,
+  "moonrockz/notebooks/conversion",
 }
 pkgtype(kind: "executable")

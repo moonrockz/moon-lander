@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notebook file trees: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Notebook file trees</h1>
+<p class="meta">OpenSpec change | 2026-10-29 | Approved scope, author implementation decisions</p>
+<nav class="toc" aria-label="Contents"><a href="#context">Context</a> · <a href="#goals">Goals</a> · <a href="#decisions">Decisions</a> · <a href="#risks">Risks</a> · <a href="#migration">Migration</a></nav>
+<h2 id="context">Context</h2><p>See <a href="proposal.md">proposal.md</a>. DIB already supports typed kernels and lossless source. Jupyter already retains arbitrary cell metadata. Both can describe one pure tree model.</p>
+<h2 id="goals">Goals and non-goals</h2><p>Provide one immutable text tree, a reusable DIB codec and two file mappings. Keep all logic portable and free of I/O. Disk materialization, binary entries, symlinks, execution and configuration-module dependencies are outside this change.</p>
+<h2 id="decisions">Decisions</h2>
+<h3>VFS-1. Shared tree and typed paths (Call)</h3><p>Use new files, files/dib and files/ipynb packages within notebooks. A TreePath accepts only portable nonempty relative segments. TextFile normalizes line endings to LF. FileTree stores ordered files and explicit directories, infers parents and rejects duplicate files and file/directory conflicts. Accessors return immutable values or defensive copies.</p>
+<h3>VFS-2. Kernel descriptor and configured codec (Owner)</h3><p>The owner approved a small open trait returning KernelInfo and an immutable codec that applies one registry and source policy. KernelInfo itself implements the trait. No custom default means the standard registry; a custom descriptor seeds a custom registry with Markdown available. Registration returns a new codec and retains typed duplicate errors. Codec cell construction, reading and writing use one mode.</p>
+<h3>VFS-3. DIB transport (Call)</h3><p>Register tree and text in the file format and select Lossless. A first-line file directive owns its path; the remainder is exact normalized file content. Later file directives are literal content. A tree cell declares explicit directories. Writers use JSON strings for paths so spaces and quotes remain unambiguous; readers also accept simple raw paths. Unmarked cells remain notes outside the projection. Registered selector collisions retain DIB refusal. No new escaping or hidden source encoding is introduced.</p>
+<h3>VFS-4. Neutral Jupyter metadata (Owner)</h3><p>The owner selected metadata.vfs, without a Moon-Lander namespace. Notebook vfs metadata contains version 1 and directories. File-cell vfs metadata contains path and kernel. Source has no transport directive. Raw, Markdown and code cells map to text, markdown and other kernels. Ordinary unmarked cells, outputs and attachments remain outside the tree projection.</p>
+<pre><code class="language-json">{"metadata":{"vfs":{"version":1,"directories":["fixtures/empty"]}}}
+{"cell_type":"code","metadata":{"vfs":{"path":"src/main.mbt","kernel":"moonbit"}},"source":"let answer = 42","execution_count":null,"outputs":[]}</code></pre>
+<h3>VFS-5. Projection and fresh export (Call)</h3><p>Reading a tree never mutates the notebook. Writing a tree creates a fresh notebook and makes no promise to preserve unrelated notebook metadata, notes, IDs, attachments or outputs. Keep the original notebook for full-document editing. Per-cell kernel labels describe content; they do not make a Jupyter execution kernel polyglot.</p>
+<h3>VFS-6. Explicit conversion (Owner scope, Call policy)</h3><p>The owner requested format conversion. Tree conversion uses an open format trait and the shared projection. A separate configured source-notebook converter keeps ordinary cells and kernel identity. Strict conversion refuses reported data loss; SourceOnly is explicit opt-in and returns typed losses for discarded cell IDs, metadata, outputs, execution counts, attachments and extension fields. Unknown cell types are refused. The existing Polyglot kernel metadata convention carries kernel identity; VFS paths remain in metadata.vfs.</p><h2 id="risks">Risks and trade-offs</h2><table><tr><th>Risk</th><th>Decision</th></tr><tr><td>Generic metadata name collides with another convention</td><td>Use explicit version 1, strict shape errors and documented fields. Do not claim a Jupyter standard.</td></tr><tr><td>Lossless is confused with byte reproduction</td><td>Document LF-normalized text and fresh notebook export; preserve content and tree structure.</td></tr><tr><td>File content holds a DIB selector</td><td>Keep typed export refusal. Jupyter source can carry such text without DIB framing.</td></tr><tr><td>Path declarations overwrite files</td><td>Reject duplicates and file/directory conflicts. No implicit overlay.</td></tr></table>
+<h2 id="migration">Migration plan</h2><p>All APIs are additive. Existing DIB defaults and Jupyter codecs remain unchanged. Verify descriptors, same-tree examples and typed failures on four targets. Release/version decisions stay separate.</p>
+</main>
+</body>
+</html>

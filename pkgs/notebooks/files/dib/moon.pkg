@@ -1,0 +1,10 @@
+import {
+  "moonrockz/notebooks/dib" @source_dib,
+  "moonrockz/notebooks/files",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonrockz/notebooks/files/dib" @tree_dib,
+} for "test"

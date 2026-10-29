@@ -93,3 +93,26 @@ _Avoid_: canonical writing
 Producing deterministic JSON formatting from a document model under a documented
 ordering and spelling policy.
 _Avoid_: source reproduction
+
+## Notebook file trees
+
+**Virtual file tree**:
+An immutable collection of text files and directories under one virtual root. It
+does not imply that any entry exists on a host filesystem.
+
+**Tree path**:
+A portable relative name identifying an entry within one virtual tree.
+
+**File cell**:
+A notebook source cell explicitly associated with a virtual file path and kernel.
+
+**Tree projection**:
+The files and directory declarations selected from a notebook. Unmarked notes,
+execution outputs and attachments are outside that projection.
+
+**Source conversion**:
+A change of notebook representation that retains source cells and reports
+format-specific state that cannot be carried into the target representation.
+
+**Conversion loss**:
+A source-document value that has no retained equivalent in a converted document.

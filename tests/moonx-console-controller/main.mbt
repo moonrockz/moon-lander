@@ -1,4 +1,11 @@
 ///|
+extern "C" fn prepare_console() -> Int = "lander_moonx_console_prepare"
+
+///|
+// Module initialization precedes the compiler's ordinary async main entry.
+let console_setup : Int = prepare_console()
+
+///|
 #borrow(runner, wasm, node, owner)
 extern "C" fn start_console(
   runner : String, runner_length : Int,
@@ -52,6 +59,7 @@ fn ConsoleEvent::parse(input : String) -> ConsoleEvent raise ControllerInputErro
 ///|
 async fn main {
   assert_eq(@env.get_env_var("OS"), Some("Windows_NT"))
+  assert_eq(console_setup, 0)
   let args = @env.args()
   assert_eq(args.length(), 6)
   let target = ConsoleTarget::parse(args[1])

@@ -263,7 +263,31 @@ async fn build(
   guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
     fail("Missing compiler artifact: " + out.text())
   }
-  path
+  if target == "js" {
+    node_fixture_path(
+      path,
+      windows=@env.get_env_var("OS") == Some("Windows_NT"),
+    )
+  } else {
+    path
+  }
+}
+
+///|
+/// Node's module resolver rejects compiler-generated extended Windows paths.
+/// Convert only owned test artifacts, never caller argv, cwd or payload bytes.
+fn node_fixture_path(path : String, windows~ : Bool) -> String {
+  if !windows {
+    return path
+  }
+  let path = path.replace_all(old="/", new="\\")
+  if path.strip_prefix("\\\\?\\UNC\\") is Some(rest) {
+    "\\\\" + rest.to_owned()
+  } else if path.strip_prefix("\\\\?\\") is Some(rest) {
+    rest.to_owned()
+  } else {
+    path
+  }
 }
 
 ///|
@@ -1620,6 +1644,27 @@ async fn main {
     }
   }
   retain_report(tools, results, published~)
+}
+
+///|
+test "Node fixture paths preserve ordinary Windows and Unicode spellings" {
+  assert_eq(
+    node_fixture_path("/tmp/é🙂/host.js", windows=false),
+    "/tmp/é🙂/host.js",
+  )
+  assert_eq(
+    node_fixture_path("C:/é🙂/host.js", windows=true),
+    "C:\\é🙂\\host.js",
+  )
+  assert_eq(
+    node_fixture_path("\\\\?\\C:\\é🙂\\host.js", windows=true),
+    "C:\\é🙂\\host.js",
+  )
+  assert_eq(
+    node_fixture_path("\\\\?\\UNC\\server\\share\\host.js", windows=true),
+    "\\\\server\\share\\host.js",
+  )
+  assert_eq(node_fixture_path("C:\\host.js", windows=true), "C:\\host.js")
 }
 
 ///|

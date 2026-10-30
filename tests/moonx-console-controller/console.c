@@ -14,6 +14,20 @@
 
 static PROCESS_INFORMATION owned_process;
 
+int32_t lander_moonx_console_prepare(void) {
+  HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+  HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+  HANDLE error = GetStdHandle(STD_ERROR_HANDLE);
+  // Run before the ordinary async entry initializes its console handler. Keep
+  // this console attached until process exit so that handler teardown is valid.
+  FreeConsole();
+  if (!AllocConsole()) return (int32_t)GetLastError();
+  SetStdHandle(STD_INPUT_HANDLE, input);
+  SetStdHandle(STD_OUTPUT_HANDLE, output);
+  SetStdHandle(STD_ERROR_HANDLE, error);
+  return SetConsoleCtrlHandler(NULL, FALSE) ? 0 : (int32_t)GetLastError();
+}
+
 static WCHAR *copy_text(moonbit_string_t text, int32_t length) {
   WCHAR *result = (WCHAR *)calloc((size_t)length + 1, sizeof(WCHAR));
   if (result) memcpy(result, text, (size_t)length * sizeof(WCHAR));
@@ -74,14 +88,8 @@ int32_t lander_moonx_console_start(
   DWORD ids[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
   HANDLE original[3] = {GetStdHandle(STD_INPUT_HANDLE), GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
   DWORD error = ERROR_SUCCESS;
-  // The async test runner creates a process group that can inherit an ignored
-  // Ctrl-C attribute. Start from a fresh ordinary controller console, restore
-  // its redirected pipes, and clear that inherited attribute before creating
-  // the target, which inherits this isolated console. No stock executable is
-  // patched. Only targeted Ctrl-Break cases create a new process group.
-  FreeConsole();
-  if (!AllocConsole()) { error = GetLastError(); goto done; }
-  for (int i = 0; i < 3; i++) SetStdHandle(ids[i], original[i]);
+  // The target inherits this ordinary isolated console and enabled Ctrl-C.
+  // Only targeted Ctrl-Break cases create a new process group.
   if (!SetConsoleCtrlHandler(NULL, FALSE)) { error = GetLastError(); goto done; }
   for (int i = 0; i < 3; i++) {
     if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(ids[i]), GetCurrentProcess(),
@@ -119,7 +127,9 @@ int32_t lander_moonx_console_start(
   DeleteProcThreadAttributeList(attributes);
   HeapFree(GetProcessHeap(), 0, attributes);
 done:
-  FreeConsole();
+  // Ignore Ctrl-C only in the controller, after the child inherited its normal
+  // attribute. Do not detach or reset async's registered console handlers.
+  SetConsoleCtrlHandler(NULL, TRUE);
   for (int i = 0; i < 3; i++) SetStdHandle(ids[i], original[i]);
   for (int i = 0; i < 3; i++) if (handles[i]) CloseHandle(handles[i]);
   free(exe); free(command);
@@ -132,16 +142,9 @@ int32_t lander_moonx_console_resume(void) {
 }
 
 int32_t lander_moonx_console_event(int32_t kind) {
-  FreeConsole();
-  if (!AttachConsole(owned_process.dwProcessId)) return (int32_t)GetLastError();
-  // Ignore the broadcast only in this controller. The independently created
-  // target console process keeps its ordinary Ctrl-C behavior.
-  SetConsoleCtrlHandler(NULL, TRUE);
   BOOL ok = GenerateConsoleCtrlEvent(kind == 0 ? CTRL_C_EVENT : CTRL_BREAK_EVENT,
                                     kind == 0 ? 0 : owned_process.dwProcessId);
   DWORD error = ok ? ERROR_SUCCESS : GetLastError();
-  FreeConsole();
-  SetConsoleCtrlHandler(NULL, FALSE);
   return (int32_t)error;
 }
 
@@ -167,6 +170,7 @@ void lander_moonx_console_close(void) {
   }
 }
 #else
+int32_t lander_moonx_console_prepare(void) { return -1; }
 int32_t lander_moonx_console_start(moonbit_string_t a, int32_t al, moonbit_string_t b, int32_t bl,
   moonbit_string_t c, int32_t cl, moonbit_string_t d, int32_t dl, int32_t baseline) { return 0; }
 int32_t lander_moonx_console_resume(void) { return -1; }

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>add-moonx-signal-forwarding</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); } a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line); border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left; overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body><main>
+<h1>add-moonx-signal-forwarding</h1>
+<p class="meta">OpenSpec design | 2026-10-30 | Owner-approved optional module</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li><li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li><li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+</ul></nav>
+
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">the proposal</a> for motivation and
+<a href="specs/moonx-launcher/spec.md">the launcher contract</a> for behavior.
+Stock Moonx executes a verified prebuilt Wasm asset. Adjacent source-archive JS
+files do not provide a runtime payload directory. The Node child must retain
+its own host, worker layout and completion schema.</p>
+<p>Local feasibility built a renamed async runtime with both stock compilers,
+proved separate parent and Node module graphs, and preserved POSIX Interrupt/130 and
+Terminate/143 through direct Moonrun and genuine top-level Moonx. The candidate
+test used a loopback registry, not an actual public publication.</p>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p>The public facade accepts work as immutable values and owns process and file
+lifetime. Its root policy package is pure on all four targets. Its driver owns
+one runtime and never exchanges async values with canonical hosting. Node sees
+the caller's working directory, application arguments and standard streams.</p>
+<p>Payload assembly, hashing and embedding remain application work. This module
+does not select application commands, change completion JSON, install Node,
+change actor APIs, or replace the stock compiler or Moonrun.</p>
+
+<h2 id="decisions">Decisions</h2>
+<h3 id="rte-1">RTE-1. Owner: frozen optional runtime subset</h3>
+<p>Add <code>moonrockz/moon-lander-moonx</code> in <code>pkgs/moonx</code>.
+Its <code>runtime</code> subtree is the approved production dependency closure
+of async 0.22.5 root, process, signal and stdio: 21 packages, 158 source/manifest
+files, 646,193 original bytes and 23,428 lines before retained test support.
+Keep upstream types inside this frozen subtree rather than refactoring them.
+The new public policy facade follows the repository's domain type rules.</p>
+<p>The immutable source archive is
+<code>https://download.mooncakes.io/user/moonbitlang/async/0.22.5.zip</code>, SHA-256
+<code>142776b3fac385b8ee97e62fb3213b02a80595ae1a4a80ede6419f452eab01c2</code>.
+Keep Apache-2.0 and copyright notices. A MoonBit task owns deterministic import
+renaming, source/test selection, declared patches and checksums. Verification
+rejects drift. Retain the relevant upstream tests and required fixture provenance.</p>
+<p>A full fork carries unrelated protocols. A thin canonical wrapper cannot
+read the signal. A new hand-written event loop has more semantic maintenance
+risk. The owner accepted the selected frozen subset. Track the return path in
+<a href="https://github.com/moonbitlang/async/issues/706">async #706</a> without
+waiting for that release.</p>
+
+<h3 id="api-1">API-1. Call: portable values and one synchronous driver</h3>
+<p>The root package defines opaque immutable executable, argument, relative-file,
+payload and positive shutdown-grace values. Parse raw strings and arrays once.
+Use typed error rules. Empty arguments are valid; NUL is not. File paths reject
+non-ASCII asset names, absolute and traversal forms, ambiguous segments and nonportable names. This restriction does not affect Unicode argv, cwd, host temporary paths or bytes. Payload
+construction checks duplicates, file-directory conflicts and entry membership.</p>
+<p>Commands and Node payload launches form typed alternatives in a launch plan.
+The <code>driver</code> package provides a synchronous <code>run</code> entry with
+an optional synchronous finalizer and after-cleanup completion callback. No public facade callback carries a canonical
+or compatibility async type. The driver terminates the parent after cleanup,
+using the real child status on finite completion and the runtime's real signal
+termination path on cancellation.</p>
+<p>A pure typed outcome distinguishes not-started failures or cancellation from
+started child completion. It retains the actual wait status, cancellation cause,
+hard-termination request observation, cleanup failures and selected parent status.
+Windows keeps the full 32-bit status. The application owns startup result JSON;
+the framework never reads or adds an application document on the child channel.</p>
+<pre><code class="language-moonbit">fn main raise {
+  let arguments = @moonx.Arguments::parse(@env.args()[1:].to_owned())
+  let command = @moonx.Command::new(@moonx.Executable::node(), arguments)
+  @driver.run(Process(command))
+}</code></pre>
+<p>Stock compilers hardcode canonical async for <code>async fn main</code>.
+The owned runtime instead exposes an explicit public synchronous entry around
+its own event loop. No canonical import is added to satisfy the compiler.
+Retained async tests use a synchronous test adapter for this same owned loop.</p>
+
+<h3 id="cli-1">CLI-1. Public stock Moonx artifact and report ownership</h3>
+<p>The owner approved <code>pkgs/moonx/launch</code> inside the optional module as
+a narrow exception to executable placement under <code>apps/</code>. It is a thin
+caller of the public driver, with no private lifetime implementation or payload
+protocol. A published <code>/launch</code> Wasm asset provides genuine cold
+Moonx qualification without another public module.</p>
+<p>Launcher options stop at <code>--</code> or the first executable. Child argv
+and streams stay opaque. <code>--json</code> owns only help, usage errors and
+typed not-started reports; a started child owns stdout completely. Parent reports
+use schema version 1, command and package version, a typed report kind, selected
+unsigned process status and kind-specific details. Root version automation keeps
+the embedded package version aligned. Tests exercise actual help, startup failure,
+child JSON ownership, literal child options and binary streams.</p>
+
+<h3 id="sig-1">SIG-1. Call: first signal, real completion and platform behavior</h3>
+<p>Record the first signal before cancelling the main task. A public typed,
+non-consuming observer reads it during protected cleanup. Keep the existing
+runtime's final process-signal handling. At child cancellation, select the
+observed signal and delegate to its existing graceful policy and bounded hard
+termination. Ordinary task cancellation uses the platform's documented default,
+without claiming an OS observation.</p>
+<p>Two additional observations preserve truthful completion: a non-consuming view
+of the unchanged runtime exit-signal selection, and an optional synchronous
+notification immediately before the existing hard termination request. The
+reported force-request flag does not infer cause of death. The selected parent
+status is distinct from the first forwarding identity and actual child status.</p>
+<p>POSIX SIGINT and SIGTERM are forwarded unchanged. Windows launching remains
+supported: finite processes, opaque transport, payload lifetime and its available
+Ctrl-Break graceful cancellation followed by forced termination. Exact stock
+Moonrun commits 2284bd2 and 3778465 always deliver Ctrl-Break to the owned Windows
+process group. Do not rename it Interrupt or invent POSIX SIGTERM there.</p>
+<p>Actual isolated-console qualification on both stocks proves the limitation:
+direct ordinary-console Node reports Interrupt/130, while a Moonrun parent that
+records Interrupt delivers Ctrl-Break and the genuine Node host reports
+Quit/131. The parent preserves status bits <code>0xc000013a</code>; worker,
+service and finalizer completion, open stdin and real child reaping are verified.
+The owner approved this Windows-only Moonx exception and the 0.9.0 release.
+Retain these actual observations in qualification rather than relabeling Quit
+as Interrupt. Track the public delivery capability in
+<a href="https://github.com/moonbitlang/moon/issues/2419">moon #2419</a>.</p>
+<p>Native Windows finite/payload, Ctrl-Break and ignored-Break forced-cleanup
+cases are independently qualified. They do not establish original Ctrl-C
+delivery. Existing native, JS and embedded framework hosts stay unchanged.
+Do not add a blanket Windows refusal, a guessed reason, a new application
+protocol, a downstream workaround or a custom toolchain.</p>
+
+<h3 id="fs-1">FS-1. Call: private payload directory through reaping</h3>
+<p>Create a new directory atomically through the owned async filesystem API,
+with mode 0700 on POSIX. Register protected cleanup immediately. Write validated
+relative entries with exclusive creation and preserve their bytes and layout.
+Pass the absolute selected entry to Node while retaining the caller's cwd and
+standard streams. Do not put the payload in argv or consume stdin for it.</p>
+<p>Close writes before launch. After finite completion, graceful stop, forced
+termination or startup failure, reap any owned child before removing the payload.
+Use the filesystem API's non-following directory entries for recursive cleanup.
+Finalization is idempotent and protected. It preserves selected nonzero statuses;
+a finalization failure changes only selected success into failure.</p>
+
+<h3 id="ci-1">CI-1. Call: existing checks own the new assurance</h3>
+<p>Use the personal build-master skill; this repository has no local copy.
+Extend the existing lint/workspace, target tests, task-script, macOS and Windows
+categories. Do not add a new event or weaken <code>ci-ok</code>. The launcher task
+builds its compatible parent/Node fixtures once per compiler and reuses them
+across signal, payload and transport cases. Independent compilers remain distinct.</p>
+<table><thead><tr><th>Check</th><th>Risk and boundary</th><th>Owner and execution</th></tr></thead><tbody>
+<tr><td>Pure policies and provenance</td><td>Invalid plans, source drift; before merge</td><td>Existing lint, target and script categories</td></tr>
+<tr><td>Real host and process acceptance</td><td>Wrong signal, leaked child/files, corrupted transport; before merge</td><td>Existing Linux/macOS/Windows host categories</td></tr>
+<tr><td>Candidate archives</td><td>Missing licensed source or adapter; before promotion</td><td>Existing framework registry task</td></tr>
+<tr><td>Actual public archives and two-stock consumers</td><td>Published bytes or behavior differ; before GitHub release</td><td>Existing Release publish/verify chain and independent post-publication proof</td></tr>
+</tbody></table>
+<p>Candidate proof cannot stand in for public proof. Missing or failed required
+consumer evidence blocks promotion. Keep exact source, compiler, dependency,
+configuration and archive identities. Record measured suite durations before
+changing any job timeout.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>Two runtime identities enter one executable</td><td>Pure root facade, separate driver and compiler/link-graph checks; no umbrella dependency</td></tr>
+<tr><td>Frozen runtime maintenance</td><td>Immutable archive, mechanical generator, narrow patch, retained upstream tests, checksum drift check and documented removal criteria</td></tr>
+<tr><td>Windows console semantics differ</td><td>Document the owner-approved stock Moonrun Ctrl-C-to-Ctrl-Break limitation; retain genuine Quit/131, full parent status and actual graceful/forced cleanup proof</td></tr>
+<tr><td>Payload file escape or leak</td><td>Typed relative entries, collision checks, private exclusive root and non-following cleanup after reaping</td></tr>
+<tr><td>Signal during materialization or cleanup</td><td>Register ownership cleanup immediately and protect finalization from cancellation</td></tr>
+<tr><td>Large embedded payload</td><td>File bytes stay outside argv/stdin; the application owns assembly and checksums</td></tr>
+<tr><td>Local green differs from publication</td><td>Audit every actual release archive and independently run cold default-registry consumers</td></tr>
+</tbody></table>
+
+<h2 id="migration">Migration plan</h2>
+<p>No existing consumer migrates automatically. Add the optional module, its
+documentation and consumer gate. The final feature pull request archives
+<a href="tasks.md">the implementation tasks</a>. A separate release gate bead
+stays open until the owner-authorized version change publishes and independent
+actual-artifact proof succeeds. Recheck upstream main before selecting 0.9.0.</p>
+<p>Releases run only in GitHub Actions. Do not overwrite a registry version or
+release. If verification fails, retain the evidence and repair the release gate
+or prepare a new approved version. Replace the frozen subset only after a public
+upstream observer supports both stock toolchains and passes the same process,
+payload, isolation and public-registry contracts.</p>
+</main></body></html>

@@ -25,6 +25,7 @@ priv enum ReleaseLibrary {
   LoggingHostingAsync
   Actors
   Hosting
+  Moonx
   Lander
   Notebooks
   OpenRpc
@@ -59,6 +60,7 @@ fn ReleaseLibrary::parse_name(
     "moonrockz/moon-lander-logging-hosting-async" => LoggingHostingAsync
     "moonrockz/moon-lander-actors" => Actors
     "moonrockz/moon-lander-hosting" => Hosting
+    "moonrockz/moon-lander-moonx" => Moonx
     "moonrockz/moon-lander" => Lander
     "moonrockz/notebooks" => Notebooks
     "moonrockz/openrpc" => OpenRpc
@@ -76,6 +78,7 @@ fn ReleaseLibrary::fixture_name(self : ReleaseLibrary) -> String {
     LoggingHostingAsync => "logging-hosting-async"
     Actors => "actors"
     Hosting => "hosting"
+    Moonx => "moonx"
     Lander => "lander"
     Notebooks => "notebooks"
     OpenRpc => "openrpc"
@@ -270,6 +273,11 @@ async fn main {
             "vendor/LICENSE",
           ]
         LoggingHostingAsync => ["runtime/node.generated.js.mbt"]
+        Moonx =>
+          [
+            "LICENSE", "runtime/LICENSE", "runtime/provenance.json", "runtime/signal/received.mbt",
+            "driver/driver.mbt",
+          ]
         _ => []
       }
       for file in adapter_files {
@@ -425,6 +433,14 @@ async fn main {
         ignore(run(["add", "moonbitlang/async@0.22.5"]))
       }
       let graph = run(["tree"])
+      if candidate.library is Moonx {
+        let leaks = moonx_graph_leaks(graph)
+        guard leaks.is_empty() else {
+          fail(
+            "Moonx registry consumer resolves a second runtime or framework module: \{leaks.join(", ")}",
+          )
+        }
+      }
       guard graph.contains("\{candidate.library.name()}@\{version}") &&
         !graph.contains(root) else {
         fail("Registry graph leaks workspace or misses the candidate: \{graph}")
@@ -555,7 +571,7 @@ async fn main {
         } : Json).stringify(),
     )
     @async.with_timeout(1_800_000, verify)
-    println("All ten public registry consumers passed from \{dir}")
+    println("All eleven public registry consumers passed from \{dir}")
     return
   }
   // The candidate archives are the only new registry entries. Their
@@ -674,6 +690,7 @@ fn fixture_packages(library : ReleaseLibrary) -> Array[String] {
   match library {
     Hosting => ["logging", "completion"]
     Actors => ["runtime"]
+    Moonx => ["driver"]
     _ => []
   }
 }
@@ -687,8 +704,29 @@ fn fixture_package_targets(
 ) -> Array[String] {
   match (library, fixture_package) {
     (Actors, "runtime") => ["wasm", "js", "native"]
+    (Moonx, "driver") => ["wasm", "native"]
     _ => []
   }
+}
+
+///|
+fn moonx_graph_leaks(graph : String) -> Array[String] {
+  let forbidden = [
+    Core,
+    Logging,
+    Config,
+    Mediator,
+    LoggingHostingAsync,
+    Actors,
+    Hosting,
+    Lander,
+    Notebooks,
+    OpenRpc,
+  ].map(library => library.name())
+  forbidden.push("moonbitlang/async")
+  forbidden.filter(name => {
+    graph.contains(name + "@") || graph.contains(name + " ->")
+  })
 }
 
 ///|
@@ -701,6 +739,7 @@ fn actor_graph_leaks(graph : String) -> Array[String] {
     Mediator,
     LoggingHostingAsync,
     Hosting,
+    Moonx,
     Lander,
     Notebooks,
     OpenRpc,
@@ -801,6 +840,7 @@ test "candidate identity parses one fixed library with its matching folder" {
       LoggingHostingAsync,
       Actors,
       Hosting,
+      Moonx,
       Lander,
       Notebooks,
       OpenRpc,
@@ -875,4 +915,20 @@ test "archive digests require exactly 64 lower-case hex digits" {
   }
   let digest = ArchiveDigest::of_archive(b"candidate")
   assert_true(ArchiveDigest::parse(digest.to_string()) == digest)
+}
+
+///|
+test "Moonx public consumers keep portable plans and isolated driver targets" {
+  assert_eq(fixture_packages(Moonx), ["driver"])
+  assert_eq(fixture_package_targets(Moonx, "driver"), ["wasm", "native"])
+  assert_eq(
+    moonx_graph_leaks("moonrockz/moon-lander-moonx@0.9.0\nmoonbitlang/x@0.5.6"),
+    [],
+  )
+  assert_eq(
+    moonx_graph_leaks(
+      "moonbitlang/async@0.22.5\nmoonrockz/moon-lander-hosting@0.9.0",
+    ),
+    ["moonrockz/moon-lander-hosting", "moonbitlang/async"],
+  )
 }

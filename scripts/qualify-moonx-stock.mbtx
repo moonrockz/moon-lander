@@ -1,0 +1,80 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/http",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+}
+----
+
+///|
+/// Complete only the task-scoped official stock installation, then qualify it
+/// through explicit MOON_TOOLCHAIN_ROOT/MOON_HOME/PATH selection in the checker.
+/// Never replace the primary compiler, core or Moonrun with source builds.
+async fn main {
+  let version = "0.10.16+b1a0e846e"
+  let (code, out, err) = @process.collect_output("mise", [
+    "where",
+    "http:moonbit@" + version,
+  ])
+  assert_eq(code, 0, msg=err.text())
+  let root = @fs.realpath(out.text().trim())
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  if !@fs.exists(root + "/lib/core/moon.mod") ||
+    !@fs.exists(root + "/bin/moonx" + (if windows { ".exe" } else { "" })) {
+    let temporary = @fs.tmpdir(prefix="lander-stock-install")
+    defer @fs.rmdir(temporary, recursive=true)
+    let name = if windows { "powershell.ps1" } else { "unix.sh" }
+    let (response, body) = @http.get(
+      "https://cli.moonbitlang.com/install/" + name,
+    )
+    assert_eq(response.code, 200)
+    let installer = temporary + "/" + name
+    @fs.write_file(installer, body.binary())
+    let environment = { "MOON_HOME": root, "MOONBIT_INSTALL_VERSION": version }
+    let code = if windows {
+      @process.run(
+        "pwsh",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer],
+        extra_env=environment,
+      )
+    } else {
+      @process.run("bash", [installer, version], extra_env=environment)
+    }
+    assert_eq(code, 0)
+  }
+  if !@fs.exists(root + "/registry/index/user/moonbitlang/x.index") {
+    let directory = @fs.tmpdir(prefix="lander-stock-registry")
+    defer @fs.rmdir(directory, recursive=true)
+    @fs.write_file(
+      directory + "/moon.mod",
+      "name = \"lander-stock-registry\"\nversion = \"0.0.1\"\nprivate = true\n",
+    )
+    let separator = if windows { ";" } else { ":" }
+    assert_eq(
+      @process.run(
+        root + "/bin/moon" + (if windows { ".exe" } else { "" }),
+        ["update"],
+        cwd=directory,
+        extra_env={
+          "MOON_HOME": root,
+          "MOON_TOOLCHAIN_ROOT": root,
+          "PATH": root +
+          "/bin" +
+          separator +
+          @env.get_env_var("PATH").unwrap_or(""),
+        },
+      ),
+      0,
+    )
+  }
+  let code = @process.run(
+    "moonx",
+    [
+      "scripts/toolchain.mbtx", "scripts/check-moonx.mbtx", "--toolchain-root", root,
+    ] +
+    @env.args()[1:].to_owned(),
+  )
+  assert_eq(code, 0)
+}

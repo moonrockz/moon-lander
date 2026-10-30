@@ -1,0 +1,7 @@
+import {
+  "moonrockz/moon-lander-moonx" @library,
+  "moonrockz/moon-lander-moonx/driver" @launcher_driver,
+}
+// The isolated I/O runtime uses the stock Wasm/native host ABI.
+supported_targets = "wasm+native"
+pkgtype(kind: "executable")

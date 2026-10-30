@@ -140,3 +140,16 @@ Feature: One version across the workspace
       inspect("1.0.0", content="1.0.0")
       inspect(@lander.version(), content="0.0.1")
       """
+
+  Scenario: The public launcher embeds the shared version
+    Given a file "pkgs/moonx/launch/version.mbt" with the text:
+      """
+      let package_version : PackageVersion = PackageVersion("0.8.0")
+      """
+    When I look for versions other than "0.9.0"
+    Then the mismatches are "pkgs/moonx/launch/version.mbt: found 0.8.0, expected 0.9.0"
+    When I set the versions of the files to "0.9.0"
+    Then the result is:
+      """
+      let package_version : PackageVersion = PackageVersion("0.9.0")
+      """

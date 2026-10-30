@@ -1,0 +1,27 @@
+fn payload_case(args : Array[String]) -> @moonx.NodeLaunch raise {
+  let files = [
+    @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("package.json"), b"{\"type\":\"module\"}"),
+    @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {Worker} from 'node:worker_threads'; import {dirname,join} from 'node:path'; import {fileURLToPath} from 'node:url'; import {symlinkSync,mkdirSync,writeFileSync,chmodSync} from 'node:fs'; const root=dirname(fileURLToPath(import.meta.url)); console.log('PAYLOAD='+root); console.log('CWD='+process.cwd()); console.log('ARGV='+JSON.stringify(process.argv.slice(2))); if(process.argv[2]==='--symlink') symlinkSync(process.argv[3],join(root,'escape'),'junction'); if(process.argv[2]==='--cleanup-failure') { mkdirSync(join(root,'locked')); writeFileSync(join(root,'locked','data'),'owned'); chmodSync(join(root,'locked'),0); } const w=new Worker(new URL('./workers/work.js',import.meta.url)); w.once('message',x=>{ console.log('VALUE='+x); w.terminate().then(()=>process.exit(process.argv.includes('--success')?0:23)); });"),
+    @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("workers/work.js"), b"import {parentPort} from 'node:worker_threads'; import {value} from '../runtime/value.js'; parentPort.postMessage(value);"),
+    @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("runtime/value.js"), b"export const value=42;"),
+  ]
+  if args.contains("--ignore-signal") {
+    files[1] = @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {dirname} from 'node:path'; import {fileURLToPath} from 'node:url'; process.on('SIGINT',()=>console.log('IGNORED_INTERRUPT')); console.log('PAYLOAD='+dirname(fileURLToPath(import.meta.url))); console.log('READY '+process.pid); setInterval(()=>{},1000);")
+  }
+  if args.contains("--ignore-break") {
+    files[1] = @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {dirname} from 'node:path'; import {fileURLToPath} from 'node:url'; process.on('SIGBREAK',()=>console.log('IGNORED_BREAK')); console.log('PAYLOAD='+dirname(fileURLToPath(import.meta.url))); console.log('READY '+process.pid); console.log('CHILD_READY'); setInterval(()=>{},1000);")
+  }
+  if args.contains("--large-payload") {
+    let content = Bytes::make(4096, b'x')
+    for index in 0..<4096 {
+      files.push(@moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("materializing/file-" + index.to_string()), content))
+    }
+  }
+  if args.contains("--write-failure") {
+    files.push(@moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("a".repeat(300)), b"unrepresentable filesystem component"))
+  }
+  let node = if args.length() > 0 && args[0] == "--missing-node" {
+    @moonx.Executable::parse(args[1])
+  } else { @moonx.Executable::node() }
+  @moonx.NodeLaunch::new(@moonx.Payload::new(files, @moonx.RelativeFilePath::parse("entry.js")), @moonx.Arguments::parse(args), node~)
+}

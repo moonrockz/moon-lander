@@ -1,0 +1,6 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonbitlang/core/deque",
+}
+
+supported_targets = "wasm+native"

@@ -1,0 +1,8 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonbitlang/core/deque",
+  "moonrockz/moon-lander-moonx/runtime/internal/coroutine",
+  "moonrockz/moon-lander-moonx/runtime/internal/cancellable_queue",
+}
+
+supported_targets = "wasm+native"

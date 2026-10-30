@@ -1,0 +1,74 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/x509"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/sigstore/internal/signature",
+}
+
+// Values
+pub const EKU_ANY : String = "2.5.29.37.0"
+
+pub const EKU_CODE_SIGNING : String = "1.3.6.1.5.5.7.3.3"
+
+pub const KEY_USAGE_CERT_SIGN : Int32 = 32
+
+pub const KEY_USAGE_DIGITAL_SIGNATURE : Int32 = 1
+
+pub const SCT_LIST_OID : String = "1.3.6.1.4.1.11129.2.4.2"
+
+pub fn decode_pem(String) -> Array[Bytes] raise X509Error
+
+pub fn fulcio_value(Extension) -> String raise X509Error
+
+pub fn parse(BytesView) -> Certificate raise X509Error
+
+pub fn signature_hash(String) -> @signature.HashAlgorithm?
+
+// Errors
+pub suberror X509Error {
+  BadCertificate(String)
+} derive(@debug.Debug)
+pub fn X509Error::message(Self) -> String
+pub fn X509Error::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct BasicConstraints {
+  is_ca : Bool
+  path_length : Int32?
+}
+
+pub struct Certificate {
+  raw : Bytes
+  tbs : Bytes
+  signature_algorithm : String
+  signature : Bytes
+  issuer : Bytes
+  subject : Bytes
+  not_before : Int64
+  not_after : Int64
+  spki : Bytes
+  extensions : Array[Extension]
+  basic_constraints : BasicConstraints?
+  key_usage : Int32?
+  extended_key_usage : Array[String]?
+  san_uris : Array[String]
+  san_emails : Array[String]
+  authority_key_id : Bytes?
+  subject_key_id : Bytes?
+}
+pub fn Certificate::extension(Self, String) -> Extension?
+pub fn Certificate::is_issued_by(Self, Self) -> Bool
+pub fn Certificate::tbs_without(Self, String) -> Bytes raise X509Error
+pub fn Certificate::unhandled_critical(Self, allowed? : Array[String]) -> String?
+pub fn Certificate::valid_at(Self, Int64) -> Bool
+
+pub struct Extension {
+  oid : String
+  critical : Bool
+  value : Bytes
+}
+
+// Type aliases
+
+// Traits

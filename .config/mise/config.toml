@@ -295,6 +295,14 @@ run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-artifacts.mbtx --ch
 description = "Generate portable OpenRPC regex identifier tables from frozen Unicode data"
 run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-unicode.mbtx"
 
+[tasks."build:sigstore-assets"]
+description = "Generate the pinned Sigstore public-good root and the test fixtures from pkgs/sigstore/testdata"
+run = "moonx scripts/toolchain.mbtx scripts/generate-sigstore-assets.mbtx"
+
+[tasks."check:sigstore-assets"]
+description = "Reject stale Sigstore assets or changed test data without rewriting"
+run = "moonx scripts/toolchain.mbtx scripts/generate-sigstore-assets.mbtx --check"
+
 [tasks."check:openrpc-unicode"]
 description = "Reject stale OpenRPC Unicode tables and license without rewriting"
 run = "moonx scripts/toolchain.mbtx scripts/generate-openrpc-unicode.mbtx --check"

@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/sct"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/sigstore/internal/signature",
+}
+
+// Values
+pub fn parse_list(BytesView) -> Array[Sct] raise SctError
+
+// Errors
+pub suberror SctError {
+  BadSct(String)
+} derive(@debug.Debug)
+pub fn SctError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Sct {
+  log_id : Bytes
+  timestamp : Int64
+  extensions : Bytes
+  hash_algorithm : Int32
+  signature_algorithm : Int32
+  signature : Bytes
+}
+pub fn Sct::signed_data(Self, BytesView, BytesView) -> Bytes
+pub fn Sct::verify(Self, @signature.PublicKey, BytesView, BytesView) -> Bool
+
+// Type aliases
+
+// Traits

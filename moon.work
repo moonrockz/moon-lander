@@ -11,5 +11,6 @@ members = [
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./pkgs/openrpc",
+  "./pkgs/sigstore",
   "./tests",
 ]

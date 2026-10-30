@@ -1,0 +1,6 @@
+These test cases are copied without change from sigstore/sigstore-conformance,
+test/assets/bundle-verify/, at commit acb38c9ee4274fa058127e6a5a4cdb9e94e449e1.
+
+The README of that repository states: "sigstore-conformance is licensed under
+the Apache 2.0 License." The repository has no LICENSE file, so LICENSE in this
+folder is a copy of the Apache License 2.0 text.

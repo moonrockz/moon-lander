@@ -1,0 +1,37 @@
+[
+  {
+    "bundle": "morphir-rust-provider-snapshot-0.2.0.sigstore.json",
+    "artifact": "morphir-provider-snapshot-0.2.0-aarch64-apple-darwin.tgz",
+    "digest": "sha256:03d190b8ef97d354f9aca6854542979c36ce5f77c68a3d80de28ac1a77c432bd",
+    "repository": "finos/morphir-rust",
+    "repositoryId": "513894754",
+    "ownerId": "35377814",
+    "workflow": ".github/workflows/release-provider-snapshot.yml",
+    "ref": "refs/tags/provider-snapshot/v0.2.0",
+    "san": "https://github.com/finos/morphir-rust/.github/workflows/release-provider-snapshot.yml@refs/tags/provider-snapshot/v0.2.0",
+    "integratedTime": 1792133282,
+    "logIndex": 3275146211
+  },
+  {
+    "bundle": "cli-2.50.0.sigstore.json",
+    "artifact": "gh_2.50.0_linux_amd64.tar.gz",
+    "digest": "sha256:7f9795b3ce99351a1bfc6ea3b09b7363cb1eccca19978a046bcb477839efab82",
+    "repository": "cli/cli",
+    "workflow": ".github/workflows/deployment.yml",
+    "ref": "refs/heads/trunk",
+    "san": "https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk",
+    "integratedTime": 1716998983,
+    "logIndex": 97913918
+  },
+  {
+    "bundle": "cli-2.83.0.sigstore.json",
+    "artifact": "gh_2.83.0_linux_amd64.tar.gz",
+    "digest": "sha256:a5cf6cdb40fc67751adf561126b3314044779cea81ba4f254fbe8e9a69f1676f",
+    "repository": "cli/cli",
+    "workflow": ".github/workflows/deployment.yml",
+    "ref": "refs/heads/trunk",
+    "san": "https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk",
+    "integratedTime": 1762280054,
+    "logIndex": 667839981
+  }
+]

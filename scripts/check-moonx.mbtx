@@ -53,7 +53,7 @@ fn ApprovedArchiveDigest::check(
   assert_eq(
     @crypto.bytes_to_hex_string(@crypto.sha256(bytes)),
     self.text,
-    msg="Published archive differs from the owner-approved release archive",
+    msg="Bytes differ from the expected SHA-256 digest",
   )
 }
 
@@ -849,6 +849,7 @@ priv enum WindowsConsoleCase {
   BaselineBreak
   LauncherInterrupt
   LauncherBreak
+  LauncherForcedBreak
 }
 
 ///|
@@ -858,6 +859,7 @@ fn WindowsConsoleCase::name(self : WindowsConsoleCase) -> String {
     BaselineBreak => "baseline-ctrl-break"
     LauncherInterrupt => "launcher-ctrl-c"
     LauncherBreak => "launcher-ctrl-break"
+    LauncherForcedBreak => "launcher-ignored-break-forced-payload"
   }
 }
 
@@ -898,8 +900,16 @@ async fn windows_console(
   let node = node.text().trim().to_owned()
   let baseline = scenario is (BaselineInterrupt | BaselineBreak)
   let interrupt = scenario is (BaselineInterrupt | LauncherInterrupt)
+  let forced = scenario is LauncherForcedBreak
   let environment = tools.environment.copy()
   environment.set("MOONX_HOST_PROGRAM", host)
+  let temporary = stage + "/windows-forced-payload"
+  if forced {
+    @fs.mkdir(temporary)
+    for name in ["TMPDIR", "TMP", "TEMP"] {
+      environment.set(name, temporary)
+    }
+  }
   let (stdin, writer) = @process.write_to_process()
   defer writer.close()
   let (reader, stdout) = @process.read_from_process()
@@ -912,7 +922,9 @@ async fn windows_console(
         group,
         controller,
         [
-          if baseline && !interrupt {
+          if forced {
+            "payload-group"
+          } else if baseline && !interrupt {
             "baseline-group"
           } else if baseline {
             "baseline"
@@ -939,12 +951,16 @@ async fn windows_console(
       }
       let console_pid = reader.read_until("\n").unwrap()
       assert_true(console_pid.has_prefix("CONSOLE_PID="))
+      if forced {
+        let payload = reader.read_until("\n").unwrap()
+        assert_true(payload.has_prefix("PAYLOAD="), msg=payload)
+      }
       let ready = reader.read_until("\n").unwrap()
       guard ready.strip_prefix("READY ") is Some(node_pid) else {
         fail("Expected Node readiness: " + ready)
       }
       let host_ready = reader.read_until("\n")
-      if host_ready != Some("HOST_READY") {
+      if host_ready != Some(if forced { "CHILD_READY" } else { "HOST_READY" }) {
         let remaining = reader.read_all().text()
         let diagnostics = diagnostics_task.wait()
         let controller_status = child.wait()
@@ -998,6 +1014,29 @@ async fn windows_console(
       // Emit actual behavior before any contract assertion, so a stock host gap
       // remains reviewable rather than disappearing behind a failed test.
       println(evidence.stringify(indent=2))
+      if forced {
+        assert_eq(raw_status.unwrap().reinterpret_as_uint(), 0xc000013aU)
+        assert_eq(
+          output.split("IGNORED_BREAK").to_array().length(),
+          2,
+          msg=evidence.stringify(),
+        )
+        assert_true(
+          diagnostics.contains("PARENT_STARTED=STOPPED:1:FORCED=true"),
+          msg=evidence.stringify(),
+        )
+        assert_true(
+          diagnostics.contains("PARENT_SIGNAL=Break"),
+          msg=evidence.stringify(),
+        )
+        assert_true(
+          diagnostics.contains("PARENT_SELECTED=3221225786"),
+          msg=evidence.stringify(),
+        )
+        assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+        assert_eq(@fs.readdir(temporary), [])
+        return evidence
+      }
       for
         marker in [
           "WORKER_STOPPED",
@@ -1013,6 +1052,7 @@ async fn windows_console(
         )
       }
       if !baseline {
+        assert_eq(raw_status.unwrap().reinterpret_as_uint(), 0xc000013aU)
         assert_true(
           diagnostics.contains("PARENT_SELECTED=3221225786"),
           msg=evidence.stringify(),
@@ -1382,6 +1422,10 @@ async fn retain_report(
   results : Array[Json],
   published~ : ApprovedArchiveDigest? = None,
 ) -> Unit {
+  let (node_code, node_version, node_error) = @process.collect_output("node", [
+    "--version",
+  ])
+  assert_eq(node_code, 0, msg=node_error.text())
   let (code, head, error) = @process.collect_output("git", ["rev-parse", "HEAD"])
   assert_eq(code, 0, msg=error.text())
   let (code, dirty, error) = @process.collect_output("git", [
@@ -1395,6 +1439,7 @@ async fn retain_report(
     } else {
       "cold-public-registry"
     },
+    "freshDependencyAndBuildCaches": published is Some(_),
     "approvedArchiveSha256": match published {
       None => Json::null()
       Some(digest) => Json(digest.text)
@@ -1403,6 +1448,7 @@ async fn retain_report(
     "working_tree_dirty": !dirty.text().is_empty(),
     "stock": tools.version.text(),
     "compiler": tools.description,
+    "nodeVersion": node_version.text().trim().to_owned(),
     "cases": results,
   }
   @fs.mkdir("_build/moonx", recursive=true, allow_exist=true)
@@ -1495,6 +1541,8 @@ async fn main {
     let home = stage + "/cold-public-home"
     @fs.mkdir(home)
     environment.set("MOON_HOME", home)
+    environment.set("MOON_DEP_CACHE", stage + "/cold-dependencies")
+    environment.set("MOON_BUILD_CACHE", stage + "/cold-build-cache")
     {
       root: tools.root,
       version: tools.version,
@@ -1546,6 +1594,7 @@ async fn main {
       scenario in [
         BaselineInterrupt,
         BaselineBreak,
+        LauncherForcedBreak,
         LauncherBreak,
         LauncherInterrupt,
       ] {

@@ -69,3 +69,10 @@ The retained file-lock helper also waits for its actual `acquired lock` line
 before returning. Otherwise a cold child can lose the race to the parent's
 `try_lock`, leaving the child blocked while the parent waits for its completion.
 All original lock, cancellation and log assertions remain in place.
+
+Process-cancellation tests acknowledge the child's installed handler before
+cancelling it. The orphan-survival test acknowledges actual orphan creation
+before starting its original 300ms hard-cancel deadline. The test-only spawn
+fixture writes that acknowledgement through async stdio, so pipe buffering does
+not delay it until process exit. These changes preserve the original stop,
+timing and orphan-survival assertions and do not change published source.

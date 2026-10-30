@@ -8,6 +8,9 @@ fn payload_case(args : Array[String]) -> @moonx.NodeLaunch raise {
   if args.contains("--ignore-signal") {
     files[1] = @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {dirname} from 'node:path'; import {fileURLToPath} from 'node:url'; process.on('SIGINT',()=>console.log('IGNORED_INTERRUPT')); console.log('PAYLOAD='+dirname(fileURLToPath(import.meta.url))); console.log('READY '+process.pid); setInterval(()=>{},1000);")
   }
+  if args.contains("--ignore-break") {
+    files[1] = @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {dirname} from 'node:path'; import {fileURLToPath} from 'node:url'; process.on('SIGBREAK',()=>console.log('IGNORED_BREAK')); console.log('PAYLOAD='+dirname(fileURLToPath(import.meta.url))); console.log('READY '+process.pid); console.log('CHILD_READY'); setInterval(()=>{},1000);")
+  }
   if args.contains("--large-payload") {
     let content = Bytes::make(4096, b'x')
     for index in 0..<4096 {

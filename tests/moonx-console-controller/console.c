@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 static PROCESS_INFORMATION owned_process;
 
@@ -45,6 +46,7 @@ int32_t lander_moonx_console_start(
 ) {
   int32_t baseline = mode & 1;
   int32_t grouped = mode & 2;
+  int32_t payload = mode & 4;
   WCHAR *exe = copy_text(baseline ? node : runner, baseline ? node_len : runner_len);
   size_t capacity = ((size_t)runner_len + wasm_len + node_len + owner_len) * 2 + 64;
   WCHAR *command = (WCHAR *)calloc(capacity, sizeof(WCHAR));
@@ -53,11 +55,19 @@ int32_t lander_moonx_console_start(
   if (!baseline) {
     *end++ = L' ';
     end = quoted(end, (const WCHAR *)wasm, wasm_len);
-    memcpy(end, L" -- ", 4 * sizeof(WCHAR)); end += 4;
-    end = quoted(end, (const WCHAR *)node, node_len);
+    if (payload) {
+      const WCHAR *arguments = L" -- --payload --ignore-break";
+      size_t length = wcslen(arguments);
+      memcpy(end, arguments, length * sizeof(WCHAR)); end += length;
+    } else {
+      memcpy(end, L" -- ", 4 * sizeof(WCHAR)); end += 4;
+      end = quoted(end, (const WCHAR *)node, node_len);
+    }
   }
-  *end++ = L' ';
-  end = quoted(end, (const WCHAR *)owner, owner_len);
+  if (!payload) {
+    *end++ = L' ';
+    end = quoted(end, (const WCHAR *)owner, owner_len);
+  }
   *end = 0;
 
   HANDLE handles[3] = {NULL, NULL, NULL};

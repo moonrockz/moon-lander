@@ -23,6 +23,7 @@ fixed startup sleep, retaining their stop/finalizer assertions. The basic wait
 case checks pending/completed states around an explicit child release. Retained
 file-lock helpers acknowledge actual lock acquisition before returning, avoiding
 an exclusive-lock deadlock during cold child startup. Original lock assertions
-remain unchanged. Retained
-native and Wasm suites run sequentially because original timestamp fixtures use
+remain unchanged. Process-cancel cases acknowledge the real child handler;
+the orphan case starts its original hard-cancel deadline after acknowledged
+orphan creation. Retained native and Wasm suites run sequentially because original timestamp fixtures use
 shared `/tmp` names.

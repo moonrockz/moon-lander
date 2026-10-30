@@ -44,6 +44,31 @@ async fn main {
     }
     assert_eq(code, 0)
   }
+  if !@fs.exists(root + "/registry/index/user/moonbitlang/x.index") {
+    let directory = @fs.tmpdir(prefix="lander-stock-registry")
+    defer @fs.rmdir(directory, recursive=true)
+    @fs.write_file(
+      directory + "/moon.mod",
+      "name = \"lander-stock-registry\"\nversion = \"0.0.1\"\nprivate = true\n",
+    )
+    let separator = if windows { ";" } else { ":" }
+    assert_eq(
+      @process.run(
+        root + "/bin/moon" + (if windows { ".exe" } else { "" }),
+        ["update"],
+        cwd=directory,
+        extra_env={
+          "MOON_HOME": root,
+          "MOON_TOOLCHAIN_ROOT": root,
+          "PATH": root +
+          "/bin" +
+          separator +
+          @env.get_env_var("PATH").unwrap_or(""),
+        },
+      ),
+      0,
+    )
+  }
   let code = @process.run(
     "moonx",
     [

@@ -502,6 +502,9 @@ async fn retained_tests(stage : String, target : String) -> Unit {
     if file == "fs/lock_test.mbt" {
       text = adapt_lock_tests(text)
     }
+    if file == "process/cancel_test.mbt" {
+      text = adapt_process_cancel_tests(text)
+    }
     if file == "all_any_test.mbt" {
       // Source locations change when wrapping the compiler entry. Preserve the
       // exact semantic error assertion without an upstream line-number snapshot.
@@ -589,6 +592,8 @@ async fn retained_tests(stage : String, target : String) -> Unit {
       if file.has_suffix(".mbt") {
         let text = if path == "test_programs/sleep/main.mbt" {
           adapt_sleep_fixture(original.text())
+        } else if path == "test_programs/spawn/main.mbt" {
+          adapt_spawn_fixture(original.text())
         } else {
           original.text()
         }
@@ -598,6 +603,15 @@ async fn retained_tests(stage : String, target : String) -> Unit {
         )
       } else if file.has_suffix("moon.pkg") {
         let renamed = rename_imports(original.text())
+        let renamed = if path == "test_programs/spawn/moon.pkg" {
+          patch_once(
+            renamed,
+            "import {",
+            "import {\n  \"" + runtime_namespace + "/stdio\",",
+          )
+        } else {
+          renamed
+        }
         @fs.write_file(
           module_dir + "/" + path,
           if renamed.contains("\"" + runtime_namespace + "\"") {
@@ -898,4 +912,66 @@ fn adapt_lock_tests(source : String) -> String raise {
     #|  @runtime_testing.wait_ready(ready)
     #|  reader
   patch_once(source, original, replacement)
+}
+
+///|
+fn adapt_spawn_fixture(source : String) -> String raise {
+  let text = patch_once(
+    source, "  let (is_orphan, args) = match args {", "  let (ready, args) = match args {\n    [\"-ready-after-spawn\", .. rest] => (true, rest)\n    args => (false, args)\n  }\n  let (is_orphan, args) = match args {",
+  )
+  patch_once(
+    text, "    let pid = @process.spawn_orphan(cmd, args)\n    ignore(@process.wait_pid(pid))",
+    "    let pid = @process.spawn_orphan(cmd, args)\n    if ready { @stdio.stdout.write(\"SPAWN_READY\\n\") }\n    ignore(@process.wait_pid(pid))",
+  )
+}
+
+///|
+fn adapt_process_cancel_tests(source : String) -> String raise {
+  let mut text = source
+  for
+    name in ["cancel process", "cancel process timeout", "cancel process hard"] {
+    let start = text.find("async test \"" + name + "\" {").unwrap()
+    let length = text[start:].find("\n}\n").unwrap() + 3
+    let original = text[start:start + length].to_owned()
+    let changed = patch_once(
+      original, "    let (r, w) = @process.read_from_process()", "    let (r, w) = @process.read_from_process()\n    let ready = @async.Semaphore(1, initial_value=0)",
+    )
+    let changed = if name == "cancel process timeout" {
+      patch_once(
+        changed, "[\"-swallow-cancel-signal\", \"10000\"]", "[\"-swallow-cancel-signal\", \"10000\", \"-ready-after-setup\"]",
+      )
+    } else {
+      patch_once(changed, "[\"10000\"]", "[\"10000\", \"-ready-after-setup\"]")
+    }
+    let changed = patch_once(
+      changed, "      defer r.close()", "      defer r.close()\n      assert_eq(r.read_until(\"\\n\"), Some(\"UPSTREAM_READY\"))\n      ready.release()",
+    )
+    let changed = patch_once(
+      changed, "    @async.sleep(500)", "    @runtime_testing.wait_ready(ready)",
+    )
+    text = patch_once(text, original, changed)
+  }
+  let start = text
+    .find("async test \"do not kill orphan children on hard cancel\" {")
+    .unwrap()
+  let original = text[start:].to_owned()
+  let replacement =
+    #|async test "do not kill orphan children on hard cancel" {
+    #|  let spawn = spawn_prog.wait()
+    #|  let sleep = sleep_prog.wait()
+    #|  let (r, w) = @process.read_from_process()
+    #|  defer r.close()
+    #|  @async.with_task_group(group => {
+    #|    let process = group.spawn(() => @process.run(spawn,
+    #|      ["-ready-after-spawn", "-orphan", sleep, "450", "-print-after-sleep", "after sleep"],
+    #|      stdout=w, cancel_handler=@process.hard_cancel()))
+    #|    assert_eq(r.read_until("\n"), Some("SPAWN_READY"))
+    #|    // Keep the real 300ms hard-cancel deadline, after actual orphan creation.
+    #|    @async.sleep(300)
+    #|    process.cancel()
+    #|  })
+    #|  inspect(r.read_all().text().trim(), content="after sleep")
+    #|}
+    #|
+  patch_once(text, original, replacement)
 }

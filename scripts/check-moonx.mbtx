@@ -435,6 +435,7 @@ async fn host_signal(
   signal : StopSignal,
   moonx_home~ : String? = None,
   repeated~ : Bool = false,
+  backend~ : DriverBackend = WasmParent,
 ) -> Json {
   let environment = tools.environment.copy()
   environment.set("MOONX_HOST_PROGRAM", host)
@@ -444,8 +445,13 @@ async fn host_signal(
   let (program, arguments) = match moonx_home {
     None =>
       (
-        stock_program(tools.root, Moonrun),
-        [parent, "--", "node", stage + "/host/owner.cjs"],
+        if backend is NativeParent {
+          parent
+        } else {
+          stock_program(tools.root, Moonrun)
+        },
+        (if backend is NativeParent { [] } else { [parent, "--"] }) +
+        ["node", stage + "/host/owner.cjs"],
       )
     Some(home) => {
       environment.set("MOON_HOME", home)
@@ -545,7 +551,9 @@ async fn host_signal(
         "stock": tools.version.text(),
         "signal": signal.name(),
         "repeatedSignalDuringFinalization": repeated,
-        "entry": if moonx_home is None {
+        "entry": if backend is NativeParent {
+          "native-public-driver"
+        } else if moonx_home is None {
           "public-driver"
         } else {
           "stock-moonx-public-launch"
@@ -745,11 +753,18 @@ fn PayloadScenario::selected(self : PayloadScenario) -> Int32 {
 }
 
 ///|
+priv enum DriverBackend {
+  WasmParent
+  NativeParent
+}
+
+///|
 async fn finite_payload(
   tools : StockToolchain,
   stage : String,
   parent : String,
   scenario : PayloadScenario,
+  backend~ : DriverBackend = WasmParent,
 ) -> Json {
   let unicode_temporary = stage + "/é🙂 host temporary"
   let unicode_cwd = stage + "/é🙂 caller cwd"
@@ -760,6 +775,15 @@ async fn finite_payload(
   let environment = tools.environment.copy()
   for variable in ["TMPDIR", "TMP", "TEMP"] {
     environment.set(variable, unicode_temporary)
+  }
+  // Frozen native POSIX async uses /tmp; Moonrun and native Windows use their
+  // host temporary-root policy. Verify each actual owned path without changing
+  // that published runtime behavior to make a test's environment take effect.
+  let owned_temporary = if backend is NativeParent &&
+    @env.get_env_var("OS") != Some("Windows_NT") {
+    @fs.realpath("/tmp")
+  } else {
+    unicode_temporary
   }
   let arguments = scenario.arguments(stage)
   let (stdin, writer) = @process.write_to_process()
@@ -772,8 +796,14 @@ async fn finite_payload(
     @async.with_task_group(group => {
       let child = @process.spawn(
         group,
-        stock_program(tools.root, Moonrun),
-        [parent, "--", "--payload"] + arguments,
+        if backend is NativeParent {
+          parent
+        } else {
+          stock_program(tools.root, Moonrun)
+        },
+        (if backend is NativeParent { [] } else { [parent, "--"] }) +
+        ["--payload"] +
+        arguments,
         stdin~,
         stdout~,
         stderr~,
@@ -831,11 +861,19 @@ async fn finite_payload(
             reported_payload
             .replace_all(old="\\", new="/")
             .has_prefix(
-              unicode_temporary.replace_all(old="\\", new="/") +
-              "/moon-lander-moonx.",
+              owned_temporary.replace_all(old="\\", new="/") +
+              "/moon-lander-moonx." +
+              child.pid.to_string() +
+              ".",
             ),
             msg=output,
           )
+          if !(scenario is (CleanupAfterSuccess | CleanupAfterFailure)) {
+            assert_false(
+              @fs.exists(reported_payload),
+              msg="Owned payload remains: " + reported_payload,
+            )
+          }
           let child_status = match scenario {
             FinalizerAfterSuccess | CleanupAfterSuccess => "0"
             _ => "23"
@@ -865,6 +903,11 @@ async fn finite_payload(
         )
       }
       assert_eq(@fs.readdir(unicode_temporary), [])
+      let prefix = "moon-lander-moonx." + child.pid.to_string() + "."
+      assert_eq(
+        @fs.readdir(owned_temporary).filter(name => name.has_prefix(prefix)),
+        [],
+      )
       assert_eq(
         @fs.read_file(stage + "/external/sentinel").binary(),
         b"external\x00\xff",
@@ -872,9 +915,15 @@ async fn finite_payload(
       {
         "stock": tools.version.text(),
         "scenario": scenario.name(),
+        "entry": if backend is NativeParent {
+          "native-public-driver"
+        } else {
+          "moonrun-public-driver"
+        },
         "selected": status,
         "stdinHeldOpenThroughExit": true,
         "ownedPayloadRemoved": true,
+        "temporaryRoot": Json(owned_temporary),
         "externalSentinelPreserved": true,
         "stdout": output,
         "stderr": diagnostics,
@@ -904,6 +953,8 @@ priv enum WindowsConsoleCase {
   LauncherInterrupt
   LauncherBreak
   LauncherForcedBreak
+  NativeBreak
+  NativeForcedBreak
 }
 
 ///|
@@ -914,6 +965,8 @@ fn WindowsConsoleCase::name(self : WindowsConsoleCase) -> String {
     LauncherInterrupt => "launcher-ctrl-c"
     LauncherBreak => "launcher-ctrl-break"
     LauncherForcedBreak => "launcher-ignored-break-forced-payload"
+    NativeBreak => "native-launcher-ctrl-break"
+    NativeForcedBreak => "native-launcher-ignored-break-forced-payload"
   }
 }
 
@@ -948,16 +1001,18 @@ async fn windows_console(
   host : String,
   controller : String,
   scenario : WindowsConsoleCase,
+  native_parent : String,
 ) -> Json {
   let (code, node, err) = @process.collect_output("mise", ["which", "node"])
   assert_eq(code, 0, msg=err.text())
   let node = node.text().trim().to_owned()
   let baseline = scenario is (BaselineInterrupt | BaselineBreak)
   let interrupt = scenario is (BaselineInterrupt | LauncherInterrupt)
-  let forced = scenario is LauncherForcedBreak
+  let forced = scenario is (LauncherForcedBreak | NativeForcedBreak)
+  let native = scenario is (NativeBreak | NativeForcedBreak)
   let environment = tools.environment.copy()
   environment.set("MOONX_HOST_PROGRAM", host)
-  let temporary = stage + "/windows-forced-payload"
+  let temporary = stage + "/" + scenario.name() + "-payload"
   if forced {
     @fs.mkdir(temporary)
     for name in ["TMPDIR", "TMP", "TEMP"] {
@@ -976,7 +1031,11 @@ async fn windows_console(
         group,
         controller,
         [
-          if forced {
+          if native && forced {
+            "native-payload-group"
+          } else if native {
+            "native-group"
+          } else if forced {
             "payload-group"
           } else if baseline && !interrupt {
             "baseline-group"
@@ -987,7 +1046,11 @@ async fn windows_console(
           } else {
             "launcher"
           },
-          stock_program(tools.root, Moonrun),
+          if native {
+            native_parent
+          } else {
+            stock_program(tools.root, Moonrun)
+          },
           parent,
           node,
           stage + "/host/owner.cjs",
@@ -1664,6 +1727,17 @@ async fn main {
     tools
   }
   let (parent, host, launch) = prepare(tools, stage, published~)
+  let native_parent = build(
+    tools,
+    stage + "/parent",
+    "native",
+    stage + "/native-parent-build",
+  )
+  assert_false(
+    module_roots(
+      stage + "/native-parent-build/native/debug/build/all_pkgs.json",
+    ).contains("moonbitlang/async"),
+  )
   let results : Array[Json] = []
   results.push(launch_command(tools, stage, launch))
   results.push(binary_transport(tools, stage, launch))
@@ -1680,6 +1754,15 @@ async fn main {
       FinalizerAfterFailure,
     ] {
     results.push(finite_payload(tools, stage, parent, scenario))
+    results.push(
+      finite_payload(
+        tools,
+        stage,
+        native_parent,
+        scenario,
+        backend=NativeParent,
+      ),
+    )
   }
   if @env.get_env_var("OS") != Some("Windows_NT") {
     for scenario in [CleanupAfterSuccess, CleanupAfterFailure] {
@@ -1687,6 +1770,16 @@ async fn main {
     }
     for signal in [Interrupt, Terminate] {
       results.push(host_signal(tools, stage, parent, host, signal))
+      results.push(
+        host_signal(
+          tools,
+          stage,
+          native_parent,
+          host,
+          signal,
+          backend=NativeParent,
+        ),
+      )
     }
     results.push(
       host_signal(tools, stage, parent, host, Interrupt, repeated=true),
@@ -1712,10 +1805,14 @@ async fn main {
         BaselineBreak,
         LauncherForcedBreak,
         LauncherBreak,
+        NativeForcedBreak,
+        NativeBreak,
         LauncherInterrupt,
       ] {
       try
-        windows_console(tools, stage, parent, host, controller, scenario)
+        windows_console(
+          tools, stage, parent, host, controller, scenario, native_parent,
+        )
       catch {
         error => {
           let detail = scenario.name() + ": " + error.to_string()

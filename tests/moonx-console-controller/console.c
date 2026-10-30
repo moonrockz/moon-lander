@@ -61,20 +61,24 @@ int32_t lander_moonx_console_start(
   int32_t baseline = mode & 1;
   int32_t grouped = mode & 2;
   int32_t payload = mode & 4;
+  int32_t native_parent = mode & 8;
   WCHAR *exe = copy_text(baseline ? node : runner, baseline ? node_len : runner_len);
   size_t capacity = ((size_t)runner_len + wasm_len + node_len + owner_len) * 2 + 64;
   WCHAR *command = (WCHAR *)calloc(capacity, sizeof(WCHAR));
   if (!exe || !command) { free(exe); free(command); SetLastError(ERROR_NOT_ENOUGH_MEMORY); return 0; }
   WCHAR *end = quoted(command, exe, baseline ? node_len : runner_len);
   if (!baseline) {
-    *end++ = L' ';
-    end = quoted(end, (const WCHAR *)wasm, wasm_len);
+    if (!native_parent) {
+      *end++ = L' ';
+      end = quoted(end, (const WCHAR *)wasm, wasm_len);
+    }
     if (payload) {
-      const WCHAR *arguments = L" -- --payload --ignore-break";
+      const WCHAR *arguments = native_parent ? L" --payload --ignore-break" : L" -- --payload --ignore-break";
       size_t length = wcslen(arguments);
       memcpy(end, arguments, length * sizeof(WCHAR)); end += length;
     } else {
-      memcpy(end, L" -- ", 4 * sizeof(WCHAR)); end += 4;
+      if (native_parent) { *end++ = L' '; }
+      else { memcpy(end, L" -- ", 4 * sizeof(WCHAR)); end += 4; }
       end = quoted(end, (const WCHAR *)node, node_len);
     }
   }

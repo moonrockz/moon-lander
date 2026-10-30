@@ -30,17 +30,25 @@ priv struct ApprovedArchiveDigest {
 }
 
 ///|
+priv enum DigestRule {
+  Sha256Length
+  LowercaseHex
+} derive(Eq, Debug)
+
+///|
 suberror DigestError {
-  InvalidArchiveDigest(String)
+  InvalidArchiveDigest(input~ : String, rule~ : DigestRule)
 }
 
 ///|
 fn ApprovedArchiveDigest::parse(
   text : String,
 ) -> ApprovedArchiveDigest raise DigestError {
-  guard text.length() == 64 &&
-    text.iter().all(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) else {
-    raise InvalidArchiveDigest(text)
+  guard text.length() == 64 else {
+    raise InvalidArchiveDigest(input=text, rule=Sha256Length)
+  }
+  guard text.iter().all(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) else {
+    raise InvalidArchiveDigest(input=text, rule=LowercaseHex)
   }
   { text, }
 }
@@ -1115,8 +1123,19 @@ async fn windows_console(
       let rest = reader.read_all().text()
       let diagnostics = diagnostics_task.wait()
       let output = lines.join("\n") + "\n" + rest
-      let expected_reason = if interrupt { "Interrupt" } else { "Quit" }
-      let expected_completion = if interrupt { "130" } else { "131" }
+      // Direct Node proves ordinary Ctrl-C handling. Stock Windows Moonrun
+      // delivers Ctrl-Break for its own Ctrl-C cancellation, so retain the
+      // genuine Quit/131 outcome under the owner-approved platform limitation.
+      let expected_reason = if scenario is BaselineInterrupt {
+        "Interrupt"
+      } else {
+        "Quit"
+      }
+      let expected_completion = if scenario is BaselineInterrupt {
+        "130"
+      } else {
+        "131"
+      }
       let evidence : Json = {
         "stock": tools.version.text(),
         "scenario": scenario.name(),
@@ -1125,6 +1144,15 @@ async fn windows_console(
         "rawConsoleStatus": raw_status.unwrap(),
         "stdinHeldOpenThroughExit": true,
         "childReaped": true,
+        "stockMoonrunCtrlCLimitation": scenario is LauncherInterrupt,
+        "nodeObservedOriginalCtrlC": if interrupt {
+          Json(
+            output.contains("HOST_REASON=Interrupt\n") &&
+            output.contains("HOST_COMPLETION=130\n"),
+          )
+        } else {
+          Json::null()
+        },
         "stdout": output,
         "stderr": diagnostics,
       }
@@ -1175,6 +1203,18 @@ async fn windows_console(
           msg=evidence.stringify(),
         )
         assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+        assert_true(
+          diagnostics.contains(
+            "PARENT_SIGNAL=" + (if interrupt { "Interrupt" } else { "Break" }),
+          ),
+          msg=evidence.stringify(),
+        )
+        assert_true(
+          diagnostics.contains("PARENT_STARTED=STOPPED:131:FORCED=false"),
+          msg=evidence.stringify(),
+        )
+      } else {
+        assert_eq(raw_status.unwrap(), if interrupt { 130 } else { 131 })
       }
       evidence
     })
@@ -1859,21 +1899,30 @@ test "Node fixture paths preserve ordinary Windows and Unicode spellings" {
 ///|
 test "approved archive digest requires exact lower-case SHA256" {
   let text = "a".repeat(64)
-  assert_eq(ApprovedArchiveDigest::parse(text).text, text)
+  for valid in ["0", "9", "a", "f"] {
+    let valid = valid.repeat(64)
+    assert_eq(ApprovedArchiveDigest::parse(valid).text, valid)
+  }
   ApprovedArchiveDigest::parse(
     @crypto.bytes_to_hex_string(@crypto.sha256(b"archive")),
   ).check(b"archive")
   for
-    input in [
-      "",
-      "a".repeat(63),
-      "a".repeat(65),
-      "A".repeat(64),
-      "g".repeat(64),
-      " " + text,
+    (input, rule) in [
+      ("", Sha256Length),
+      ("a".repeat(63), Sha256Length),
+      ("a".repeat(65), Sha256Length),
+      (" " + text, Sha256Length),
+      ("/".repeat(64), LowercaseHex),
+      (":".repeat(64), LowercaseHex),
+      ("`".repeat(64), LowercaseHex),
+      ("g".repeat(64), LowercaseHex),
+      ("A".repeat(64), LowercaseHex),
     ] {
     try ApprovedArchiveDigest::parse(input) catch {
-      InvalidArchiveDigest(actual) => assert_eq(actual, input)
+      InvalidArchiveDigest(input=actual, rule=actual_rule) => {
+        assert_eq(actual, input)
+        assert_eq(actual_rule, rule)
+      }
     } noraise {
       _ => fail("Accepted malformed archive digest")
     }

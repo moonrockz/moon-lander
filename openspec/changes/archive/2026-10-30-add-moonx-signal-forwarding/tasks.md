@@ -6,7 +6,7 @@ Bead: `lander-pq1.1`
 
 - [x] 1.1 Add the optional module, portable immutable command/argument/grace plans and typed rule errors; verify constructors and boundary values on all four targets.
 - [x] 1.2 Freeze the approved licensed async subset with a deterministic MoonBit generator, source/patch digests, notices, retained upstream tests and pinned fixture provenance; verify regeneration and deliberate drift rejection.
-- [x] 1.3 Add the public synchronous driver, explicit owned runtime entry and first-signal observer; verify finite status and genuine Node-host SIGINT/130 and SIGTERM/143 completion on both stock toolchains without a canonical parent runtime.
+- [x] 1.3 Add the public synchronous driver, explicit owned runtime entry and first-signal observer; verify finite status and genuine POSIX Node-host SIGINT/130 and SIGTERM/143 completion on both stock toolchains without a canonical parent runtime.
 - [x] 1.4 Add the command/signal API guide and isolation checks with this implementation; verify the documented example, canonical consumer compatibility and separate compiler/link graphs.
 
 ## 2. Private embedded Node payload lifetime
@@ -22,11 +22,11 @@ Bead: `lander-pq1.2`
 
 Bead: `lander-pq1.3`
 
-- [x] 3.1 Complete direct and top-level Moonx acceptance on both stock compilers for real Node-host completion, non-yielding worker work, open stdin, repeated signals and bounded forced reaping; require acknowledgements and one finalization per run.
-- [ ] 3.2 Verify opaque argument arrays, binary stdin/stdout, separate stderr, explicit finite statuses and payload removal across the supported process hosts; record actual Windows finite/console/graceful/hard behavior and return any unavoidable Ctrl-C contract gap before narrowing delivery.
-- [ ] 3.3 Register the module in workspace/dependency/version/publication validation and candidate/public archive consumers; verify all eleven archives, portable policies on four targets, supported runtime adapters and no workspace overrides.
-- [ ] 3.4 Place focused launcher and provenance checks in the existing CI/release categories with candidate-bound evidence and exact stock selection; verify required failure propagation and preserve all existing aggregate gates.
-- [ ] 3.5 Update module/workspace/release documentation and generated public interfaces, run strict OpenSpec validation, formatting and the required full/focused checks, and fix verified review findings; retain evidence for the reviewed green feature pull request.
+- [x] 3.1 Complete direct and top-level Moonx POSIX acceptance on both stock compilers for real Node-host completion, non-yielding worker work, open stdin, repeated signals and bounded forced reaping; require acknowledgements and one finalization per run.
+- [x] 3.2 Verify opaque argument arrays, binary stdin/stdout, separate stderr, explicit finite statuses and payload removal across supported process hosts; preserve actual Windows finite/console/graceful/hard behavior and qualify the owner-approved stock Moonrun Ctrl-C-to-Ctrl-Break limitation with genuine Quit/131 and full parent status.
+- [x] 3.3 Register the module in workspace/dependency/version/publication validation and candidate/public archive consumers; verify all eleven archives, portable policies on four targets, supported runtime adapters and no workspace overrides.
+- [x] 3.4 Place focused launcher and provenance checks in the existing CI/release categories with candidate-bound evidence and exact stock selection; verify required failure propagation and preserve all existing aggregate gates.
+- [x] 3.5 Update module/workspace/release documentation and generated public interfaces, run strict OpenSpec validation, formatting and the required full/focused checks, and fix verified review findings; retain evidence for the reviewed green feature pull request.
 
 ## Workflow follow-up
 

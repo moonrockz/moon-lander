@@ -43,4 +43,4 @@ before GitHub release creation.
 #### Scenario: Public Moonx consumer qualification
 
 - **WHEN** the new Moonx library is published
-- **THEN** fresh default-registry consumers on both required stock toolchains verify the published source and run genuine Node-host signal, payload, cleanup and transport cases before release promotion
+- **THEN** fresh default-registry consumers on both required stock toolchains verify the published source and run genuine Node-host signal, payload, cleanup and transport cases under the declared POSIX guarantee and Windows limitation before release promotion

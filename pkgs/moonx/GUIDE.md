@@ -47,10 +47,20 @@ identity remains fixed across repeated signals; the upstream runtime's existing
 exit selection can change when a later signal arrives.
 
 Windows process statuses retain all 32 bits. Console control events have Windows
-semantics: stock process hosts support targeted Ctrl-Break and hard termination;
-SIGTERM is not a Windows console event. Ctrl-C delivery requires separate console
-qualification and must not be inferred from a Ctrl-Break test. See the release's
-host qualification evidence for the tested stock tools and console setup.
+semantics. On stock `0.10.16+b1a0e846e` and `0.10.17+d971670cd`, Moonrun forwards
+parent Ctrl-C to its Node child as Ctrl-Break. A genuine Node-owned console host
+therefore reports Quit and completion 131. The parent still records Interrupt
+and retains its real status bits `0xc000013a`. The driver does not relabel either
+outcome. Original Windows Ctrl-C forwarding is not guaranteed. The public
+capability request is [moon #2419](https://github.com/moonbitlang/moon/issues/2419).
+
+Windows finite processes, opaque transport, private payload lifetime, targeted
+Ctrl-Break and bounded forced cleanup remain supported. Both Moonrun and native
+Ctrl-Break and ignored-Break cases are qualified with actual Node completion,
+open stdin, reaping and payload cleanup. SIGTERM is not a Windows console event.
+These optional-launcher limits do not change existing native, JS or embedded
+framework hosts. See the release's host qualification evidence for exact tools
+and console setup.
 
 # Embed a Node payload
 
@@ -128,7 +138,8 @@ owned runtime into their executable.
 
 `mise run check:moonx` and `mise run check:moonx-stock16` build independent
 consumers with the two supported stock toolchains. They check real console-host
-completion, idle stdin, repeated signals during finalization, ignored-signal
+completion under the POSIX guarantee and documented Windows limitation, idle
+stdin, repeated signals during finalization, ignored-signal
 forced reaping, cancellation during materialization, and opaque binary streams.
 The candidate registry serves only the public `/launch` Wasm asset and its
 checksum to a fresh Moonx home. Its report explicitly says it is local evidence.

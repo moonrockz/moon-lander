@@ -11,6 +11,9 @@
 ///
 /// Standard streams are inherited directly; no forwarding task waits for stdin
 /// EOF. The child keeps the caller's working directory. Output remains opaque.
+/// Original SIGINT/SIGTERM forwarding is guaranteed on POSIX. Stock Windows
+/// Moonrun delivers Ctrl-C as Ctrl-Break; actual child and parent outcomes stay
+/// distinct. See the module guide for the qualified platform limitation.
 pub fn run(
   plan : @moonx.LaunchPlan,
   grace~ : @moonx.ShutdownGrace = @moonx.ShutdownGrace::standard(),

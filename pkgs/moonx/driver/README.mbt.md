@@ -5,6 +5,10 @@ only after reaping, private payload cleanup and callbacks. The package uses the
 stock Wasm/native host ABI. Its plan values remain portable to all four targets.
 Do not import canonical async into this launcher executable.
 
+Original SIGINT/SIGTERM forwarding is guaranteed on POSIX. Stock Windows Moonrun
+delivers Ctrl-C as Ctrl-Break, with genuine Node-host Quit/131 completion and
+the parent's real Windows status. The guide states the platform limitation.
+
 ```mbt check
 ///|
 /// Body of a synchronous process launcher main.

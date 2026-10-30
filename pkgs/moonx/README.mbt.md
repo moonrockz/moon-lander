@@ -11,6 +11,11 @@ represent it. A shutdown grace period is positive and defaults to five seconds.
 The Node executable must be available on PATH, or the application supplies an
 explicit executable. This module does not install Node or own application schemas.
 
+Original SIGINT/SIGTERM forwarding is guaranteed on POSIX. Stock Windows Moonrun
+delivers parent Ctrl-C as Ctrl-Break to Node, whose genuine host reports Quit/131.
+The parent retains its original observation and full Windows status. See the
+guide for this limitation and actual Windows cleanup qualification.
+
 The [launcher and payload guide](GUIDE.md) describes the public synchronous
 driver, private Node payloads and typed completion callbacks. [Runtime
 provenance](RUNTIME.md) records the frozen source, test inputs and removal path.

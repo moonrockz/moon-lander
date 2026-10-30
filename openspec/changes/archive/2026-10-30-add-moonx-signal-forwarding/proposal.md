@@ -5,17 +5,23 @@
 Stock Moonx runs a Wasm parent. The public async cancellation policy can send
 one configured child signal, so parent SIGINT can become Node SIGTERM and
 change the real application host's stop reason and completion code.
-Applications need an original-signal launcher and a private lifetime for an
-embedded Node payload without waiting for a third-party release.
+Applications need original POSIX signal forwarding and a private lifetime for
+an embedded Node payload without waiting for a third-party release. Stock
+Windows Moonrun delivers Ctrl-Break when its parent receives Ctrl-C. Its Node
+child truthfully reports Quit/131, while the parent retains its real Windows
+cancellation status. The owner approved this Windows-only limitation.
 
 ## What Changes
 
 - Add the optional `moonrockz/moon-lander-moonx` module in `pkgs/moonx`.
 - Provide portable immutable command, argument, relative-file, payload and
   shutdown policy values with typed construction errors.
-- Add a synchronous process driver for stock Wasm and native hosts. It forwards
-  the first received SIGINT or SIGTERM, preserves process transport and statuses,
+- Add a synchronous process driver for stock Wasm and native hosts. On POSIX it
+  forwards the first received SIGINT or SIGTERM, preserves transport and statuses,
   reaps its child and completes protected finalization before the parent exits.
+- Preserve actual Windows finite, payload, Ctrl-Break and forced-cleanup behavior.
+  Document stock Moonrun's Ctrl-C-to-Ctrl-Break delivery without relabeling the
+  child's Quit/131 completion or the parent's original Interrupt observation.
 - Materialize immutable Node payload files in a newly owned private directory,
   preserve their layout and the caller's working directory, launch the selected
   entry with opaque application arguments, and remove the directory after reaping.
@@ -34,7 +40,7 @@ The external async contribution is nonblocking.
 
 ### New Capabilities
 
-- `moonx-launcher`: typed process plans, original-signal child forwarding, private
+- `moonx-launcher`: typed process plans, original POSIX signal forwarding, private
   Node payload lifetime, isolated runtime provenance and stock consumer proof.
 
 ### Modified Capabilities
@@ -49,12 +55,16 @@ The external async contribution is nonblocking.
 Epic: `lander-pq1`.
 Public request: [Moon-Lander #140](https://github.com/moonrockz/moon-lander/issues/140).
 Nonblocking return path: [async #706](https://github.com/moonbitlang/async/issues/706).
+Windows delivery capability: [moon #2419](https://github.com/moonbitlang/moon/issues/2419).
 The owner approved the frozen 21-package production subset and maintenance cost,
 implementation, reviewed green CI, merge, release and independent public proof.
 The owner also approved a thin `/launch` executable inside this optional module
 as a narrow exception to executable placement under `apps/`. It enables genuine
 public Moonx asset proof, calls only the public driver, and owns command help,
 usage errors and typed not-started reporting. It does not own application output.
+After actual isolated-console qualification on both stocks, the owner approved
+the Windows Moonx exception and the 0.9.0 release. Original POSIX forwarding,
+real Windows outcomes and existing native, JS and embedded behavior remain intact.
 
 ## Impact
 

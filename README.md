@@ -232,7 +232,9 @@ script. Also update the assessed versions above.
 - `pkgs/moonx/` contains the optional
   [`moonrockz/moon-lander-moonx`](pkgs/moonx/README.mbt.md): immutable portable
   process/payload plans and a Wasm/native driver with an isolated frozen runtime.
-  It owns original-signal forwarding and private Node payload cleanup. The
+  It owns original POSIX signal forwarding and private Node payload cleanup.
+  Stock Windows Moonrun delivers Ctrl-C as Ctrl-Break with genuine Node-host
+  Quit/131; the guide documents this limitation and full parent status. The
   [public `/launch` command](pkgs/moonx/launch/README.md) is a thin driver caller;
   application result schemas stay application-owned. No other framework module
   imports it, and its executable must not mix with canonical async.

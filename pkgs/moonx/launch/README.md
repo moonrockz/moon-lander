@@ -19,6 +19,13 @@ output, failure output or a child's own JSON. A finite child status is preserved
 including a nonzero status. The public driver owns signal forwarding, deadlines,
 reaping and finalization; see [the guide](../GUIDE.md).
 
+Original SIGINT/SIGTERM forwarding is guaranteed on POSIX hosts. On the two
+qualified stock Windows Moonrun versions, parent Ctrl-C reaches Node as
+Ctrl-Break, so a genuine Node-owned host reports Quit/131. The parent preserves
+its original Interrupt observation and full Windows cancellation status.
+Finite transport, Ctrl-Break and forced cleanup remain supported. The launcher
+does not rewrite the child's completion or application result.
+
 ## JSON ownership contract
 
 `--json` selects a single parent JSON document only for command help, usage

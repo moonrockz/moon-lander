@@ -44,7 +44,7 @@ Stock Moonx executes a verified prebuilt Wasm asset. Adjacent source-archive JS
 files do not provide a runtime payload directory. The Node child must retain
 its own host, worker layout and completion schema.</p>
 <p>Local feasibility built a renamed async runtime with both stock compilers,
-proved separate parent and Node module graphs, and preserved Interrupt/130 and
+proved separate parent and Node module graphs, and preserved POSIX Interrupt/130 and
 Terminate/143 through direct Moonrun and genuine top-level Moonx. The candidate
 test used a loopback registry, not an actual public publication.</p>
 
@@ -135,12 +135,20 @@ supported: finite processes, opaque transport, payload lifetime and its availabl
 Ctrl-Break graceful cancellation followed by forced termination. Exact stock
 Moonrun commits 2284bd2 and 3778465 always deliver Ctrl-Break to the owned Windows
 process group. Do not rename it Interrupt or invent POSIX SIGTERM there.</p>
-<p>Qualify real Windows console behavior in CI, including an isolated-console
-Ctrl-C observation where feasible. New process groups disable Ctrl-C by default,
-so source inspection and the existing Ctrl-Break suite are not Ctrl-C proof.
-Any unavoidable gap in intended application cancellation semantics must return
-to the owner before a release contract is narrowed. Do not add a blanket Windows
-refusal, a guessed reason, a new application protocol or a custom toolchain.</p>
+<p>Actual isolated-console qualification on both stocks proves the limitation:
+direct ordinary-console Node reports Interrupt/130, while a Moonrun parent that
+records Interrupt delivers Ctrl-Break and the genuine Node host reports
+Quit/131. The parent preserves status bits <code>0xc000013a</code>; worker,
+service and finalizer completion, open stdin and real child reaping are verified.
+The owner approved this Windows-only Moonx exception and the 0.9.0 release.
+Retain these actual observations in qualification rather than relabeling Quit
+as Interrupt. Track the public delivery capability in
+<a href="https://github.com/moonbitlang/moon/issues/2419">moon #2419</a>.</p>
+<p>Native Windows finite/payload, Ctrl-Break and ignored-Break forced-cleanup
+cases are independently qualified. They do not establish original Ctrl-C
+delivery. Existing native, JS and embedded framework hosts stay unchanged.
+Do not add a blanket Windows refusal, a guessed reason, a new application
+protocol, a downstream workaround or a custom toolchain.</p>
 
 <h3 id="fs-1">FS-1. Call: private payload directory through reaping</h3>
 <p>Create a new directory atomically through the owned async filesystem API,
@@ -168,14 +176,14 @@ across signal, payload and transport cases. Independent compilers remain distinc
 </tbody></table>
 <p>Candidate proof cannot stand in for public proof. Missing or failed required
 consumer evidence blocks promotion. Keep exact source, compiler, dependency,
-configuration and archive identities. Runtime estimates are not yet measured
-for the production suite; measure them before changing any job timeout.</p>
+configuration and archive identities. Record measured suite durations before
+changing any job timeout.</p>
 
 <h2 id="risks">Risks and trade-offs</h2>
 <table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
 <tr><td>Two runtime identities enter one executable</td><td>Pure root facade, separate driver and compiler/link-graph checks; no umbrella dependency</td></tr>
 <tr><td>Frozen runtime maintenance</td><td>Immutable archive, mechanical generator, narrow patch, retained upstream tests, checksum drift check and documented removal criteria</td></tr>
-<tr><td>Windows console semantics differ</td><td>Preserve available Windows execution, qualify actual console behavior and report exact gaps before narrowing delivery</td></tr>
+<tr><td>Windows console semantics differ</td><td>Document the owner-approved stock Moonrun Ctrl-C-to-Ctrl-Break limitation; retain genuine Quit/131, full parent status and actual graceful/forced cleanup proof</td></tr>
 <tr><td>Payload file escape or leak</td><td>Typed relative entries, collision checks, private exclusive root and non-following cleanup after reaping</td></tr>
 <tr><td>Signal during materialization or cleanup</td><td>Register ownership cleanup immediately and protect finalization from cancellation</td></tr>
 <tr><td>Large embedded payload</td><td>File bytes stay outside argv/stdin; the application owns assembly and checksums</td></tr>

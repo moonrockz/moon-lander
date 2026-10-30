@@ -1,11 +1,12 @@
-# Spec Delta
+# moonx-launcher Specification
 
 ## Purpose
 
-Let a stock Moonx parent launch an application process with its original stop
-signal and own a private on-disk Node payload through final process cleanup.
+Let a stock Moonx parent preserve original POSIX stop signals, retain actual
+Windows cancellation outcomes, and own a private on-disk Node payload through
+final process cleanup.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Typed immutable launch plans
 
@@ -71,25 +72,54 @@ An unexpected child signal MUST use its conventional process status.
 
 ### Requirement: Original cancellation signal
 
-On supported process hosts, the launcher SHALL forward the first received
-SIGINT or SIGTERM to its owned child. The observation MUST remain typed,
+On POSIX process hosts, the launcher SHALL forward the first received SIGINT
+or SIGTERM to its owned child. On every supported host the observation MUST remain typed,
 non-consuming and available during protected cleanup. Ordinary task
 cancellation MUST NOT be reported as an observed OS signal.
 
 #### Scenario: Interrupt a genuine Node-owned host
 
-- **WHEN** SIGINT is sent only to a ready launcher whose Node child owns a Moon-Lander host
+- **WHEN** POSIX SIGINT is sent only to a ready launcher whose Node child owns a Moon-Lander host
 - **THEN** that host reports Interrupt and completion 130 after its finalizer, and the parent selects 130
 
 #### Scenario: Terminate a genuine Node-owned host
 
-- **WHEN** SIGTERM is sent only to a ready launcher whose Node child owns a Moon-Lander host
+- **WHEN** POSIX SIGTERM is sent only to a ready launcher whose Node child owns a Moon-Lander host
 - **THEN** that host reports Terminate and completion 143 after its finalizer, and the parent selects 143
 
 #### Scenario: Repeated signal reads
 
 - **WHEN** cleanup reads the signal more than once after a second signal arrives
 - **THEN** the observed cancellation identity remains the first received signal
+
+### Requirement: Truthful Windows console semantics
+
+The Windows launcher SHALL retain actual child and parent cancellation outcomes.
+Stock Moonrun Ctrl-C delivery MUST be documented as Ctrl-Break, with genuine
+Quit/131 and the parent's original Interrupt observation and full status.
+It MUST NOT claim original Windows Ctrl-C forwarding or describe SIGTERM as a
+console event. Finite transport, payload lifetime, Ctrl-Break and bounded forced
+cleanup MUST remain supported. Existing framework hosts MUST remain unchanged.
+
+#### Scenario: Ordinary-console Node baseline
+
+- **WHEN** direct Node owning a Moon-Lander host receives Ctrl-C in an isolated ordinary Windows console with handling enabled
+- **THEN** its genuine host reports Interrupt and completion 130, establishing a baseline separate from the launcher
+
+#### Scenario: Stock Moonrun receives Ctrl-C
+
+- **WHEN** Ctrl-C reaches a ready Moonrun launcher at commit `2284bd2` or `3778465` whose Node child owns a Moon-Lander host
+- **THEN** the parent records Interrupt, the genuine Node host reports Quit and completion 131, and the parent retains status bits `0xc000013a` after worker, service and finalizer completion and child reaping
+
+#### Scenario: Targeted Ctrl-Break
+
+- **WHEN** targeted Ctrl-Break reaches a ready Moonrun or native launcher whose Node child owns a Moon-Lander host
+- **THEN** its genuine Node host reports Quit and completion 131, the parent records Break and its full Windows status, and finalization and reaping complete with idle stdin held open
+
+#### Scenario: Ignored Ctrl-Break
+
+- **WHEN** an owned Node payload acknowledges but ignores Ctrl-Break through the graceful deadline
+- **THEN** the launcher records the actual hard-termination request and child status, reaps the child, removes its payload, and finalizes once while preserving the parent's real Windows cancellation status
 
 ### Requirement: Bounded owned-child cleanup
 
@@ -112,7 +142,7 @@ that does not yield.
 #### Scenario: Non-yielding Node worker
 
 - **WHEN** the Node owner receives the forwarded signal while its hosted worker polls a shared stop probe without yielding
-- **THEN** the genuine host observes the original signal and reports its completion after cleanup
+- **THEN** the genuine host observes the delivered signal and reports its actual completion after cleanup under the platform's documented signal contract
 
 ### Requirement: Private Node payload lifetime
 
@@ -241,9 +271,15 @@ The command MUST document its report schema and argument boundary.
 
 Release qualification SHALL exercise stock `0.10.16+b1a0e846e` and
 `0.10.17+d971670cd`, including genuine top-level Moonx and real Node-host
-completion. After publication, fresh consumers MUST use the default public
+completion under the declared platform contract. After publication, fresh
+consumers MUST use the default public
 registry with no source override. Every released archive checksum MUST match
 the actual approved release artifact.
+
+#### Scenario: Platform-specific signal evidence
+
+- **WHEN** host qualification runs on both required stock toolchains
+- **THEN** POSIX proves original SIGINT/130 and SIGTERM/143, while Windows retains actual Ctrl-C-to-Ctrl-Break delivery, full parent status, graceful and forced cleanup, and opaque finite transport
 
 #### Scenario: Local candidate proof
 

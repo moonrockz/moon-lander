@@ -37,6 +37,14 @@ and replace only the launcher's adapter imports. Preserve the launch-plan API
 and cleanup behavior. An upstream issue or unreleased source change alone is
 not enough to remove the compatibility boundary.
 
+Windows signal delivery is a separate host capability. Stock Moonrun commits
+`2284bd2` and `3778465` send Ctrl-Break to the owned process group even when
+the launcher observed Ctrl-C. The owner approved this Windows Moonx limitation:
+retain the genuine Node-host Quit/131 outcome and the parent's original
+Interrupt observation and full status. The frozen observer does not rewrite
+either value. [moon #2419](https://github.com/moonbitlang/moon/issues/2419) tracks
+the delivery capability; resolving async #706 alone does not resolve it.
+
 Run retained upstream tests with `mise run test:moonx-runtime -- --test native`
 and `mise run test:moonx-runtime -- --test wasm`; run the drift regression with
 `mise run test:moonx-runtime -- --test-drift`. The test task creates an isolated,

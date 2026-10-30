@@ -7,3 +7,8 @@ import {
   "moonrockz/sigstore/internal/der",
   "moonrockz/sigstore/internal/encoding",
 }
+
+import {
+  "moonbitlang/core/json",
+  "moonrockz/sigstore/internal/fixtures",
+} for "test"

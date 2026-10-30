@@ -102,7 +102,8 @@ pub fn parse(raw : BytesView) -> Certificate raise X509Error {
 fn parse_der(raw : BytesView) -> Certificate raise {
   let outer = @der.parse_tag(raw, @der.SEQUENCE).children()
   let tbs = outer.expect(@der.SEQUENCE)
-  let algorithm = read_algorithm(outer.expect(@der.SEQUENCE))
+  let outer_algorithm = outer.expect(@der.SEQUENCE)
+  let algorithm = read_algorithm(outer_algorithm)
   let signature = outer.expect(@der.BIT_STRING).bit_string_bytes()
   outer.finish()
   let fields = tbs.children()
@@ -117,8 +118,10 @@ fn parse_der(raw : BytesView) -> Certificate raise {
   }
   guard version == 2 else { raise BadCertificate("not an X.509 v3 certificate") }
   ignore(fields.expect(@der.INTEGER))
-  let inner_algorithm = read_algorithm(fields.expect(@der.SEQUENCE))
-  guard inner_algorithm == algorithm else {
+  // RFC 5280, section 4.1.1.2: the same AlgorithmIdentifier, parameters too.
+  let inner_algorithm = fields.expect(@der.SEQUENCE)
+  ignore(read_algorithm(inner_algorithm))
+  guard inner_algorithm.raw == outer_algorithm.raw else {
     raise BadCertificate("the two signature algorithms differ")
   }
   let issuer = fields.expect(@der.SEQUENCE)

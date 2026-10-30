@@ -29,6 +29,7 @@ let publish_list : Array[(String, String)] = [
   ("pkgs/lander", "moonrockz/moon-lander"),
   ("pkgs/notebooks", "moonrockz/notebooks"),
   ("pkgs/openrpc", "moonrockz/openrpc"),
+  ("pkgs/sigstore", "moonrockz/sigstore"),
 ]
 
 ///|
@@ -190,7 +191,7 @@ async fn main {
   }
   if @env.args().contains("--check") {
     println(
-      "Publication policy verified: ten libraries; all tooling and tests private",
+      "Publication policy verified: eleven libraries; all tooling and tests private",
     )
     return
   }
@@ -233,12 +234,12 @@ test "publish outcomes distinguish duplicates, transient and refused failures" {
 }
 
 ///|
-test "the allowlist holds ten libraries in publication order" {
+test "the allowlist holds eleven libraries in publication order" {
   assert_eq(publish_list.map(entry => entry.1), [
     "moonrockz/moon-lander-core", "moonrockz/moon-lander-logging", "moonrockz/moon-lander-config",
     "moonrockz/moon-lander-mediator", "moonrockz/moon-lander-logging-hosting-async",
     "moonrockz/moon-lander-actors", "moonrockz/moon-lander-hosting", "moonrockz/moon-lander",
-    "moonrockz/notebooks", "moonrockz/openrpc",
+    "moonrockz/notebooks", "moonrockz/openrpc", "moonrockz/sigstore",
   ])
 }
 

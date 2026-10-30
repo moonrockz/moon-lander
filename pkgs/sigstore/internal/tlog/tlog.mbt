@@ -150,7 +150,8 @@ pub fn parse_checkpoint(envelope : String) -> Checkpoint raise CheckpointError {
       raise BadCheckpoint("a signature line does not start with an em dash")
     }
     let rest = line[2:]
-    guard rest.rev_find(" ") is Some(space) else {
+    // The name has no space (signed note format), so the first space ends it.
+    guard rest.find(" ") is Some(space) && space > 0 else {
       raise BadCheckpoint("a signature line has no name")
     }
     let bytes = @encoding.decode_base64(rest[space + 1:]) catch {

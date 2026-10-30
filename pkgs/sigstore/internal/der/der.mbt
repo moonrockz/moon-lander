@@ -246,6 +246,11 @@ pub fn Element::named_bits(self : Element) -> Int raise DerError {
   let data = self.content[1:]
   guard unused <= 7 && data.length() <= 2 else { raise Malformed("BIT STRING is too long") }
   guard data.length() > 0 || unused == 0 else { raise Malformed("BIT STRING unused bits") }
+  // DER sets the unused bits to zero (X.690, section 11.2.1).
+  guard data.length() == 0 ||
+    (data[data.length() - 1].to_int() & ((1 << unused) - 1)) == 0 else {
+    raise Malformed("BIT STRING unused bits are not zero")
+  }
   let mut bits = 0
   for i in 0..<data.length() {
     let byte = data[i].to_int()

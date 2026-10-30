@@ -8,6 +8,7 @@ configuration core, and the sync and async mediators.
 | --- | --- | --- |
 | `actors-acceptance` | Actor scenarios of `add-typed-actors`: the counter, concurrent producers, independent actors, finite actors, FIFO and selective receive, time limits, bounded and unbounded admission, reenqueue order, the receive test runner, request races and destinations, close, drain, cancel, startup and cleanup, child ownership, services and responders, names and directories, and topics. `mise run check:actors` fails when a target runs zero tests | wasm, JavaScript, native |
 | `actors-bench` | Local benchmark program of the actor receive shapes. Only the manual task `mise run bench:actors` runs it; it is not a test | wasm, JavaScript, native |
+| `sigstore-bench` | Local benchmark program of one Sigstore bundle verification with a real GitHub bundle. Only the manual task `mise run bench:sigstore` runs it; it is not a test | All four |
 | `config-acceptance` | Merge, get/show/path helpers, and a complete pure load across all file formats, environment and overrides | All four |
 | `browser-parity`, `browser-parity-reference` | Shared explicit cases (the core fixture, a parse error, a binding error) and their reference observation; `mise run test:browser` compares it with the browser result | All four |
 | `browser-fixture`, `browser-consumer`, `browser/` | Browser acceptance application, headless consumer guide and Playwright suites; see [the browser guide](browser/README.md) | JavaScript in Chromium, Firefox and WebKit |

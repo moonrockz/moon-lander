@@ -89,7 +89,12 @@ bundle, it SHALL verify the signature over the artifact digest.
 
 #### Scenario: Changed payload
 
-- **WHEN** one byte of the DSSE payload changes
+- **WHEN** one byte of the DSSE payload of a logged bundle changes
+- **THEN** the verdict fails with a transparency log body reason, because the logged payload hash no longer matches
+
+#### Scenario: Signature that does not verify
+
+- **WHEN** the log body matches the bundle but the content signature does not verify with the leaf key
 - **THEN** the verdict fails with a content signature reason
 
 #### Scenario: Two signatures

@@ -115,3 +115,172 @@ test "encode writes minimal lengths that parse back" {
     assert_eq(element.content.length(), size)
   }
 }
+
+///|
+/// True when `body` raises `Malformed`.
+fn refused(body : () -> Unit raise) -> Bool {
+  try {
+    body()
+    false
+  } catch {
+    @der.Malformed(_) => true
+    _ => false
+  }
+}
+
+///|
+test "length forms at each limit" {
+  // One to three length bytes are read; four are not.
+  assert_eq(@der.parse(hex("0481ff" + "00".repeat(255))).content.length(), 255)
+  assert_eq(@der.parse(hex("04820100" + "00".repeat(256))).content.length(), 256)
+  assert_true(malformed(hex("048200ff" + "00".repeat(255))))
+  assert_true(malformed(hex("0484000000010000")))
+  // A length longer than the input, in the short and long forms.
+  assert_true(malformed(hex("047f00")))
+  assert_true(malformed(hex("048180" + "00".repeat(127))))
+  // The length bytes themselves are truncated.
+  assert_true(malformed(hex("0482")))
+  assert_true(malformed(hex("048201")))
+  // A tag of 0x1e is one byte; 0x1f starts a multi-byte tag.
+  assert_eq(@der.parse(hex("1e00")).tag, 0x1e)
+  assert_true(malformed(hex("3f0100")))
+}
+
+///|
+test "reader cursor operations" {
+  let reader = @der.Reader::new(hex("0201010400"))
+  assert_eq(reader.peek_tag(), Some(@der.INTEGER))
+  assert_true(reader.optional(@der.OCTET_STRING) is None)
+  assert_true(refused(() => reader.finish()))
+  assert_eq(reader.expect(@der.INTEGER).small_int(), 1)
+  assert_true(refused(() => ignore(reader.expect(@der.INTEGER))))
+  // A failed expect still reads the element.
+  assert_true(reader.is_empty())
+  assert_eq(reader.peek_tag(), None)
+  reader.finish()
+  assert_true(refused(() => ignore(reader.next())))
+  // The raw bytes include the header.
+  let element = @der.parse(hex("3003020105"))
+  assert_eq(element.raw.to_owned(), hex("3003020105"))
+  assert_eq(element.content.to_owned(), hex("020105"))
+  assert_eq(element.children().expect(@der.INTEGER).small_int(), 5)
+  // Only constructed elements have children.
+  assert_true(refused(() => ignore(@der.parse(hex("020105")).children())))
+  assert_eq(@der.parse_tag(hex("0500"), @der.NULL).content.length(), 0)
+  assert_true(refused(() => ignore(@der.parse_tag(hex("0500"), @der.INTEGER))))
+}
+
+///|
+test "small integers up to three bytes" {
+  assert_eq(@der.parse(hex("02037fffff")).small_int(), 0x7fffff)
+  assert_eq(@der.parse(hex("020400ffffff")).small_int(), 0xffffff)
+  assert_true(refused(() => ignore(@der.parse(hex("020401000000")).small_int())))
+  // Not an INTEGER.
+  assert_true(refused(() => ignore(@der.parse(hex("0a0101")).small_int())))
+}
+
+///|
+test "booleans must be one byte" {
+  assert_true(refused(() => ignore(@der.parse(hex("0100")).boolean())))
+  assert_true(refused(() => ignore(@der.parse(hex("0102ffff")).boolean())))
+  assert_true(refused(() => ignore(@der.parse(hex("0201ff")).boolean())))
+}
+
+///|
+test "bit strings at each limit" {
+  // bit_string_bytes needs no unused bits.
+  assert_eq(@der.parse(hex("030100")).bit_string_bytes().length(), 0)
+  assert_true(refused(() => ignore(@der.parse(hex("0300")).bit_string_bytes())))
+  assert_true(refused(() => ignore(@der.parse(hex("030201ff")).bit_string_bytes())))
+  assert_true(refused(() => ignore(@der.parse(hex("0401ff")).bit_string_bytes())))
+  // named_bits: no bits, 16 bits, and the limits of the unused count.
+  assert_eq(@der.parse(hex("030100")).named_bits(), 0)
+  assert_eq(@der.parse(hex("030300ffff")).named_bits(), 0xffff)
+  assert_eq(@der.parse(hex("03020080")).named_bits(), 1)
+  assert_true(refused(() => ignore(@der.parse(hex("03040000ffff")).named_bits())))
+  assert_true(refused(() => ignore(@der.parse(hex("03020880")).named_bits())))
+  assert_true(refused(() => ignore(@der.parse(hex("030101")).named_bits())))
+  assert_true(refused(() => ignore(@der.parse(hex("0300")).named_bits())))
+  // The unused bits must be zero.
+  assert_true(refused(() => ignore(@der.parse(hex("03020781")).named_bits())))
+  assert_true(refused(() => ignore(@der.parse(hex("03020107")).named_bits())))
+  assert_eq(@der.parse(hex("03020780")).named_bits(), 1)
+  assert_eq(@der.parse(hex("03020106")).named_bits(), 0x60)
+}
+
+///|
+test "object identifier arcs at each limit" {
+  // The first two arcs share one value: 0.39, 1.0, 1.39, 2.0 and 2.100.
+  assert_eq(@der.parse(hex("060127")).oid(), "0.39")
+  assert_eq(@der.parse(hex("060128")).oid(), "1.0")
+  assert_eq(@der.parse(hex("06014f")).oid(), "1.39")
+  assert_eq(@der.parse(hex("060150")).oid(), "2.0")
+  assert_eq(@der.parse(hex("06028134")).oid(), "2.100")
+  // Arcs of 127 and 128.
+  assert_eq(@der.parse(hex("06022a7f")).oid(), "1.2.127")
+  assert_eq(@der.parse(hex("06032a8100")).oid(), "1.2.128")
+  // The largest arc of 63 bits, and one 7-bit group more.
+  assert_eq(
+    @der.parse(hex("060a2a" + "ff".repeat(8) + "7f")).oid(),
+    "1.2.\{(1UL << 63) - 1UL}",
+  )
+  assert_true(
+    refused(() => ignore(@der.parse(hex("060b2a" + "ff".repeat(9) + "7f")).oid())),
+  )
+  // Not an OID.
+  assert_true(refused(() => ignore(@der.parse(hex("04012a")).oid())))
+}
+
+///|
+test "strings" {
+  assert_eq(@der.parse(hex("0c026162")).text(), "ab")
+  assert_eq(@der.parse(hex("13026162")).text(), "ab")
+  assert_eq(@der.parse(hex("16026162")).text(), "ab")
+  assert_eq(@der.parse(hex("0c03e282ac")).text(), "\u{20ac}")
+  assert_true(refused(() => ignore(@der.parse(hex("0c01ff")).text())))
+  assert_true(refused(() => ignore(@der.parse(hex("04026162")).text())))
+}
+
+///|
+test "time limits" {
+  // UTCTime years 50 and 49 are 1950 and 2049.
+  let utc = (text : String) => @der.parse(
+    @der.encode(@der.UTC_TIME, @encoding.utf8(text)),
+  )
+  assert_eq(utc("500101000000Z").time(), -631152000L)
+  assert_eq(utc("491231235959Z").time(), 2524607999L)
+  // Leap days.
+  assert_eq(utc("000229000000Z").time(), 951782400L)
+  assert_true(refused(() => ignore(utc("010229000000Z").time())))
+  assert_true(refused(() => ignore(utc("000230000000Z").time())))
+  // Day 0, month 0, minute 60 and second 60.
+  for bad in ["260100000000Z", "260001000000Z", "260101006000Z", "260101000060Z"] {
+    assert_true(refused(() => ignore(utc(bad).time())), msg=bad)
+  }
+  // A fraction or an offset is not DER.
+  let general = (text : String) => @der.parse(
+    @der.encode(@der.GENERALIZED_TIME, @encoding.utf8(text)),
+  )
+  assert_eq(general("21000301000000Z").time(), 4107542400L)
+  assert_true(refused(() => ignore(general("20261016064801.5Z").time())))
+  assert_true(refused(() => ignore(general("20261016064801+0000").time())))
+  assert_true(refused(() => ignore(general("2026101606480Z").time())))
+  // 2100 is not a leap year; 2000 is.
+  assert_true(refused(() => ignore(general("21000229000000Z").time())))
+  assert_eq(general("20000229000000Z").time(), 951782400L)
+  // Another tag.
+  assert_true(refused(() => ignore(@der.parse(hex("0400")).time())))
+}
+
+///|
+test "days_in_month and unix_seconds" {
+  assert_eq(@der.days_in_month(2024, 2), 29)
+  assert_eq(@der.days_in_month(2023, 2), 28)
+  assert_eq(@der.days_in_month(1900, 2), 28)
+  assert_eq(@der.days_in_month(2000, 2), 29)
+  assert_eq(@der.days_in_month(2026, 4), 30)
+  assert_eq(@der.days_in_month(2026, 12), 31)
+  assert_eq(@der.unix_seconds(1970, 1, 1, 0, 0, 0), 0L)
+  assert_eq(@der.unix_seconds(1969, 12, 31, 23, 59, 59), -1L)
+  assert_eq(@der.unix_seconds(2038, 1, 19, 3, 14, 8), 2147483648L)
+}

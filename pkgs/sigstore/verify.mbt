@@ -72,6 +72,9 @@ fn run(
     }
     raise invalid(TransparencyLog("the bundle has no transparency log entry"))
   }
+  if bundle.content is Dsse(envelope) && envelope.signatures.length() != 1 {
+    raise invalid(BundleShape("a DSSE envelope must have exactly one signature"))
+  }
   let leaf = read_leaf(raw_leaf)
   let mut first : (LogEntry, Instant)? = None
   for entry in bundle.entries {
@@ -275,8 +278,7 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
         raise invalid(TransparencyLogBody("the body does not have one signature"))
       }
       let logged = signatures[0]
-      guard envelope.signatures.length() == 1 &&
-        body_base64(json_field(logged, "signature"), "signature") ==
+      guard body_base64(json_field(logged, "signature"), "signature") ==
         envelope.signatures[0] else {
         raise invalid(TransparencyLogBody("the logged signature differs from the envelope"))
       }
@@ -477,9 +479,6 @@ fn check_content(
     Dsse(envelope) => {
       guard envelope.payload_type == in_toto_payload_type else {
         raise invalid(PayloadType(envelope.payload_type))
-      }
-      guard envelope.signatures.length() == 1 else {
-        raise invalid(BundleShape("a DSSE envelope must have exactly one signature"))
       }
       guard verify_with_leaf(
           leaf,

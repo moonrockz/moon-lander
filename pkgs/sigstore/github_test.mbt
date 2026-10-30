@@ -93,3 +93,9 @@ test "real GitHub attestations verify with the public-good root" {
     }
   }
 }
+
+///|
+/// The text of a real GitHub bundle of the test data.
+fn github_fixture(path : String) -> String {
+  fixture(@fixtures.github, path)
+}

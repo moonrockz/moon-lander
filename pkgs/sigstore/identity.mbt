@@ -251,7 +251,7 @@ pub fn WorkflowPath::parse(text : String) -> WorkflowPath raise IdentityError {
   guard file.has_suffix(".yml") || file.has_suffix(".yaml") else {
     raise fail("a workflow file ends with .yml or .yaml")
   }
-  guard !file.has_prefix(".yml") && !file.has_prefix(".yaml") else {
+  guard file != ".yml" && file != ".yaml" else {
     raise fail("the workflow file name is empty")
   }
   guard !file.contains("@") && !has_space_or_control(text) else {

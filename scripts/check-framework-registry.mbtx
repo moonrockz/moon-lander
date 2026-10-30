@@ -28,6 +28,7 @@ priv enum ReleaseLibrary {
   Lander
   Notebooks
   OpenRpc
+  Sigstore
 } derive(Eq, Hash)
 
 ///|
@@ -62,6 +63,7 @@ fn ReleaseLibrary::parse_name(
     "moonrockz/moon-lander" => Lander
     "moonrockz/notebooks" => Notebooks
     "moonrockz/openrpc" => OpenRpc
+    "moonrockz/sigstore" => Sigstore
     _ => raise InvalidReleaseInput(input~, rule=UnknownLibrary)
   }
 }
@@ -79,6 +81,7 @@ fn ReleaseLibrary::fixture_name(self : ReleaseLibrary) -> String {
     Lander => "lander"
     Notebooks => "notebooks"
     OpenRpc => "openrpc"
+    Sigstore => "sigstore"
   }
 }
 
@@ -90,7 +93,7 @@ fn ReleaseLibrary::folder(self : ReleaseLibrary) -> String {
 ///|
 fn ReleaseLibrary::name(self : ReleaseLibrary) -> String {
   match self {
-    Notebooks | OpenRpc => "moonrockz/" + self.fixture_name()
+    Notebooks | OpenRpc | Sigstore => "moonrockz/" + self.fixture_name()
     Lander => "moonrockz/moon-lander"
     _ => "moonrockz/moon-lander-" + self.fixture_name()
   }
@@ -270,11 +273,17 @@ async fn main {
             "vendor/LICENSE",
           ]
         LoggingHostingAsync => ["runtime/node.generated.js.mbt"]
+        Sigstore => sigstore_archive_files
         _ => []
       }
       for file in adapter_files {
         if !names.contains(file) {
           problems.push("missing " + file)
+        }
+      }
+      if library is Sigstore {
+        for file in sigstore_source_fixtures(names) {
+          problems.push("source fixture " + file)
         }
       }
       guard problems.is_empty() else { fail("\{name}: \{problems.join(", ")}") }
@@ -434,6 +443,15 @@ async fn main {
           fail("Registry graph has a local dependency: \{line}")
         }
       }
+      if candidate.library is Sigstore {
+        // The verifier is standalone: it resolves no other release library.
+        let leaks = sigstore_graph_leaks(graph)
+        guard leaks.is_empty() else {
+          fail(
+            "The sigstore consumer graph has \{leaks.join(", ")}; sigstore is standalone: \{graph}",
+          )
+        }
+      }
       if candidate.library is Actors {
         // A standalone actor consumer resolves no application module or parser.
         let leaks = actor_graph_leaks(graph)
@@ -555,7 +573,7 @@ async fn main {
         } : Json).stringify(),
     )
     @async.with_timeout(1_800_000, verify)
-    println("All ten public registry consumers passed from \{dir}")
+    println("All eleven public registry consumers passed from \{dir}")
     return
   }
   // The candidate archives are the only new registry entries. Their
@@ -704,6 +722,7 @@ fn actor_graph_leaks(graph : String) -> Array[String] {
     Lander,
     Notebooks,
     OpenRpc,
+    Sigstore,
   ].map(library => library.name())
   forbidden.push_iter(
     ["moonbit-community/toml", "moonbit-community/yaml", "moonrockz/ion"].iter(),
@@ -779,6 +798,81 @@ test "archive audit rejects missing licenses and nested tooling" {
 }
 
 ///|
+/// The files that the sigstore archive must hold: the readme, the pinned
+/// public-good root, the generated test fixtures that its root test imports
+/// (moon resolves test imports when it builds the archived module), and the
+/// license notices of the vendored data in those fixtures.
+let sigstore_archive_files : Array[String] = [
+  "README.mbt.md", "public_good.generated.mbt", "internal/fixtures/moon.pkg", "testdata/README.md",
+  "testdata/conformance/LICENSE", "testdata/conformance/NOTICE", "testdata/wycheproof/LICENSE",
+]
+
+///|
+/// The entries of `names` under `testdata/` other than the notices in
+/// `sigstore_archive_files`. `pkgs/sigstore/.moonignore` keeps the source
+/// fixtures out of the archive, because nothing builds them.
+fn sigstore_source_fixtures(names : Array[String]) -> Array[String] {
+  names.filter(name => {
+    name.has_prefix("testdata/") &&
+    !name.has_suffix("/") &&
+    !sigstore_archive_files.contains(name)
+  })
+}
+
+///|
+/// The release libraries in the `moon tree` output `graph` of a sigstore
+/// consumer. The verifier imports no other release library.
+fn sigstore_graph_leaks(graph : String) -> Array[String] {
+  [
+    Core,
+    Logging,
+    Config,
+    Mediator,
+    LoggingHostingAsync,
+    Actors,
+    Hosting,
+    Lander,
+    Notebooks,
+    OpenRpc,
+  ]
+  .map(library => library.name())
+  .filter(name => graph.contains(name + "@") || graph.contains(name + " ->"))
+}
+
+///|
+test "the sigstore archive keeps notices and drops source fixtures" {
+  let names = [
+    "moon.mod", "moon.pkg", "LICENSE", "verify.mbt", "internal/fixtures/github.generated.mbt",
+    ..sigstore_archive_files,
+  ]
+  assert_eq(sigstore_source_fixtures(names), [])
+  assert_eq(
+    sigstore_source_fixtures(
+      [
+        ..names, "testdata/", "testdata/SHA256SUMS", "testdata/github/cli-2.50.0.sigstore.json",
+      ],
+    ),
+    ["testdata/SHA256SUMS", "testdata/github/cli-2.50.0.sigstore.json"],
+  )
+}
+
+///|
+test "a sigstore graph resolves no other release library" {
+  let standalone =
+    #|registry-consumer@0.0.1 (local /tmp/x) [workspace member]:
+    #|└─ moonrockz/sigstore -> moonrockz/sigstore@0.8.0
+    #|   └─ moonbitstack/mooncrypt -> moonbitstack/mooncrypt@0.4.4
+  assert_eq(sigstore_graph_leaks(standalone), [])
+  assert_eq(
+    sigstore_graph_leaks(
+      standalone +
+      "\n   └─ moonrockz/moon-lander-core -> moonrockz/moon-lander-core@0.8.0\n",
+    ),
+    ["moonrockz/moon-lander-core"],
+  )
+}
+
+///|
 fn input_failure(
   action : () -> Unit raise ReleaseInputError,
 ) -> ReleaseInputRule? {
@@ -804,6 +898,7 @@ test "candidate identity parses one fixed library with its matching folder" {
       Lander,
       Notebooks,
       OpenRpc,
+      Sigstore,
     ] {
     assert_true(
       ReleaseLibrary::parse("\{library.folder()} \{library.name()}") == library,

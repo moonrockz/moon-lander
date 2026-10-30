@@ -129,8 +129,10 @@ targets. Time for each verify on an Apple Silicon Mac (<code>moon bench --releas
 <tbody><tr><td>0.64 ms</td><td>0.86 ms</td><td>1.59 ms</td><td>2.41 ms</td><td>0.03 ms</td></tr></tbody>
 </table>
 <p>A bundle needs six signature checks (DSSE, leaf by a P-384 intermediate, intermediate by
-root, SCT, SET, checkpoint), so one bundle takes a few milliseconds. On js, core
-<code>BigInt</code> is the JavaScript <code>BigInt</code>.</p>
+root, SCT, SET, checkpoint). On js, core <code>BigInt</code> is the JavaScript
+<code>BigInt</code>. Measured after implementation with <code>bench:sigstore</code> (mooncrypt,
+release mode, Apple Silicon): one full verification of a real GitHub bundle takes about
+16 ms on native and 41 ms on wasm-gc. That is acceptable at install time.</p>
 
 <h3 id="research-vectors">Test vectors</h3>
 <table>
@@ -298,6 +300,9 @@ from core <code>@json</code> values with hand-written decoders that follow proto
 sigstore-go reads it (see the parse step above). Generated protobuf code needs
 <code>protoc</code> and does not accept URL-safe base64. Build the SET payload as text from its
 four values instead of a general canonical JSON library.</p>
+<p>A trusted root key that is not an ECDSA SubjectPublicKeyInfo, such as the PKCS#1 RSA CT log
+key (<code>PKCS1_RSA_PKCS1V5</code>) in conformance roots or the Ed25519 Rekor v2 key, is kept
+and marked not usable, as sigstore-go keeps it. A bad ECDSA key is a parse error.</p>
 
 <h3 id="pol-1">POL-1. Policy model</h3>
 <p><span class="label call">Call.</span> A <code>Policy</code> holds an <code>Issuer</code>
@@ -329,6 +334,13 @@ fixture. The conformance and Wycheproof files are Apache-2.0; their license and 
 commit go next to them in <code>testdata/</code>. <code>mise run check:sigstore</code> fails when
 a target runs zero sigstore tests, as <code>check:actors</code> does. A full run of the Python
 conformance harness through a CLI is not part of this change.</p>
+<p>Implementation result: all 70 conformance cases are vendored, and a test pins the outcome of
+each one. The 6 Rekor v1 pass cases pass; each Rekor v1 <code>_fail</code> case fails with its
+expected reason; the Rekor v2, managed-key and timestamp cases give a not-supported reason or
+fail to parse. The 1,530 Wycheproof ECDSA cases give their expected result on all four targets.
+The published archive leaves out the <code>testdata/</code> sources through
+<code>pkgs/sigstore/.moonignore</code>, but keeps the generated fixtures and their license
+notices, because moon resolves test imports when it builds an archived module.</p>
 
 <h2 id="risks">Risks and trade-offs</h2>
 <table>
@@ -339,7 +351,7 @@ conformance harness through a CLI is not part of this change.</p>
 <tr><td>The public-good root rotates keys</td><td>The caller can pass a newer root; a TUF client follows; the pinned root has a named source and digest</td></tr>
 <tr><td>GitHub moves to Rekor v2 or adds a TSA timestamp</td><td>Typed <code>Unsupported</code> reason, so the CLI can tell users to update; the conformance <code>rekor2-*</code> cases are ready for that change</td></tr>
 <tr><td>Strict unknown-field rejection refuses a newer bundle that adds a field</td><td>Same rule as sigstore-go, so gh refuses it too; a media type check comes first</td></tr>
-<tr><td>Pure crypto is 20 times slower than OpenSSL</td><td>A few milliseconds for each bundle at install time; measured with a manual benchmark, never in <code>check</code> or CI</td></tr>
+<tr><td>Pure crypto is 20 times slower than OpenSSL</td><td>About 16 ms (native) to 41 ms (wasm-gc) for each bundle at install time; measured with the manual <code>bench:sigstore</code>, never in <code>check</code> or CI</td></tr>
 <tr><td>Large generated test fixtures slow the build</td><td>Test-only files; vendor only the Rekor v1 subset and the two Wycheproof ECDSA sets</td></tr>
 </tbody>
 </table>

@@ -117,6 +117,8 @@ fn media_version(media_type : String) -> BundleVersion? {
     "application/vnd.dev.sigstore.bundle+json;version=0.1" => Some(V0_1)
     "application/vnd.dev.sigstore.bundle+json;version=0.2" => Some(V0_2)
     "application/vnd.dev.sigstore.bundle+json;version=0.3" => Some(V0_3)
+    "application/vnd.dev.sigstore.bundle.v0.1+json" => Some(V0_1)
+    "application/vnd.dev.sigstore.bundle.v0.2+json" => Some(V0_2)
     "application/vnd.dev.sigstore.bundle.v0.3+json" => Some(V0_3)
     _ => None
   }

@@ -6,3 +6,8 @@ import {
   "moonrockz/sigstore/internal/encoding",
   "moonrockz/sigstore/internal/signature",
 }
+
+import {
+  "moonbitlang/core/json",
+  "moonrockz/sigstore/internal/fixtures",
+} for "test"

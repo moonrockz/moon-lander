@@ -5,7 +5,7 @@
 #           or a vX.Y.Z tag, when vX.Y.Z has no GitHub release yet and
 #           CHANGELOG.md has its section.
 # validate  runs the full checks and the shared-version check.
-# publish   packages and audits all ten libraries, publishes in dependency
+# publish   packages and audits all eleven libraries, publishes in dependency
 #           order, then verifies each public archive against its approved
 #           checksum and runs the public format override qualification.
 # site      builds the docs site of the moon.mod minor line through

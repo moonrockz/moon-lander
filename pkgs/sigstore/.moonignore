@@ -1,0 +1,12 @@
+# Package only what a consumer builds. The source fixtures in testdata/ are not
+# built, so they stay out of the published archive. The generated constants in
+# internal/fixtures/ ship, because the root test imports them and moon resolves
+# test imports when it builds the archived module. So the source list and the
+# license notices of the vendored data ship too. scripts/check-framework-registry.mbtx
+# checks the archive. (moon.mod `include` and `exclude` are deprecated.)
+/testdata/**
+!/testdata/**/
+!/testdata/README.md
+!/testdata/conformance/LICENSE
+!/testdata/conformance/NOTICE
+!/testdata/wycheproof/LICENSE

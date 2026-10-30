@@ -2,6 +2,7 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/x@0.5.6/crypto",
@@ -255,4 +256,55 @@ test "manifest lines give a path and a digest" {
     _ => true
   }
   assert_true(failed)
+}
+
+///|
+async test "asset freshness rejects missing, changed and altered input" {
+  let script = @fs.realpath("generate-sigstore-assets.mbtx")
+  let temporary = @fs.tmpdir(prefix="sigstore-asset-check")
+  defer @fs.rmdir(temporary, recursive=true)
+  let source = "../\{testdata}"
+  let copy = "\{temporary}/\{testdata}"
+  let manifest = @fs.read_file("\{source}/SHA256SUMS").text()
+  @fs.mkdir("\{temporary}/pkgs/sigstore/internal/fixtures", recursive=true)
+  @fs.mkdir(copy, recursive=true)
+  @fs.write_file("\{copy}/SHA256SUMS", manifest)
+  for entry in manifest_entries(manifest) {
+    let (path, _) = entry
+    if path.rev_find("/") is Some(at) && !@fs.exists("\{copy}/\{path[:at]}") {
+      @fs.mkdir("\{copy}/\{path[:at]}", recursive=true)
+    }
+    @fs.write_file("\{copy}/\{path}", @fs.read_file("\{source}/\{path}"))
+  }
+  let run = async fn(args : Array[String]) -> (Int32, String) {
+    let (code, out, err) = @process.collect_output(
+      "moonx",
+      [script, ..args],
+      cwd=temporary,
+    )
+    (code, out.text() + err.text())
+  }
+  let (missing, output) = run(["--check"])
+  assert_true(missing != 0, msg=output)
+  let (built, output) = run([])
+  assert_eq(built, 0, msg=output)
+  let (fresh, output) = run(["--check"])
+  assert_eq(fresh, 0, msg=output)
+  for file in [public_good_output, fixture_groups[0].1] {
+    let output_path = "\{temporary}/\{file}"
+    let original = @fs.read_file(output_path).text()
+    @fs.write_file(output_path, original + "\n")
+    let (changed, output) = run(["--check"])
+    assert_true(changed != 0, msg=file)
+    assert_true(output.contains("is stale"), msg=output)
+    @fs.write_file(output_path, original)
+  }
+  let fixture = "\{copy}/github/cases.json"
+  @fs.write_file(fixture, @fs.read_file(fixture).text() + " ")
+  let (tampered, output) = run(["--check"])
+  assert_true(tampered != 0, msg=output)
+  assert_true(
+    output.contains("Digest mismatch: testdata/github/cases.json"),
+    msg=output,
+  )
 }

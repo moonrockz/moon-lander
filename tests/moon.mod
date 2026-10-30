@@ -17,6 +17,7 @@ import {
   "moonrockz/moon-lander-logging-hosting-async@0.8.0",
   "moonrockz/moon-lander-actors@0.8.0",
   "moonrockz/openrpc@0.8.0",
+  "moonrockz/sigstore@0.8.0",
   "moonrockz/ion@0.6.0",
   "moonrockz/moonspec@0.11.0",
   "moonrockz/expect@0.6.1",

@@ -15,3 +15,7 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonrockz/sigstore/internal/fixtures",
 } for "test"
+
+import {
+  "moonrockz/sigstore/internal/fixtures",
+} for "wbtest"

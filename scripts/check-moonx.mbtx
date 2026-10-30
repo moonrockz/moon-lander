@@ -1,0 +1,1086 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+}
+----
+
+///|
+/// Candidate qualification uses a copied optional module in an isolated
+/// workspace. The genuine Node host is an independent public canonical
+/// consumer. Neither executable imports the other's runtime.
+let fixtures = "tests/assets/moonx-launcher"
+
+///|
+priv enum StockVersion {
+  Stock16
+  Stock17
+}
+
+///|
+fn StockVersion::text(self : StockVersion) -> String {
+  match self {
+    Stock16 => "0.10.16+b1a0e846e"
+    Stock17 => "0.10.17+d971670cd"
+  }
+}
+
+///|
+fn StockVersion::commit(self : StockVersion) -> String {
+  match self {
+    Stock16 => "2284bd2"
+    Stock17 => "3778465"
+  }
+}
+
+///|
+fn StockVersion::parse_description(
+  input : String,
+) -> StockVersion raise ConfigurationError {
+  let lines = input.split("\n").to_array()
+  let compilers = lines.filter(line => line.has_prefix("moonc v"))
+  let moons = lines.filter(line => line.has_prefix("moon "))
+  let runners = lines.filter(line => line.has_prefix("moonrun "))
+  guard compilers.length() == 1 && moons.length() == 1 && runners.length() == 1 else {
+    raise InvalidConfiguration(input~, rule=UnsupportedStock)
+  }
+  let version = if compilers[0].has_prefix("moonc v" + Stock16.text() + " ") {
+    Stock16
+  } else if compilers[0].has_prefix("moonc v" + Stock17.text() + " ") {
+    Stock17
+  } else {
+    raise InvalidConfiguration(input~, rule=UnsupportedStock)
+  }
+  guard moons[0].contains("(" + version.commit() + " ") &&
+    runners[0].contains("(" + version.commit() + " ") else {
+    raise InvalidConfiguration(input~, rule=UnsupportedStock)
+  }
+  version
+}
+
+///|
+priv enum ConfigurationRule {
+  MissingRoot
+  ContainsNul
+  UnsupportedStock
+  SourceOverride
+}
+
+///|
+fn ConfigurationRule::description(self : ConfigurationRule) -> String {
+  match self {
+    MissingRoot => "missing stock toolchain root"
+    ContainsNul => "toolchain root contains NUL"
+    UnsupportedStock => "unsupported stock compiler"
+    SourceOverride => "source or toolchain override is forbidden"
+  }
+}
+
+///|
+suberror ConfigurationError {
+  InvalidConfiguration(input~ : String, rule~ : ConfigurationRule)
+}
+
+///|
+priv struct StockToolchain {
+  root : String
+  version : StockVersion
+  environment : Map[String, String]
+  description : String
+}
+
+///|
+priv enum StockProgram {
+  Moon
+  Moonrun
+}
+
+///|
+fn stock_program(root : String, program : StockProgram) -> String {
+  let name = match program {
+    Moon => "moon"
+    Moonrun => "moonrun"
+  }
+  root +
+  "/bin/" +
+  name +
+  (if @env.get_env_var("OS") == Some("Windows_NT") { ".exe" } else { "" })
+}
+
+///|
+async fn StockToolchain::parse(input : String) -> StockToolchain {
+  guard !input.is_empty() else {
+    raise InvalidConfiguration(input~, rule=MissingRoot)
+  }
+  guard !input.contains("\u{0}") else {
+    raise InvalidConfiguration(input~, rule=ContainsNul)
+  }
+  for
+    name in [
+      "MOONC_OVERRIDE", "MOONRUN_OVERRIDE", "MOON_OVERRIDE", "MOON_CORE_OVERRIDE",
+    ] {
+    if @env.get_env_var(name) is Some(value) {
+      raise InvalidConfiguration(input=name + "=" + value, rule=SourceOverride)
+    }
+  }
+  let root = @fs.realpath(input)
+  let separator = if @env.get_env_var("OS") == Some("Windows_NT") {
+    ";"
+  } else {
+    ":"
+  }
+  let environment = {
+    "MOON_HOME": root,
+    "MOON_TOOLCHAIN_ROOT": root,
+    "PATH": root + "/bin" + separator + @env.get_env_var("PATH").unwrap_or(""),
+  }
+  let (code, out, err) = @process.collect_output(
+    stock_program(root, Moon),
+    ["version", "--all"],
+    extra_env=environment,
+  )
+  assert_eq(code, 0, msg=err.text())
+  let version = StockVersion::parse_description(out.text())
+  { root, version, environment, description: out.text(), }
+}
+
+///|
+priv enum StopSignal {
+  Interrupt
+  Terminate
+}
+
+///|
+fn StopSignal::argument(self : StopSignal) -> String {
+  match self {
+    Interrupt => "INT"
+    Terminate => "TERM"
+  }
+}
+
+///|
+fn StopSignal::name(self : StopSignal) -> String {
+  match self {
+    Interrupt => "Interrupt"
+    Terminate => "Terminate"
+  }
+}
+
+///|
+fn StopSignal::number(self : StopSignal) -> Int32 {
+  match self {
+    Interrupt => 2
+    Terminate => 15
+  }
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true, allow_exist=true)
+  for name in @fs.readdir(source) {
+    if ["_build", ".mooncakes", ".git"].contains(name) {
+      continue
+    }
+    let from = source + "/" + name
+    let to = destination + "/" + name
+    if @fs.kind(from, follow_symlink=false) == Directory {
+      copy_tree(from, to)
+    } else {
+      @fs.write_file(to, @fs.read_file(from))
+    }
+  }
+}
+
+///|
+fn workspace_version(text : String) -> String {
+  for line in text.split("\n") {
+    if line.strip_prefix("version = \"") is Some(rest) &&
+      rest.find("\"") is Some(end) {
+      return rest[:end].to_owned()
+    }
+  }
+  abort("Root moon.mod has no shared version")
+}
+
+///|
+async fn build(
+  tools : StockToolchain,
+  cwd : String,
+  target : String,
+  build_dir : String,
+  package_path~ : String = ".",
+) -> String {
+  let (code, out, err) = @process.collect_output(
+    stock_program(tools.root, Moon),
+    [
+      "run", "--build-only", "--deny-warn", "--target", target, "--target-dir", build_dir,
+      package_path,
+    ],
+    cwd~,
+    extra_env=tools.environment,
+  )
+  assert_eq(code, 0, msg=err.text())
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail("Missing compiler artifact: " + out.text())
+  }
+  path
+}
+
+///|
+async fn module_roots(path : String) -> Array[String] {
+  guard @json.parse(@fs.read_file(path).text())
+    is { "packages": Array(packages), .. } else {
+    fail("Missing compiler package graph")
+  }
+  let roots : Array[String] = []
+  for item in packages {
+    guard item is { "root": String(root), .. } else {
+      fail("Missing package root")
+    }
+    if !roots.contains(root) {
+      roots.push(root)
+    }
+  }
+  roots.sort()
+  roots
+}
+
+///|
+async fn prepare(
+  tools : StockToolchain,
+  stage : String,
+) -> (String, String, String) {
+  let version = workspace_version(@fs.read_file("moon.mod").text())
+  copy_tree("pkgs/moonx", stage + "/library")
+  @fs.mkdir(stage + "/parent")
+  @fs.write_file(
+    stage + "/moon.work",
+    "members = [\"./library\", \"./parent\"]\n",
+  )
+  @fs.write_file(
+    stage + "/parent/moon.mod",
+    "name = \"moonx-acceptance-parent\"\nversion = \"0.0.1\"\nimport { \"moonrockz/moon-lander-moonx@" +
+    version +
+    "\" }\n",
+  )
+  for
+    (source, target) in [
+      ("parent.mbt.txt", "main.mbt"),
+      ("payload.mbt.txt", "payload.mbt"),
+      ("parent.moon.pkg.txt", "moon.pkg"),
+    ] {
+    @fs.write_file(
+      stage + "/parent/" + target,
+      @fs.read_file(fixtures + "/" + source),
+    )
+  }
+  let parent = build(tools, stage + "/parent", "wasm", stage + "/parent-build")
+  let roots = module_roots(
+    stage + "/parent-build/wasm/debug/build/all_pkgs.json",
+  )
+  assert_true(roots.contains("moonrockz/moon-lander-moonx"))
+  assert_false(roots.contains("moonbitlang/async"))
+  let launch = build(
+    tools,
+    stage + "/library",
+    "wasm",
+    stage + "/launch-build",
+    package_path="launch",
+  )
+  @fs.mkdir(stage + "/host")
+  // The existing released host proves API and runtime identity compatibility.
+  @fs.write_file(stage + "/host/moon.work", "members = [\".\"]\n")
+  @fs.write_file(
+    stage + "/host/moon.mod",
+    "name = \"moonx-public-host\"\nversion = \"0.0.1\"\nimport { \"moonrockz/moon-lander-core@0.8.0\", \"moonrockz/moon-lander-hosting@0.8.0\", \"moonbitlang/async@0.22.5\" }\n",
+  )
+  for
+    (source, target) in [
+      ("host.mbt.txt", "main.mbt"),
+      ("host.moon.pkg.txt", "moon.pkg"),
+      ("owner.cjs", "owner.cjs"),
+      ("worker.cjs", "worker.cjs"),
+    ] {
+    @fs.write_file(
+      stage + "/host/" + target,
+      @fs.read_file(fixtures + "/" + source),
+    )
+  }
+  let host = build(tools, stage + "/host", "js", stage + "/host-build")
+  let roots = module_roots(stage + "/host-build/js/debug/build/all_pkgs.json")
+  assert_true(roots.contains("moonbitlang/async"))
+  assert_false(roots.contains("moonrockz/moon-lander-moonx"))
+  (parent, host, launch)
+}
+
+///|
+async fn host_signal(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+  host : String,
+  signal : StopSignal,
+) -> Json {
+  let environment = tools.environment.copy()
+  environment.set("MOONX_HOST_PROGRAM", host)
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "node", stage + "/host/owner.cjs"],
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=environment,
+        cancel_handler=@process.graceful_cancel(timeout=1000),
+      )
+      let ready = reader.read_until("\n").unwrap()
+      assert_true(ready.has_prefix("READY "), msg=ready)
+      assert_eq(reader.read_until("\n"), Some("HOST_READY"))
+      assert_eq(
+        @process.run("kill", ["-" + signal.argument(), child.pid.to_string()]),
+        0,
+      )
+      let out = group.spawn(() => reader.read_all().text())
+      let err = group.spawn(() => errors.read_all().text())
+      let raw = child.wait()
+      let output = out.wait()
+      let diagnostics = err.wait()
+      assert_eq(raw, -signal.number())
+      let selected = (128 + signal.number()).to_string()
+      for
+        marker in [
+          "WORKER_STOPPED",
+          "SERVICE_STOPPED",
+          "HOST_FINALIZER=" + selected,
+          "HOST_REASON=" + signal.name(),
+          "HOST_COMPLETION=" + selected,
+        ] {
+        assert_eq(output.split(marker).to_array().length(), 2, msg=output)
+      }
+      assert_true(
+        diagnostics.contains("PARENT_SELECTED=" + selected),
+        msg=diagnostics,
+      )
+      assert_true(
+        diagnostics.contains(
+          "PARENT_STARTED=STOPPED:" + selected + ":FORCED=false",
+        ),
+        msg=diagnostics,
+      )
+      assert_true(
+        diagnostics.contains("PARENT_SIGNAL=" + signal.name()),
+        msg=diagnostics,
+      )
+      assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      let (alive, _, _) = @process.collect_output("kill", [
+        "-0",
+        ready[6:].to_owned(),
+      ])
+      assert_true(alive != 0, msg="Node child was not reaped")
+      {
+        "stock": tools.version.text(),
+        "signal": signal.name(),
+        "rawParentStatus": raw,
+        "compiler": tools.description,
+        "stdout": output,
+        "stderr": diagnostics,
+        "stdinHeldOpenThroughExit": true,
+        "childReaped": true,
+        "nonYieldingWorkerStopped": true,
+      }
+    })
+  })
+}
+
+///|
+priv enum PayloadScenario {
+  Finite
+  MissingNode
+  WriteFailure
+  Symlink
+  FinalizerAfterSuccess
+  FinalizerAfterFailure
+  CleanupAfterSuccess
+  CleanupAfterFailure
+}
+
+///|
+fn PayloadScenario::arguments(
+  self : PayloadScenario,
+  stage : String,
+) -> Array[String] {
+  match self {
+    Finite => ["", "é🙂", "--", "a b", "a\nb"]
+    MissingNode => ["--missing-node", stage + "/intentionally-missing-node"]
+    WriteFailure => ["--write-failure"]
+    Symlink => ["--symlink", stage + "/external"]
+    FinalizerAfterSuccess => ["--success", "--finalizer-fails"]
+    FinalizerAfterFailure => ["--finalizer-fails"]
+    CleanupAfterSuccess => ["--cleanup-failure", "--success"]
+    CleanupAfterFailure => ["--cleanup-failure"]
+  }
+}
+
+///|
+fn PayloadScenario::selected(self : PayloadScenario) -> Int32 {
+  match self {
+    MissingNode | WriteFailure | FinalizerAfterSuccess | CleanupAfterSuccess =>
+      1
+    _ => 23
+  }
+}
+
+///|
+async fn finite_payload(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+  scenario : PayloadScenario,
+) -> Json {
+  let unicode_temporary = stage + "/é🙂 host temporary"
+  let unicode_cwd = stage + "/é🙂 caller cwd"
+  @fs.mkdir(unicode_temporary, allow_exist=true)
+  @fs.mkdir(unicode_cwd, allow_exist=true)
+  @fs.mkdir(stage + "/external", allow_exist=true)
+  @fs.write_file(stage + "/external/sentinel", b"external\x00\xff")
+  let environment = tools.environment.copy()
+  for variable in ["TMPDIR", "TMP", "TEMP"] {
+    environment.set(variable, unicode_temporary)
+  }
+  let arguments = scenario.arguments(stage)
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "--payload"] + arguments,
+        stdin~,
+        stdout~,
+        stderr~,
+        cwd=unicode_cwd,
+        extra_env=environment,
+      )
+      let out = group.spawn(() => reader.read_all().text())
+      let err = group.spawn(() => errors.read_all().text())
+      let status = child.wait()
+      let output = out.wait()
+      let diagnostics = err.wait()
+      assert_eq(status, scenario.selected(), msg=output + diagnostics)
+      assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      assert_true(
+        diagnostics.contains("PARENT_SELECTED=" + status.to_string()),
+        msg=diagnostics,
+      )
+      match scenario {
+        MissingNode | WriteFailure => {
+          assert_eq(output, "")
+          assert_true(
+            diagnostics.contains(
+              "PARENT_NOT_STARTED=" +
+              (if scenario is MissingNode {
+                "NodeMissing"
+              } else {
+                "Materialization"
+              }),
+            ),
+            msg=diagnostics,
+          )
+        }
+        _ => {
+          assert_true(output.contains("VALUE=42\n"), msg=output)
+          let mut reported_arguments : Json? = None
+          let mut reported_cwd = ""
+          let mut reported_payload = ""
+          for line in output.split("\n") {
+            if line.strip_prefix("ARGV=") is Some(text) {
+              reported_arguments = Some(@json.parse(text))
+            }
+            if line.strip_prefix("CWD=") is Some(text) {
+              reported_cwd = text.to_owned()
+            }
+            if line.strip_prefix("PAYLOAD=") is Some(text) {
+              reported_payload = text.to_owned()
+            }
+          }
+          assert_eq(reported_arguments, Some(Json(arguments)))
+          assert_eq(
+            reported_cwd.replace_all(old="\\", new="/"),
+            unicode_cwd.replace_all(old="\\", new="/"),
+          )
+          assert_true(
+            reported_payload
+            .replace_all(old="\\", new="/")
+            .has_prefix(
+              unicode_temporary.replace_all(old="\\", new="/") +
+              "/moon-lander-moonx.",
+            ),
+            msg=output,
+          )
+          let child_status = match scenario {
+            FinalizerAfterSuccess | CleanupAfterSuccess => "0"
+            _ => "23"
+          }
+          assert_true(
+            diagnostics.contains("PARENT_STARTED=EXITED:" + child_status),
+            msg=diagnostics,
+          )
+        }
+      }
+      if scenario is (CleanupAfterSuccess | CleanupAfterFailure) {
+        assert_true(
+          diagnostics.contains("PARENT_FINALIZATION_ERROR=PayloadCleanup"),
+          msg=diagnostics,
+        )
+        let remaining = @fs.readdir(unicode_temporary)
+        assert_eq(remaining.length(), 1)
+        // Repair only the test's deliberate permission fault after observing the
+        // real public cleanup failure, then remove its known private fixture.
+        @fs.chmod(unicode_temporary + "/" + remaining[0] + "/locked", 0o700)
+        @fs.rmdir(unicode_temporary + "/" + remaining[0], recursive=true)
+      }
+      if scenario is (FinalizerAfterSuccess | FinalizerAfterFailure) {
+        assert_true(
+          diagnostics.contains("PARENT_FINALIZATION_ERROR=Finalizer"),
+          msg=diagnostics,
+        )
+      }
+      assert_eq(@fs.readdir(unicode_temporary), [])
+      assert_eq(
+        @fs.read_file(stage + "/external/sentinel").binary(),
+        b"external\x00\xff",
+      )
+      {
+        "stock": tools.version.text(),
+        "scenario": scenario.name(),
+        "selected": status,
+        "stdinHeldOpenThroughExit": true,
+        "ownedPayloadRemoved": true,
+        "externalSentinelPreserved": true,
+        "stdout": output,
+        "stderr": diagnostics,
+      }
+    })
+  })
+}
+
+///|
+fn PayloadScenario::name(self : PayloadScenario) -> String {
+  match self {
+    Finite => "finite"
+    MissingNode => "missing-node"
+    WriteFailure => "write-failure"
+    Symlink => "symlink"
+    FinalizerAfterSuccess => "finalizer-after-success"
+    FinalizerAfterFailure => "finalizer-after-failure"
+    CleanupAfterSuccess => "cleanup-after-success"
+    CleanupAfterFailure => "cleanup-after-failure"
+  }
+}
+
+///|
+priv enum WindowsConsoleCase {
+  BaselineInterrupt
+  BaselineBreak
+  LauncherInterrupt
+  LauncherBreak
+}
+
+///|
+fn WindowsConsoleCase::name(self : WindowsConsoleCase) -> String {
+  match self {
+    BaselineInterrupt => "baseline-ctrl-c"
+    BaselineBreak => "baseline-ctrl-break"
+    LauncherInterrupt => "launcher-ctrl-c"
+    LauncherBreak => "launcher-ctrl-break"
+  }
+}
+
+///|
+async fn windows_controller(tools : StockToolchain, stage : String) -> String {
+  let (code, out, err) = @process.collect_output(
+    stock_program(tools.root, Moon),
+    [
+      "run",
+      "--build-only",
+      "--deny-warn",
+      "--target",
+      "native",
+      "--target-dir",
+      stage + "/console-build",
+      "tests/moonx-console-controller",
+    ],
+    extra_env=tools.environment,
+  )
+  assert_eq(code, 0, msg=err.text())
+  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    fail(out.text())
+  }
+  path
+}
+
+///|
+async fn windows_console(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+  host : String,
+  controller : String,
+  scenario : WindowsConsoleCase,
+) -> Json {
+  let (code, node, err) = @process.collect_output("mise", ["which", "node"])
+  assert_eq(code, 0, msg=err.text())
+  let node = node.text().trim().to_owned()
+  let baseline = scenario is (BaselineInterrupt | BaselineBreak)
+  let interrupt = scenario is (BaselineInterrupt | LauncherInterrupt)
+  let environment = tools.environment.copy()
+  environment.set("MOONX_HOST_PROGRAM", host)
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        controller,
+        [
+          if baseline {
+            "baseline"
+          } else {
+            "launcher"
+          },
+          stock_program(tools.root, Moonrun),
+          parent,
+          node,
+          stage + "/host/owner.cjs",
+        ],
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=environment,
+        cancel_handler=@process.hard_cancel(),
+      )
+      let diagnostics_task = group.spawn(() => errors.read_all().text())
+      let address = reader.read_until("\n").unwrap()
+      guard address.strip_prefix("CONTROL_ADDR=") is Some(address) else {
+        fail("Expected controller address: " + address)
+      }
+      let console_pid = reader.read_until("\n").unwrap()
+      assert_true(console_pid.has_prefix("CONSOLE_PID="))
+      let ready = reader.read_until("\n").unwrap()
+      guard ready.strip_prefix("READY ") is Some(node_pid) else {
+        fail("Expected Node readiness: " + ready)
+      }
+      assert_eq(reader.read_until("\n"), Some("HOST_READY"))
+      let control = @socket.Tcp::connect(
+        @socket.Addr::parse(address.to_owned()),
+      )
+      defer control.close()
+      control.write(if interrupt { "CTRL_C\n" } else { "CTRL_BREAK\n" })
+      assert_eq(control.read_until("\n"), Some("CTRL_SENT"))
+      let lines : Array[String] = []
+      let mut raw_status : Int32? = None
+      while reader.read_until("\n") is Some(line) {
+        if line.strip_prefix("CONSOLE_STATUS=") is Some(value) {
+          raw_status = Some(@string.parse_int(value))
+          break
+        }
+        lines.push(line)
+      }
+      assert_true(raw_status is Some(_), msg=lines.join("\n"))
+      control.write("CHECK_NODE=" + node_pid.to_owned() + "\n")
+      assert_eq(control.read_until("\n"), Some("NODE_RUNNING=0"))
+      assert_eq(control.read_until("\n"), Some("DONE"))
+      assert_eq(child.wait(), 0)
+      let rest = reader.read_all().text()
+      let diagnostics = diagnostics_task.wait()
+      let output = lines.join("\n") + "\n" + rest
+      let expected_reason = if interrupt { "Interrupt" } else { "Quit" }
+      let expected_completion = if interrupt { "130" } else { "131" }
+      let evidence : Json = {
+        "stock": tools.version.text(),
+        "scenario": scenario.name(),
+        "consoleParent": console_pid,
+        "nodePid": node_pid.to_owned(),
+        "rawConsoleStatus": raw_status.unwrap(),
+        "stdinHeldOpenThroughExit": true,
+        "childReaped": true,
+        "stdout": output,
+        "stderr": diagnostics,
+      }
+      // Emit actual behavior before any contract assertion, so a stock host gap
+      // remains reviewable rather than disappearing behind a failed test.
+      println(evidence.stringify(indent=2))
+      for
+        marker in [
+          "WORKER_STOPPED",
+          "SERVICE_STOPPED",
+          "HOST_FINALIZER=" + expected_completion,
+          "HOST_REASON=" + expected_reason,
+          "HOST_COMPLETION=" + expected_completion,
+        ] {
+        assert_eq(
+          output.split(marker).to_array().length(),
+          2,
+          msg=evidence.stringify(),
+        )
+      }
+      if !baseline {
+        assert_true(
+          diagnostics.contains("PARENT_SELECTED=3221225786"),
+          msg=evidence.stringify(),
+        )
+        assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      }
+      evidence
+    })
+  })
+}
+
+///|
+async fn launch_command(
+  tools : StockToolchain,
+  stage : String,
+  launch : String,
+) -> Json {
+  @fs.write_file(
+    stage + "/command.cjs",
+    @fs.read_file(fixtures + "/command.cjs"),
+  )
+  let run = async fn(args : Array[String]) -> (Int32, String, String) {
+    let (code, out, err) = @process.collect_output(
+      stock_program(tools.root, Moonrun),
+      [launch, "--"] + args,
+      extra_env=tools.environment,
+    )
+    (code, out.text(), err.text())
+  }
+  let (code, out, err) = run(["--help", "--json"])
+  assert_eq(code, 0)
+  assert_eq(err, "")
+  assert_true(
+    @json.parse(out)
+    is { "schema_version": Number(1, ..), "kind": String("help"), .. },
+  )
+  let without_node = tools.environment.copy()
+  without_node.set("PATH", "")
+  let (help_code, help_out, help_err) = @process.collect_output(
+    stock_program(tools.root, Moonrun),
+    [launch, "--", "--help", "--json"],
+    extra_env=without_node,
+  )
+  assert_eq(help_code, 0)
+  assert_eq(help_err.text(), "")
+  assert_true(@json.parse(help_out.text()) is { "kind": String("help"), .. })
+  let (code, out, err) = run(["--json", "--unknown"])
+  assert_eq(code, 2)
+  assert_eq(err, "")
+  assert_true(@json.parse(out) is { "kind": String("usage-error"), .. })
+  let (code, out, err) = run(["--json", "--", stage + "/missing-executable"])
+  assert_eq(code, 1)
+  assert_eq(err, "")
+  assert_true(
+    @json.parse(out)
+    is { "kind": String("not-started"), "exit_status": Number(1, ..), .. },
+  )
+  let args = [
+    "--json",
+    "--",
+    "node",
+    stage + "/command.cjs",
+    "",
+    "--help",
+    "--json",
+    "é🙂",
+    "a\nb",
+  ]
+  let (code, out, err) = run(args)
+  assert_eq(code, 23)
+  assert_eq(err, "")
+  // Parsing the whole document also rejects an appended parent JSON result.
+  assert_eq(@json.parse(out), {
+    "ok": true,
+    "argv": ["", "--help", "--json", "é🙂", "a\nb"],
+  })
+  let (code, out, err) = run(["--", "node", stage + "/command.cjs", "--json"])
+  assert_eq(code, 23)
+  assert_eq(err, "")
+  assert_eq(@json.parse(out), { "ok": true, "argv": ["--json"] })
+  {
+    "stock": tools.version.text(),
+    "scenario": "public-launch-command",
+    "help": true,
+    "usageFailure": true,
+    "startupFailure": true,
+    "childJsonOwnership": true,
+    "opaqueChildOptions": true,
+  }
+}
+
+///|
+async fn binary_transport(
+  tools : StockToolchain,
+  stage : String,
+  launch : String,
+) -> Json {
+  @fs.write_file(stage + "/binary.cjs", @fs.read_file(fixtures + "/binary.cjs"))
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  let bytes = Bytes::makei(200000, index => (index % 256).to_byte())
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [
+          launch,
+          "--",
+          "--json",
+          "--",
+          "node",
+          stage + "/binary.cjs",
+          "",
+          "--json",
+          "--help",
+          "é🙂",
+        ],
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=tools.environment,
+      )
+      let output = group.spawn(() => reader.read_all().binary())
+      let diagnostics = group.spawn(() => errors.read_all().text())
+      writer.write(bytes)
+      writer.close()
+      assert_eq(child.wait(), 23)
+      assert_true(output.wait() == bytes, msg="Binary standard output changed")
+      let diagnostics = diagnostics.wait()
+      assert_true(diagnostics.has_prefix("BINARY_STDERR\n"), msg=diagnostics)
+      assert_eq(
+        @json.parse(diagnostics.strip_prefix("BINARY_STDERR\n").unwrap()),
+        ["", "--json", "--help", "é🙂"],
+      )
+      {
+        "stock": tools.version.text(),
+        "scenario": "public-launch-binary-transport",
+        "byteCount": bytes.length(),
+        "exactBinaryOutput": true,
+        "separateStderr": true,
+        "selected": 23,
+      }
+    })
+  })
+}
+
+///|
+async fn retain_report(tools : StockToolchain, results : Array[Json]) -> Unit {
+  let (code, head, error) = @process.collect_output("git", ["rev-parse", "HEAD"])
+  assert_eq(code, 0, msg=error.text())
+  let (code, dirty, error) = @process.collect_output("git", [
+    "status", "--porcelain",
+  ])
+  assert_eq(code, 0, msg=error.text())
+  let report : Json = {
+    "schema_version": 1,
+    "proof_kind": "local-candidate",
+    "source_commit": head.text().trim().to_owned(),
+    "working_tree_dirty": !dirty.text().is_empty(),
+    "stock": tools.version.text(),
+    "compiler": tools.description,
+    "cases": results,
+  }
+  @fs.mkdir("_build/moonx", recursive=true, allow_exist=true)
+  let path = "_build/moonx/qualification-" + tools.version.text() + ".json"
+  @fs.write_file(path, report.stringify(indent=2) + "\n")
+  println(report.stringify(indent=2))
+}
+
+///|
+async fn completion_failure(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+  success~ : Bool,
+) -> Json {
+  let temporary = stage + "/callback-payload"
+  @fs.mkdir(temporary, allow_exist=true)
+  let environment = tools.environment.copy()
+  environment.set("MOONX_SILENT_CALLBACK_FAILURE", "1")
+  for name in ["TMPDIR", "TMP", "TEMP"] {
+    environment.set(name, temporary)
+  }
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (closed_reader, stderr) = @process.read_from_process()
+  closed_reader.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "--payload"] + (if success { ["--success"] } else { [] }),
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=environment,
+      )
+      let output = group.spawn(() => reader.read_all().text())
+      let selected = child.wait()
+      assert_eq(selected, if success { 1 } else { 23 })
+      assert_true(output.wait().contains("VALUE=42\n"))
+      assert_eq(@fs.readdir(temporary), [])
+      {
+        "stock": tools.version.text(),
+        "scenario": "completion-failure-with-closed-stderr",
+        "childSucceeded": success,
+        "selected": selected,
+        "ownedPayloadRemoved": true,
+      }
+    })
+  })
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  let root = if args.length() == 2 && args[0] == "--toolchain-root" {
+    args[1]
+  } else if args.is_empty() {
+    @env.get_env_var("MOON_TOOLCHAIN_ROOT").unwrap_or("")
+  } else {
+    fail("Use --toolchain-root STOCK_INSTALL_ROOT")
+  }
+  let tools = StockToolchain::parse(root) catch {
+    InvalidConfiguration(input~, rule~) =>
+      fail(rule.description() + ": " + input)
+    error => raise error
+  }
+  let stage = @fs.tmpdir(prefix="lander-moonx-acceptance")
+  defer @fs.rmdir(stage, recursive=true)
+  let stage = @fs.realpath(stage)
+  let (parent, host, launch) = prepare(tools, stage)
+  let results : Array[Json] = []
+  results.push(launch_command(tools, stage, launch))
+  results.push(binary_transport(tools, stage, launch))
+  for success in [true, false] {
+    results.push(completion_failure(tools, stage, parent, success~))
+  }
+  for
+    scenario in [
+      Finite,
+      MissingNode,
+      WriteFailure,
+      Symlink,
+      FinalizerAfterSuccess,
+      FinalizerAfterFailure,
+    ] {
+    results.push(finite_payload(tools, stage, parent, scenario))
+  }
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    for scenario in [CleanupAfterSuccess, CleanupAfterFailure] {
+      results.push(finite_payload(tools, stage, parent, scenario))
+    }
+    for signal in [Interrupt, Terminate] {
+      results.push(host_signal(tools, stage, parent, host, signal))
+    }
+  } else {
+    let controller = windows_controller(tools, stage)
+    let failures : Array[String] = []
+    for
+      scenario in [
+        BaselineInterrupt,
+        BaselineBreak,
+        LauncherBreak,
+        LauncherInterrupt,
+      ] {
+      try
+        windows_console(tools, stage, parent, host, controller, scenario)
+      catch {
+        error => {
+          let detail = scenario.name() + ": " + error.to_string()
+          failures.push(detail)
+          results.push({
+            "stock": tools.version.text(),
+            "scenario": scenario.name(),
+            "failed": detail,
+          })
+        }
+      } noraise {
+        result => results.push(result)
+      }
+    }
+    if !failures.is_empty() {
+      retain_report(tools, results)
+      fail("Windows console qualification failed: " + failures.join("\n"))
+    }
+  }
+  retain_report(tools, results)
+}
+
+///|
+test "stock identity requires matching compiler frontend and Moonrun" {
+  let stock16 = "moon 0.1.20261020 (2284bd2 2026-10-20) /stock/bin/moon\nmoonc v0.10.16+b1a0e846e (2026-10-16) /stock/bin/moonc\nmoonrun 0.1.20261020 (2284bd2 2026-10-20) /stock/bin/moonrun\n"
+  let stock17 = "moon 0.1.20261023 (3778465 2026-10-23) /stock/bin/moon\nmoonc v0.10.17+d971670cd (2026-10-23) /stock/bin/moonc\nmoonrun 0.1.20261023 (3778465 2026-10-23) /stock/bin/moonrun\n"
+  assert_true(StockVersion::parse_description(stock16) is Stock16)
+  assert_true(StockVersion::parse_description(stock17) is Stock17)
+  for
+    input in [
+      "",
+      stock16.replace_all(old="2284bd2", new="3778465"),
+      stock16.replace_all(old=Stock16.text(), new=Stock17.text()),
+      stock17 + stock16,
+      "moonc v0.10.17+d971670cd\n",
+    ] {
+    try StockVersion::parse_description(input) catch {
+      InvalidConfiguration(input=actual, rule=UnsupportedStock) =>
+        assert_eq(actual, input)
+      _ => fail("Expected unsupported stock identity")
+    } noraise {
+      _ => fail("Accepted mixed or incomplete toolchain identity")
+    }
+  }
+}
+
+///|
+async test "stock root rejects invalid input before filesystem work" {
+  try StockToolchain::parse("") catch {
+    InvalidConfiguration(input="", rule=MissingRoot) => ()
+    _ => fail("Expected missing root")
+  } noraise {
+    _ => fail("Accepted empty stock root")
+  }
+  try StockToolchain::parse("a\u{0}b") catch {
+    InvalidConfiguration(input="a\u{0}b", rule=ContainsNul) => ()
+    _ => fail("Expected NUL rule")
+  } noraise {
+    _ => fail("Accepted NUL stock root")
+  }
+}

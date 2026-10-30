@@ -1,0 +1,43 @@
+///|
+extern "js" fn start_worker() -> @js_async.Promise[Unit] =
+  #|() => globalThis.moonxFixture.start()
+
+///|
+extern "js" fn stop_worker() -> Unit =
+  #|() => globalThis.moonxFixture.stop()
+
+///|
+extern "js" fn join_worker() -> @js_async.Promise[Unit] =
+  #|() => globalThis.moonxFixture.join()
+
+///|
+async fn main {
+  let finalized = Ref(false)
+  let host = @hosting.builder(@core.AppName::parse("moonx-host-proof"), [])
+    |> @hosting.service("owned-service", stop=_ => println("SERVICE_STOPPED"))
+    |> @hosting.build(_ => ())
+  @console.run(host, _ => {
+    defer stop_worker()
+    start_worker().wait()
+    println("HOST_READY")
+    @async.sleep(60000)
+    fail("Command was not cancelled")
+  }, finalize=selected => {
+    assert_false(finalized.val)
+    finalized.val = true
+    println("HOST_FINALIZER_START")
+    join_worker().wait()
+    println("HOST_FINALIZER=" + selected.to_int().to_string())
+    selected
+  }, completed=(outcome, selected) => {
+    assert_true(finalized.val)
+    let reason = match outcome.stop_reason() {
+      Signal(Interrupt) => "Interrupt"
+      Signal(Terminate) => "Terminate"
+      Signal(Quit) => "Quit"
+      _ => fail("Host did not observe a signal")
+    }
+    println("HOST_REASON=" + reason)
+    println("HOST_COMPLETION=" + selected.to_int().to_string())
+  })
+}

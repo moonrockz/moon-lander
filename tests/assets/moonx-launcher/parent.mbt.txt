@@ -1,0 +1,42 @@
+fn main raise {
+  let args = @env.args()
+  let plan = if args[1] == "--payload" {
+    @moonx.LaunchPlan::Node(payload_case(args[2:].to_owned()))
+  } else {
+    Process(@moonx.Command::new(@moonx.Executable::parse(args[1]), @moonx.Arguments::parse(args[2:].to_owned())))
+  }
+  @driver.run(plan, grace=@moonx.ShutdownGrace::from_milliseconds(200),
+    finalize=() => {
+      if @env.get_env_var("MOONX_SILENT_CALLBACK_FAILURE") != Some("1") { eprintln("PARENT_FINALIZER") }
+      if args.contains("--finalizer-fails") { raise Failure("Expected finalizer failure") }
+    },
+    completed=outcome => {
+      if @env.get_env_var("MOONX_SILENT_CALLBACK_FAILURE") == Some("1") { raise Failure("Expected completion failure") }
+      eprintln("PARENT_SELECTED=" + outcome.selected_status().bits().to_string())
+      for failure in outcome.finalization_failures() {
+        match failure {
+          PayloadCleanup(_) => eprintln("PARENT_FINALIZATION_ERROR=PayloadCleanup")
+          Finalizer(_) => eprintln("PARENT_FINALIZATION_ERROR=Finalizer")
+        }
+      }
+      match outcome.result() {
+        Started(Exited(status)) => eprintln("PARENT_STARTED=EXITED:" + status.bits().to_string())
+        Started(Stopped(cause~, status~, force_requested~)) => {
+          eprintln("PARENT_STARTED=STOPPED:" + status.bits().to_string() + ":FORCED=" + force_requested.to_string())
+          match cause {
+            Signal(Interrupt) => eprintln("PARENT_SIGNAL=Interrupt")
+            Signal(Terminate) => eprintln("PARENT_SIGNAL=Terminate")
+            Signal(Break) => eprintln("PARENT_SIGNAL=Break")
+            _ => fail("Wrong cause")
+          }
+        }
+        NotStarted(Failed(ProcessStart(_))) => eprintln("PARENT_NOT_STARTED=ProcessStart")
+        NotStarted(Failed(NodeMissing(..))) => eprintln("PARENT_NOT_STARTED=NodeMissing")
+        NotStarted(Failed(Materialization(_))) => eprintln("PARENT_NOT_STARTED=Materialization")
+        NotStarted(Cancelled(Signal(Interrupt))) => eprintln("PARENT_NOT_STARTED=Cancelled:Interrupt")
+        NotStarted(Cancelled(Signal(Terminate))) => eprintln("PARENT_NOT_STARTED=Cancelled:Terminate")
+        _ => fail("Unexpected outcome")
+      }
+    },
+  )
+}

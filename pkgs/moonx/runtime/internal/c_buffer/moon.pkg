@@ -1,0 +1,7 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+options(
+  "native-stub": [ "stub.c" ],
+  targets: { "c_buffer.mbt": [ "native" ], "c_buffer.wasm.mbt": [ "wasm" ] },
+)
+
+supported_targets = "wasm+native"

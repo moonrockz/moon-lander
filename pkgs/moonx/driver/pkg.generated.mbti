@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-moonx/driver"
+
+import {
+  "moonrockz/moon-lander-moonx",
+}
+
+// Values
+pub fn run(@moon-lander-moonx.LaunchPlan, grace? : @moon-lander-moonx.ShutdownGrace, finalize? : () -> Unit raise, completed? : (@moon-lander-moonx.LaunchOutcome) -> Unit raise) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

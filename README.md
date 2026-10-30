@@ -87,8 +87,12 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
-| `mise run check:framework-registry` | Audit all ten candidate archives and build isolated registry consumers on supported targets |
-| `mise run check:framework-published` | Release-only gate for all ten public archives and approved checksums |
+| `mise run check:framework-registry` | Audit all eleven candidate archives and build isolated registry consumers on supported targets |
+| `mise run check:framework-published` | Release-only gate for all eleven public archives and approved checksums |
+| `mise run check:moonx` | Qualify the optional launcher with the primary stock compiler and a real Node-owned host |
+| `mise run check:moonx-stock16` | Qualify the same public APIs with pinned stock 0.10.16 |
+| `mise run check:moonx-runtime` | Reconstruct and verify frozen source, patches, licenses and provenance |
+| `mise run check:moonx-retained` | Run retained upstream native and Wasm tests sequentially |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
@@ -225,6 +229,13 @@ script. Also update the assessed versions above.
 - `pkgs/lander/` contains the `moonrockz/moon-lander` library, imported
   as `@lander`: the `cli` entry, the re-exports, and `version()`, which provides a
   build and test smoke check.
+- `pkgs/moonx/` contains the optional
+  [`moonrockz/moon-lander-moonx`](pkgs/moonx/README.mbt.md): immutable portable
+  process/payload plans and a Wasm/native driver with an isolated frozen runtime.
+  It owns original-signal forwarding and private Node payload cleanup. The
+  [public `/launch` command](pkgs/moonx/launch/README.md) is a thin driver caller;
+  application result schemas stay application-owned. No other framework module
+  imports it, and its executable must not mix with canonical async.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
@@ -289,8 +300,8 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 
 Release versions are shared across workspace members. The framework modules
 listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are in the
-publication allowlist and publish to mooncakes.io. `moonrockz/moon-lander-actors`
-joins this release as the tenth library. Install a module at an exact version,
+publication allowlist and publish to mooncakes.io. The optional
+`moonrockz/moon-lander-moonx` is the eleventh library. Install a module at an exact version,
 for example `moon add moonrockz/moon-lander@0.8.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
@@ -300,7 +311,7 @@ pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
 adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
 its checks on that pull request. Merging it to `main` is the owner's approval:
 the workflow then runs the full check, publishes the public modules with the
-`MOONCAKES_USER_TOKEN` organization secret, verifies all ten published archives against approved checksums, runs isolated
+`MOONCAKES_USER_TOKEN` organization secret, verifies all eleven published archives against approved checksums, runs isolated
 registry consumers and the format override checks on supported targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
 

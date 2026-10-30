@@ -99,6 +99,47 @@ run = "moonx scripts/toolchain.mbtx scripts/serve-site.mbtx"
 description = "Run tests for all workspace members (args: targets; default: wasm wasm-gc js native)"
 run = "moonx scripts/toolchain.mbtx scripts/test.mbtx"
 
+[tasks."moonx-runtime:generate"]
+description = "Regenerate the isolated launcher runtime from frozen licensed inputs"
+run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --write"
+
+[tasks."check:moonx-runtime"]
+description = "Verify frozen launcher source, patches, provenance and license"
+run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --check"
+
+[tasks."test:moonx-runtime"]
+description = "Execute retained upstream runtime tests (args: --test native|wasm, --test-drift)"
+run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx"
+
+[tasks."check:moonx"]
+description = "Qualify the optional launcher with the primary stock compiler"
+run = "moonx scripts/toolchain.mbtx scripts/check-moonx.mbtx"
+
+[tasks."check:moonx-retained"]
+description = "Run retained upstream native and Wasm runtime tests sequentially"
+run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --test-all"
+
+[tasks."check:moonx-drift"]
+description = "Verify modified, missing and added frozen source failures"
+run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --test-drift"
+
+[tasks."check:moonx-stock16"]
+description = "Complete and qualify the pinned stock 0.10.16 consumer"
+run = "moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx"
+
+# Task-scoped tools avoid installing the second stock compiler in unrelated jobs.
+# The primary compiler pin and its wrapper selection stay unchanged.
+[tasks."check:moonx-stock16".tools."http:moonbit"]
+version = "0.10.16+b1a0e846e"
+bin_path = "bin"
+
+[tasks."check:moonx-stock16".tools."http:moonbit".platforms]
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.16%2Bb1a0e846e/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.16%2Bb1a0e846e/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.16%2Bb1a0e846e/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.16%2Bb1a0e846e/moonbit-windows-x86_64.zip", format = "zip" }
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.16%2Bb1a0e846e/moonbit-windows-x86_64.zip", format = "zip" }
+
 [tasks.format]
 description = "Format MoonBit code"
 run = "moonx scripts/toolchain.mbtx scripts/format.mbtx"

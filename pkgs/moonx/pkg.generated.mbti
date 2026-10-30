@@ -1,0 +1,200 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-moonx"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror ArgumentsError {
+  ArgumentContainsNul(input~ : String, index~ : Int32)
+} derive(@debug.Debug)
+pub fn ArgumentsError::to_repr(Self) -> @debug.Repr
+
+pub suberror ExecutableError {
+  InvalidExecutable(input~ : String, rule~ : ExecutableRule)
+} derive(@debug.Debug)
+pub fn ExecutableError::to_repr(Self) -> @debug.Repr
+
+pub suberror PayloadError {
+  DuplicatePayloadPath(first~ : RelativeFilePath, second~ : RelativeFilePath)
+  PayloadFileDirectoryConflict(file~ : RelativeFilePath, descendant~ : RelativeFilePath)
+  PayloadDirectoryCaseConflict(first~ : RelativeFilePath, second~ : RelativeFilePath)
+  PayloadEntryMissing(entry~ : RelativeFilePath)
+} derive(@debug.Debug)
+pub fn PayloadError::to_repr(Self) -> @debug.Repr
+
+pub suberror PayloadPathError {
+  InvalidPayloadPath(input~ : String, rule~ : PayloadPathRule)
+} derive(@debug.Debug)
+pub fn PayloadPathError::to_repr(Self) -> @debug.Repr
+
+pub suberror ShutdownGraceError {
+  NonPositiveShutdownGrace(milliseconds~ : Int32)
+} derive(@debug.Debug)
+pub fn ShutdownGraceError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Arguments {
+  // private fields
+}
+pub fn Arguments::concat(Self, Self) -> Self
+pub fn Arguments::empty() -> Self
+pub fn Arguments::parse(Array[String]) -> Self raise ArgumentsError
+pub fn Arguments::to_array(Self) -> Array[String]
+
+pub(all) enum CancellationCause {
+  Signal(LauncherSignal)
+  Requested
+} derive(@debug.Debug)
+pub fn CancellationCause::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ChildCompletion {
+  Exited(ProcessStatus)
+  Stopped(cause~ : CancellationCause, status~ : ProcessStatus, force_requested~ : Bool)
+  Failed(Error)
+} derive(@debug.Debug)
+pub fn ChildCompletion::to_repr(Self) -> @debug.Repr
+
+pub struct Command {
+  // private fields
+}
+pub fn Command::arguments(Self) -> Arguments
+pub fn Command::executable(Self) -> Executable
+pub fn Command::new(Executable, Arguments) -> Self
+
+pub struct Executable {
+  // private fields
+} derive(@debug.Debug)
+pub fn Executable::node() -> Self
+pub fn Executable::parse(String) -> Self raise ExecutableError
+pub fn Executable::to_repr(Self) -> @debug.Repr
+pub fn Executable::to_string(Self) -> String
+
+pub enum ExecutableRule {
+  Empty
+  ContainsNul
+} derive(Eq, @debug.Debug)
+pub fn ExecutableRule::equal(Self, Self) -> Bool
+pub fn ExecutableRule::not_equal(Self, Self) -> Bool
+pub fn ExecutableRule::to_repr(Self) -> @debug.Repr
+
+pub(all) enum FinalizationFailure {
+  PayloadCleanup(Error)
+  Finalizer(Error)
+} derive(@debug.Debug)
+pub fn FinalizationFailure::to_repr(Self) -> @debug.Repr
+
+pub struct LaunchOutcome {
+  // private fields
+}
+pub fn LaunchOutcome::finalization_failures(Self) -> Array[FinalizationFailure]
+pub fn LaunchOutcome::new(LaunchResult, ProcessStatus, Array[FinalizationFailure]) -> Self
+pub fn LaunchOutcome::result(Self) -> LaunchResult
+pub fn LaunchOutcome::selected_status(Self) -> ProcessStatus
+
+pub(all) enum LaunchPlan {
+  Process(Command)
+  Node(NodeLaunch)
+}
+
+pub(all) enum LaunchResult {
+  NotStarted(StartupStop)
+  Started(ChildCompletion)
+} derive(@debug.Debug)
+pub fn LaunchResult::to_repr(Self) -> @debug.Repr
+
+pub(all) enum LauncherSignal {
+  Interrupt
+  Terminate
+  Hangup
+  Break
+} derive(Eq, @debug.Debug)
+pub fn LauncherSignal::equal(Self, Self) -> Bool
+pub fn LauncherSignal::not_equal(Self, Self) -> Bool
+pub fn LauncherSignal::to_repr(Self) -> @debug.Repr
+
+pub struct NodeLaunch {
+  // private fields
+}
+pub fn NodeLaunch::arguments(Self) -> Arguments
+pub fn NodeLaunch::executable(Self) -> Executable
+pub fn NodeLaunch::new(Payload, Arguments, node? : Executable) -> Self
+pub fn NodeLaunch::payload(Self) -> Payload
+
+pub struct Payload {
+  // private fields
+}
+pub fn Payload::entry(Self) -> RelativeFilePath
+pub fn Payload::files(Self) -> Array[PayloadFile]
+pub fn Payload::new(Array[PayloadFile], RelativeFilePath) -> Self raise PayloadError
+
+pub struct PayloadFile {
+  // private fields
+}
+pub fn PayloadFile::bytes(Self) -> Bytes
+pub fn PayloadFile::new(RelativeFilePath, Bytes) -> Self
+pub fn PayloadFile::path(Self) -> RelativeFilePath
+
+pub(all) enum PayloadPathRule {
+  Empty
+  Absolute
+  EmptySegment
+  DotSegment
+  ParentSegment
+  Backslash
+  ControlCharacter
+  NonAscii
+  ReservedCharacter
+  TrailingDotOrSpace
+  ReservedName
+} derive(Eq, @debug.Debug)
+pub fn PayloadPathRule::equal(Self, Self) -> Bool
+pub fn PayloadPathRule::not_equal(Self, Self) -> Bool
+pub fn PayloadPathRule::to_repr(Self) -> @debug.Repr
+
+pub struct ProcessStatus {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ProcessStatus::bits(Self) -> UInt32
+pub fn ProcessStatus::equal(Self, Self) -> Bool
+pub fn ProcessStatus::failure() -> Self
+pub fn ProcessStatus::from_bits(UInt32) -> Self
+pub fn ProcessStatus::is_success(Self) -> Bool
+pub fn ProcessStatus::not_equal(Self, Self) -> Bool
+pub fn ProcessStatus::success() -> Self
+pub fn ProcessStatus::to_int(Self) -> Int32
+pub fn ProcessStatus::to_repr(Self) -> @debug.Repr
+
+pub struct RelativeFilePath {
+  // private fields
+} derive(@debug.Debug)
+pub fn RelativeFilePath::parse(String) -> Self raise PayloadPathError
+pub fn RelativeFilePath::to_repr(Self) -> @debug.Repr
+pub fn RelativeFilePath::to_string(Self) -> String
+
+pub struct ShutdownGrace {
+  // private fields
+}
+pub fn ShutdownGrace::from_milliseconds(Int32) -> Self raise ShutdownGraceError
+pub fn ShutdownGrace::milliseconds(Self) -> Int32
+pub fn ShutdownGrace::standard() -> Self
+
+pub(all) enum StartupFailure {
+  Materialization(Error)
+  NodeMissing(executable~ : Executable, cause~ : Error)
+  ProcessStart(Error)
+} derive(@debug.Debug)
+pub fn StartupFailure::to_repr(Self) -> @debug.Repr
+
+pub(all) enum StartupStop {
+  Failed(StartupFailure)
+  Cancelled(CancellationCause)
+} derive(@debug.Debug)
+pub fn StartupStop::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

@@ -51,6 +51,16 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   no signal identity and no handler that runs during code that never yields. The
   stub does only async-signal-safe work. All other process and filesystem work stays
   with `moonbitlang/async`.
+- The optional parent-only `moonrockz/moon-lander-moonx` driver uses the frozen,
+  namespaced async 0.22.5 subset in `pkgs/moonx/runtime/`. This owner-approved
+  compatibility boundary supplies original-signal observation on stock Moonx;
+  it must never share an executable with canonical async. Its generated native
+  stubs and Wasm ABI are upstream source, not a custom toolchain. Regenerate and
+  verify it with `scripts/moonx-runtime.mbtx`; review its declared patches and
+  provenance, and retain upstream types inside the frozen subtree. New facade
+  and driver code follows all domain and I/O boundary rules. Run retained
+  native and Wasm suites sequentially because upstream tests use shared `/tmp`
+  fixture names. See `pkgs/moonx/RUNTIME.md` for licensing and the return path.
 - `pkgs/hosting/vendor/` holds a copy of `moonbitlang/core/argparse` with the patch of
   moonbitlang/core#4487 (`Command::try_parse`), until a pinned MoonBit release has it
   (bead `lander-4us.5.18`). Do not edit it; its `README.md` gives the source, the one
@@ -73,6 +83,13 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
 - Put libraries under `pkgs/` and executables under `apps/`. Register modules in
   `moon.work`. Add acceptance suites under an unpublished `tests/` module when
   there is behavior to test.
+- The optional module's thin `pkgs/moonx/launch` executable is an owner-approved
+  placement exception for public stock Moonx artifact qualification. It calls
+  the public driver, preserves opaque child argv/streams, and owns only command
+  help/usage and not-started reporting. It must not copy process lifetime logic
+  or application result schemas. The unpublished Windows console controller
+  under `tests/moonx-console-controller` uses C only for isolated console
+  creation/control unavailable in public spawn flags; async owns I/O and waits.
 - The root `moon.mod` is the version source of truth. Keep member versions and
   source version strings aligned using `scripts/versions.mbtx`.
 - Prefer pure domain functions, explicit inputs, immutable public values, and
@@ -149,14 +166,18 @@ skill. Report these as problems:
 
 ## Publishing
 
-The framework is eight modules: `moonrockz/moon-lander-core`,
+The framework is nine modules: `moonrockz/moon-lander-core`,
 `moonrockz/moon-lander-logging`, `moonrockz/moon-lander-config`, `moonrockz/moon-lander-mediator`,
 the optional `moonrockz/moon-lander-logging-hosting-async`, the optional
-`moonrockz/moon-lander-actors`, `moonrockz/moon-lander-hosting` and the umbrella
+`moonrockz/moon-lander-actors`, `moonrockz/moon-lander-hosting`, the optional
+parent-only `moonrockz/moon-lander-moonx`, and the umbrella
 `moonrockz/moon-lander`. Each imports only the modules below it
 (`mise run validate` checks this). The logging module imports only the MoonBit core
 library; `logging-hosting-async` imports core, logging and `moonbitlang/async`, never
-config, mediator or hosting; `actors` imports core and `moonbitlang/async` only. The module names are provisional. There is no CLI yet.
+config, mediator or hosting; `actors` imports core and `moonbitlang/async` only.
+Moonx imports no framework module or canonical async, and no other framework
+module imports Moonx. Its `/launch` command is a process adapter, not an
+application command model. The module names are provisional.
 Do not add UI packages or a separate regolith module. One exception: the unpublished
 docs tool `apps/site` can use Rabbita. No other module can import it, and the
 published library stays UI-free. Consume `zig-cross` through

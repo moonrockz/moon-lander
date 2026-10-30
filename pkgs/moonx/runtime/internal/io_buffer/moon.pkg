@@ -1,0 +1,3 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+
+supported_targets = "wasm+native"

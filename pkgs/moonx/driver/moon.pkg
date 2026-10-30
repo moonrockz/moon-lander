@@ -1,0 +1,15 @@
+import {
+  "moonrockz/moon-lander-moonx" @moonx,
+  "moonrockz/moon-lander-moonx/runtime" @runtime,
+  "moonrockz/moon-lander-moonx/runtime/process",
+  "moonrockz/moon-lander-moonx/runtime/signal",
+  "moonrockz/moon-lander-moonx/runtime/stdio",
+  "moonrockz/moon-lander-moonx/runtime/fs",
+  "moonrockz/moon-lander-moonx/runtime/io",
+  "moonrockz/moon-lander-moonx/runtime/os_error",
+  "moonbitlang/x/sys",
+}
+
+// The stock process/filesystem host ABI is available on Wasm and native.
+// Portable plans and outcomes live in the separate four-target root package.
+supported_targets = "wasm+native"

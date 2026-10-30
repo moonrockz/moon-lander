@@ -1,0 +1,9 @@
+import {
+  "moonrockz/moon-lander-core" @core,
+  "moonrockz/moon-lander-hosting" @hosting,
+  "moonrockz/moon-lander-hosting/console" @console,
+  "moonbitlang/async",
+  "moonbitlang/async/js_async",
+}
+supported_targets = "js"
+pkgtype(kind: "executable")

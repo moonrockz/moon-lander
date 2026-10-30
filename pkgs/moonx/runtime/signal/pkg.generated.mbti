@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-moonx/runtime/signal"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn exit_cancellation_signal() -> Signal?
+
+pub fn received_cancellation_signal() -> Signal?
+
+pub fn set_global_cancellation_signals(ReadOnlyArray[Signal]) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum Signal {
+  SIGINT
+  SIGTERM
+  SIGHUP
+  SIGBREAK
+} derive(@debug.Debug)
+pub fn Signal::to_int(Self) -> Int32
+
+// Type aliases
+
+// Traits

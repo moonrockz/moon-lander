@@ -1,0 +1,11 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/int",
+  "moonrockz/moon-lander-moonx/runtime/internal/coroutine",
+  "moonrockz/moon-lander-moonx/runtime/internal/io_buffer",
+}
+
+supported_targets = "wasm+native"

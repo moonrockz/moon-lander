@@ -66,6 +66,7 @@ fn kind_name(kind : @sigstore.IdentityKind) -> String {
     Workflow => "Workflow"
     Ref => "Ref"
     NumericId => "NumericId"
+    Predicate => "Predicate"
   }
 }
 
@@ -270,4 +271,29 @@ test "GitHubId: 1 to 20 digits without a leading zero" {
   refuses(parse_id, " 1", "NumericId", digits)
   refuses(parse_id, "01", "NumericId", zero)
   refuses(parse_id, "00", "NumericId", zero)
+}
+
+///|
+test "a predicate type is an absolute URI" {
+  for
+    text in [
+      "https://slsa.dev/provenance/v1", "https://spdx.dev/Document/v2.3", "urn:example:x",
+      "https://in-toto.io/attestation/release/v0.2",
+    ] {
+    assert_eq(@sigstore.PredicateType::parse(text).to_string(), text)
+  }
+  assert_eq(
+    @sigstore.PredicateType::slsa_provenance_v1().to_string(),
+    "https://slsa.dev/provenance/v1",
+  )
+  for text in ["", "slsa", ":x", "https:", "1ttp://x", "https://slsa.dev/a b"] {
+    let failed = try {
+      ignore(@sigstore.PredicateType::parse(text))
+      false
+    } catch {
+      InvalidIdentity(kind=Predicate, text=got, ..) => got == text
+      _ => false
+    }
+    assert_true(failed, msg=text)
+  }
 }

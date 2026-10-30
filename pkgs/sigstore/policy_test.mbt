@@ -255,3 +255,19 @@ test "the cli/cli bundles match only their own repository" {
     }
   }
 }
+
+///|
+test "a provenance bundle does not pass a policy for another predicate type" {
+  let case = github_cases()[0]
+  let policy = @sigstore.Policy::github_workflow(
+    @sigstore.GitHubRepository::parse(case.repository),
+    workflow=@sigstore.WorkflowPath::parse(case.workflow),
+    predicate_type=@sigstore.PredicateType::parse("https://spdx.dev/Document/v2.3"),
+  )
+  guard verify_case(case, policy)
+    is Rejected(Invalid(Policy([PredicateTypeMismatch(expected~, actual~)]))) else {
+    fail("expected a predicate type mismatch")
+  }
+  assert_eq(expected, "https://spdx.dev/Document/v2.3")
+  assert_eq(actual, Some("https://slsa.dev/provenance/v1"))
+}

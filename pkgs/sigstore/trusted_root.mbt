@@ -11,6 +11,7 @@ pub suberror TrustedRootError {
 pub extend TrustedRootError with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the field and the rule.
 pub fn TrustedRootError::message(self : TrustedRootError) -> String {
   match self {
     UnsupportedTrustedRootMediaType(media_type) =>
@@ -27,6 +28,7 @@ pub fn TrustedRootError::message(self : TrustedRootError) -> String {
 ///|
 /// Whether the verifier can use a key of the trusted root.
 pub enum KeyStatus {
+  /// The verifier can use the key.
   Supported
   /// The key type, for example `Ed25519`, that the verifier does not support.
   Unsupported(String)
@@ -110,6 +112,7 @@ pub struct TrustedRootSummary {
 }
 
 ///|
+/// The logs and authorities of the root, and whether each log key is usable.
 pub fn TrustedRoot::summary(self : TrustedRoot) -> TrustedRootSummary {
   fn log_summary(log : TrustedLog) -> TrustedLogSummary {
     { base_url: log.base_url, key: log.key.status() }

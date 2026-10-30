@@ -27,6 +27,7 @@ pub suberror DigestError {
 pub extend DigestError with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the input and the rule.
 pub fn DigestError::message(self : DigestError) -> String {
   let InvalidDigest(text~, rule~) = self
   let reason = match rule {

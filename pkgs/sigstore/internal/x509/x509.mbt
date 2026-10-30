@@ -164,8 +164,10 @@ fn parse_der(raw : BytesView) -> Certificate raise {
 fn read_algorithm(element : @der.Element) -> String raise @der.DerError {
   let reader = element.children()
   let oid = reader.expect(@der.OID).oid()
-  // ECDSA algorithms have no parameters; RSA algorithms have NULL.
-  ignore(reader.optional(@der.NULL))
+  // ECDSA algorithms have no parameters (RFC 5758); RSA algorithms have NULL.
+  if reader.optional(@der.NULL) is Some(_) && oid.has_prefix("1.2.840.10045.4.") {
+    raise @der.Malformed("an ECDSA algorithm has parameters")
+  }
   reader.finish()
   oid
 }
@@ -207,7 +209,13 @@ fn decode_extensions(certificate : Certificate) -> Certificate raise {
       "2.5.29.19" => {
         let reader = @der.parse_tag(value, @der.SEQUENCE).children()
         let is_ca = match reader.optional(@der.BOOLEAN) {
-          Some(flag) => flag.boolean()
+          Some(flag) => {
+            // DER omits the default value false.
+            guard flag.boolean() else {
+              raise BadCertificate("cA is encoded as false")
+            }
+            true
+          }
           None => false
         }
         let path_length = match reader.optional(@der.INTEGER) {

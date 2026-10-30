@@ -79,6 +79,7 @@ pub struct Policy {
   priv owner_id : GitHubId?
   priv source_ref : GitRef?
   priv hosted_runner_only : Bool
+  priv predicate_type : PredicateType?
 }
 
 ///|
@@ -92,6 +93,7 @@ fn Policy::new(issuer : Issuer, identity : Identity) -> Policy {
     owner_id: None,
     source_ref: None,
     hosted_runner_only: false,
+    predicate_type: None,
   }
 }
 
@@ -120,21 +122,32 @@ pub fn Policy::signer_workflow(
 ///|
 /// The usual policy for a GitHub release: the workflow `workflow` of
 /// `repository` signed it, from the source of that repository, on a
-/// GitHub-hosted runner unless `hosted_runner_only` is false.
+/// GitHub-hosted runner unless `hosted_runner_only` is false, and the statement
+/// has the predicate type `predicate_type` (by default SLSA provenance v1, as
+/// `gh attestation verify` requires). So an SBOM attestation of the same
+/// workflow does not pass as provenance.
 pub fn Policy::github_workflow(
   repository : GitHubRepository,
   workflow~ : WorkflowPath,
   git_ref? : GitRef,
   hosted_runner_only? : Bool = true,
+  predicate_type? : PredicateType = PredicateType::slsa_provenance_v1(),
 ) -> Policy {
-  let policy = Policy::signer_workflow(repository, workflow, git_ref?).source_repository(
-    repository,
-  )
+  let policy = Policy::signer_workflow(repository, workflow, git_ref?)
+    .source_repository(repository)
+    .predicate_type(predicate_type)
   if hosted_runner_only {
     policy.hosted_runners_only()
   } else {
     policy
   }
+}
+
+///|
+/// Also require an in-toto statement with the predicate type `predicate_type`.
+/// A message-signature bundle has no statement, so it does not match.
+pub fn Policy::predicate_type(self : Policy, predicate_type : PredicateType) -> Policy {
+  { ..self, predicate_type: Some(predicate_type) }
 }
 
 ///|
@@ -200,6 +213,9 @@ pub enum PolicyMismatch {
   ClaimMismatch(claim~ : Claim, expected~ : String, actual~ : String?)
   /// The policy requires a GitHub-hosted runner; the certificate gives `actual`.
   RunnerEnvironment(actual~ : String?)
+  /// The statement has the predicate type `actual` (`None` without a
+  /// statement), not `expected`.
+  PredicateTypeMismatch(expected~ : String, actual~ : String?)
 } derive(Eq, Debug)
 
 ///|
@@ -209,6 +225,7 @@ pub extend PolicyMismatch with Eq::{equal, not_equal}
 pub extend PolicyMismatch with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the expected and the actual value.
 pub fn PolicyMismatch::message(self : PolicyMismatch) -> String {
   fn shown(value : String?) -> String {
     match value {
@@ -234,6 +251,8 @@ pub fn PolicyMismatch::message(self : PolicyMismatch) -> String {
     }
     RunnerEnvironment(actual~) =>
       "the runner environment is \{shown(actual)}, not \"github-hosted\""
+    PredicateTypeMismatch(expected~, actual~) =>
+      "the predicate type is \{shown(actual)}, not \{expected.escape()}"
   }
 }
 
@@ -243,8 +262,13 @@ fn equal_ignoring_case(a : String?, b : String) -> Bool {
 }
 
 ///|
-/// The first reason that `claims` does not match the policy, or `None`.
-fn Policy::mismatch(self : Policy, claims : CertificateClaims) -> PolicyMismatch? {
+/// The first reason that `claims` and `statement` do not match the policy, or
+/// `None`.
+fn Policy::mismatch(
+  self : Policy,
+  claims : CertificateClaims,
+  statement : Statement?,
+) -> PolicyMismatch? {
   let issuer = self.issuer.to_string()
   guard claims.issuer == Some(issuer) else {
     return Some(IssuerMismatch(expected=issuer, actual=claims.issuer))
@@ -341,6 +365,12 @@ fn Policy::mismatch(self : Policy, claims : CertificateClaims) -> PolicyMismatch
   if self.hosted_runner_only {
     guard claims.runner_environment == Some("github-hosted") else {
       return Some(RunnerEnvironment(actual=claims.runner_environment))
+    }
+  }
+  if self.predicate_type is Some(expected) {
+    let actual = statement.map(statement => statement.predicate_type)
+    guard actual == Some(expected.to_string()) else {
+      return Some(PredicateTypeMismatch(expected=expected.to_string(), actual~))
     }
   }
   None

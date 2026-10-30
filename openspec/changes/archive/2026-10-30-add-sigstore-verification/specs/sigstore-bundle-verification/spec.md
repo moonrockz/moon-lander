@@ -132,8 +132,8 @@ the precertificate.
 
 ### Requirement: Verify the transparency log entry
 
-The verifier SHALL require one Rekor v1 entry from a log in the trusted root, with a
-valid signed entry timestamp, an integrated time inside the log's validity and not
+The verifier SHALL require at least one Rekor v1 entry, and SHALL check each entry: it
+is from a log in the trusted root, with a valid signed entry timestamp, an integrated time inside the log's validity and not
 after "now", and a body whose kind, signature, certificate and payload hash match
 the bundle.
 

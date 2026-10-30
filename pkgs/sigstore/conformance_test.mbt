@@ -107,8 +107,8 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
 
 ///|
 /// The expected outcome of each sigstore-conformance case at `acb38c9`. Cases
-/// that end in `_fail` must not pass. Rekor v2, managed-key and timestamp
-/// authority cases are out of scope (design SCOPE-1) and must give a
+/// that end in `_fail` must not pass. Rekor v2, Rekor v1 `intoto/0.0.2`,
+/// managed-key and timestamp authority cases are out of scope (design SCOPE-1) and must give a
 /// not-supported reason or fail to parse.
 let expected_outcomes : Array[(String, String)] = [
   ("bundle-empty-certificate-chain_fail", "parse"),
@@ -132,12 +132,12 @@ let expected_outcomes : Array[(String, String)] = [
   ("inclusion-proof-corrupted-hash_fail", "inclusion proof"),
   ("incorrect-public-key_fail", "transparency log"),
   ("integrated-time-in-future_fail", "certificate validity"),
-  ("intoto-expired-certificate_fail", "unsupported Rekor v2"),
-  ("intoto-log-entry-mismatch_fail", "unsupported Rekor v2"),
+  ("intoto-expired-certificate_fail", "unsupported entry kind"),
+  ("intoto-log-entry-mismatch_fail", "unsupported entry kind"),
   ("intoto-missing-inclusion-proof_fail", "parse"),
-  ("intoto-set-outside-signing-cert-validity_fail", "unsupported Rekor v2"),
-  ("intoto-tsa-timestamp-outside-cert-validity_fail", "unsupported Rekor v2"),
-  ("intoto-with-custom-trust-root", "unsupported Rekor v2"),
+  ("intoto-set-outside-signing-cert-validity_fail", "unsupported entry kind"),
+  ("intoto-tsa-timestamp-outside-cert-validity_fail", "unsupported entry kind"),
+  ("intoto-with-custom-trust-root", "unsupported entry kind"),
   ("invalid-checkpoint-signature_fail", "checkpoint"),
   ("invalid-ct-key_fail", "certificate timestamp"),
   ("invalid-inclusion-proof_fail", "parse"),

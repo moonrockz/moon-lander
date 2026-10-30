@@ -93,6 +93,18 @@ pub fn CertificateClaims::equal(Self, Self) -> Bool
 pub fn CertificateClaims::not_equal(Self, Self) -> Bool
 pub fn CertificateClaims::to_repr(Self) -> @debug.Repr
 
+pub enum CertificateProblem {
+  Unreadable(String)
+  NotForCodeSigning
+  NoDigitalSignature
+  UnknownCriticalExtension(String)
+  LeafIsAuthority
+} derive(Eq, @debug.Debug)
+pub fn CertificateProblem::equal(Self, Self) -> Bool
+pub fn CertificateProblem::message(Self) -> String
+pub fn CertificateProblem::not_equal(Self, Self) -> Bool
+pub fn CertificateProblem::to_repr(Self) -> @debug.Repr
+
 pub enum Claim {
   SourceRepository
   SourceOwner
@@ -121,7 +133,7 @@ pub enum Failure {
   TransparencyLogBody(String)
   InclusionProof(String)
   Checkpoint(String)
-  Certificate(String)
+  Certificate(CertificateProblem)
   CertificateValidity(not_before~ : Instant, not_after~ : Instant, time~ : Instant)
   CertificateChain(String)
   CertificateTimestamp(String)
@@ -203,6 +215,7 @@ pub enum IdentityKind {
   Workflow
   Ref
   NumericId
+  Predicate
 } derive(Eq, @debug.Debug)
 pub fn IdentityKind::equal(Self, Self) -> Bool
 pub fn IdentityKind::not_equal(Self, Self) -> Bool
@@ -248,9 +261,10 @@ pub fn KeyStatus::to_repr(Self) -> @debug.Repr
 pub struct Policy {
   // private fields
 }
-pub fn Policy::github_workflow(GitHubRepository, workflow~ : WorkflowPath, git_ref? : GitRef, hosted_runner_only? : Bool) -> Self
+pub fn Policy::github_workflow(GitHubRepository, workflow~ : WorkflowPath, git_ref? : GitRef, hosted_runner_only? : Bool, predicate_type? : PredicateType) -> Self
 pub fn Policy::hosted_runners_only(Self) -> Self
 pub fn Policy::owner_id(Self, GitHubId) -> Self
+pub fn Policy::predicate_type(Self, PredicateType) -> Self
 pub fn Policy::repository_id(Self, GitHubId) -> Self
 pub fn Policy::signer_workflow(GitHubRepository, WorkflowPath, git_ref? : GitRef, issuer? : Issuer) -> Self
 pub fn Policy::source_owner(Self, GitHubOwner) -> Self
@@ -263,11 +277,24 @@ pub enum PolicyMismatch {
   IdentityMismatch(expected~ : String, actual~ : Array[String])
   ClaimMismatch(claim~ : Claim, expected~ : String, actual~ : String?)
   RunnerEnvironment(actual~ : String?)
+  PredicateTypeMismatch(expected~ : String, actual~ : String?)
 } derive(Eq, @debug.Debug)
 pub fn PolicyMismatch::equal(Self, Self) -> Bool
 pub fn PolicyMismatch::message(Self) -> String
 pub fn PolicyMismatch::not_equal(Self, Self) -> Bool
 pub fn PolicyMismatch::to_repr(Self) -> @debug.Repr
+
+pub struct PredicateType {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn PredicateType::equal(Self, Self) -> Bool
+pub fn PredicateType::not_equal(Self, Self) -> Bool
+pub fn PredicateType::output(Self, &Logger) -> Unit
+pub fn PredicateType::parse(String) -> Self raise IdentityError
+pub fn PredicateType::slsa_provenance_v1() -> Self
+pub fn PredicateType::to_repr(Self) -> @debug.Repr
+pub fn PredicateType::to_string(Self) -> String
+pub impl Show for PredicateType
 
 pub enum Rejection {
   Unsupported(Feature)
@@ -289,7 +316,7 @@ pub fn Statement::to_repr(Self) -> @debug.Repr
 
 pub struct Subject {
   name : String
-  sha256 : String?
+  sha256 : ArtifactDigest?
 } derive(Eq, @debug.Debug)
 pub fn Subject::equal(Self, Self) -> Bool
 pub fn Subject::not_equal(Self, Self) -> Bool

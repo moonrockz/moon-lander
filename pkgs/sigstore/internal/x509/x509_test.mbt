@@ -500,17 +500,17 @@ test "malformed certificates are refused" {
     parse_outcome({ ..parts, fields: other_inner }.join()),
     "the two signature algorithms differ",
   )
+  // ECDSA algorithms have no parameters (RFC 5758), on either side.
   let with_null = hex("300c06082a8648ce3d0403030500")
   assert_eq(
     parse_outcome({ ..parts, algorithm: with_null }.join()),
-    "the two signature algorithms differ",
+    "malformed DER: an ECDSA algorithm has parameters",
   )
-  // The same NULL parameters on both sides are read.
   let both_null = parts.fields.copy()
   both_null[2] = with_null
   assert_eq(
     parse_outcome({ fields: both_null, algorithm: with_null, signature: parts.signature }.join()),
-    "ok",
+    "malformed DER: an ECDSA algorithm has parameters",
   )
   // The signature BIT STRING has unused bits.
   let unused = parts.signature.to_array()

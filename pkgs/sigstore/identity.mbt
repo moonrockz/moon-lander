@@ -8,6 +8,7 @@ pub enum IdentityKind {
   Workflow
   Ref
   NumericId
+  Predicate
 } derive(Eq, Debug)
 
 ///|
@@ -27,6 +28,7 @@ pub suberror IdentityError {
 pub extend IdentityError with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the kind of value, the input and the rule.
 pub fn IdentityError::message(self : IdentityError) -> String {
   let InvalidIdentity(kind~, text~, rule~) = self
   let name = match kind {
@@ -37,6 +39,7 @@ pub fn IdentityError::message(self : IdentityError) -> String {
     Workflow => "workflow path"
     Ref => "Git ref"
     NumericId => "GitHub ID"
+    Predicate => "predicate type"
   }
   "Invalid \{name} \{text.escape()}: \{rule}"
 }
@@ -331,3 +334,47 @@ pub impl Show for GitHubId with output(self, logger) {
 
 ///|
 pub extend GitHubId with Show::{output, to_string}
+
+///|
+/// The predicate type of an in-toto statement, for example
+/// `https://slsa.dev/provenance/v1`. It tells what the attestation claims.
+pub struct PredicateType {
+  priv uri : String
+} derive(Eq, Debug)
+
+///|
+pub extend PredicateType with Eq::{equal, not_equal}
+
+///|
+pub extend PredicateType with @debug.Debug::{to_repr}
+
+///|
+/// Parse a predicate type: an absolute URI (a scheme of ASCII letters, `:`
+/// and a non-empty rest) with no spaces.
+pub fn PredicateType::parse(text : String) -> PredicateType raise IdentityError {
+  let fail = rule => InvalidIdentity(kind=Predicate, text~, rule~)
+  guard text.find(":") is Some(colon) && colon > 0 && colon + 1 < text.length() else {
+    raise fail("use an absolute URI")
+  }
+  guard text[:colon].iter().all(c => c.is_ascii_alphabetic()) else {
+    raise fail("the URI scheme has only ASCII letters")
+  }
+  guard !has_space_or_control(text) else {
+    raise fail("the URI has a space or a control character")
+  }
+  { uri: text }
+}
+
+///|
+/// SLSA provenance v1, the predicate type of `actions/attest` build provenance.
+pub fn PredicateType::slsa_provenance_v1() -> PredicateType {
+  { uri: "https://slsa.dev/provenance/v1" }
+}
+
+///|
+pub impl Show for PredicateType with output(self, logger) {
+  logger.write_string(self.uri)
+}
+
+///|
+pub extend PredicateType with Show::{output, to_string}

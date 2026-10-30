@@ -122,8 +122,10 @@ test "scenario: pass" {
   assert_eq(statement.predicate_type, "https://slsa.dev/provenance/v1")
   assert_eq(statement.subjects.length(), 4)
   assert_eq(
-    statement.subjects[0].sha256,
-    Some("03d190b8ef97d354f9aca6854542979c36ce5f77c68a3d80de28ac1a77c432bd"),
+    statement.subjects[0].sha256.map(digest => digest.to_string()),
+    Some(
+      "sha256:03d190b8ef97d354f9aca6854542979c36ce5f77c68a3d80de28ac1a77c432bd",
+    ),
   )
   assert_eq(facts.integrated_time.unix_seconds(), 1792133282L)
   assert_eq(facts.claims.subject_names, [

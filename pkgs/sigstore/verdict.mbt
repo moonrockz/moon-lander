@@ -42,7 +42,7 @@ pub enum Failure {
   /// The checkpoint does not verify or has another root hash.
   Checkpoint(String)
   /// The leaf certificate cannot be read or used.
-  Certificate(String)
+  Certificate(CertificateProblem)
   /// The leaf certificate was not valid at the integrated time.
   CertificateValidity(not_before~ : Instant, not_after~ : Instant, time~ : Instant)
   /// No trusted certificate authority issued the leaf at the integrated time.
@@ -68,6 +68,41 @@ pub extend Failure with Eq::{equal, not_equal}
 pub extend Failure with @debug.Debug::{to_repr}
 
 ///|
+/// Why the leaf certificate cannot be used.
+pub enum CertificateProblem {
+  /// The certificate, its key or a Fulcio extension cannot be read; the text
+  /// gives the rule.
+  Unreadable(String)
+  /// The leaf has no code signing extended key usage.
+  NotForCodeSigning
+  /// The leaf key usage does not allow digital signatures.
+  NoDigitalSignature
+  /// The leaf has a critical extension with this OID that the verifier does
+  /// not understand.
+  UnknownCriticalExtension(String)
+  /// The leaf is a certificate authority.
+  LeafIsAuthority
+} derive(Eq, Debug)
+
+///|
+pub extend CertificateProblem with Eq::{equal, not_equal}
+
+///|
+pub extend CertificateProblem with @debug.Debug::{to_repr}
+
+///|
+/// Text for people that describes the problem.
+pub fn CertificateProblem::message(self : CertificateProblem) -> String {
+  match self {
+    Unreadable(rule) => rule
+    NotForCodeSigning => "the leaf is not for code signing"
+    NoDigitalSignature => "the leaf key usage does not allow digital signatures"
+    UnknownCriticalExtension(oid) => "the leaf has the unknown critical extension \{oid}"
+    LeafIsAuthority => "the leaf is a certificate authority"
+  }
+}
+
+///|
 /// Why a bundle was not verified: a valid feature that is not supported, or
 /// a check that failed.
 pub enum Rejection {
@@ -82,6 +117,7 @@ pub extend Rejection with Eq::{equal, not_equal}
 pub extend Rejection with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the feature or the check, with its detail.
 pub fn Rejection::message(self : Rejection) -> String {
   match self {
     Unsupported(feature) => {
@@ -104,7 +140,7 @@ pub fn Rejection::message(self : Rejection) -> String {
         TransparencyLogBody(text) => "transparency log body: \{text}"
         InclusionProof(text) => "inclusion proof: \{text}"
         Checkpoint(text) => "checkpoint: \{text}"
-        Certificate(text) => "certificate: \{text}"
+        Certificate(problem) => "certificate: \{problem.message()}"
         CertificateValidity(not_before~, not_after~, time~) =>
           "the certificate is valid from \{not_before} to \{not_after}, not at \{time}"
         CertificateChain(text) => "certificate chain: \{text}"
@@ -125,8 +161,8 @@ pub fn Rejection::message(self : Rejection) -> String {
 /// One subject of an in-toto statement.
 pub struct Subject {
   name : String
-  /// The SHA-256 digest in lowercase hex, when the subject has one.
-  sha256 : String?
+  /// The SHA-256 digest, when the subject has one.
+  sha256 : ArtifactDigest?
 } derive(Eq, Debug)
 
 ///|

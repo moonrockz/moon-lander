@@ -78,9 +78,12 @@ from parsed values, each with a smart constructor and a typed `IdentityError`:
 | `WorkflowPath` | `.github/workflows/release.yml` | A `.yml` or `.yaml` file directly in `.github/workflows/` |
 | `GitRef` | `refs/tags/v1.0.0` | `refs/` and a name |
 | `GitHubId` | `513894754` | Decimal digits, no leading zero |
+| `PredicateType` | `https://slsa.dev/provenance/v1` | An absolute URI |
 
-`Policy::github_workflow` requires the signer workflow, the same source repository
-and a GitHub-hosted runner. Add claims to pin more. A deleted and recreated
+`Policy::github_workflow` requires the signer workflow, the same source repository,
+a GitHub-hosted runner and an in-toto statement of SLSA provenance v1, as
+`gh attestation verify` does. So an SBOM attestation that the same workflow made
+does not pass as provenance; give `predicate_type=` to accept another type. Add claims to pin more. A deleted and recreated
 repository keeps its name but gets a new ID, so a trust record should pin the IDs:
 
 ```mbt check

@@ -172,8 +172,8 @@ the verdict. The verifier stops at the first failure.</p>
 <summary>Exact rules for each step</summary>
 <ol>
 <li><strong>Parse.</strong> Media type <code>application/vnd.dev.sigstore.bundle+json;version=0.1|0.2|0.3</code> or <code>application/vnd.dev.sigstore.bundle.v0.3+json</code>. Content is <code>dsseEnvelope</code> or <code>messageSignature</code>. Material is <code>certificate</code>, or <code>x509CertificateChain</code> for v0.1 and v0.2 (only the first certificate is used). v0.3 refuses <code>x509CertificateChain</code>. A <code>publicKey</code> is not supported. At most 32 log entries. Unknown fields fail. Bytes accept standard and URL-safe base64, with optional padding. 64-bit integers accept a string or a number.</li>
-<li><strong>Log entry.</strong> Exactly one Rekor v1 entry is used. Find the log by <code>hex(logId.keyId)</code> in <code>tlogs</code>; for an ECDSA log, the ID is SHA-256 of the DER key. Kinds: <code>dsse/0.0.1</code> and <code>hashedrekord/0.0.1</code>; <code>intoto/0.0.2</code> and v0.0.2 kinds are not supported. SET payload: <code>{"body":"&lt;base64 canonicalizedBody&gt;","integratedTime":N,"logID":"&lt;hex keyId&gt;","logIndex":N}</code>, in this key order with no spaces; ECDSA verify over SHA-256 of it. The integrated time is inside the closed range of the log <code>validFor</code>, and not after "now".</li>
-<li><strong>Inclusion.</strong> Required for v0.2 and later. Leaf hash <code>SHA-256(0x00 ∥ body)</code>, node hash <code>SHA-256(0x01 ∥ left ∥ right)</code>. With <code>inner = bitlen(index xor (size − 1))</code> and <code>border = popcount(index &gt;&gt; inner)</code>, the hash count is <code>inner + border</code>, and <code>index &lt; size</code>. Use <code>inclusionProof.logIndex</code>, not the entry index. Checkpoint: split at the last blank line; the note text keeps its last newline; a signature line is <code>— &lt;name&gt; &lt;base64(4-byte key hint ∥ DER signature)&gt;</code>; the key hint is the first 4 bytes of the log ID; ECDSA verify over SHA-256 of the text. The third text line (base64 root hash) equals <code>inclusionProof.rootHash</code>.</li>
+<li><strong>Log entry.</strong> Each Rekor v1 entry of the bundle is checked, and there must be at least one. Find the log by <code>hex(logId.keyId)</code> in <code>tlogs</code>; for an ECDSA log, the ID is SHA-256 of the DER key. Kinds: <code>dsse/0.0.1</code> and <code>hashedrekord/0.0.1</code>. The Rekor v2 kinds <code>dsse/0.0.2</code> and <code>hashedrekord/0.0.2</code> give <code>Unsupported(RekorV2)</code>; other kinds, such as the Rekor v1 <code>intoto/0.0.2</code>, give <code>Unsupported(EntryKind)</code>. SET payload: <code>{"body":"&lt;base64 canonicalizedBody&gt;","integratedTime":N,"logID":"&lt;hex keyId&gt;","logIndex":N}</code>, in this key order with no spaces; ECDSA verify over SHA-256 of it. The integrated time is inside the closed range of the log <code>validFor</code>, and not after "now".</li>
+<li><strong>Inclusion.</strong> Required for v0.2 and later. Leaf hash <code>SHA-256(0x00 ∥ body)</code>, node hash <code>SHA-256(0x01 ∥ left ∥ right)</code>. With <code>inner = bitlen(index xor (size − 1))</code> and <code>border = popcount(index &gt;&gt; inner)</code>, the hash count is <code>inner + border</code>, and <code>index &lt; size</code>. Use <code>inclusionProof.logIndex</code>, not the entry index. Checkpoint: split at the last blank line; the note text keeps its last newline; a signature line is <code>— &lt;name&gt; &lt;base64(4-byte key hint ∥ DER signature)&gt;</code>; the key hint is the first 4 bytes of the log ID; ECDSA verify over SHA-256 of the text. The third text line (base64 root hash) equals <code>inclusionProof.rootHash</code>, and the size line equals <code>inclusionProof.treeSize</code>.</li>
 <li><strong>Certificate.</strong> For a Fulcio CA in the root whose <code>validFor</code> holds the integrated time, build the path leaf → CA intermediates → CA root (the bundle gives no intermediates in v0.3). Each certificate is valid at that time (bounds inclusive). Each signature verifies (public good: ECDSA P-384 with SHA-384). CA certificates have basic constraints CA true and obey path length. The leaf has EKU code signing and key usage digital signature. An unknown critical extension fails, except SAN, which Fulcio marks critical.</li>
 <li><strong>SCT.</strong> Extension <code>1.3.6.1.4.1.11129.2.4.2</code>. Find the CT log by key ID in <code>ctlogs</code>; the SCT time is in its <code>validFor</code>. Signed data: <code>0x00 ∥ 0x00 ∥ timestamp u64 ∥ 0x0001 ∥ SHA-256(issuer SPKI) ∥ u24 length ∥ TBS without the SCT extension ∥ u16 extensions length ∥ extensions</code>; ECDSA with SHA-256.</li>
 <li><strong>Log body.</strong> Decode <code>canonicalizedBody</code>. Its kind and version equal <code>kindVersion</code>. Its signature equals the bundle signature. Its PEM verifier decodes to DER that equals the leaf DER. For DSSE, <code>payloadHash</code> equals hex SHA-256 of the payload; for hashedrekord, the digest equals the message digest.</li>
@@ -249,15 +249,14 @@ The verify call takes only parsed values, so it does not check input syntax agai
 <pre><code class="language-moonbit">let bundle = @sigstore.Bundle::parse(bundle_json)            // raise BundleError
 let root = @sigstore.TrustedRoot::public_good()              // or TrustedRoot::parse(text)
 let digest = @sigstore.ArtifactDigest::parse("sha256:03d1…")  // raise DigestError
-let policy = @sigstore.Policy::github_workflow(
+let policy = @sigstore.Policy::github_workflow(              // SLSA provenance v1 by default
   @sigstore.GitHubRepository::parse("finos/morphir-rust"),
   workflow=@sigstore.WorkflowPath::parse(".github/workflows/release-provider-snapshot.yml"),
-  hosted_runner_only=true,
-)
+).repository_id(@sigstore.GitHubId::parse("513894754"))
 let now = @sigstore.Instant::from_unix_seconds(clock_value)  // the caller reads the clock
-match @sigstore.verify(bundle, digest, root, [policy], now) {
-  Verified(facts) =&gt; facts.statement.predicate_type
-  Rejected(reason) =&gt; reason.to_string()
+match @sigstore.verify(bundle, digest, root, policy, now~, alternatives=[]) {
+  Verified(facts) =&gt; facts.claims.source_repository_ref
+  Rejected(reason) =&gt; Some(reason.message())
 }</code></pre>
 <p>The verify call is synchronous and does no I/O. The CLI keeps the bundle JSON in its lock
 file and calls the same function again later.</p>
@@ -307,9 +306,12 @@ and marked not usable, as sigstore-go keeps it. A bad ECDSA key is a parse error
 <h3 id="pol-1">POL-1. Policy model</h3>
 <p><span class="label call">Call.</span> A <code>Policy</code> holds an <code>Issuer</code>
 (default <code>https://token.actions.githubusercontent.com</code>), an identity
-(<code>ExactSan(SanUri)</code> or <code>SignerWorkflow(repository, path, ref?)</code>), and
-optional claims: source repository, owner, repository ID, owner ID, source ref, and
-hosted-runner-only. There are no regular expressions: a signer workflow matches the SAN
+(an exact <code>SubjectName</code>, URI or email, or <code>SignerWorkflow(repository, path, ref?)</code>), and
+optional claims: source repository, owner, repository ID, owner ID, source ref,
+hosted-runner-only and the in-toto predicate type. <code>Policy::github_workflow</code> requires
+SLSA provenance v1 by default, as <code>gh attestation verify</code> does, so an SBOM attestation
+of the same workflow does not pass as provenance (added after the pre-merge review).
+Repository and owner URLs compare without regard to ASCII case; IDs, paths and refs compare exactly. There are no regular expressions: a signer workflow matches the SAN
 <code>https://github.com/</code><em>owner/repo/path</em><code>@</code><em>ref</em> on
 exact parts, so <code>release.yml</code> does not match <code>release.yml.evil.yml</code>.
 The Morphir trust record should pin the repository ID and the owner ID, because a deleted

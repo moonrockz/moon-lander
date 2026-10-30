@@ -18,6 +18,12 @@ fn unsupported(feature : Feature) -> Stop {
 let in_toto_payload_type : String = "application/vnd.in-toto+json"
 
 ///|
+/// The in-toto statement types that a payload can have.
+let in_toto_statement_types : Array[String] = [
+  "https://in-toto.io/Statement/v1", "https://in-toto.io/Statement/v0.1",
+]
+
+///|
 /// The most subjects of a statement, and digests of a subject, as in sigstore-go.
 let max_subjects : Int = 1024
 
@@ -79,8 +85,8 @@ fn run(
   let mut first : (LogEntry, Instant)? = None
   for entry in bundle.entries {
     let time = check_entry(bundle, entry, root, now)
-    check_body(bundle, entry, leaf)
     check_certificate(leaf, root, time)
+    check_body(bundle, entry, leaf)
     if first is None {
       first = Some((entry, time))
     }
@@ -90,11 +96,11 @@ fn run(
   }
   let statement = check_content(bundle, leaf, artifact)
   let claims = read_claims(leaf.certificate) catch {
-    err => raise invalid(Certificate(err.message()))
+    err => raise invalid(Certificate(Unreadable(err.message())))
   }
   let reasons = []
   for index, policy in policies {
-    match policy.mismatch(claims) {
+    match policy.mismatch(claims, statement) {
       None =>
         return {
           statement,
@@ -113,11 +119,11 @@ fn run(
 ///|
 fn read_leaf(raw : Bytes) -> Leaf raise Stop {
   let certificate = @x509.parse(raw) catch {
-    err => raise invalid(Certificate(err.message()))
+    err => raise invalid(Certificate(Unreadable(err.message())))
   }
   let key = @signature.PublicKey::from_spki(certificate.spki) catch {
     UnsupportedKey(kind) => raise unsupported(KeyType(kind))
-    BadKey(rule) => raise invalid(Certificate("bad public key: \{rule}"))
+    BadKey(rule) => raise invalid(Certificate(Unreadable("bad public key: \{rule}")))
   }
   { certificate, key }
 }
@@ -133,7 +139,7 @@ fn check_entry(
 ) -> Instant raise Stop {
   match (entry.kind, entry.version) {
     ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") => ()
-    (_, "0.0.2") => raise unsupported(RekorV2)
+    ("dsse", "0.0.2") | ("hashedrekord", "0.0.2") => raise unsupported(RekorV2)
     (kind, version) => raise unsupported(EntryKind(kind~, version~))
   }
   guard root.tlog(entry.log_id) is Some(log) else {
@@ -198,6 +204,9 @@ fn check_inclusion(
   }
   guard checkpoint.root_hash == proof.root_hash else {
     raise invalid(Checkpoint("the checkpoint root hash differs from the proof"))
+  }
+  guard checkpoint.size == proof.tree_size else {
+    raise invalid(Checkpoint("the checkpoint tree size differs from the proof"))
   }
 }
 
@@ -292,13 +301,7 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
         "data.hash",
       )
       let logged_algorithm = body_string(json_field(hash, "algorithm"), "data.hash.algorithm")
-      let expected_algorithm = match algorithm {
-        "SHA2_256" => "sha256"
-        "SHA2_384" => "sha384"
-        "SHA2_512" => "sha512"
-        other => other
-      }
-      guard logged_algorithm == expected_algorithm &&
+      guard logged_algorithm == algorithm.rekor_name() &&
         body_string(json_field(hash, "value"), "data.hash.value").to_lower() ==
         @encoding.encode_hex(digest) else {
         raise invalid(TransparencyLogBody("the logged digest differs from the message digest"))
@@ -334,17 +337,17 @@ fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Unit ra
   }
   guard certificate.extended_key_usage is Some(usages) &&
     usages.contains(@x509.EKU_CODE_SIGNING) else {
-    raise invalid(Certificate("the leaf is not for code signing"))
+    raise invalid(Certificate(NotForCodeSigning))
   }
   guard certificate.key_usage is Some(bits) &&
     (bits & @x509.KEY_USAGE_DIGITAL_SIGNATURE) != 0 else {
-    raise invalid(Certificate("the leaf key usage does not allow digital signatures"))
+    raise invalid(Certificate(NoDigitalSignature))
   }
   if certificate.unhandled_critical() is Some(oid) {
-    raise invalid(Certificate("the leaf has the unknown critical extension \{oid}"))
+    raise invalid(Certificate(UnknownCriticalExtension(oid)))
   }
   if certificate.basic_constraints is Some(constraints) && constraints.is_ca {
-    raise invalid(Certificate("the leaf is a certificate authority"))
+    raise invalid(Certificate(LeafIsAuthority))
   }
   let mut reason = "no trusted certificate authority issued the leaf"
   for authority in root.authorities {
@@ -425,7 +428,7 @@ fn check_sct(leaf : Leaf, issuer : @x509.Certificate, root : TrustedRoot) -> Uni
     BadSct(rule) => raise invalid(CertificateTimestamp(rule))
   }
   let tbs = leaf.certificate.tbs_without(@x509.SCT_LIST_OID) catch {
-    err => raise invalid(Certificate(err.message()))
+    err => raise invalid(Certificate(Unreadable(err.message())))
   }
   for sct in scts {
     guard root.ctlog(sct.log_id) is Some(log) else { continue }
@@ -488,14 +491,15 @@ fn check_content(
         raise invalid(ContentSignature)
       }
       let statement = read_statement(envelope.payload)
-      let expected = @encoding.encode_hex(artifact.to_bytes())
-      guard statement.subjects.iter().any(subject => subject.sha256 == Some(expected)) else {
+      guard statement.subjects.iter().any(subject => subject.sha256 == Some(artifact)) else {
         raise invalid(ArtifactDigestMismatch(artifact))
       }
       Some(statement)
     }
     Message(algorithm~, digest~, signature~) => {
-      guard algorithm == "SHA2_256" else { raise unsupported(DigestAlgorithm(algorithm)) }
+      guard algorithm is Sha2_256 else {
+        raise unsupported(DigestAlgorithm(algorithm.name()))
+      }
       guard digest.length() == 32 else {
         raise invalid(BundleShape("a SHA-256 message digest has 32 bytes"))
       }
@@ -516,8 +520,14 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
   let text = @utf8.decode(payload) catch {
     _ => raise invalid(Statement("the payload is not UTF-8"))
   }
-  let json = @json.parse(text) catch {
-    _ => raise invalid(Statement("the payload is not JSON"))
+  // Duplicate keys are refused, as protobuf JSON refuses them, so that no
+  // other reader can see another subject list in the same signed payload.
+  let json = @json.parse(text, reject_duplicate_keys=true) catch {
+    _ => raise invalid(Statement("the payload is not JSON, or has a duplicate key"))
+  }
+  guard json_field(json, "_type") is Some(String(statement_type)) &&
+    in_toto_statement_types.contains(statement_type) else {
+    raise invalid(Statement("the payload is not an in-toto statement"))
   }
   guard json_field(json, "predicateType") is Some(String(predicate_type)) else {
     raise invalid(Statement("the statement has no predicate type"))
@@ -531,12 +541,15 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
       raise invalid(Statement("a subject has no digest map, or more than \{max_subject_digests}"))
     }
     let sha256 = match digests.get("sha256") {
-      Some(String(hex)) =>
-        try @encoding.decode_hex(hex) catch {
+      Some(String(hex)) => {
+        let bytes = @encoding.decode_hex(hex) catch {
           _ => raise invalid(Statement("a subject digest is not hex"))
-        } noraise {
-          bytes => Some(@encoding.encode_hex(bytes))
         }
+        guard bytes.length() == 32 else {
+          raise invalid(Statement("a subject sha256 digest does not have 32 bytes"))
+        }
+        Some(ArtifactDigest::{ bytes, })
+      }
       Some(_) => raise invalid(Statement("a subject digest is not a string"))
       None => None
     }

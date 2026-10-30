@@ -11,6 +11,7 @@ pub suberror BundleError {
 pub extend BundleError with @debug.Debug::{to_repr}
 
 ///|
+/// Text for people that names the field and the rule.
 pub fn BundleError::message(self : BundleError) -> String {
   match self {
     UnsupportedBundleMediaType(media_type) =>
@@ -59,9 +60,51 @@ priv struct Envelope {
 }
 
 ///|
+/// The hash of a message digest, read from its protobuf enum name.
+priv enum DigestAlgorithm {
+  Sha2_256
+  Sha2_384
+  Sha2_512
+  /// Another `HashAlgorithm` name, such as `SHA3_256`.
+  OtherDigest(String)
+}
+
+///|
+fn DigestAlgorithm::from_name(name : String) -> DigestAlgorithm {
+  match name {
+    "SHA2_256" => Sha2_256
+    "SHA2_384" => Sha2_384
+    "SHA2_512" => Sha2_512
+    other => OtherDigest(other)
+  }
+}
+
+///|
+/// The name that Rekor writes in a hashedrekord body.
+fn DigestAlgorithm::rekor_name(self : DigestAlgorithm) -> String {
+  match self {
+    Sha2_256 => "sha256"
+    Sha2_384 => "sha384"
+    Sha2_512 => "sha512"
+    OtherDigest(name) => name
+  }
+}
+
+///|
+/// The protobuf enum name.
+fn DigestAlgorithm::name(self : DigestAlgorithm) -> String {
+  match self {
+    Sha2_256 => "SHA2_256"
+    Sha2_384 => "SHA2_384"
+    Sha2_512 => "SHA2_512"
+    OtherDigest(name) => name
+  }
+}
+
+///|
 priv enum Content {
   Dsse(Envelope)
-  Message(algorithm~ : String, digest~ : Bytes, signature~ : Bytes)
+  Message(algorithm~ : DigestAlgorithm, digest~ : Bytes, signature~ : Bytes)
 }
 
 ///|
@@ -137,13 +180,26 @@ pub fn Bundle::parse(text : StringView) -> Bundle raise BundleError {
 
 ///|
 fn parse_bundle(text : StringView) -> Bundle raise {
-  let root = fields(parse_json(text), "", [
-    "mediaType", "verificationMaterial", "messageSignature", "dsseEnvelope",
-  ])
-  let media_type = root.require_string("mediaType")
+  let json = parse_json(text)
+  // The media type comes first, so a later version with new fields is
+  // "not supported", not "invalid".
+  let raw_media_type = match json {
+    Object(map) =>
+      match map.get("mediaType") {
+        Some(value) => Some(value)
+        None => map.get("media_type")
+      }
+    _ => None
+  }
+  guard raw_media_type is Some(String(media_type)) else {
+    raise Shape("mediaType", "field is required")
+  }
   guard media_version(media_type) is Some(version) else {
     raise UnsupportedBundleMediaType(media_type)
   }
+  let root = fields(json, "", [
+    "mediaType", "verificationMaterial", "messageSignature", "dsseEnvelope",
+  ])
   let material = root.require_object("verificationMaterial", [
     "publicKey", "x509CertificateChain", "certificate", "tlogEntries", "timestampVerificationData",
   ])
@@ -222,7 +278,11 @@ fn read_envelope(envelope : Fields) -> Envelope raise Shape {
 fn read_message(message : Fields) -> Content raise Shape {
   let digest = message.require_object("messageDigest", ["algorithm", "digest"])
   Message(
-    algorithm=digest.enum_name("algorithm", hash_algorithm_names).unwrap_or("HASH_ALGORITHM_UNSPECIFIED"),
+    algorithm=DigestAlgorithm::from_name(
+      digest
+      .enum_name("algorithm", hash_algorithm_names)
+      .unwrap_or("HASH_ALGORITHM_UNSPECIFIED"),
+    ),
     digest=digest.require_bytes("digest"),
     signature=message.require_bytes("signature"),
   )

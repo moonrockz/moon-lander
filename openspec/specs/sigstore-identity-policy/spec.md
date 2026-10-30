@@ -9,7 +9,8 @@ match that identity against the Fulcio certificate of a verified bundle.
 ### Requirement: Typed identity values
 
 A policy SHALL be made only from parsed values: an OIDC issuer URL, a certificate
-identity, a GitHub repository, a workflow path, a Git ref and a runner environment.
+identity, a GitHub repository or owner, a workflow path, a Git ref, a GitHub ID and a
+predicate type.
 Each parse SHALL fail with a typed error that names the input and the broken rule.
 
 #### Scenario: Repository without owner
@@ -64,7 +65,8 @@ any ref.
 
 A policy SHALL optionally require a source repository, a source repository owner, a
 repository ID, an owner ID and a source ref. The verifier SHALL compare each with the
-matching Fulcio extension, exactly. A missing extension SHALL fail a required claim.
+matching Fulcio extension: repository and owner URLs without regard to ASCII case, as
+GitHub names are, and IDs and refs exactly. A missing extension SHALL fail a required claim.
 
 #### Scenario: Source repository
 
@@ -80,6 +82,22 @@ matching Fulcio extension, exactly. A missing extension SHALL fail a required cl
 
 - **WHEN** the policy requires the source ref `refs/heads/main` and extension `1.3.6.1.4.1.57264.1.14` is `refs/tags/provider-snapshot/v0.2.0`
 - **THEN** the verdict fails with a claim mismatch reason that names the source ref
+
+### Requirement: Match the predicate type
+
+A policy SHALL optionally require the predicate type of the in-toto statement. The
+GitHub workflow policy SHALL require `https://slsa.dev/provenance/v1` unless the caller
+gives another type. A bundle without a statement SHALL fail a required predicate type.
+
+#### Scenario: SBOM attestation for a provenance policy
+
+- **WHEN** a GitHub workflow policy with the default predicate type meets a statement with predicate type `https://spdx.dev/Document/v2.3`
+- **THEN** the verdict fails with a predicate type mismatch reason that gives both values
+
+#### Scenario: Provenance for an SBOM policy
+
+- **WHEN** the policy requires `https://spdx.dev/Document/v2.3` and the morphir-rust bundle has SLSA provenance v1
+- **THEN** the verdict fails with a predicate type mismatch reason
 
 ### Requirement: Refuse self-hosted runners
 

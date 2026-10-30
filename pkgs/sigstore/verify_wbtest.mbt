@@ -113,12 +113,12 @@ test "message signature content checks" {
     step_rejection(() => ignore(check_content(bundle, leaf, other))),
     Some(Invalid(ArtifactDigestMismatch(other))),
   )
-  let sha384 = { ..bundle, content: Message(algorithm="SHA2_384", digest~, signature~) }
+  let sha384 = { ..bundle, content: Message(algorithm=Sha2_384, digest~, signature~) }
   assert_eq(
     step_rejection(() => ignore(check_content(sha384, leaf, artifact))),
     Some(Unsupported(DigestAlgorithm("SHA2_384"))),
   )
-  assert_eq(algorithm, "SHA2_256")
+  assert_true(algorithm is Sha2_256)
   let short = {
     ..bundle,
     content: Message(algorithm~, digest=Bytes::from_array(digest.to_array()[:31].to_owned()), signature~),
@@ -168,33 +168,54 @@ test "read_statement refuses a payload that is not a statement" {
     step_rejection(() => ignore(read_statement(b"\xff\xfe"))),
     Some(Invalid(Statement("the payload is not UTF-8"))),
   )
-  assert_eq(reason("{"), Some(Invalid(Statement("the payload is not JSON"))))
   assert_eq(
-    reason("{\"subject\":[]}"),
+    reason("{"),
+    Some(Invalid(Statement("the payload is not JSON, or has a duplicate key"))),
+  )
+  assert_eq(
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"subject\":[],\"subject\":[]}"),
+    Some(Invalid(Statement("the payload is not JSON, or has a duplicate key"))),
+  )
+  assert_eq(
+    reason("{\"_type\":\"https://example.com/v1\",\"predicateType\":\"p\",\"subject\":[]}"),
+    Some(Invalid(Statement("the payload is not an in-toto statement"))),
+  )
+  assert_eq(
+    reason("{\"_type\":\"https://in-toto.io/Statement/v0.1\",\"subject\":[]}"),
     Some(Invalid(Statement("the statement has no predicate type"))),
   )
-  assert_true(reason("{\"predicateType\":\"p\"}") is Some(Invalid(Statement(_))))
+  assert_true(reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\"}") is Some(Invalid(Statement(_))))
   assert_true(
-    reason("{\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\"}]}") is
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\"}]}") is
     Some(Invalid(Statement(_))),
   )
   assert_eq(
-    reason("{\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}"),
     Some(Invalid(Statement("a subject digest is not hex"))),
   )
   assert_eq(
-    reason("{\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}"),
     Some(Invalid(Statement("a subject digest is not a string"))),
+  )
+  assert_eq(
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":\"\{"ab".repeat(31)}\"}}]}"),
+    Some(Invalid(Statement("a subject sha256 digest does not have 32 bytes"))),
   )
   // Upper-case hex is read as lower-case; a subject without sha256 is kept.
   let statement = read_statement(
     @encoding.utf8(
-      "{\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\",\"digest\":{\"sha256\":\"AB\"}},{\"digest\":{\"sha512\":\"00\"}}]}",
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\",\"digest\":{\"sha256\":\"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB\"}},{\"digest\":{\"sha512\":\"00\"}}]}",
     ),
   ) catch {
     Stop(_) => fail("refused")
   }
-  assert_eq(statement.subjects, [{ name: "a", sha256: Some("ab") }, { name: "", sha256: None }])
+  assert_eq(statement.subjects.length(), 2)
+  assert_eq(statement.subjects[0].name, "a")
+  assert_eq(
+    statement.subjects[0].sha256.map(digest => digest.to_string()),
+    Some("sha256:abababababababababababababababababababababababababababababababab"),
+  )
+  assert_eq(statement.subjects[1].sha256, None)
 }
 
 ///|
@@ -202,7 +223,7 @@ test "read_statement limits subjects and digests" {
   fn subjects(count : Int, digests : Int) -> Bytes {
     let digest_map = Array::makei(digests, index => "\"d\{index}\":\"00\"").join(",")
     let items = Array::make(count, "{\"digest\":{\{digest_map}}}").join(",")
-    @encoding.utf8("{\"predicateType\":\"p\",\"subject\":[\{items}]}")
+    @encoding.utf8("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[\{items}]}")
   }
 
   assert_eq(step_rejection(() => ignore(read_statement(subjects(1024, 1)))), None)

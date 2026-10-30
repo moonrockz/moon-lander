@@ -2,7 +2,9 @@
 /// A point in time, UTC, with nanosecond precision. The caller reads the clock
 /// and gives "now" as an `Instant`; the library never reads a clock.
 pub struct Instant {
-  priv nanos : Int64
+  priv seconds : Int64
+  /// Nanoseconds after `seconds`, from 0 to 999 999 999.
+  priv nanos : Int
 } derive(Eq, Compare, Debug)
 
 ///|
@@ -15,23 +17,15 @@ pub extend Instant with Compare::{compare, op_lt, op_le, op_ge, op_gt}
 pub extend Instant with @debug.Debug::{to_repr}
 
 ///|
-let nanos_per_second : Int64 = 1_000_000_000L
-
-///|
-/// The instant `seconds` after 1970-01-01T00:00:00Z.
+/// The instant `seconds` after 1970-01-01T00:00:00Z. Every `Int64` is valid.
 pub fn Instant::from_unix_seconds(seconds : Int64) -> Instant {
-  { nanos: seconds * nanos_per_second }
+  { seconds, nanos: 0 }
 }
 
 ///|
 /// Whole seconds since 1970-01-01T00:00:00Z, rounded down.
 pub fn Instant::unix_seconds(self : Instant) -> Int64 {
-  let seconds = self.nanos / nanos_per_second
-  if self.nanos % nanos_per_second < 0L {
-    seconds - 1L
-  } else {
-    seconds
-  }
+  self.seconds
 }
 
 ///|
@@ -85,7 +79,7 @@ fn parse_timestamp(text : String) -> Instant? {
     return None
   }
   let mut at = 19
-  let mut fraction = 0L
+  let mut fraction = 0
   if char_at(at, '.') {
     at += 1
     let mut digits = 0
@@ -93,13 +87,13 @@ fn parse_timestamp(text : String) -> Instant? {
           text[at].to_int() >= '0'.to_int() &&
           text[at].to_int() <= '9'.to_int() {
       guard digits < 9 else { return None }
-      fraction = fraction * 10L + (text[at].to_int() - '0'.to_int()).to_int64()
+      fraction = fraction * 10 + (text[at].to_int() - '0'.to_int())
       digits += 1
       at += 1
     }
     guard digits > 0 else { return None }
     for _ in digits..<9 {
-      fraction = fraction * 10L
+      fraction = fraction * 10
     }
   }
   let offset = if char_at(at, 'Z') && at + 1 == text.length() {
@@ -122,5 +116,5 @@ fn parse_timestamp(text : String) -> Instant? {
   }
   let seconds = @der.unix_seconds(year, month, day, hour, minute, second) -
     offset.to_int64()
-  Some({ nanos: seconds * nanos_per_second + fraction })
+  Some({ seconds, nanos: fraction })
 }

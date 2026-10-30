@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.8.0 - 2026-10-29
+
+All ten libraries share this minor version. The optional actors module is
+published for the first time. Existing public APIs remain compatible.
+
+### Added
+
+- `moonrockz/moon-lander-actors`: local typed actors with private state,
+  scope-owned lifetimes and bounded FIFO mailboxes. Add blocking admission,
+  nonblocking `try_send`, backpressure and cancellation-safe admission.
+- Composable `Receive` values, selective receive, state actors, deterministic
+  message-based test runners and stack-safe receive loops. The policy root
+  supports wasm, wasm-gc, JavaScript and native; the actor runtime supports wasm,
+  JavaScript and native.
+- Typed request/reply with admission-and-reply deadlines, subjects, services and
+  responders. Add close, drain, cancellation, protected cleanup, initialization,
+  child scopes, scoped names and addresses, immutable directories and event
+  topics. The actors module imports only core and `moonbitlang/async` and remains
+  separate from the umbrella module.
+- Notebook virtual text file trees with checked relative paths, explicit empty
+  directories and typed conflict errors. DIB file declarations and Jupyter
+  `metadata.vfs` read and write the same portable model through `TreeFormat`.
+- Whole source-notebook conversion between DIB and Jupyter, with preserved cell
+  order, empty cells, source boundaries and custom kernel identities. The default
+  policy rejects reported losses; explicit `SourceOnly` returns typed loss
+  reports with the converted notebook and serialized text.
+- Configured DIB `Codec` and the open `KernelDescriptor` trait for shared kernel
+  registration and source-mode settings.
+
+### Changed
+
+- Replace the private docs generator with published Telescope 0.5.1, retaining
+  docs/API routes, anchors, diagrams, search and versioned release assets.
+- Add the Moonrockz bunny-and-lander mascot, logos and browser icons, a new
+  landing page, and Smithy light/dark colors. Native Windows docs tooling uses
+  the upstream host-path repair and a tested local API-index link adapter.
+- Publish and verify the actors library alongside the existing nine libraries,
+  with isolated candidate/public consumers and supported-target checks.
+
+### Fixed
+
+- Read nested Polyglot and legacy kernelInfo registrations so custom notebook
+  kernels remain self-describing after source conversion.
+
 ## 0.7.3 - 2026-10-28
 
 All nine libraries share this patch version.

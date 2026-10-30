@@ -1,0 +1,33 @@
+Generated with the built-in image_gen tool with transparent_background=true.
+The PNG files are raster originals. There is no vector source.
+
+Visual references:
+https://github.com/moonrockz/smithy/blob/main/site/public/moonrockz.png
+https://github.com/moonrockz/smithy/blob/main/docs/assets/brand/smithy-badge-1024.png
+https://github.com/moonrockz/diagrams.mbt/blob/main/docs/assets/brand/diagrams-badge.png
+
+Primary badge
+Use case: logo-brand.
+Create ONE finished square transparent PNG primary badge logo for the Moon-Lander application framework, as a new sibling in the moonrockz project family.
+Reference image 1 is the original moonrockz mascot and defines character identity. Reference image 2 is Smithy and reference image 3 is Diagrams; use their shared painted cartoon rendering, lunar badge composition and dimensional lettering. These are visual references, not edit targets.
+Preserve the SAME recognizable cheerful pink bunny: two tall swept pink ears with darker pink interiors, large happy oval eyes with navy pupils, fluffy WHITE cheek muzzle, tiny pink nose, friendly open grin, white chest, bright pink paws, thick very dark navy outlines, soft painted highlights. Keep its face large and its ears free and clearly visible.
+New Moon-Lander scene: the bunny is piloting a small charming APOLLO-STYLE LUNAR LANDER, seated visibly in its open upper cockpit with a white-and-gray astronaut backpack. One pink paw rests on the cockpit rim and the other operates a short control lever. The squat lander has a cool silver upper rim, warm ochre-gold faceted lower hull, FOUR splayed landing struts ending in broad round footpads, and one central engine nozzle. Show a compact three-quarter view with landing feet resting on the cratered gray moon surface. No flames on landed craft. Lander is broad and legible, bunny larger than cockpit, face never obscured behind glass. Warm gold is the project-specific accent.
+A round midnight navy starry space badge behind the scene, restrained dark blue rim, a small blue Earth and a few floating gray moon rocks in background. Gray cratered moon ground along bottom. Bunny ears extend above the circle, like the family reference. Compact centered silhouette with 4 percent clear margins; no cropping.
+Exact lettering below scene: "moon-lander" entirely lowercase, m o o n hyphen l a n d e r. Large rounded chunky white dimensional letters, cool gray shaded lower faces, thick midnight navy outline with subtle dark blue outer edging, same lettering family as Smithy and Diagrams. Spell correctly and include the hyphen. Lettering follows a gentle arc or straight baseline and is completely legible.
+True transparent alpha outside the complete badge, ears, footpads and wordmark. No opaque rectangular backdrop, no checkerboard, no extra words, no tagline, no watermark. One finished logo only, no design sheet or mockup. Target 1024 x 1024 or higher square.
+
+Small icon
+Use case: logo-brand.
+Asset type: one finished square PNG app icon / browser favicon for Moon-Lander in the moonrockz family. This is a NEW painting. Reference 1 is the original Moonrockz mascot, reference 2 the Smithy sibling logo, and reference 3 the Diagrams sibling logo. Preserve the same character identity and softly painted cartoon style.
+Design intentionally for 16 x 16 px reading: very few LARGE BOLD shapes, thick midnight navy outlines, very large pink bunny face and broad white muzzle, simple two-tone shading, no tiny texture.
+Inside a perfectly circular midnight navy badge with a restrained dark blue rim show the SAME happy pink bunny HEAD with TWO tall swept pink ears and dark pink interiors, large cheerful white oval eyes with navy pupils, a small pink nose, broad fluffy WHITE cheek muzzle, simple open friendly smile. Bunny face fills most of the lower middle, ears fill the top and fit entirely inside circle. Keep exact original cheerful face identity; not a different rabbit.
+Moon-Lander-specific cue: a very SIMPLE ochre-GOLD LUNAR LANDER COCKPIT immediately below the chin. Just a wide shallow gold trapezoid with a silver upper rim and TWO short dark outlined diagonal landing legs ending in chunky gold footpads, spread toward lower sides, fully inside the disc. No control panel, no buttons, no full spacecraft body, no torso, no arms, no helmet. The bunny appears to peek out of the gold lander. Face and ears dominate, the gold base is a strong simple accent at bottom.
+Fill square with circle leaving 3 percent transparent margin all around. Entire content fits INSIDE the circle. No protruding ears or feet. Navy circle, pink ears, white cheeks and gold lander form bold contrasting masses. No background stars, no Earth, no rocks, no ground, no text, no wordmark, no letters, no watermark. No electric blue glow. Real alpha transparency outside circle, no checkerboard or solid rectangle. One icon, no sheet, no mockup. Target 1024 x 1024 square or larger.
+
+Standalone mark
+Use case: logo-brand.
+Asset type: a standalone transparent mascot mark for Moon-Lander, companion to the primary badge.
+Input reference image 1 is the FINISHED Moon-Lander primary badge. It defines the exact bunny identity, pink/white/navy/gold palette, spacecraft design and softly painted cartoon illustration style. Create a NEW companion drawing of the same bunny in the same gold lunar lander, without scenery, lettering or badge.
+Keep this recognizable pink moonrockz bunny: two tall swept ears with deep pink interiors, cheerful large oval eyes, white fluffy cheek muzzle, small pink nose, friendly open grin, white chest, white/gray backpack, dark navy outlines and softly painted highlights.
+Compose a compact three-quarter view, bunny piloting a squat warm gold lunar lander with silver upper cockpit rim, holding the gold-topped control lever with one paw and resting the other paw on the rim. Bunny face stays very large, both ears fully visible. Below cockpit the wide faceted ochre-gold hull, FOUR splayed landing legs with round gold footpads and a central dark engine nozzle. Match the reference gold spacecraft with its silver trim. All feet in view, minimal small controls, no flames. Preserve coherent anatomy and unmistakable lander silhouette.
+Isolated bunny and spacecraft ONLY, entirely surrounded by true alpha transparency, including between the legs and ears. No wordmark, no letters, no circle, no stars, no Earth, no rocks, no ground, no shadow beneath, no rectangular background, no checkerboard, no watermark. Soft painted dimensional cartoon, not flat vector, not photorealistic. Fill the square with a comfortable 5 percent margin so no ears or footpads touch canvas edges. One finished mark, no grid or mockup. Target 1024 x 1024 square or larger.

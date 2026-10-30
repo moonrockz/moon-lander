@@ -1,5 +1,6 @@
 import {
-  "moonrockz/moon-lander-site/model",
+  "moonrockz/telescope/model",
+  "moonrockz/telescope/host",
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/process",
@@ -8,6 +9,7 @@ import {
   "moonbitlang/x/sys",
 }
 
+// This private host tool uses native process and filesystem APIs for release archives.
 supported_targets = "native"
 
 pkgtype(kind: "executable")

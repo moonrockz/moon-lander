@@ -1,8 +1,0 @@
-{
-  "title": "API fixture",
-  "description": "A fixture for the API pages",
-  "base_path": "/fixture/",
-  "site_url": "https://example.org/fixture/",
-  "repo_url": "https://example.org/repo",
-  "api": ["pkgs/notebooks"]
-}

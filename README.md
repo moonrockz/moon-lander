@@ -1,5 +1,9 @@
 # Moon-Lander
 
+<p align="center">
+  <img src="docs/assets/moon-lander-badge.png" alt="The pink Moonrockz bunny piloting a gold lunar lander above the moon-lander wordmark" width="360" />
+</p>
+
 Moon-Lander is an application framework for MoonBit. It has no user interface.
 
 Build an application once and land it on a host. A host can be the web, WebAssembly, or a native process.
@@ -232,7 +236,8 @@ script. Also update the assessed versions above.
   `openspec/specs/openrpc-documents/` and `openspec/specs/openrpc-rollout/`;
   Smithy consumes the published `0.2.0`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
-  builds the static site at `https://moonrockz.github.io/moon-lander/` with Rabbita.
+  builds the static site at `https://moonrockz.github.io/moon-lander/` with
+  `moonrockz/telescope@0.5.1`. It owns the Moon-Lander landing page and content adapters.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress

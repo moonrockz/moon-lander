@@ -1,0 +1,2 @@
+import { "moonbitlang/core/string", "moonbitlang/core/debug" }
+import { "moonrockz/moon-lander-site/policy" } for "test"

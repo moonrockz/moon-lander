@@ -30,7 +30,9 @@ let member_roots : Array[String] = ["pkgs", "apps"]
 
 ///|
 /// UI libraries. Only the docs tool can import them.
-let ui_libraries : Array[String] = ["moonbit-community/rabbita"]
+let ui_libraries : Array[String] = [
+  "moonbit-community/rabbita", "moonrockz/telescope",
+]
 
 ///|
 /// The unpublished docs tool, the only module that can import a UI library.
@@ -353,6 +355,13 @@ test "the docs tool can import Rabbita" {
     #|  "moonbit-community/rabbita@0.16.5",
     #|}
   assert_eq(ui_import_errors("apps/site", manifest), [])
+}
+
+///|
+test "Telescope is restricted to the private docs tool" {
+  let manifest = "import {\n  \"moonrockz/telescope@0.4.0\",\n}\n"
+  assert_eq(ui_import_errors("apps/site", manifest), [])
+  assert_eq(ui_import_errors("pkgs/lander", manifest).length(), 1)
 }
 
 ///|

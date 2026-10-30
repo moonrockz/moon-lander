@@ -1,0 +1,16 @@
+import {
+  "moonrockz/telescope/host",
+  "moonrockz/telescope/model",
+  "moonrockz/telescope/content",
+  "moonrockz/telescope/site",
+  "moonrockz/moon-lander-site/providers",
+  "moonrockz/moon-lander-site/policy",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+// The shared host performs native filesystem and process I/O.
+supported_targets = "native"

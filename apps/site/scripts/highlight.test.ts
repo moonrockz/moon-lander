@@ -22,6 +22,19 @@ test('unknown languages stay plain with a warning', async () => {
   assert.deepEqual(warnings, ['unknown language `cobol`']);
 });
 
+test('API signatures keep local links and show unselected packages as text', async () => {
+  const source = '<pre class="api-signature"><code><a href="#Local">Local</a> '+
+    '<a href="/moon-lander/api/other/#T">T</a> '+
+    '<a href="https://mooncakes.io/docs/moonbitlang/core">Eq</a></code></pre>'+
+    '<p><a href="https://example.test/">Outside prose</a></p>';
+  const { html } = await highlightHtml(source);
+  assert.match(html, /href="#Local"/);
+  assert.match(html, /href="\/moon-lander\/api\/other\/#T"/);
+  assert.doesNotMatch(html, /href="https:\/\/mooncakes/);
+  assert.match(html, / Eq<\/code>/);
+  assert.match(html, /href="https:\/\/example.test/);
+});
+
 test('text, plaintext and txt stay plain without a warning', async () => {
   for (const lang of ['text', 'plaintext', 'txt']) {
     const source = `<pre><code class="language-${lang}">a b</code></pre>`;

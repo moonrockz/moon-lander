@@ -5,7 +5,7 @@ extern "C" fn start_console(
   wasm : String, wasm_length : Int,
   node : String, node_length : Int,
   owner : String, owner_length : Int,
-  baseline : Int,
+  mode : Int,
 ) -> Int = "lander_moonx_console_start"
 
 ///|
@@ -24,7 +24,7 @@ extern "C" fn close_console() -> Unit = "lander_moonx_console_close"
 extern "C" fn process_running(pid : Int) -> Int = "lander_moonx_process_running"
 
 ///|
-priv enum ConsoleTarget { Baseline; Launcher }
+priv enum ConsoleTarget { Baseline; BaselineGroup; Launcher; LauncherGroup }
 
 ///|
 priv enum ConsoleEvent { Interrupt; Break }
@@ -36,7 +36,9 @@ suberror ControllerInputError { InvalidControllerInput(String) }
 fn ConsoleTarget::parse(input : String) -> ConsoleTarget raise ControllerInputError {
   match input {
     "baseline" => Baseline
+    "baseline-group" => BaselineGroup
     "launcher" => Launcher
+    "launcher-group" => LauncherGroup
     _ => raise InvalidControllerInput(input)
   }
 }
@@ -59,7 +61,7 @@ async fn main {
   let server = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
   let pid = start_console(runner, runner.length(), wasm, wasm.length(), node, node.length(), owner, owner.length(),
-    if target is Baseline { 1 } else { 0 })
+    match target { Baseline => 1; BaselineGroup => 3; Launcher => 0; LauncherGroup => 2 })
   let error = last_error()
   assert_true(pid != 0, msg="CreateProcessW: " + error.to_string())
   defer close_console()

@@ -41,8 +41,10 @@ int32_t lander_moonx_console_start(
   moonbit_string_t wasm, int32_t wasm_len,
   moonbit_string_t node, int32_t node_len,
   moonbit_string_t owner, int32_t owner_len,
-  int32_t baseline
+  int32_t mode
 ) {
+  int32_t baseline = mode & 1;
+  int32_t grouped = mode & 2;
   WCHAR *exe = copy_text(baseline ? node : runner, baseline ? node_len : runner_len);
   size_t capacity = ((size_t)runner_len + wasm_len + node_len + owner_len) * 2 + 64;
   WCHAR *command = (WCHAR *)calloc(capacity, sizeof(WCHAR));
@@ -65,7 +67,8 @@ int32_t lander_moonx_console_start(
   // The async test runner creates a process group that can inherit an ignored
   // Ctrl-C attribute. Start from a fresh ordinary controller console, restore
   // its redirected pipes, and clear that inherited attribute before creating
-  // the independently isolated target console. No stock executable is patched.
+  // the target, which inherits this isolated console. No stock executable is
+  // patched. Only targeted Ctrl-Break cases create a new process group.
   FreeConsole();
   if (!AllocConsole()) { error = GetLastError(); goto done; }
   for (int i = 0; i < 3; i++) SetStdHandle(ids[i], original[i]);
@@ -97,8 +100,9 @@ int32_t lander_moonx_console_start(
     startup.StartupInfo.hStdError = handles[2];
     startup.lpAttributeList = attributes;
     ZeroMemory(&owned_process, sizeof(owned_process));
-    DWORD flags = CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT |
+    DWORD flags = CREATE_UNICODE_ENVIRONMENT |
                   EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED;
+    if (grouped) flags |= CREATE_NEW_PROCESS_GROUP;
     if (!CreateProcessW(exe, command, NULL, NULL, TRUE, flags, NULL, NULL,
                         &startup.StartupInfo, &owned_process)) error = GetLastError();
   }

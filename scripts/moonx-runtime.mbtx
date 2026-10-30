@@ -499,6 +499,9 @@ async fn retained_tests(stage : String, target : String) -> Unit {
     if file == "process/wait_test.mbt" {
       text = adapt_basic_wait(text)
     }
+    if file == "fs/lock_test.mbt" {
+      text = adapt_lock_tests(text)
+    }
     if file == "all_any_test.mbt" {
       // Source locations change when wrapping the compiler entry. Preserve the
       // exact semantic error assertion without an upstream line-number snapshot.
@@ -868,5 +871,31 @@ fn adapt_basic_wait(source : String) -> String raise {
     #|    assert_eq(waiting.wait(), 0)
     #|  }
     #|}
+  patch_once(source, original, replacement)
+}
+
+///|
+fn adapt_lock_tests(source : String) -> String raise {
+  // A cold child can start after the upstream 250ms sleep. In that case the
+  // parent acquires the exclusive lock first and waits forever for the child.
+  // Keep every lock assertion, but return only after the child owns its lock.
+  let original =
+    #|  group.spawn() <| () => {
+    #|    defer r.close()
+    #|    while r.read_until("\n") is Some(line) {
+    #|      log.push(prefix + line)
+    #|    }
+    #|  }
+  let replacement =
+    #|  let ready = @async.Semaphore(0)
+    #|  let reader = group.spawn(() => {
+    #|    defer r.close()
+    #|    while r.read_until("\n") is Some(line) {
+    #|      log.push(prefix + line)
+    #|      if line == "acquired lock" { ready.release() }
+    #|    }
+    #|  })
+    #|  @runtime_testing.wait_ready(ready)
+    #|  reader
   patch_once(source, original, replacement)
 }

@@ -21,5 +21,8 @@ The test harness declares its entry, path and readiness adaptations in
 unchanged. Signal cases wait for the actual fixture handler stage rather than a
 fixed startup sleep, retaining their stop/finalizer assertions. The basic wait
 case checks pending/completed states around an explicit child release. Retained
+file-lock helpers acknowledge actual lock acquisition before returning, avoiding
+an exclusive-lock deadlock during cold child startup. Original lock assertions
+remain unchanged. Retained
 native and Wasm suites run sequentially because original timestamp fixtures use
 shared `/tmp` names.

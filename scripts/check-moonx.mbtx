@@ -665,8 +665,12 @@ async fn windows_console(
         group,
         controller,
         [
-          if baseline {
+          if baseline && !interrupt {
+            "baseline-group"
+          } else if baseline {
             "baseline"
+          } else if !interrupt {
+            "launcher-group"
           } else {
             "launcher"
           },

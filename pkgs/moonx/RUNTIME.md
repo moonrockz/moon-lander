@@ -64,3 +64,8 @@ release and checks that the real wait is pending before release and returns its
 actual status afterward. These declared test-only adaptations remove cold-start
 sleep assumptions; readiness waits have a real timeout. They do not modify the
 published runtime or application protocol.
+
+The retained file-lock helper also waits for its actual `acquired lock` line
+before returning. Otherwise a cold child can lose the race to the parent's
+`try_lock`, leaving the child blocked while the parent waits for its completion.
+All original lock, cancellation and log assertions remain in place.

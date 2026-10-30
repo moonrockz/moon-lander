@@ -1,5 +1,6 @@
 # Release: plan, validate, publish, verify, GitHub release. Adapted from
-# Smithy's release flow (CONTRIBUTING.md). Moon-Lander ships no binaries.
+# Smithy's release flow (CONTRIBUTING.md). Mooncakes serves launcher Wasm;
+# the GitHub release asset contains the documentation site.
 #
 # plan      decides if this run releases: a push to main that changes moon.mod
 #           or a vX.Y.Z tag, when vX.Y.Z has no GitHub release yet and

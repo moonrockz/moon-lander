@@ -133,6 +133,7 @@ priv struct StockToolchain {
 priv enum StockProgram {
   Moon
   Moonrun
+  Moonx
 }
 
 ///|
@@ -140,6 +141,7 @@ fn stock_program(root : String, program : StockProgram) -> String {
   let name = match program {
     Moon => "moon"
     Moonrun => "moonrun"
+    Moonx => "moonx"
   }
   root +
   "/bin/" +
@@ -570,6 +572,18 @@ async fn candidate_moonx(
   let version = workspace_version(@fs.read_file("moon.mod").text())
   let wasm = @fs.read_file(launch).binary()
   let checksum = @crypto.bytes_to_hex_string(@crypto.sha256(wasm))
+  let package_dir = stage + "/candidate-package"
+  let (code, _, error) = @process.collect_output(
+    stock_program(tools.root, Moon),
+    ["package", "--target-dir", package_dir],
+    cwd=stage + "/library",
+    extra_env=tools.environment,
+  )
+  assert_eq(code, 0, msg=error.text())
+  let archive = @fs.read_file(
+    package_dir + "/publish/moonrockz-moon-lander-moonx-" + version + ".zip",
+  ).binary()
+  let archive_checksum = @crypto.bytes_to_hex_string(@crypto.sha256(archive))
   let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
   defer server.close()
   let home = stage + "/cold-moonx-home"
@@ -578,7 +592,7 @@ async fn candidate_moonx(
     "name": "moonrockz/moon-lander-moonx",
     "version": Json(version),
     "deps": { "moonbitlang/x": "0.5.6" },
-    "checksum": Json(checksum),
+    "checksum": Json(archive_checksum),
   }
   @fs.write_file(
     home + "/registry/index/user/moonrockz/moon-lander-moonx.index",
@@ -591,6 +605,7 @@ async fn candidate_moonx(
   @fs.write_file(home + "/config.json", config.stringify())
   let requests : Array[String] = []
   let stops : Array[Json] = []
+  let transports : Array[Json] = []
   @async.with_timeout(120000, () => {
     @async.with_task_group(group => {
       group.spawn_bg(no_wait=true, () => {
@@ -624,7 +639,7 @@ async fn candidate_moonx(
       let environment = tools.environment.copy()
       environment.set("MOON_HOME", home)
       let (code, output, error) = @process.collect_output(
-        tools.root + "/bin/moonx",
+        stock_program(tools.root, Moonx),
         ["moonrockz/moon-lander-moonx/launch@" + version, "--json", "--help"],
         extra_env=environment,
       )
@@ -633,22 +648,35 @@ async fn candidate_moonx(
         is { "kind": "help", "exit_status": 0, .. } else {
         fail(output.text())
       }
-      for signal in [Interrupt, Terminate] {
+      transports.push(top_finite(tools, stage, home))
+      transports.push(
+        binary_transport(tools, stage, launch, moonx_home=Some(home)),
+      )
+      if @env.get_env_var("OS") != Some("Windows_NT") {
+        for signal in [Interrupt, Terminate] {
+          stops.push(
+            host_signal(
+              tools,
+              stage,
+              launch,
+              host,
+              signal,
+              moonx_home=Some(home),
+            ),
+          )
+        }
         stops.push(
-          host_signal(tools, stage, launch, host, signal, moonx_home=Some(home)),
+          host_signal(
+            tools,
+            stage,
+            launch,
+            host,
+            Interrupt,
+            moonx_home=Some(home),
+            repeated=true,
+          ),
         )
       }
-      stops.push(
-        host_signal(
-          tools,
-          stage,
-          launch,
-          host,
-          Interrupt,
-          moonx_home=Some(home),
-          repeated=true,
-        ),
-      )
     })
   })
   assert_eq(
@@ -671,6 +699,8 @@ async fn candidate_moonx(
     "publicPublication": false,
     "freshHome": true,
     "wasmSha256": Json(checksum),
+    "candidateArchiveSha256": Json(archive_checksum),
+    "transportCases": Json(transports),
     "requests": Json(requests),
     "hostStops": Json(stops),
   }
@@ -1173,7 +1203,22 @@ async fn binary_transport(
   tools : StockToolchain,
   stage : String,
   launch : String,
+  moonx_home~ : String? = None,
 ) -> Json {
+  let environment = tools.environment.copy()
+  let (program, prefix) = match moonx_home {
+    None => (stock_program(tools.root, Moonrun), [launch, "--"])
+    Some(home) => {
+      environment.set("MOON_HOME", home)
+      (
+        stock_program(tools.root, Moonx),
+        [
+          "moonrockz/moon-lander-moonx/launch@" +
+          workspace_version(@fs.read_file("moon.mod").text()),
+        ],
+      )
+    }
+  }
   @fs.write_file(stage + "/binary.cjs", @fs.read_file(fixtures + "/binary.cjs"))
   let (stdin, writer) = @process.write_to_process()
   defer writer.close()
@@ -1186,10 +1231,9 @@ async fn binary_transport(
     @async.with_task_group(group => {
       let child = @process.spawn(
         group,
-        stock_program(tools.root, Moonrun),
+        program,
+        prefix +
         [
-          launch,
-          "--",
           "--json",
           "--",
           "node",
@@ -1202,7 +1246,7 @@ async fn binary_transport(
         stdin~,
         stdout~,
         stderr~,
-        extra_env=tools.environment,
+        extra_env=environment,
       )
       let output = group.spawn(() => reader.read_all().binary())
       let diagnostics = group.spawn(() => errors.read_all().text())
@@ -1219,6 +1263,11 @@ async fn binary_transport(
       {
         "stock": tools.version.text(),
         "scenario": "public-launch-binary-transport",
+        "entry": if moonx_home is None {
+          "moonrun"
+        } else {
+          "stock-moonx"
+        },
         "byteCount": bytes.length(),
         "exactBinaryOutput": true,
         "separateStderr": true,
@@ -1246,6 +1295,37 @@ async fn verify_cached_asset(
     }
   }
   found
+}
+
+///|
+async fn top_finite(
+  tools : StockToolchain,
+  stage : String,
+  home : String,
+) -> Json {
+  @fs.write_file(
+    stage + "/command.cjs",
+    @fs.read_file(fixtures + "/command.cjs"),
+  )
+  let environment = tools.environment.copy()
+  environment.set("MOON_HOME", home)
+  let coordinate = "moonrockz/moon-lander-moonx/launch@" +
+    workspace_version(@fs.read_file("moon.mod").text())
+  let arguments = ["", "--help", "--json", "é🙂"]
+  let (code, output, error) = @process.collect_output(
+    stock_program(tools.root, Moonx),
+    [coordinate, "--json", "--", "node", stage + "/command.cjs"] + arguments,
+    extra_env=environment,
+  )
+  assert_eq(code, 23, msg=error.text())
+  assert_eq(error.text(), "")
+  assert_eq(@json.parse(output.text()), { "ok": true, "argv": Json(arguments) })
+  {
+    "scenario": "stock-moonx-finite-opaque-json",
+    "wholeChildDocument": true,
+    "exactArguments": true,
+    "selected": 23,
+  }
 }
 
 ///|
@@ -1283,28 +1363,35 @@ async fn published_moonx(
   advertised.check(body.binary())
   assert_eq(verify_cached_asset(home, advertised), 1)
   let stops : Array[Json] = []
-  for signal in [Interrupt, Terminate] {
+  let transports = [
+    top_finite(tools, stage, home),
+    binary_transport(tools, stage, "", moonx_home=Some(home)),
+  ]
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    for signal in [Interrupt, Terminate] {
+      stops.push(
+        host_signal(tools, stage, "", host, signal, moonx_home=Some(home)),
+      )
+    }
     stops.push(
-      host_signal(tools, stage, "", host, signal, moonx_home=Some(home)),
+      host_signal(
+        tools,
+        stage,
+        "",
+        host,
+        Interrupt,
+        moonx_home=Some(home),
+        repeated=true,
+      ),
     )
   }
-  stops.push(
-    host_signal(
-      tools,
-      stage,
-      "",
-      host,
-      Interrupt,
-      moonx_home=Some(home),
-      repeated=true,
-    ),
-  )
   {
     "scenario": "stock-moonx-public-registry",
     "defaultRegistry": true,
     "freshHome": true,
     "publicAssetUrl": Json(asset),
     "advertisedAndCachedWasmSha256": Json(advertised.text),
+    "transportCases": Json(transports),
     "hostStops": Json(stops),
   }
 }
@@ -1612,6 +1699,11 @@ async fn main {
       results.push(published_moonx(tools, stage, host))
     }
   } else {
+    if published is None {
+      results.push(candidate_moonx(tools, stage, launch, host))
+    } else {
+      results.push(published_moonx(tools, stage, host))
+    }
     let controller = windows_controller(tools, stage)
     let failures : Array[String] = []
     for

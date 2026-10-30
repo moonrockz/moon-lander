@@ -123,3 +123,22 @@ See [RUNTIME.md](RUNTIME.md) for provenance, retained tests, maintenance and the
 return path to a released public upstream observer. Existing hosting, actor and
 embedded applications continue using canonical async and must not import this
 owned runtime into their executable.
+
+## Qualification and public release proof
+
+`mise run check:moonx` and `mise run check:moonx-stock16` build independent
+consumers with the two supported stock toolchains. They check real console-host
+completion, idle stdin, repeated signals during finalization, ignored-signal
+forced reaping, cancellation during materialization, and opaque binary streams.
+The candidate registry serves only the public `/launch` Wasm asset and its
+checksum to a fresh Moonx home. Its report explicitly says it is local evidence.
+
+After publication, `mise run check:moonx-published` reads the pre-publication
+approved digest from `_build/publish/checksums.json`. Both stock consumers use
+fresh homes and the default public registry. The source archive must match that
+approved digest, the independent parent must resolve the public module without
+a workspace override, and stock Moonx must download the public `/launch` asset.
+The gate compares the public asset, advertised checksum and actual fresh cached
+Wasm before running genuine Node-owned host completion again. Public reports
+are retained as `_build/moonx/qualification-published-*.json`. Source checks and
+candidate simulations do not count as a successful public release proof.

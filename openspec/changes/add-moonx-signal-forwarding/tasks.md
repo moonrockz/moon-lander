@@ -15,14 +15,14 @@ Bead: `lander-pq1.2`
 
 - [x] 2.1 Add immutable payload file entries, portable relative-path and collection rules, entry membership and a typed Node launch plan; verify every constructor rule and exact retained bytes.
 - [x] 2.2 Materialize a newly owned private directory, preserve file layout and caller cwd/stdin, and launch Node through the common driver; verify an ESM package with its real worker/runtime layout and finite status.
-- [ ] 2.3 Reap before protected idempotent payload cleanup and optional finalization; verify missing Node, startup/write failure, ignored signals, symlink boundaries, cleanup errors and finalizer status precedence.
+- [x] 2.3 Reap before protected idempotent payload cleanup and optional finalization; verify missing Node, startup/write failure, ignored signals, symlink boundaries, cleanup errors and finalizer status precedence.
 - [x] 2.4 Document the payload API and ownership boundary; verify the guide's generic embedded example without application-specific paths or result schemas.
 
 ## 3. Host acceptance and publication integration
 
 Bead: `lander-pq1.3`
 
-- [ ] 3.1 Complete direct and top-level Moonx acceptance on both stock compilers for real Node-host completion, non-yielding worker work, open stdin, repeated signals and bounded forced reaping; require acknowledgements and one finalization per run.
+- [x] 3.1 Complete direct and top-level Moonx acceptance on both stock compilers for real Node-host completion, non-yielding worker work, open stdin, repeated signals and bounded forced reaping; require acknowledgements and one finalization per run.
 - [ ] 3.2 Verify opaque argument arrays, binary stdin/stdout, separate stderr, explicit finite statuses and payload removal across the supported process hosts; record actual Windows finite/console/graceful/hard behavior and return any unavoidable Ctrl-C contract gap before narrowing delivery.
 - [ ] 3.3 Register the module in workspace/dependency/version/publication validation and candidate/public archive consumers; verify all eleven archives, portable policies on four targets, supported runtime adapters and no workspace overrides.
 - [ ] 3.4 Place focused launcher and provenance checks in the existing CI/release categories with candidate-bound evidence and exact stock selection; verify required failure propagation and preserve all existing aggregate gates.

@@ -6,6 +6,13 @@ const shared = new SharedArrayBuffer(4);
 const stop = new Int32Array(shared);
 let worker;
 let exit;
+const released = process.env.MOONX_HOLD_FINALIZER === '1'
+  ? new Promise(resolve => process.stdin.once('data', () => {
+      process.stdin.pause();
+      process.stdin.unref?.();
+      resolve();
+    }))
+  : Promise.resolve();
 globalThis.moonxFixture = {
   start() {
     return new Promise((resolve, reject) => {
@@ -22,7 +29,7 @@ globalThis.moonxFixture = {
     });
   },
   stop() { Atomics.store(stop, 0, 1); },
-  join() { return exit ?? Promise.resolve(); },
+  async join() { await (exit ?? Promise.resolve()); await released; },
 };
 process.stdout.write(`READY ${process.pid}\n`);
 require(process.env.MOONX_HOST_PROGRAM);

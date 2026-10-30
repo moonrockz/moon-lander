@@ -119,13 +119,17 @@ run = "moonx scripts/toolchain.mbtx scripts/check-moonx.mbtx"
 description = "Run retained upstream native and Wasm runtime tests sequentially"
 run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --test-all"
 
+[tasks."check:moonx-published"]
+description = "Verify approved public archive and cold default-registry consumers on both stocks"
+run = "moonx scripts/toolchain.mbtx scripts/check-moonx-release.mbtx"
+
 [tasks."check:moonx-drift"]
 description = "Verify modified, missing and added frozen source failures"
 run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --test-drift"
 
 [tasks."check:moonx-stock16"]
 description = "Complete and qualify the pinned stock 0.10.16 consumer"
-run = "moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx"
+run = "mise exec http:moonbit@0.10.17+d971670cd -- moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx"
 
 # Task-scoped tools avoid installing the second stock compiler in unrelated jobs.
 # The primary compiler pin and its wrapper selection stay unchanged.

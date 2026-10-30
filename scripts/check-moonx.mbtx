@@ -3,10 +3,12 @@ import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
   "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.5/http",
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
+  "moonbitlang/x@0.5.6/crypto",
 }
 ----
 
@@ -20,6 +22,39 @@ let fixtures = "tests/assets/moonx-launcher"
 priv enum StockVersion {
   Stock16
   Stock17
+}
+
+///|
+priv struct ApprovedArchiveDigest {
+  text : String
+}
+
+///|
+suberror DigestError {
+  InvalidArchiveDigest(String)
+}
+
+///|
+fn ApprovedArchiveDigest::parse(
+  text : String,
+) -> ApprovedArchiveDigest raise DigestError {
+  guard text.length() == 64 &&
+    text.iter().all(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) else {
+    raise InvalidArchiveDigest(text)
+  }
+  { text, }
+}
+
+///|
+fn ApprovedArchiveDigest::check(
+  self : ApprovedArchiveDigest,
+  bytes : Bytes,
+) -> Unit raise {
+  assert_eq(
+    @crypto.bytes_to_hex_string(@crypto.sha256(bytes)),
+    self.text,
+    msg="Published archive differs from the owner-approved release archive",
+  )
 }
 
 ///|
@@ -254,13 +289,41 @@ async fn module_roots(path : String) -> Array[String] {
 async fn prepare(
   tools : StockToolchain,
   stage : String,
+  published~ : ApprovedArchiveDigest? = None,
 ) -> (String, String, String) {
   let version = workspace_version(@fs.read_file("moon.mod").text())
-  copy_tree("pkgs/moonx", stage + "/library")
+  match published {
+    None => copy_tree("pkgs/moonx", stage + "/library")
+    Some(digest) => {
+      let (response, body) = @http.get(
+        "https://download.mooncakes.io/user/moonrockz/moon-lander-moonx/" +
+        version +
+        ".zip",
+      )
+      assert_eq(response.code, 200)
+      let archive = body.binary()
+      digest.check(archive)
+      @fs.write_file(stage + "/published.zip", archive)
+      assert_eq(
+        @process.run("unzip", [
+          "-q",
+          stage + "/published.zip",
+          "-d",
+          stage + "/library",
+        ]),
+        0,
+      )
+      @fs.write_file(stage + "/library/moon.work", "members = [\".\"]\n")
+    }
+  }
   @fs.mkdir(stage + "/parent")
   @fs.write_file(
     stage + "/moon.work",
-    "members = [\"./library\", \"./parent\"]\n",
+    if published is None {
+      "members = [\"./library\", \"./parent\"]\n"
+    } else {
+      "members = [\"./parent\"]\n"
+    },
   )
   @fs.write_file(
     stage + "/parent/moon.mod",
@@ -279,7 +342,26 @@ async fn prepare(
       @fs.read_file(fixtures + "/" + source),
     )
   }
+  if published is Some(_) {
+    assert_eq(
+      @process.run(
+        stock_program(tools.root, Moon),
+        ["update"],
+        cwd=stage + "/parent",
+        extra_env=tools.environment,
+      ),
+      0,
+    )
+  }
   let parent = build(tools, stage + "/parent", "wasm", stage + "/parent-build")
+  if published is Some(digest) {
+    let home = tools.environment["MOON_HOME"]
+    digest.check(
+      @fs.read_file(
+        home + "/registry/cache/moonrockz/moon-lander-moonx/" + version + ".zip",
+      ).binary(),
+    )
+  }
   let roots = module_roots(
     stage + "/parent-build/wasm/debug/build/all_pkgs.json",
   )
@@ -325,9 +407,35 @@ async fn host_signal(
   parent : String,
   host : String,
   signal : StopSignal,
+  moonx_home~ : String? = None,
+  repeated~ : Bool = false,
 ) -> Json {
   let environment = tools.environment.copy()
   environment.set("MOONX_HOST_PROGRAM", host)
+  if repeated {
+    environment.set("MOONX_HOLD_FINALIZER", "1")
+  }
+  let (program, arguments) = match moonx_home {
+    None =>
+      (
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "node", stage + "/host/owner.cjs"],
+      )
+    Some(home) => {
+      environment.set("MOON_HOME", home)
+      (
+        tools.root + "/bin/moonx",
+        [
+          "moonrockz/moon-lander-moonx/launch@" +
+          workspace_version(@fs.read_file("moon.mod").text()),
+          "--json",
+          "--",
+          "node",
+          stage + "/host/owner.cjs",
+        ],
+      )
+    }
+  }
   let (stdin, writer) = @process.write_to_process()
   defer writer.close()
   let (reader, stdout) = @process.read_from_process()
@@ -338,8 +446,8 @@ async fn host_signal(
     @async.with_task_group(group => {
       let child = @process.spawn(
         group,
-        stock_program(tools.root, Moonrun),
-        [parent, "--", "node", stage + "/host/owner.cjs"],
+        program,
+        arguments,
         stdin~,
         stdout~,
         stderr~,
@@ -353,13 +461,26 @@ async fn host_signal(
         @process.run("kill", ["-" + signal.argument(), child.pid.to_string()]),
         0,
       )
+      let mut prefix = ""
+      if repeated {
+        while reader.read_until("\n") is Some(line) {
+          prefix += line + "\n"
+          if line == "HOST_FINALIZER_START" {
+            break
+          }
+        }
+        assert_true(prefix.contains("HOST_FINALIZER_START\n"), msg=prefix)
+        assert_eq(@process.run("kill", ["-TERM", child.pid.to_string()]), 0)
+        writer.write("release-finalizer")
+      }
       let out = group.spawn(() => reader.read_all().text())
       let err = group.spawn(() => errors.read_all().text())
       let raw = child.wait()
-      let output = out.wait()
+      let output = prefix + out.wait()
       let diagnostics = err.wait()
-      assert_eq(raw, -signal.number())
+      assert_eq(raw, if repeated { -15 } else { -signal.number() })
       let selected = (128 + signal.number()).to_string()
+      let parent_selected = if repeated { "143" } else { selected }
       for
         marker in [
           "WORKER_STOPPED",
@@ -370,21 +491,25 @@ async fn host_signal(
         ] {
         assert_eq(output.split(marker).to_array().length(), 2, msg=output)
       }
-      assert_true(
-        diagnostics.contains("PARENT_SELECTED=" + selected),
-        msg=diagnostics,
-      )
-      assert_true(
-        diagnostics.contains(
-          "PARENT_STARTED=STOPPED:" + selected + ":FORCED=false",
-        ),
-        msg=diagnostics,
-      )
-      assert_true(
-        diagnostics.contains("PARENT_SIGNAL=" + signal.name()),
-        msg=diagnostics,
-      )
-      assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      if moonx_home is None {
+        assert_true(
+          diagnostics.contains("PARENT_SELECTED=" + parent_selected),
+          msg=diagnostics,
+        )
+        assert_true(
+          diagnostics.contains(
+            "PARENT_STARTED=STOPPED:" + selected + ":FORCED=false",
+          ),
+          msg=diagnostics,
+        )
+        assert_true(
+          diagnostics.contains("PARENT_SIGNAL=" + signal.name()),
+          msg=diagnostics,
+        )
+        assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      } else {
+        assert_eq(diagnostics, "")
+      }
       let (alive, _, _) = @process.collect_output("kill", [
         "-0",
         ready[6:].to_owned(),
@@ -393,6 +518,12 @@ async fn host_signal(
       {
         "stock": tools.version.text(),
         "signal": signal.name(),
+        "repeatedSignalDuringFinalization": repeated,
+        "entry": if moonx_home is None {
+          "public-driver"
+        } else {
+          "stock-moonx-public-launch"
+        },
         "rawParentStatus": raw,
         "compiler": tools.description,
         "stdout": output,
@@ -403,6 +534,122 @@ async fn host_signal(
       }
     })
   })
+}
+
+///|
+async fn candidate_moonx(
+  tools : StockToolchain,
+  stage : String,
+  launch : String,
+  host : String,
+) -> Json {
+  let version = workspace_version(@fs.read_file("moon.mod").text())
+  let wasm = @fs.read_file(launch).binary()
+  let checksum = @crypto.bytes_to_hex_string(@crypto.sha256(wasm))
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let home = stage + "/cold-moonx-home"
+  @fs.mkdir(home + "/registry/index/user/moonrockz", recursive=true)
+  let entry : Json = {
+    "name": "moonrockz/moon-lander-moonx",
+    "version": Json(version),
+    "deps": { "moonbitlang/x": "0.5.6" },
+    "checksum": Json(checksum),
+  }
+  @fs.write_file(
+    home + "/registry/index/user/moonrockz/moon-lander-moonx.index",
+    entry.stringify() + "\n",
+  )
+  let config : Json = {
+    "registry": Json("http://" + server.addr.to_string()),
+    "index": Json(stage + "/unused-index"),
+  }
+  @fs.write_file(home + "/config.json", config.stringify())
+  let requests : Array[String] = []
+  let stops : Array[Json] = []
+  @async.with_timeout(120000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, connection) => {
+          let path = request.path.replace_all(old="%2F", new="/")
+          requests.push(path)
+          let asset = "/moonrockz/moon-lander-moonx@" +
+            version +
+            "/launch/launch.wasm"
+          if path == "/assets" + asset || path == "/prebuild" + asset {
+            connection.send_response(
+              200,
+              "OK",
+              extra_headers=Map::from_array([
+                (
+                  @http.CaseInsensitiveString("Content-Length"),
+                  wasm.length().to_string(),
+                ),
+              ]),
+            )
+            connection.write(wasm)
+          } else if path == "/assets" + asset + ".sha256" ||
+            path == "/prebuild" + asset + ".sha256" {
+            connection.send_response(200, "OK")
+            connection.write(checksum)
+          } else {
+            connection.send_response(404, "Not Found")
+          }
+        })
+      })
+      let environment = tools.environment.copy()
+      environment.set("MOON_HOME", home)
+      let (code, output, error) = @process.collect_output(
+        tools.root + "/bin/moonx",
+        ["moonrockz/moon-lander-moonx/launch@" + version, "--json", "--help"],
+        extra_env=environment,
+      )
+      assert_eq(code, 0, msg=error.text())
+      guard @json.parse(output.text())
+        is { "kind": "help", "exit_status": 0, .. } else {
+        fail(output.text())
+      }
+      for signal in [Interrupt, Terminate] {
+        stops.push(
+          host_signal(tools, stage, launch, host, signal, moonx_home=Some(home)),
+        )
+      }
+      stops.push(
+        host_signal(
+          tools,
+          stage,
+          launch,
+          host,
+          Interrupt,
+          moonx_home=Some(home),
+          repeated=true,
+        ),
+      )
+    })
+  })
+  assert_eq(
+    requests.filter(path => path.has_suffix("/launch/launch.wasm")).length(),
+    1,
+  )
+  assert_eq(
+    requests
+    .filter(path => path.has_suffix("/launch/launch.wasm.sha256"))
+    .length(),
+    1,
+  )
+  assert_false(requests.any(path => path.has_suffix(".zip")))
+  assert_eq(
+    verify_cached_asset(home, ApprovedArchiveDigest::parse(checksum)),
+    1,
+  )
+  {
+    "scenario": "stock-moonx-candidate-registry",
+    "publicPublication": false,
+    "freshHome": true,
+    "wasmSha256": Json(checksum),
+    "requests": Json(requests),
+    "hostStops": Json(stops),
+  }
 }
 
 ///|
@@ -903,7 +1150,223 @@ async fn binary_transport(
 }
 
 ///|
-async fn retain_report(tools : StockToolchain, results : Array[Json]) -> Unit {
+async fn verify_cached_asset(
+  directory : String,
+  expected : ApprovedArchiveDigest,
+) -> Int32 {
+  let mut found = 0
+  for name in @fs.readdir(directory) {
+    let path = directory + "/" + name
+    match @fs.kind(path, follow_symlink=false) {
+      Directory => found += verify_cached_asset(path, expected)
+      Regular if name.has_suffix(".wasm") => {
+        expected.check(@fs.read_file(path).binary())
+        found += 1
+      }
+      _ => ()
+    }
+  }
+  found
+}
+
+///|
+async fn published_moonx(
+  tools : StockToolchain,
+  stage : String,
+  host : String,
+) -> Json {
+  let version = workspace_version(@fs.read_file("moon.mod").text())
+  let home = stage + "/cold-public-moonx-home"
+  @fs.mkdir(home)
+  let environment = tools.environment.copy()
+  environment.set("MOON_HOME", home)
+  let moonx = tools.root +
+    "/bin/moonx" +
+    (if @env.get_env_var("OS") == Some("Windows_NT") { ".exe" } else { "" })
+  let package_id = "moonrockz/moon-lander-moonx/launch@" + version
+  let (code, output, error) = @process.collect_output(
+    moonx,
+    [package_id, "--json", "--help"],
+    extra_env=environment,
+  )
+  assert_eq(code, 0, msg=error.text())
+  guard @json.parse(output.text()) is { "kind": "help", "exit_status": 0, .. } else {
+    fail(output.text())
+  }
+  let asset = "https://download.mooncakes.io/assets/moonrockz/moon-lander-moonx@" +
+    version +
+    "/launch/launch.wasm"
+  let (response, body) = @http.get(asset + ".sha256")
+  assert_eq(response.code, 200)
+  let advertised = ApprovedArchiveDigest::parse(body.text().trim().to_owned())
+  let (response, body) = @http.get(asset)
+  assert_eq(response.code, 200)
+  advertised.check(body.binary())
+  assert_eq(verify_cached_asset(home, advertised), 1)
+  let stops : Array[Json] = []
+  for signal in [Interrupt, Terminate] {
+    stops.push(
+      host_signal(tools, stage, "", host, signal, moonx_home=Some(home)),
+    )
+  }
+  stops.push(
+    host_signal(
+      tools,
+      stage,
+      "",
+      host,
+      Interrupt,
+      moonx_home=Some(home),
+      repeated=true,
+    ),
+  )
+  {
+    "scenario": "stock-moonx-public-registry",
+    "defaultRegistry": true,
+    "freshHome": true,
+    "publicAssetUrl": Json(asset),
+    "advertisedAndCachedWasmSha256": Json(advertised.text),
+    "hostStops": Json(stops),
+  }
+}
+
+///|
+async fn forced_payload(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+) -> Json {
+  let temporary = stage + "/forced-payload"
+  @fs.mkdir(temporary)
+  let environment = tools.environment.copy()
+  for name in ["TMPDIR", "TMP", "TEMP"] {
+    environment.set(name, temporary)
+  }
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "--payload", "--ignore-signal"],
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=environment,
+      )
+      let payload = reader.read_until("\n").unwrap()
+      assert_true(payload.has_prefix("PAYLOAD="), msg=payload)
+      let ready = reader.read_until("\n").unwrap()
+      assert_true(ready.has_prefix("READY "), msg=ready)
+      assert_eq(@process.run("kill", ["-INT", child.pid.to_string()]), 0)
+      assert_eq(reader.read_until("\n"), Some("IGNORED_INTERRUPT"))
+      let output = group.spawn(() => reader.read_all().text())
+      let diagnostics = group.spawn(() => errors.read_all().text())
+      assert_eq(child.wait(), -2)
+      assert_eq(output.wait(), "")
+      let diagnostics = diagnostics.wait()
+      assert_true(
+        diagnostics.contains("PARENT_STARTED=STOPPED:137:FORCED=true"),
+        msg=diagnostics,
+      )
+      assert_true(
+        diagnostics.contains("PARENT_SIGNAL=Interrupt"),
+        msg=diagnostics,
+      )
+      assert_true(diagnostics.contains("PARENT_SELECTED=130"), msg=diagnostics)
+      assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      assert_eq(@fs.readdir(temporary), [])
+      let (alive, _, _) = @process.collect_output("kill", [
+        "-0",
+        ready[6:].to_owned(),
+      ])
+      assert_true(alive != 0, msg="Forced Node child was not reaped")
+      {
+        "scenario": "ignored-interrupt-forced-payload",
+        "actualChildStatus": 137,
+        "forceRequested": true,
+        "selected": 130,
+        "ownedPayloadRemoved": true,
+        "childReaped": true,
+        "stdinHeldOpenThroughExit": true,
+      }
+    })
+  })
+}
+
+///|
+async fn cancelled_materialization(
+  tools : StockToolchain,
+  stage : String,
+  parent : String,
+) -> Json {
+  let temporary = stage + "/cancelled-materialization"
+  @fs.mkdir(temporary)
+  let environment = tools.environment.copy()
+  for name in ["TMPDIR", "TMP", "TEMP"] {
+    environment.set(name, temporary)
+  }
+  let watcher = @fs.Watcher(
+    temporary,
+    debounce_timeout=0,
+    report_child_event=false,
+  )
+  defer watcher.close()
+  let (stdin, writer) = @process.write_to_process()
+  defer writer.close()
+  let (reader, stdout) = @process.read_from_process()
+  defer reader.close()
+  let (errors, stderr) = @process.read_from_process()
+  defer errors.close()
+  @async.with_timeout(30000, () => {
+    @async.with_task_group(group => {
+      let child = @process.spawn(
+        group,
+        stock_program(tools.root, Moonrun),
+        [parent, "--", "--payload", "--large-payload"],
+        stdin~,
+        stdout~,
+        stderr~,
+        extra_env=environment,
+      )
+      let output = group.spawn(() => reader.read_all().text())
+      let diagnostics = group.spawn(() => errors.read_all().text())
+      watcher.wait_any()
+      assert_eq(@fs.readdir(temporary).length(), 1)
+      assert_eq(@process.run("kill", ["-TERM", child.pid.to_string()]), 0)
+      assert_eq(child.wait(), -15)
+      assert_eq(output.wait(), "")
+      let diagnostics = diagnostics.wait()
+      assert_true(
+        diagnostics.contains("PARENT_NOT_STARTED=Cancelled:Terminate"),
+        msg=diagnostics,
+      )
+      assert_true(diagnostics.contains("PARENT_SELECTED=143"), msg=diagnostics)
+      assert_eq(diagnostics.split("PARENT_FINALIZER").to_array().length(), 2)
+      assert_eq(@fs.readdir(temporary), [])
+      {
+        "scenario": "signal-during-materialization",
+        "filesystemCreationAcknowledged": true,
+        "notStarted": true,
+        "selected": 143,
+        "ownedPayloadRemoved": true,
+        "stdinHeldOpenThroughExit": true,
+      }
+    })
+  })
+}
+
+///|
+async fn retain_report(
+  tools : StockToolchain,
+  results : Array[Json],
+  published~ : ApprovedArchiveDigest? = None,
+) -> Unit {
   let (code, head, error) = @process.collect_output("git", ["rev-parse", "HEAD"])
   assert_eq(code, 0, msg=error.text())
   let (code, dirty, error) = @process.collect_output("git", [
@@ -912,7 +1375,15 @@ async fn retain_report(tools : StockToolchain, results : Array[Json]) -> Unit {
   assert_eq(code, 0, msg=error.text())
   let report : Json = {
     "schema_version": 1,
-    "proof_kind": "local-candidate",
+    "proof_kind": if published is None {
+      "local-candidate"
+    } else {
+      "cold-public-registry"
+    },
+    "approvedArchiveSha256": match published {
+      None => Json::null()
+      Some(digest) => Json(digest.text)
+    },
     "source_commit": head.text().trim().to_owned(),
     "working_tree_dirty": !dirty.text().is_empty(),
     "stock": tools.version.text(),
@@ -920,7 +1391,10 @@ async fn retain_report(tools : StockToolchain, results : Array[Json]) -> Unit {
     "cases": results,
   }
   @fs.mkdir("_build/moonx", recursive=true, allow_exist=true)
-  let path = "_build/moonx/qualification-" + tools.version.text() + ".json"
+  let path = "_build/moonx/qualification-" +
+    (if published is None { "" } else { "published-" }) +
+    tools.version.text() +
+    ".json"
   @fs.write_file(path, report.stringify(indent=2) + "\n")
   println(report.stringify(indent=2))
 }
@@ -975,12 +1449,23 @@ async fn completion_failure(
 ///|
 async fn main {
   let args = @env.args()[1:].to_owned()
+  let published = if args.length() >= 2 &&
+    args[args.length() - 2] == "--published-checksum" {
+    Some(ApprovedArchiveDigest::parse(args.pop().unwrap()))
+  } else {
+    None
+  }
+  if published is Some(_) {
+    ignore(args.pop())
+  }
   let root = if args.length() == 2 && args[0] == "--toolchain-root" {
     args[1]
   } else if args.is_empty() {
     @env.get_env_var("MOON_TOOLCHAIN_ROOT").unwrap_or("")
   } else {
-    fail("Use --toolchain-root STOCK_INSTALL_ROOT")
+    fail(
+      "Use [--toolchain-root STOCK_INSTALL_ROOT] [--published-checksum APPROVED_SHA256]",
+    )
   }
   let tools = StockToolchain::parse(root) catch {
     InvalidConfiguration(input~, rule~) =>
@@ -990,7 +1475,21 @@ async fn main {
   let stage = @fs.tmpdir(prefix="lander-moonx-acceptance")
   defer @fs.rmdir(stage, recursive=true)
   let stage = @fs.realpath(stage)
-  let (parent, host, launch) = prepare(tools, stage)
+  let tools = if published is Some(_) {
+    let environment = tools.environment.copy()
+    let home = stage + "/cold-public-home"
+    @fs.mkdir(home)
+    environment.set("MOON_HOME", home)
+    {
+      root: tools.root,
+      version: tools.version,
+      environment,
+      description: tools.description,
+    }
+  } else {
+    tools
+  }
+  let (parent, host, launch) = prepare(tools, stage, published~)
   let results : Array[Json] = []
   results.push(launch_command(tools, stage, launch))
   results.push(binary_transport(tools, stage, launch))
@@ -1014,6 +1513,16 @@ async fn main {
     }
     for signal in [Interrupt, Terminate] {
       results.push(host_signal(tools, stage, parent, host, signal))
+    }
+    results.push(
+      host_signal(tools, stage, parent, host, Interrupt, repeated=true),
+    )
+    results.push(forced_payload(tools, stage, parent))
+    results.push(cancelled_materialization(tools, stage, parent))
+    if published is None {
+      results.push(candidate_moonx(tools, stage, launch, host))
+    } else {
+      results.push(published_moonx(tools, stage, host))
     }
   } else {
     let controller = windows_controller(tools, stage)
@@ -1042,11 +1551,35 @@ async fn main {
       }
     }
     if !failures.is_empty() {
-      retain_report(tools, results)
+      retain_report(tools, results, published~)
       fail("Windows console qualification failed: " + failures.join("\n"))
     }
   }
-  retain_report(tools, results)
+  retain_report(tools, results, published~)
+}
+
+///|
+test "approved archive digest requires exact lower-case SHA256" {
+  let text = "a".repeat(64)
+  assert_eq(ApprovedArchiveDigest::parse(text).text, text)
+  ApprovedArchiveDigest::parse(
+    @crypto.bytes_to_hex_string(@crypto.sha256(b"archive")),
+  ).check(b"archive")
+  for
+    input in [
+      "",
+      "a".repeat(63),
+      "a".repeat(65),
+      "A".repeat(64),
+      "g".repeat(64),
+      " " + text,
+    ] {
+    try ApprovedArchiveDigest::parse(input) catch {
+      InvalidArchiveDigest(actual) => assert_eq(actual, input)
+    } noraise {
+      _ => fail("Accepted malformed archive digest")
+    }
+  }
 }
 
 ///|

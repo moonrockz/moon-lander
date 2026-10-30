@@ -5,6 +5,15 @@ fn payload_case(args : Array[String]) -> @moonx.NodeLaunch raise {
     @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("workers/work.js"), b"import {parentPort} from 'node:worker_threads'; import {value} from '../runtime/value.js'; parentPort.postMessage(value);"),
     @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("runtime/value.js"), b"export const value=42;"),
   ]
+  if args.contains("--ignore-signal") {
+    files[1] = @moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("entry.js"), b"import {dirname} from 'node:path'; import {fileURLToPath} from 'node:url'; process.on('SIGINT',()=>console.log('IGNORED_INTERRUPT')); console.log('PAYLOAD='+dirname(fileURLToPath(import.meta.url))); console.log('READY '+process.pid); setInterval(()=>{},1000);")
+  }
+  if args.contains("--large-payload") {
+    let content = Bytes::make(4096, b'x')
+    for index in 0..<4096 {
+      files.push(@moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("materializing/file-" + index.to_string()), content))
+    }
+  }
   if args.contains("--write-failure") {
     files.push(@moonx.PayloadFile::new(@moonx.RelativeFilePath::parse("a".repeat(300)), b"unrepresentable filesystem component"))
   }

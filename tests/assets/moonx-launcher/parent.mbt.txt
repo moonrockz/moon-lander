@@ -5,7 +5,8 @@ fn main raise {
   } else {
     Process(@moonx.Command::new(@moonx.Executable::parse(args[1]), @moonx.Arguments::parse(args[2:].to_owned())))
   }
-  @driver.run(plan, grace=@moonx.ShutdownGrace::from_milliseconds(200),
+  let grace = if args.contains("--ignore-signal") { 200 } else { 2000 }
+  @driver.run(plan, grace=@moonx.ShutdownGrace::from_milliseconds(grace),
     finalize=() => {
       if @env.get_env_var("MOONX_SILENT_CALLBACK_FAILURE") != Some("1") { eprintln("PARENT_FINALIZER") }
       if args.contains("--finalizer-fails") { raise Failure("Expected finalizer failure") }

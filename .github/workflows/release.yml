@@ -5,7 +5,7 @@
 #           or a vX.Y.Z tag, when vX.Y.Z has no GitHub release yet and
 #           CHANGELOG.md has its section.
 # validate  runs the full checks and the shared-version check.
-# publish   packages and audits all ten libraries, publishes in dependency
+# publish   packages and audits all eleven libraries, publishes in dependency
 #           order, then verifies each public archive against its approved
 #           checksum and runs the public format override qualification.
 # site      builds the docs site of the moon.mod minor line through
@@ -34,6 +34,8 @@ on:
       - scripts/credentials.mbtx
       - scripts/check-openrpc-registry.mbtx
       - scripts/check-framework-registry.mbtx
+      - scripts/check-moonx.mbtx
+      - scripts/check-moonx-release.mbtx
       - scripts/check-formats-registry.mbtx
       - scripts/versions.mbtx
       - .github/workflows/site-asset.yml
@@ -131,6 +133,15 @@ jobs:
         run: mise run release:publish
       - name: Verify all published libraries and archive checksums
         run: mise run check:framework-published
+      - name: Verify cold public Moonx consumers on both stock compilers
+        run: mise run check:moonx-published
+      - name: Retain public Moonx qualification
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonx-public-qualification
+          path: _build/moonx/qualification-published-*.json
+          if-no-files-found: error
       - name: Verify public format overrides on four targets
         run: mise run check:formats-published
       - name: Verify the published OpenRPC consumer on four targets

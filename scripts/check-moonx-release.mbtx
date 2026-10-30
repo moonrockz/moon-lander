@@ -1,0 +1,24 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/json",
+}
+----
+
+///|
+/// Reuse the exact archive digest approved before upload. Never derive approval
+/// from the downloaded public archive itself.
+async fn main {
+  guard @json.parse(@fs.read_file("_build/publish/checksums.json").text())
+    is { "moonrockz/moon-lander-moonx": String(checksum), .. } else {
+    fail("Missing approved Moonx release archive checksum")
+  }
+  for task in ["check:moonx", "check:moonx-stock16"] {
+    assert_eq(
+      @process.run("mise", ["run", task, "--", "--published-checksum", checksum]),
+      0,
+    )
+  }
+}

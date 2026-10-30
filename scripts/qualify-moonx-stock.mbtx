@@ -44,8 +44,12 @@ async fn main {
     }
     assert_eq(code, 0)
   }
-  let code = @process.run("moonx", [
-    "scripts/toolchain.mbtx", "scripts/check-moonx.mbtx", "--toolchain-root", root,
-  ])
+  let code = @process.run(
+    "moonx",
+    [
+      "scripts/toolchain.mbtx", "scripts/check-moonx.mbtx", "--toolchain-root", root,
+    ] +
+    @env.args()[1:].to_owned(),
+  )
   assert_eq(code, 0)
 }

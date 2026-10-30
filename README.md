@@ -184,7 +184,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.7.3`.
+- `moon.mod` holds the shared version, currently `0.8.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -256,9 +256,16 @@ publishes releases.
 
 ## Releases
 
-The `0.7.3` patch makes async sender and basic middleware composition portable
-to wasm-gc, including non-suspending sends under the embedded host. See the
-[async mediator guide](pkgs/mediator/async/README.mbt.md).
+The `0.8.0` release adds the optional typed actors module, notebook virtual file
+trees and DIB/Jupyter source conversion. It also adds the branded Telescope docs
+site and landing page. Actors are the tenth published library; their runtime
+supports wasm, JavaScript and native. See the [actors guide](pkgs/actors/README.mbt.md)
+and [notebook conversion guide](pkgs/notebooks/conversion/README.mbt.md).
+
+The `0.7.3` patch adds optional completion reporting to console and logging
+bridge entry points. The `0.7.2` patch makes async sender and basic middleware
+composition portable to wasm-gc, including non-suspending sends under the embedded
+host. See the [async mediator guide](pkgs/mediator/async/README.mbt.md).
 
 The `0.7.1` patch adds enclosing signal probes and real hosted session shutdown
 to the console logging bridge. See the [bridge guide](pkgs/hosting/logging/README.mbt.md).
@@ -283,8 +290,8 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 Release versions are shared across workspace members. The framework modules
 listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are in the
 publication allowlist and publish to mooncakes.io. `moonrockz/moon-lander-actors`
-is new: the next release publishes it for the first time. Install a module at an exact version, for example
-`moon add moonrockz/moon-lander@0.7.3`. The workspace root, docs site, `tests`
+joins this release as the tenth library. Install a module at an exact version,
+for example `moon add moonrockz/moon-lander@0.8.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 

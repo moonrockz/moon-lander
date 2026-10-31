@@ -358,6 +358,28 @@ async test "EVT: ended subscriber is skipped without failing others" {
 }
 
 ///|
+async test "EVT: an ended subscriber actor is skipped with no event and no failure" {
+  let log : Array[String] = []
+  let events = @actors.RuntimeEvents::new()
+  @actors.scope(events~, scope => {
+    // The watcher ends at its first event while its subscription is active.
+    let watcher = scope.start((), (_, _ : @actors.ActorEvent) => Stop)
+    ignore(events.subscribe(scope, watcher.to_ref().to_subject()))
+    ignore(events.subscribe(scope, event_log(log)))
+    let worker = scope.start((), (_, _ : Int) => Stop)
+    watcher.join()
+    // The watcher's own end found its mailbox closed and removed it.
+    assert_eq(events.subscriber_count(), 1)
+    worker.send(0)
+    worker.join()
+  })
+  assert_eq(log.length(), 3)
+  assert_true(log[0].has_prefix("started "))
+  assert_true(log[1].has_suffix(" completed"))
+  assert_true(log[2].has_suffix(" completed"))
+}
+
+///|
 async test "EVT: dropping an event publishes no feedback event" {
   let log : Array[String] = []
   let events = @actors.RuntimeEvents::new()

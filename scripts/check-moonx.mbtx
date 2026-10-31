@@ -1,10 +1,10 @@
 ----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/http",
-  "moonbitlang/async@0.22.5/socket",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/http",
+  "moonbitlang/async@0.22.7/socket",
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
@@ -453,6 +453,8 @@ async fn prepare(
   )
   @fs.mkdir(stage + "/host")
   // The existing released host proves API and runtime identity compatibility.
+  // Keep async 0.22.5, the release of hosting 0.8.0: async 0.22.6 and later
+  // import moonbitlang/core/async, which the stock 0.10.16 and 0.10.17 cores lack.
   @fs.write_file(stage + "/host/moon.work", "members = [\".\"]\n")
   @fs.write_file(
     stage + "/host/moon.mod",

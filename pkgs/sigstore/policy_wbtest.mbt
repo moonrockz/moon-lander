@@ -438,3 +438,14 @@ test "the purl version is the percent-decoded exact tag" {
   assert_eq(at_policy.mismatch(release_claims, Some(at_statement)), None)
   assert_eq(percent_decode("a%2"), None)
 }
+
+///|
+test "a percent-encoded tag is decoded as UTF-8" {
+  assert_eq(percent_decode("v1-%C3%A9"), Some("v1-é"))
+  assert_eq(percent_decode("v1-é"), Some("v1-é"))
+  assert_eq(percent_decode("v1-%C3"), None)
+  assert_eq(percent_decode("v1-%FF"), None)
+  let policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v1-é"))
+  let statement = release_statement("cli/cli", "v1-é", "pkg:github/cli/cli@v1-%C3%A9")
+  assert_eq(policy.mismatch(release_claims, Some(statement)), None)
+}

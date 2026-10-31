@@ -83,9 +83,11 @@ fn run(
   // The source roots of the logs of the verified entries.
   let entry_sources : Array[Int] = []
   for entry in bundle.entries {
-    let (time, source) = check_entry(entry, root, now)
+    let (time, sources) = check_entry(entry, root, now)
     times.push({ time, source: Log(log_id=entry.log_id, log_index=entry.log_index) })
-    entry_sources.push(source)
+    for source in sources {
+      entry_sources.push(source)
+    }
   }
   let signature = match bundle.content {
     Dsse(envelope) => envelope.signatures[0]
@@ -163,19 +165,43 @@ fn check_entry(
   entry : LogEntry,
   root : TrustedRoot,
   now : Instant,
-) -> (Instant, Int) raise Stop {
+) -> (Instant, Array[Int]) raise Stop {
   match (entry.kind, entry.version) {
     ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") | ("intoto", "0.0.2") => ()
     ("dsse", "0.0.2") | ("hashedrekord", "0.0.2") => raise unsupported(RekorV2)
     (kind, version) => raise unsupported(EntryKind(kind~, version~))
   }
-  guard root.tlog(entry.log_id) is Some(log) else {
+  // Combined roots can list the same log; every listing that verifies the
+  // entry counts, so the result does not depend on the order of the roots.
+  let logs = root.tlogs.filter(log => log.log_id[:] == entry.log_id[:])
+  guard !logs.is_empty() else {
     raise invalid(
       TransparencyLog(
         "the log \{@encoding.encode_hex(entry.log_id)} is not in the trusted root",
       ),
     )
   }
+  let sources = []
+  let mut first_failure : Stop? = None
+  let mut verified_time = Instant::from_unix_seconds(entry.integrated_time)
+  for log in logs {
+    try check_entry_with(entry, log, now) catch {
+      Stop(_) as failure => if first_failure is None { first_failure = Some(failure) }
+    } noraise {
+      time => {
+        verified_time = time
+        sources.push(log.source)
+      }
+    }
+  }
+  guard !sources.is_empty() else { raise first_failure.unwrap() }
+  (verified_time, sources)
+}
+
+///|
+/// Check one Rekor v1 entry against one trusted log: its signed entry
+/// timestamp, its time and its inclusion proof. Give the integrated time.
+fn check_entry_with(entry : LogEntry, log : TrustedLog, now : Instant) -> Instant raise Stop {
   let key = match log.key {
     Usable(key) => key
     Unusable(kind) => raise unsupported(KeyType(kind))
@@ -199,7 +225,7 @@ fn check_entry(
   if entry.proof is Some(proof) {
     check_inclusion(entry, proof, key)
   }
-  (time, log.source)
+  time
 }
 
 ///|

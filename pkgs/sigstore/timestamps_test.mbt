@@ -323,3 +323,15 @@ test "scenario: workflow claim on a release policy" {
     fail(outcome(verdict))
   }
 }
+
+///|
+test "a log listed by two combined roots counts for both" {
+  // A root with the public-good logs and no CAs, combined with the full
+  // public-good root, in either order: the entry comes from a log of the root
+  // that issued the leaf too.
+  let logs_only = changed_root(doc => array_at(doc, "certificateAuthorities").clear())
+  for roots in [[logs_only, @sigstore.TrustedRoot::public_good()], [@sigstore.TrustedRoot::public_good(), logs_only]] {
+    let verdict = verify_morphir(morphir_policy(), root=@sigstore.TrustedRoot::combine(roots))
+    assert_true(verdict is Verified(_), msg=outcome(verdict))
+  }
+}

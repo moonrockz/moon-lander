@@ -348,11 +348,6 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
 }
 
 ///|
-fn TrustedRoot::tlog(self : TrustedRoot, log_id : BytesView) -> TrustedLog? {
-  self.tlogs.iter().find_first(log => log.log_id[:] == log_id)
-}
-
-///|
 fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView, source~ : Int) -> TrustedLog? {
   self.ctlogs.iter().find_first(log => log.log_id[:] == log_id && log.source == source)
 }

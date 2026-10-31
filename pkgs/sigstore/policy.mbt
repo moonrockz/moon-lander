@@ -518,26 +518,32 @@ fn Policy::release_mismatch(
 }
 
 ///|
-/// The text of a purl component with its `%XX` escapes decoded, or `None` when
-/// an escape is not two hex digits.
+/// The text of a purl component with its `%XX` escapes decoded as UTF-8
+/// bytes, or `None` when an escape is not two hex digits or the bytes are not
+/// UTF-8.
 fn percent_decode(text : String) -> String? {
-  let out = StringBuilder()
+  let bytes : Array[Byte] = []
+  let encoded = @utf8.encode(text)
   let mut i = 0
-  while i < text.length() {
-    let code = text[i].to_int()
-    if code == '%'.to_int() {
-      guard i + 2 < text.length() else { return None }
-      let high = hex_digit(text[i + 1].to_int())
-      let low = hex_digit(text[i + 2].to_int())
+  while i < encoded.length() {
+    let byte = encoded[i]
+    if byte == b'%' {
+      guard i + 2 < encoded.length() else { return None }
+      let high = hex_digit(encoded[i + 1].to_int())
+      let low = hex_digit(encoded[i + 2].to_int())
       guard high >= 0 && low >= 0 else { return None }
-      out.write_char((high * 16 + low).unsafe_to_char())
+      bytes.push((high * 16 + low).to_byte())
       i += 3
     } else {
-      out.write_char(code.unsafe_to_char())
+      bytes.push(byte)
       i += 1
     }
   }
-  Some(out.to_string())
+  @utf8.decode(Bytes::from_array(bytes)) catch {
+    _ => None
+  } noraise {
+    decoded => Some(decoded)
+  }
 }
 
 ///|

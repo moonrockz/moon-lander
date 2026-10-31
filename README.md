@@ -223,7 +223,8 @@ script. Also update the assessed versions above.
   [`moonrockz/moon-lander-actors`](pkgs/actors/README.mbt.md): local typed actors.
   The portable policy types are at the root, imported as `@policy` (all four
   targets). The actor runtime is in `runtime`, imported as `@actors` (wasm, js
-  and native). It imports core and `moonbitlang/async` only, never logging,
+  and native). It imports only core, `moonbitlang/async` and `moonrockz/ion`,
+  with only the `moonrockz/ion/ion` package from Ion. It never imports logging,
   config, mediator or hosting.
 - `pkgs/hosting/` contains
   [`moonrockz/moon-lander-hosting`](pkgs/hosting/README.mbt.md), imported as

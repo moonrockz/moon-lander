@@ -1,6 +1,6 @@
 name = "moonrockz/moon-lander-logging"
 
-version = "0.8.0"
+version = "0.9.0"
 
 description = "Structured logging with a bring-your-own logger trait for the Moon-Lander framework"
 

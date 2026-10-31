@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.9.0 - 2026-10-30
+
+All eleven libraries share this minor version. The optional Moonx launcher
+module is published for the first time. Existing public APIs remain compatible.
+
+### Added
+
+- `moonrockz/moon-lander-moonx`: immutable typed process, argument, shutdown,
+  private Node payload and completion values. The policy root supports wasm,
+  wasm-gc, JavaScript and native; the synchronous process driver supports wasm
+  and native with a separate parent runtime.
+- Original POSIX SIGINT/SIGTERM forwarding with genuine Node-owned host
+  completion, bounded child reaping, idle stdin and protected finalization.
+  Materialize complete Node/worker layouts in a private owned directory and
+  remove them after reaping, including startup failure and cancellation.
+- Public `/launch` with opaque argv and binary streams. Parent `--json` owns
+  help, usage errors and not-started reports. A started child owns its output
+  and application result schema. Node is an explicit prerequisite.
+- Licensed frozen async0.22.5 source with deterministic provenance, drift
+  checks, retained upstream tests and documented maintenance/removal criteria.
+- Eleven-library publication and source-archive verification, with separate
+  cold default-registry source and public Moonx asset qualification on stock
+  0.10.16+b1a0e846e and 0.10.17+d971670cd.
+
+### Platform behavior
+
+- Stock Windows Moonrun delivers parent Ctrl-C to Node as Ctrl-Break. A genuine
+  Moon-Lander Node host reports Quit/131 while the parent retains Interrupt and
+  its full Windows cancellation status. This documented limitation does not
+  change existing native, JS, embedded or actor behavior. Actual Windows finite
+  transport, Ctrl-Break, forced reaping and private payload cleanup are qualified.
+
 ## 0.8.0 - 2026-10-29
 
 All ten libraries share this minor version. The optional actors module is

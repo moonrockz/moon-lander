@@ -388,8 +388,11 @@ async fn sync_environment() -> Map[String, String] {
     }
     let installer = temporary + "/unix.sh"
     @fs.write_file(installer, body.binary())
+    // The installer bundles the core with the stock moon. Select the stock compiler for it too:
+    // the inherited MOON_TOOLCHAIN_ROOT names the primary pin.
     let code = @process.run("bash", [installer, sync_stock], extra_env={
       "MOON_HOME": root,
+      "MOON_TOOLCHAIN_ROOT": root,
       "MOONBIT_INSTALL_VERSION": sync_stock,
     })
     guard code == 0 else {

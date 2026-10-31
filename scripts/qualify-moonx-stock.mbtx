@@ -79,7 +79,13 @@ async fn main {
     assert_eq(response.code, 200)
     let installer = temporary + "/" + name
     @fs.write_file(installer, body.binary())
-    let environment = { "MOON_HOME": root, "MOONBIT_INSTALL_VERSION": version }
+    // The installer bundles the core with the stock moon. Select the stock compiler for it too:
+    // the inherited MOON_TOOLCHAIN_ROOT names the primary pin.
+    let environment = {
+      "MOON_HOME": root,
+      "MOON_TOOLCHAIN_ROOT": root,
+      "MOONBIT_INSTALL_VERSION": version,
+    }
     let code = if windows {
       @process.run(
         "pwsh",

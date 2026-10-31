@@ -1,9 +1,10 @@
 ----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
-  "moonbitlang/async@0.22.5/stdio",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/http",
+  "moonbitlang/async@0.22.7/process",
+  "moonbitlang/async@0.22.7/stdio",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x@0.5.6/sys",
@@ -23,7 +24,9 @@ import {
 ///   with the console signal stub and `moonbitlang/async`, and the sync programs. CI already builds
 ///   and runs x64 Linux with gcc and with zig, so this plan does not build `linux-x64`.
 /// - `sync`: the experimental synchronous runtime (`ZIG_CROSS_RUNTIME=sync`) for `darwin-arm64`,
-///   `darwin-x64` and `windows-x64`, for `sync_programs` only.
+///   `darwin-x64` and `windows-x64`, for `sync_programs` only. zig-cross accepts this runtime only
+///   with stock MoonBit `sync_stock`, so this plan runs with that task-scoped toolchain first on
+///   `PATH` (see `sync_environment`).
 ///
 /// This is a compile, link and header check. It does not run the programs, and it does not
 /// replace the native test legs on macOS and Windows. Do not ship a cross-built Windows program:
@@ -39,13 +42,20 @@ import {
 ///|
 /// The zig-cross release. Change it here, in `.config/mise/config.toml` and in `README.md`; a
 /// test of this script fails when they differ.
-let zig_cross : String = "moonrockz/zig-cross@0.3.0"
+let zig_cross : String = "moonrockz/zig-cross@0.3.2"
+
+///|
+/// The only stock MoonBit release that zig-cross assesses for the sync runtime. It is older than
+/// the primary pin, so `build:cross` installs it as a task-scoped tool. The full plan uses the
+/// primary pin. Change it here and in `.config/mise/config.toml`.
+let sync_stock : String = "0.10.17+d971670cd"
 
 ///|
 /// The executables that fit the synchronous runtime: none of them uses `moonbitlang/async`.
 /// `main` checks only their own imports; an indirect use fails later, in the sync build. Each
 /// one, except `tests/formats-leaky`, ran on darwin-arm64 and darwin-x64 with output identical to
-/// a native macOS build (zig-cross 0.3.0, MoonBit 0.10.17+d971670cd, Zig 0.17.0).
+/// a native macOS build (zig-cross 0.3.0, MoonBit 0.10.17+d971670cd, Zig 0.17.0). The sync plan
+/// still builds them with that MoonBit release.
 let sync_programs : Array[String] = [
   "tests/browser-parity-reference", "tests/config-parity", "tests/formats-custom",
   "tests/formats-default", "tests/formats-leaky", "tests/formats-toml", "tests/openrpc-consumer",
@@ -337,13 +347,77 @@ async fn async_importers(root : String, paths : Array[String]) -> Array[String] 
 }
 
 ///|
+/// The environment of the zig-cross children of a plan. The full plan keeps the primary pin. The
+/// sync plan puts the complete stock `sync_stock` installation first on `PATH` and selects its
+/// compiler and core with `MOON_TOOLCHAIN_ROOT`; it completes that installation with the official
+/// installer when the core library or moonx is missing.
+async fn runtime_environment(runtime : Runtime) -> Map[String, String] {
+  match runtime {
+    Full => { "ZIG_CROSS_RUNTIME": runtime.name() }
+    Sync => sync_environment()
+  }
+}
+
+///|
+async fn sync_environment() -> Map[String, String] {
+  let (code, out, err) = @process.collect_output("mise", [
+    "where",
+    "http:moonbit@" + sync_stock,
+  ])
+  guard code == 0 else {
+    eprintln(err.text())
+    eprintln(
+      "❌ Stock MoonBit \{sync_stock} for the sync plan is not installed. Run mise run build:cross, which installs it as a task-scoped tool.",
+    )
+    @sys.exit(1)
+    panic()
+  }
+  let root = @fs.realpath(out.text().trim())
+  if !@fs.exists(root + "/lib/core/moon.mod") ||
+    !@fs.exists(root + "/bin/moonx") {
+    let temporary = @fs.tmpdir(prefix="lander-sync-stock")
+    defer @fs.rmdir(temporary, recursive=true)
+    let (response, body) = @http.get(
+      "https://cli.moonbitlang.com/install/unix.sh",
+    )
+    guard response.code == 200 else {
+      eprintln(
+        "❌ Cannot download the MoonBit installer (HTTP \{response.code}).",
+      )
+      @sys.exit(1)
+    }
+    let installer = temporary + "/unix.sh"
+    @fs.write_file(installer, body.binary())
+    let code = @process.run("bash", [installer, sync_stock], extra_env={
+      "MOON_HOME": root,
+      "MOONBIT_INSTALL_VERSION": sync_stock,
+    })
+    guard code == 0 else {
+      eprintln(
+        "❌ The MoonBit installer for \{sync_stock} failed (exit code \{code}).",
+      )
+      @sys.exit(1)
+    }
+  }
+  {
+    "ZIG_CROSS_RUNTIME": Sync.name(),
+    "MOON_TOOLCHAIN_ROOT": root,
+    "PATH": root + "/bin:" + @env.get_env_var("PATH").unwrap_or(""),
+  }
+}
+
+///|
 /// Run doctor for the targets of a plan, write the report, and stop when its status is `error`.
-async fn doctor(runtime : Runtime, targets : Array[Target]) -> Unit {
+async fn doctor(
+  runtime : Runtime,
+  targets : Array[Target],
+  environment : Map[String, String],
+) -> Unit {
   let targets = targets.map(target => target.name())
   let (code, out, err) = @process.collect_output(
     "moonx",
     [zig_cross, "doctor"] + targets + ["--json"],
-    extra_env={ "ZIG_CROSS_RUNTIME": runtime.name() },
+    extra_env=environment,
   )
   let text = out.text()
   @fs.mkdir("_build/cross", recursive=true, allow_exist=true)
@@ -381,13 +455,14 @@ async fn doctor(runtime : Runtime, targets : Array[Target]) -> Unit {
 ///|
 /// Run doctor, then build the plan of a runtime for some of its targets.
 async fn build(runtime : Runtime, targets : Array[Target]) -> Unit {
-  doctor(runtime, targets)
+  let environment = runtime_environment(runtime)
+  doctor(runtime, targets, environment)
   let names = targets.map(target => target.name())
   let args = [zig_cross, "build"] + names + ["--"] + runtime.paths()
   let code = @process.run(
     "moonx",
     args,
-    extra_env={ "ZIG_CROSS_RUNTIME": runtime.name() },
+    extra_env=environment,
     stdout=@stdio.stdout,
     stderr=@stdio.stderr,
   )

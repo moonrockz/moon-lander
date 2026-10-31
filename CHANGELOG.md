@@ -1,9 +1,35 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 - 2026-10-31
+
+All twelve libraries share this minor version. The actors module gets runtime
+events, and the Sigstore verifier checks RFC 3161 timestamps. The actors
+changes are compatible: the new arguments are optional. The Sigstore changes
+break callers of `VerifiedBundle` fields and callers that match every case of
+`Failure` or `Feature`; see "Changed (breaking)".
 
 ### Added
 
+- `moonrockz/moon-lander-actors`: an opt-in runtime event channel, the useful
+  part of the Akka and Pekko `EventStream` without a global bus.
+  `RuntimeEvents` goes to `scope(events~)`, and child scopes of actors use the
+  same channel. Subscribers get the read-only `ActorEvent` values `Started`,
+  `Ended` (with the `ActorEnd` of `status()`) and `Undelivered` (`Full`,
+  `Closed` or `Discarded`). Application code cannot publish an event.
+- Delivery never waits for a subscriber and never fails because of one. A full
+  subscriber drops the event and `EventSubscription::dropped_count` counts it.
+  The runtime publishes no event about the delivery of an event. A scope
+  without a channel does no event work.
+- `PayloadPolicy[M]` in the portable root selects the payload of an
+  `Undelivered` event as an Ion value: `omit` (the default, because messages
+  can hold secrets), `ion` for a protocol with `ToIon`, `json` as a bridge for
+  a protocol with core `ToJson`, and `encode` for a custom or redacted form.
+  `start`, `start_with`, `spawn` and `respond` take an optional `payload`. The
+  runtime encodes only when the channel has a subscriber and gives each
+  subscriber its own copy.
+- The actors module imports `moonrockz/ion@0.6.0`, only its
+  `moonrockz/ion/ion` data-model package. `mise run validate` rejects any other
+  Ion package in actors.
 - `moonrockz/sigstore` verifies RFC 3161 timestamps (TimeStampResp, CMS SignedData
   and its signed attributes, the TSA chain at the timestamp time, the imprint over
   the bundle signature). Bundles with no transparency log entry verify when a

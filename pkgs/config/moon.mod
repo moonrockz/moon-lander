@@ -1,9 +1,9 @@
 name = "moonrockz/moon-lander-config"
 
-version = "0.10.0"
+version = "0.11.0"
 
 import {
-  "moonrockz/moon-lander-core@0.10.0",
+  "moonrockz/moon-lander-core@0.11.0",
   "moonbitlang/async@0.22.5",
   "moonbitlang/x@0.5.6",
   "moonbit-community/toml@0.5.0",

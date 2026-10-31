@@ -192,7 +192,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.10.0`.
+- `moon.mod` holds the shared version, currently `0.11.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -329,7 +329,7 @@ listed above, `moonrockz/notebooks`, `moonrockz/openrpc` and `moonrockz/sigstore
 are in the publication allowlist and publish to mooncakes.io. The optional
 `moonrockz/moon-lander-moonx` is the eleventh library, and `moonrockz/sigstore`,
 first published in `0.10.0`, is the twelfth. Install a module at an exact version,
-for example `moon add moonrockz/moon-lander@0.10.0`. The workspace root, docs site, `tests`
+for example `moon add moonrockz/moon-lander@0.11.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 

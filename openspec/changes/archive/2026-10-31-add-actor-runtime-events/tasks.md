@@ -39,9 +39,9 @@ Bead: lander-d0y.4
 
 Depends on: group 3.
 
-- [ ] 4.1 Compare the acceptance evidence with every requirement of `actor-runtime-events` and the changed dependency requirement; verify each scenario has a test that runs on its stated targets
-- [ ] 4.2 Run the local actor benchmark with and without a channel and record the result in the pull request; verify that no benchmark runs in `mise run check` or CI
-- [ ] 4.3 Generate and review the `pkg.generated.mbti` files, run `mise run format`, `mise run check` and `mise exec -- openspec validate --all --strict`; verify all pass
+- [x] 4.1 Compare the acceptance evidence with every requirement of `actor-runtime-events` and the changed dependency requirement; verify each scenario has a test that runs on its stated targets
+- [x] 4.2 Run the local actor benchmark with and without a channel and record the result in the pull request; verify that no benchmark runs in `mise run check` or CI
+- [x] 4.3 Generate and review the `pkg.generated.mbti` files, run `mise run format`, `mise run check` and `mise exec -- openspec validate --all --strict`; verify all pass
 
 ## Workflow follow-up
 

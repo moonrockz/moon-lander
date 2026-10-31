@@ -70,9 +70,10 @@ Other packages of the module SHALL be below it, for example
 Config, mediator and logging-hosting-async SHALL import only core and logging;
 actors only core; hosting only core, logging, config and logging-hosting-async;
 the umbrella only those seven modules. Core and logging MUST import only core
-standard packages. Actors MUST use no external module except async. Moonx MUST
-import no framework module or canonical async. Other framework modules MUST NOT
-import moonx. Logging-hosting-async MAY import async.
+standard packages. Actors MUST use no external package except async and
+`moonrockz/ion/ion`. Moonx MUST import no framework module or canonical async.
+Other framework modules MUST NOT import moonx. Logging-hosting-async MAY import
+async.
 
 #### Scenario: Mediator without configuration parsers
 
@@ -127,7 +128,22 @@ import moonx. Logging-hosting-async MAY import async.
 #### Scenario: Standalone actor consumer
 
 - **WHEN** an isolated consumer imports `moonrockz/moon-lander-actors/runtime`
-- **THEN** its dependency graph has no hosting, config, mediator, logging or parser module
+- **THEN** its dependency graph has no hosting, config, mediator or logging module and no TOML, YAML or JSON5 module
+
+#### Scenario: Actors imports Ion
+
+- **WHEN** `pkgs/actors/moon.mod` imports `moonrockz/ion` and an actors package imports `moonrockz/ion/ion`
+- **THEN** `mise run validate` accepts both imports
+
+#### Scenario: Actors imports an Ion encoding package
+
+- **WHEN** a package of `pkgs/actors` imports `moonrockz/ion/text` or another Ion package than `moonrockz/ion/ion`
+- **THEN** `mise run validate` fails and names the package and the import
+
+#### Scenario: Actors imports another external module
+
+- **WHEN** `pkgs/actors/moon.mod` imports an external module other than `moonbitlang/async` or `moonrockz/ion`
+- **THEN** `mise run validate` fails and names the module
 
 #### Scenario: Actors imports against the direction
 

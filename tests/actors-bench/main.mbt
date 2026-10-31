@@ -66,6 +66,79 @@ async fn measure(
 }
 
 ///|
+/// A subscriber that counts events and admits each one at once.
+fn counting_subject(count : Ref[Int]) -> @actors.Subject[@actors.ActorEvent] {
+  @actors.Subject::new(
+    send=_ => {
+      count.val += 1
+      Admitted
+    },
+    try_send=_ => {
+      count.val += 1
+      Accepted
+    },
+  )
+}
+
+///|
+/// Send each message to one actor and wait for its sum, in a scope with the
+/// channel `events`, if any, and with one counting subscriber if `subscribe`.
+async fn end_to_end(
+  messages : Array[Int],
+  events : @actors.RuntimeEvents?,
+  subscribe? : Bool = false,
+) -> Int {
+  @actors.scope(events?, scope => {
+    if subscribe && events is Some(events) {
+      ignore(events.subscribe(scope, counting_subject(Ref(0))))
+    }
+    let replies : @aio.Queue[Int] = @aio.Queue(kind=Unbounded)
+    let actor = scope.start(0, mailbox=Unbounded, (total, value : Int?) => {
+      match value {
+        Some(value) => Continue(total + value)
+        None => {
+          replies.put(total)
+          Stop
+        }
+      }
+    })
+    for value in messages {
+      actor.send(Some(value))
+    }
+    actor.send(None)
+    replies.get()
+  })
+}
+
+///|
+/// `try_send` each message to a closed actor, with a JSON payload policy, in
+/// a scope with the channel `events`, if any. Give the number of rejections.
+async fn rejected(
+  messages : Array[Int],
+  events : @actors.RuntimeEvents?,
+  subscribe? : Bool = false,
+) -> Int {
+  @actors.scope(events?, scope => {
+    if subscribe && events is Some(events) {
+      ignore(events.subscribe(scope, counting_subject(Ref(0))))
+    }
+    let actor = scope.start(
+      (),
+      (_, _ : Int) => Continue(()),
+      payload=@actors.PayloadPolicy::json(),
+    )
+    ignore(actor.close())
+    let mut count = 0
+    for value in messages {
+      if actor.try_send(value) is Closed {
+        count += 1
+      }
+    }
+    count
+  })
+}
+
+///|
 async fn main {
   let messages = Array::make(MESSAGES, 1)
   let handler : async (Int, Int) -> @actors.Next[Int] = (total, value) => {
@@ -83,24 +156,22 @@ async fn main {
     let summing = @actors.receive_loop(0, handler)
     @actors.run_test(summing, messages, at_end=Close).result().unwrap_or(-1)
   })
-  measure("start actor end to end", () => {
-    @actors.scope(scope => {
-      let replies : @aio.Queue[Int] = @aio.Queue(kind=Unbounded)
-      let actor = scope.start(0, mailbox=Unbounded, (total, value : Int?) => {
-        match value {
-          Some(value) => Continue(total + value)
-          None => {
-            replies.put(total)
-            Stop
-          }
-        }
-      })
-      for value in messages {
-        actor.send(Some(value))
-      }
-      actor.send(None)
-      replies.get()
-    })
+  measure("start actor end to end", () => end_to_end(messages, None))
+  // The add-actor-runtime-events design compares the same actor with and
+  // without a runtime event channel.
+  measure("start actor end to end, channel with no subscriber", () => {
+    end_to_end(messages, Some(@actors.RuntimeEvents::new()))
+  })
+  measure("start actor end to end, channel with one subscriber", () => {
+    let events = @actors.RuntimeEvents::new()
+    end_to_end(messages, Some(events), subscribe=true)
+  })
+  measure("rejected try_send, no channel", () => rejected(messages, None))
+  measure("rejected try_send, channel with no subscriber", () => {
+    rejected(messages, Some(@actors.RuntimeEvents::new()))
+  })
+  measure("rejected try_send, channel with one subscriber and a payload", () => {
+    rejected(messages, Some(@actors.RuntimeEvents::new()), subscribe=true)
   })
   measure("state loop written with bind", () => {
     sum_forward(MESSAGES, 0) |> @actors.run_messages(messages) |> Option::unwrap

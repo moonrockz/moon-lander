@@ -473,6 +473,24 @@ async test "external consumers cannot take a message outside a receive or break 
         "fn probe() -> Unit { let _ : @actors.EventSubscription = { cancel: fn() { }, dropped: Ref(0) } }",
         "4036",
       ),
+      (
+        "fn probe() -> Unit { let _ = @actors.ActorEvent::Undelivered(abort(\"x\"), abort(\"x\"), payload=None) }",
+        "4036",
+      ),
+      // A payload policy needs the codec of the actor protocol.
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.start(0, (count, _ : Counter) => @actors.Continue(count), payload=@actors.PayloadPolicy::ion())) }",
+        "ToIon",
+      ),
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.spawn((_ : @actors.ActorContext[Counter]) => @actors.receive_all(_ => ()), payload=@actors.PayloadPolicy::json())) }",
+        "ToJson",
+      ),
+      // Service messages are closures, so `create` has no payload argument.
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.create(0, payload=@actors.PayloadPolicy::omit())) }",
+        "payload",
+      ),
     ] {
     @fs.write_file("\{dir}/probe.mbt", probe_prelude + source)
     let (code, out, err) = @process.collect_output(

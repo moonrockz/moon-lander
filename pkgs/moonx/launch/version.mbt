@@ -4,7 +4,7 @@
 priv struct PackageVersion(String)
 
 ///|
-let package_version : PackageVersion = PackageVersion("0.10.0")
+let package_version : PackageVersion = PackageVersion("0.11.0")
 
 ///|
 fn PackageVersion::text(self : PackageVersion) -> String { self.0 }

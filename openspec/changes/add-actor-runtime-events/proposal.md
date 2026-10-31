@@ -44,8 +44,9 @@ global bus and with typed events.
 ## Tracking
 
 Proposed on 2026-10-30, from the owner's request to give Moon-Lander the useful
-part of the Akka and Pekko `EventStream`, with Ion as the payload format. Beads
-follow maintainer approval, as `CONTRIBUTING.md` requires.
+part of the Akka and Pekko `EventStream`, with Ion as the payload format. The
+owner approved the change and its Call decisions on 2026-10-31 (PR #146). Epic
+`lander-d0y` holds stories `lander-d0y.1` to `lander-d0y.4`.
 
 A separate workspace adds `FromIon` and codec parity to `moonrockz/ion`. This
 change does not depend on that work: it uses only `ToIon` and

@@ -38,7 +38,7 @@ svg .arrow { stroke: currentColor; fill: none; }
 <body>
 <main>
 <h1>Add actor runtime events: design</h1>
-<p class="meta">OpenSpec change add-actor-runtime-events | 2026-10-30 | proposed</p>
+<p class="meta">OpenSpec change add-actor-runtime-events | 2026-10-30 | approved 2026-10-31</p>
 
 <nav class="toc" aria-label="Contents">
 <ul>
@@ -54,7 +54,7 @@ svg .arrow { stroke: currentColor; fill: none; }
 <h2 id="context">Context</h2>
 <p>See <a href="proposal.md">proposal.md</a> for the motivation. The actors module of <code>add-typed-actors</code> (archived 2026-10-29, released in 0.8.0) has <code>scope</code>, <code>Topic[M]</code> with <code>Scope::subscribe</code>, <code>Subject[M]</code>, <code>ActorStatus</code> with <code>ActorEnd</code>, and <code>Admission</code> (<code>Accepted</code>, <code>Full</code>, <code>Closed</code>). <code>Topic::publish</code> waits for admission to each subscriber. The mailbox already runs a discard action for each queued message when stop, cancellation or failure clears it. <code>close</code> returns the queued messages in a <code>Pending[M]</code> snapshot.</p>
 <p>The module imports only core and <code>moonbitlang/async</code> 0.22.5, and <code>scripts/validate-packages.mbtx</code> enforces that list. <code>moonrockz/moon-lander-config</code> already imports <code>moonrockz/ion@0.6.0</code>. In that version, <code>moonrockz/ion/ion</code> has <code>pub(open) trait ToIon { fn to_ion(Self) -&gt; Ion }</code> and <code>impl ToIon for Json</code>; it has no decode trait. MoonBit cannot derive <code>ToIon</code> and has no blanket implementations.</p>
-<p>Labels identify the source of a decision. <strong>Owner</strong> means the user requested it. <strong>Call</strong> means this proposal chooses it for review.</p>
+<p>Labels identify the source of a decision. <strong>Owner</strong> means the user requested it. <strong>Call</strong> means this proposal chooses it for review. The owner approved all Call decisions on 2026-10-31.</p>
 
 <h2 id="goals">Goals and non-goals</h2>
 <p><strong>Goals:</strong> the useful part of the Akka and Pekko <code>EventStream</code>, which is runtime visibility of dead letters and lifecycle, as typed values on an explicit channel. The runtime must never wait for, or fail because of, an observer. A scope without a channel must cost nothing.</p>
@@ -78,7 +78,7 @@ svg .arrow { stroke: currentColor; fill: none; }
 
 <h2 id="decisions">Decisions</h2>
 
-<h3 id="evt-1">EVT-1. An explicit channel for each scope, not a global bus (Owner: the channel, 2026-10-30; Call: the API)</h3>
+<h3 id="evt-1">EVT-1. An explicit channel for each scope, not a global bus (Owner: the channel, 2026-10-30; Call: the API; Owner approved 2026-10-31)</h3>
 <p><code>RuntimeEvents::new()</code> makes a channel. <code>@actors.scope(events~, body)</code> gives it to a scope. The child scopes of actors in that scope use the same channel. A separate top-level <code>scope</code> call uses only the channel that its caller gives, because <code>scope</code> has no implicit parent. To get one stream for a whole application, the application gives the same value to each top-level scope. That is the Akka system-wide stream, but as an explicit value.</p>
 <pre><code class="language-moonbit">async test "a dead letter after the actor ends" {
   let events = @actors.RuntimeEvents::new()
@@ -95,11 +95,11 @@ svg .arrow { stroke: currentColor; fill: none; }
 }</code></pre>
 <p>Alternative: one process-global stream, as in Akka. Rejected because it is mutable public state, and because the framework rules exclude global lookup. Alternative: a channel on each actor. Rejected because a dead-letter observer would then need the list of all actors.</p>
 
-<h3 id="evt-2">EVT-2. A separate channel type with no public publish (Call)</h3>
+<h3 id="evt-2">EVT-2. A separate channel type with no public publish (Call; Owner approved 2026-10-31)</h3>
 <p><code>RuntimeEvents</code> is not a <code>Topic[ActorEvent]</code>. It has <code>subscribe</code>, <code>close</code> and <code>subscriber_count</code>, but no publish. Only the runtime publishes, so a subscriber can trust that each event came from the runtime. The internal publish uses <code>try_send</code> (<a href="#evt-4">EVT-4</a>), which <code>Topic::publish</code> cannot do.</p>
 <p>Alternative: reuse <code>Topic[ActorEvent]</code>. Rejected because application code could publish false runtime events, and because <code>Topic::publish</code> waits for admission, which would let a slow observer stop the runtime.</p>
 
-<h3 id="evt-3">EVT-3. A small typed event set (Owner: dead letters and lifecycle, 2026-10-30; Call: the cases)</h3>
+<h3 id="evt-3">EVT-3. A small typed event set (Owner: dead letters and lifecycle, 2026-10-30; Call: the cases; Owner approved 2026-10-31)</h3>
 <pre><code class="language-moonbit">pub enum ActorEvent {
   Started(ActorAddress)
   Ended(ActorAddress, ActorEnd)
@@ -115,19 +115,19 @@ pub enum Undelivered {
 <p>Messages in the <code>Pending</code> snapshot of <code>close</code> are not dead letters: close gives them to its caller. Discarded asks already wake their callers; their <code>Discarded</code> event is also published, because the message was not processed. A reply to an expired <code>Reply</code> and a send to a custom <code>Subject</code> have no actor address, so they are out of scope.</p>
 <p>Alternative: an open set of classes, as in Akka (<code>DeadLetter</code>, <code>Dropped</code>, <code>UnhandledMessage</code>). Rejected because MoonBit has no class hierarchy for subscription by type, and a closed enum lets subscribers match all cases. There is no "unhandled" case: a <code>Receive</code> value handles each message that it selects, and non-matches stay queued.</p>
 
-<h3 id="evt-4">EVT-4. Non-waiting delivery: drop and count (Owner: non-waiting, 2026-10-30; Call: drop and count)</h3>
+<h3 id="evt-4">EVT-4. Non-waiting delivery: drop and count (Owner: non-waiting, 2026-10-30; Call: drop and count; Owner approved 2026-10-31)</h3>
 <p>The runtime publishes with <code>try_send</code> to a snapshot of subscriptions, in subscription order. On <code>Full</code> it drops the event for that subscriber and adds one to <code>EventSubscription::dropped_count()</code>, a snapshot <code>Int</code> like <code>queued_count()</code>. On <code>Closed</code> it removes the subscription. The runtime never publishes an event about the delivery of a runtime event, so an observer that is full cannot cause more events.</p>
 <p>This drop does not break the "no silent drop" rule of the actors spec. That rule is about mailbox policies. Here the runtime chooses not to admit an event, the subscriber's mailbox drops nothing, and the count makes each drop visible.</p>
 <p>Alternative: wait for admission, as <code>Topic</code> does. Rejected because a dead letter could then block a sender, and an observer actor in the same scope could cause a deadlock. Alternative: a <code>Lagged(count)</code> event at the next admission. Not chosen because it needs one more mailbox slot at the moment the subscriber is already full; the owner can still choose it.</p>
 
-<h3 id="evt-5">EVT-5. Subscriptions belong to the subscriber's scope (Call)</h3>
+<h3 id="evt-5">EVT-5. Subscriptions belong to the subscriber's scope (Call; Owner approved 2026-10-31)</h3>
 <p><code>events.subscribe(scope, subject) -&gt; EventSubscription raise ActorError</code> binds the subscription to the subscriber's scope, as <code>Scope::subscribe</code> does for topics. It ends on <code>unsubscribe</code> or at that scope's exit. <code>RuntimeEvents::close</code> ends all subscriptions, rejects later ones with <code>ActorError::TopicClosed</code>, and stops all later publication. A closed channel does not fail the scopes that use it.</p>
 
 <h3 id="pay-1">PAY-1. Ion as the payload format (Owner, 2026-10-30)</h3>
 <p>Payloads are <code>@ion.Ion</code> values from <code>moonrockz/ion/ion</code>. Ion is a superset of JSON and has decimals, timestamps, symbols, blobs and annotations, so a protocol keeps its value types in the payload. The payload type is concrete because one scope-level enum cannot hold the different protocol types <code>M</code> of its actors.</p>
 <p>Alternative: core <code>Json</code>, which logging uses for properties. Rejected by the owner: it loses Ion types. A bridge to logging converts with <code>@ion/json.to_json</code> (<a href="#log-1">LOG-1</a>).</p>
 
-<h3 id="pay-2">PAY-2. A payload policy for each actor, with a JSON bridge (Owner: the JSON bridge, 2026-10-30; Call: the forms and the default)</h3>
+<h3 id="pay-2">PAY-2. A payload policy for each actor, with a JSON bridge (Owner: the JSON bridge, 2026-10-30; Call: the forms and the default; Owner approved 2026-10-31)</h3>
 <p>MoonBit has no specialization and no runtime type test, so the runtime cannot find out whether <code>M</code> has <code>ToIon</code>. The bound goes on the call that starts the actor, through a value in the portable root:</p>
 <pre><code class="language-moonbit">pub struct PayloadPolicy[M] { priv encode : ((M) -&gt; @ion.Ion)? }
 
@@ -139,14 +139,14 @@ pub fn[M] PayloadPolicy::encode(f : (M) -&gt; @ion.Ion) -&gt; PayloadPolicy[M] /
 <p>The default is <code>omit</code>, because a message can hold a secret and an event usually goes to a log. The <code>ion</code> and <code>json</code> forms write the whole message; the documentation says so and shows <code>encode</code> for redaction. The encoder type cannot raise, so encoding cannot fail a delivery.</p>
 <p>Alternative: require <code>ToIon</code> on every protocol. Rejected because protocols with replies or closures could then not be actors. Alternative: a lazy payload thunk. Rejected because it keeps the message alive in the event and is not data.</p>
 
-<h3 id="pay-3">PAY-3. Encode only when someone listens, and isolate each payload (Call)</h3>
+<h3 id="pay-3">PAY-3. Encode only when someone listens, and isolate each payload (Call; Owner approved 2026-10-31)</h3>
 <p>The runtime calls the encoder only for an <code>Undelivered</code> event and only when the channel has at least one subscription at that moment. A loop of rejected <code>try_send</code> calls with no observer does no encoding work. <code>Ion</code> values hold MoonBit arrays, which can change, so each subscriber gets its own value: the runtime encodes once and gives each later subscriber a deep copy. Logging uses the same copy rule for its JSON properties.</p>
 
-<h3 id="dep-1">DEP-1. Actors imports the Ion data model (Owner: Ion, 2026-10-30; Call: the limits)</h3>
+<h3 id="dep-1">DEP-1. Actors imports the Ion data model (Owner: Ion, 2026-10-30; Call: the limits; Owner approved 2026-10-31)</h3>
 <p><code>pkgs/actors/moon.mod</code> imports <code>moonrockz/ion@0.6.0</code>, the version that config already uses, so the workspace resolves one Ion version. Actors packages import only <code>moonrockz/ion/ion</code>, not the text, binary, schema or JSON packages. <code>scripts/validate-packages.mbtx</code> adds <code>moonrockz/ion</code> to the external limit for actors and gets a package-level check for that rule. The Ion data-model package builds on all four targets, so the portable root stays portable. The decode work in the separate <code>moonrockz/ion</code> workspace is not a dependency; a later version bump can take it.</p>
 <p>Alternative: put payloads in an optional <code>actors-ion</code> package. Rejected because <code>ActorEvent</code> must name the payload type, so the runtime needs it in any case.</p>
 
-<h3 id="log-1">LOG-1. A logging bridge as an example, not a dependency (Call)</h3>
+<h3 id="log-1">LOG-1. A logging bridge as an example, not a dependency (Call; Owner approved 2026-10-31)</h3>
 <p>Logging imports only core, and actors does not import logging. A bridge is an ordinary actor in application code: it subscribes to the channel, converts the payload with <code>@ion/json.to_json</code>, and writes a <code>LogEvent</code> property. When the conversion fails, it writes the Ion text form as a string property. The unpublished acceptance tests hold this example, so no published module gets the dependency.</p>
 
 <h2 id="risks">Risks and trade-offs</h2>

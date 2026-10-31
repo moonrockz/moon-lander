@@ -1,12 +1,12 @@
 # Tasks: Add actor runtime events
 
-Status: proposed. No implementation task is complete. After maintainer approval,
-create one epic and one story per group, then replace each pending Bead value.
-Each group includes its own tests and runnable documentation.
+Status: approved on 2026-10-31. No implementation task is complete. Epic
+`lander-d0y` holds one story for each group. Each group includes its own tests
+and runnable documentation.
 
 ## 1. Ion dependency and payload policy
 
-Bead: pending approval
+Bead: lander-d0y.1
 
 - [ ] 1.1 Add `moonrockz/ion@0.6.0` to `pkgs/actors/moon.mod` and `moonrockz/ion/ion` to the actors package imports; add `moonrockz/ion` to the actors external limit in `scripts/validate-packages.mbtx`, with a package-level check that actors packages import no other Ion package; verify the accept and reject scenarios of the dependency requirement with task script tests and `mise run validate`
 - [ ] 1.2 Add `PayloadPolicy[M]` to the portable root with `omit`, `ion`, `json` and `encode`, and `omit` as the default; verify an Ion-native protocol (decimal and timestamp), a `derive(ToJson)` protocol through the bridge, a redacting encoder and a wrong-policy compile failure on wasm, wasm-gc, js and native
@@ -14,7 +14,7 @@ Bead: pending approval
 
 ## 2. Runtime event channel and lifecycle events
 
-Bead: pending approval
+Bead: lander-d0y.2
 
 Depends on: group 1.
 
@@ -25,7 +25,7 @@ Depends on: group 1.
 
 ## 3. Undelivered events and payloads
 
-Bead: pending approval
+Bead: lander-d0y.3
 
 Depends on: group 2.
 
@@ -35,7 +35,7 @@ Depends on: group 2.
 
 ## 4. Integration
 
-Bead: pending approval
+Bead: lander-d0y.4
 
 Depends on: group 3.
 
@@ -45,7 +45,6 @@ Depends on: group 3.
 
 ## Workflow follow-up
 
-- Create and link beads only after maintainer approval. Apply the group dependencies above.
 - Keep beads open until their pull requests merge. Include tests and docs in each group's pull request.
 - The final group's pull request archives this change. Close the completed stories and epic with the PR and merge SHA, then sync beads as `CONTRIBUTING.md` requires.
 - Publication needs a later owner-approved release change. Do not publish from the workstation.

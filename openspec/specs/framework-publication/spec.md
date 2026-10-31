@@ -10,12 +10,12 @@ before a release is promoted.
 
 ### Requirement: Publish every framework library
 
-The release SHALL publish moonrockz/moon-lander-core, moonrockz/moon-lander-logging, moonrockz/moon-lander-config, moonrockz/moon-lander-mediator, moonrockz/moon-lander-logging-hosting-async, moonrockz/moon-lander-actors, moonrockz/moon-lander-hosting, moonrockz/moon-lander-moonx, moonrockz/moon-lander, moonrockz/notebooks and moonrockz/openrpc at one shared version. Dependencies MUST publish first. Sibling imports MUST use that version without local paths.
+The release SHALL publish moonrockz/moon-lander-core, moonrockz/moon-lander-logging, moonrockz/moon-lander-config, moonrockz/moon-lander-mediator, moonrockz/moon-lander-logging-hosting-async, moonrockz/moon-lander-actors, moonrockz/moon-lander-hosting, moonrockz/moon-lander-moonx, moonrockz/moon-lander, moonrockz/notebooks, moonrockz/openrpc and moonrockz/sigstore at one shared version. Dependencies MUST publish first. Sibling imports MUST use that version without local paths.
 
 #### Scenario: Prepare a release
 
 - **WHEN** GitHub Actions publishes an approved version change
-- **THEN** all eleven library modules publish in dependency order with exact sibling versions
+- **THEN** all twelve library modules publish in dependency order with exact sibling versions
 
 #### Scenario: Actors candidate consumer
 
@@ -26,6 +26,11 @@ The release SHALL publish moonrockz/moon-lander-core, moonrockz/moon-lander-logg
 
 - **WHEN** the candidate archive gate checks the Moonx module outside the checkout with isolated caches
 - **THEN** its portable policy consumer builds on all four targets and its process driver builds on its declared targets without canonical async in the parent executable
+
+#### Scenario: Sigstore candidate consumer
+
+- **WHEN** the candidate archive gate checks sigstore outside the checkout with isolated caches
+- **THEN** a consumer that verifies one vendored bundle builds on wasm, wasm-gc, js and native without workspace overrides
 
 ### Requirement: Exclude tooling and test modules
 

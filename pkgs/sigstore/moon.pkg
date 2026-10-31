@@ -1,0 +1,21 @@
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonrockz/sigstore/internal/der",
+  "moonrockz/sigstore/internal/encoding",
+  "moonrockz/sigstore/internal/signature",
+  "moonrockz/sigstore/internal/sct",
+  "moonrockz/sigstore/internal/tlog",
+  "moonrockz/sigstore/internal/x509",
+}
+
+import {
+  "moonbitlang/core/encoding/utf8",
+  "moonrockz/sigstore/internal/fixtures",
+} for "test"
+
+import {
+  "moonrockz/sigstore/internal/fixtures",
+} for "wbtest"

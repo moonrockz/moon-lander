@@ -1,0 +1,71 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/x@0.5.6/sys",
+}
+----
+
+///|
+/// Run the local benchmark of one Sigstore bundle verification (openspec
+/// add-sigstore-verification, task 2.3) in release mode.
+///
+/// This is a manual local tool. `mise run check`, CI and the release workflow never run it, so it
+/// adds no time to them. The suite is the program `tests/sigstore-bench`, which times the root
+/// parse, the bundle parse and one full verification of a real GitHub bundle with the monotonic
+/// clock of `moonbitlang/core/bench`.
+///
+/// Usage: `mise run bench:sigstore [-- <target>...]`, or
+/// `moonx scripts/toolchain.mbtx scripts/bench-sigstore.mbtx`. With no target, it runs wasm,
+/// wasm-gc, js and native.
+
+///|
+/// The targets of the verifier.
+let bench_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
+
+///|
+/// The targets to run for `args`, or the unknown targets in `args`.
+fn select_targets(args : Array[String]) -> Result[Array[String], Array[String]] {
+  let targets = args.filter(arg => !arg.has_prefix("--"))
+  let unknown = targets.filter(target => !bench_targets.contains(target))
+  if !unknown.is_empty() {
+    Err(unknown)
+  } else if targets.is_empty() {
+    Ok(bench_targets)
+  } else {
+    Ok(targets)
+  }
+}
+
+///|
+async fn main {
+  let targets = match select_targets(@env.args()[1:].to_owned()) {
+    Ok(targets) => targets
+    Err(unknown) => {
+      println(
+        "❌ Unknown target: \{unknown.join(", ")}. Use wasm, wasm-gc, js or native.",
+      )
+      @sys.exit(1)
+      return
+    }
+  }
+  for target in targets {
+    println("== \{target}")
+    let code = @process.run("moon", [
+      "run", "--release", "--target", target, "tests/sigstore-bench",
+    ])
+    guard code == 0 else {
+      println("❌ The sigstore benchmark failed on \{target}")
+      @sys.exit(if code > 0 { code } else { 1 })
+    }
+  }
+}
+
+///|
+test "select_targets gives the four targets by default and rejects others" {
+  assert_eq(select_targets([]), Ok(["wasm", "wasm-gc", "js", "native"]))
+  assert_eq(select_targets(["native", "--quiet"]), Ok(["native"]))
+  assert_eq(select_targets(["wasm-gc"]), Ok(["wasm-gc"]))
+  assert_eq(select_targets(["llvm", "nativ"]), Err(["llvm", "nativ"]))
+}

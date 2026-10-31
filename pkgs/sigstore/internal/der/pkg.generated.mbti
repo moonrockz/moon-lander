@@ -1,0 +1,85 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/der"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub const BIT_STRING : Int32 = 0x03
+
+pub const BOOLEAN : Int32 = 0x01
+
+pub const GENERALIZED_TIME : Int32 = 0x18
+
+pub const IA5_STRING : Int32 = 0x16
+
+pub const INTEGER : Int32 = 0x02
+
+pub const NULL : Int32 = 0x05
+
+pub const OCTET_STRING : Int32 = 0x04
+
+pub const OID : Int32 = 0x06
+
+pub const PRINTABLE_STRING : Int32 = 0x13
+
+pub const SEQUENCE : Int32 = 0x30
+
+pub const SET : Int32 = 0x31
+
+pub const UTC_TIME : Int32 = 0x17
+
+pub const UTF8_STRING : Int32 = 0x0c
+
+pub fn context(Int32) -> Int32
+
+pub fn context_primitive(Int32) -> Int32
+
+pub fn days_in_month(Int32, Int32) -> Int32
+
+pub fn encode(Int32, BytesView) -> Bytes
+
+pub fn parse(BytesView) -> Element raise DerError
+
+pub fn parse_tag(BytesView, Int32) -> Element raise DerError
+
+pub fn unix_seconds(Int32, Int32, Int32, Int32, Int32, Int32) -> Int64
+
+// Errors
+pub(all) suberror DerError {
+  Malformed(String)
+} derive(@debug.Debug)
+pub fn DerError::message(Self) -> String
+pub fn DerError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Element {
+  tag : Int32
+  content : BytesView
+  raw : BytesView
+}
+pub fn Element::bit_string_bytes(Self) -> BytesView raise DerError
+pub fn Element::boolean(Self) -> Bool raise DerError
+pub fn Element::children(Self) -> Reader raise DerError
+pub fn Element::named_bits(Self) -> Int32 raise DerError
+pub fn Element::oid(Self) -> String raise DerError
+pub fn Element::small_int(Self) -> Int32 raise DerError
+pub fn Element::text(Self) -> String raise DerError
+pub fn Element::time(Self) -> Int64 raise DerError
+pub fn Element::unsigned(Self) -> BytesView raise DerError
+
+pub struct Reader {
+  // private fields
+}
+pub fn Reader::expect(Self, Int32) -> Element raise DerError
+pub fn Reader::finish(Self) -> Unit raise DerError
+pub fn Reader::is_empty(Self) -> Bool
+pub fn Reader::new(BytesView) -> Self
+pub fn Reader::next(Self) -> Element raise DerError
+pub fn Reader::optional(Self, Int32) -> Element? raise DerError
+pub fn Reader::peek_tag(Self) -> Int32?
+
+// Type aliases
+
+// Traits

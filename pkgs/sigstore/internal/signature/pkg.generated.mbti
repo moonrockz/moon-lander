@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/signature"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn der_signature_to_raw(BytesView, Int32) -> Bytes?
+
+pub fn digest(HashAlgorithm, BytesView) -> Bytes
+
+pub fn sha256(BytesView) -> Bytes
+
+// Errors
+pub suberror KeyError {
+  UnsupportedKey(String)
+  BadKey(String)
+} derive(@debug.Debug)
+pub fn KeyError::message(Self) -> String
+pub fn KeyError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) enum HashAlgorithm {
+  Sha256
+  Sha384
+  Sha512
+} derive(Eq, @debug.Debug)
+pub fn HashAlgorithm::equal(Self, Self) -> Bool
+pub fn HashAlgorithm::not_equal(Self, Self) -> Bool
+pub fn HashAlgorithm::to_repr(Self) -> @debug.Repr
+
+pub enum KeyKind {
+  EcdsaP256
+  EcdsaP384
+} derive(Eq, @debug.Debug)
+pub fn KeyKind::equal(Self, Self) -> Bool
+pub fn KeyKind::hash(Self) -> HashAlgorithm
+pub fn KeyKind::not_equal(Self, Self) -> Bool
+pub fn KeyKind::to_repr(Self) -> @debug.Repr
+
+pub struct PublicKey {
+  kind : KeyKind
+  spki : Bytes
+  // private fields
+}
+pub fn PublicKey::from_spki(BytesView) -> Self raise KeyError
+pub fn PublicKey::verify(Self, BytesView, BytesView, hash? : HashAlgorithm) -> Bool
+pub fn PublicKey::verify_digest(Self, BytesView, BytesView) -> Bool
+pub fn PublicKey::verify_digest_raw(Self, BytesView, BytesView) -> Bool
+
+// Type aliases
+
+// Traits

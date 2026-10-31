@@ -1,0 +1,6 @@
+import {
+  "moonrockz/sigstore",
+  "moonbitlang/core/bench",
+}
+
+pkgtype(kind: "executable")

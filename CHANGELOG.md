@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `moonrockz/sigstore`: pure, portable verification of Sigstore bundles and
+  GitHub artifact attestations on wasm, wasm-gc, JavaScript and native. It
+  checks the DSSE or message signature, the Fulcio certificate chain and SCT,
+  and the Rekor v1 entry with its inclusion proof and checkpoint, against a
+  trusted root, a publisher identity policy and a given time. A verdict gives
+  one typed reason, and unsupported bundles (Rekor v2, timestamp authorities,
+  public keys) give a typed not-supported reason. The module embeds the pinned
+  Sigstore public-good root and imports `moonbitstack/mooncrypt@0.4.4`.
+- Publish and verify `moonrockz/sigstore` as the twelfth library, after
+  `moonrockz/openrpc`, with an isolated registry consumer that verifies a real
+  GitHub bundle on all four targets. `mise run check:sigstore` fails when a
+  target runs zero sigstore tests, `mise run check:sigstore-assets` rejects a
+  stale generated root or fixture, and the manual `mise run bench:sigstore`
+  times one verification.
+
 ## 0.9.0 - 2026-10-30
 
 All eleven libraries share this minor version. The optional Moonx launcher

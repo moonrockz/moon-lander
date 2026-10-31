@@ -83,12 +83,14 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:mediator` | Fail when the mediator package or its acceptance suite runs zero tests on a target |
 | `mise run check:actors` | Fail when the actor policy root, the actor runtime or the actor acceptance suite runs zero tests on a target |
 | `mise run bench:actors` | Run the local actor receive benchmark in release mode. A manual tool: `check`, CI and the release workflow never run it |
+| `mise run check:sigstore` | Fail when the sigstore root package or one of its internal packages runs zero tests on a target |
+| `mise run bench:sigstore` | Time one Sigstore bundle verification in release mode on all four targets. A manual tool: `check`, CI and the release workflow never run it |
 | `mise run check:logging` | Fail when a portable logging package (root, formatting, rolling, sink settings) or the acceptance suite runs zero tests on a target |
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
-| `mise run check:framework-registry` | Audit all eleven candidate archives and build isolated registry consumers on supported targets |
-| `mise run check:framework-published` | Release-only gate for all eleven public archives and approved checksums |
+| `mise run check:framework-registry` | Audit all twelve candidate archives and build isolated registry consumers on supported targets |
+| `mise run check:framework-published` | Release-only gate for all twelve public archives and approved checksums |
 | `mise run check:moonx` | Qualify the optional launcher with the primary stock compiler and a real Node-owned host |
 | `mise run check:moonx-stock16` | Qualify the same public APIs with pinned stock 0.10.16 |
 | `mise run check:moonx-runtime` | Reconstruct and verify frozen source, patches, licenses and provenance |
@@ -105,6 +107,8 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:openrpc-artifacts` | Reject stale artifact metaschemas and the associated OpenRPC license |
 | `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |
 | `mise run check:openrpc-unicode` | Reject stale identifier tables and the associated Unicode license |
+| `mise run build:sigstore-assets` | Generate the pinned Sigstore public-good root and the test fixtures from `pkgs/sigstore/testdata/` |
+| `mise run check:sigstore-assets` | Reject a stale Sigstore root or fixture file, or changed test data, without rewriting |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`, `--tree next` for `_site/next/`, or `--tree <minor>` for `_site/v/<minor>/`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
 | `mise run check:site` | Check the links of the built `_site/`, or of one tree with `--tree`; an assembled site is checked tree by tree |
@@ -248,6 +252,15 @@ script. Also update the assessed versions above.
   validation and canonical writing. Its requirements are in
   `openspec/specs/openrpc-documents/` and `openspec/specs/openrpc-rollout/`;
   Smithy consumes the published `0.2.0`.
+- `pkgs/sigstore/` contains [`moonrockz/sigstore`](pkgs/sigstore/README.mbt.md),
+  imported as `@sigstore`. It verifies Sigstore bundles and GitHub artifact
+  attestations against a trusted root, a publisher identity policy and a given
+  time, on all four targets. It does no network, file or clock I/O. It embeds
+  the pinned Sigstore public-good root. DER, X.509, ECDSA, SCT and
+  transparency-log checks are internal packages. Like `moonrockz/openrpc`, it is
+  not a framework layer: it imports `moonbitstack/mooncrypt` and no Moon-Lander
+  module. Its requirements are in `openspec/specs/sigstore-bundle-verification/`,
+  `openspec/specs/sigstore-trusted-root/` and `openspec/specs/sigstore-identity-policy/`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
   builds the static site at `https://moonrockz.github.io/moon-lander/` with
   `moonrockz/telescope@0.5.1`. It owns the Moon-Lander landing page and content adapters.
@@ -308,9 +321,10 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 [the changelog](CHANGELOG.md) for details and API migration notes.
 
 Release versions are shared across workspace members. The framework modules
-listed above, `moonrockz/notebooks` and `moonrockz/openrpc` are in the
-publication allowlist and publish to mooncakes.io. The optional
-`moonrockz/moon-lander-moonx` is the eleventh library. Install a module at an exact version,
+listed above, `moonrockz/notebooks`, `moonrockz/openrpc` and `moonrockz/sigstore`
+are in the publication allowlist and publish to mooncakes.io. The optional
+`moonrockz/moon-lander-moonx` is the eleventh library, and `moonrockz/sigstore`
+joins the next release as the twelfth. Install a module at an exact version,
 for example `moon add moonrockz/moon-lander@0.9.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
@@ -320,7 +334,7 @@ pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
 adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
 its checks on that pull request. Merging it to `main` is the owner's approval:
 the workflow then runs the full check, publishes the public modules with the
-`MOONCAKES_USER_TOKEN` organization secret, verifies all eleven published archives against approved checksums, runs isolated
+`MOONCAKES_USER_TOKEN` organization secret, verifies all twelve published archives against approved checksums, runs isolated
 registry consumers and the format override checks on supported targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
 

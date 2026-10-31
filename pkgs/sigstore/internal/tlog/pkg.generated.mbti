@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/tlog"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/sigstore/internal/signature",
+}
+
+// Values
+pub fn leaf_hash(BytesView) -> Bytes
+
+pub fn node_hash(BytesView, BytesView) -> Bytes
+
+pub fn parse_checkpoint(String) -> Checkpoint raise CheckpointError
+
+pub fn root_from_inclusion_proof(Int64, Int64, BytesView, Array[Bytes]) -> Bytes?
+
+pub fn set_payload(BytesView, Int64, BytesView, Int64) -> Bytes
+
+// Errors
+pub suberror CheckpointError {
+  BadCheckpoint(String)
+} derive(@debug.Debug)
+pub fn CheckpointError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Checkpoint {
+  origin : String
+  size : Int64
+  root_hash : Bytes
+  text : Bytes
+  signatures : Array[NoteSignature]
+}
+pub fn Checkpoint::verify(Self, @signature.PublicKey) -> Bool
+
+pub struct NoteSignature {
+  name : String
+  key_hint : Bytes
+  signature : Bytes
+}
+
+// Type aliases
+
+// Traits

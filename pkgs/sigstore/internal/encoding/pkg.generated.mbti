@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/encoding"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_base64(StringView) -> Bytes raise EncodingError
+
+pub fn decode_hex(StringView) -> Bytes raise EncodingError
+
+pub fn encode_base64(BytesView) -> String
+
+pub fn encode_hex(BytesView) -> String
+
+pub fn utf8(StringView) -> Bytes
+
+// Errors
+pub suberror EncodingError {
+  BadBase64(String)
+  BadHex(String)
+} derive(@debug.Debug)
+pub fn EncodingError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+
+// Type aliases
+
+// Traits

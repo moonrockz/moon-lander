@@ -66,12 +66,15 @@ priv struct Lifetime {
   mut started : Bool
   /// Release the name reservation of the actor, after cleanup.
   release : () -> Unit
+  /// The opt-in runtime event channel of the owner scope, if any.
+  events : RuntimeEvents?
 }
 
 ///|
 fn Lifetime::new(
   address : ActorAddress,
   close_mailbox : () -> Unit,
+  events : RuntimeEvents?,
   release : () -> Unit,
 ) -> Lifetime {
   {
@@ -87,6 +90,7 @@ fn Lifetime::new(
     cancel_requested: false,
     started: true,
     release,
+    events,
   }
 }
 
@@ -215,12 +219,15 @@ async fn Lifetime::run(
   self.stop_processing(end)
   let cleanup_error = cleanup.run(primary)
   // A cleanup failure is the final outcome; it keeps the primary failure.
-  self.finish(
-    match cleanup_error {
-      Some(error) => Failed(error)
-      None => end
-    },
-  )
+  let outcome = match cleanup_error {
+    Some(error) => Failed(error)
+    None => end
+  }
+  self.finish(outcome)
+  // A failed initializer never became ready, so it publishes no end event.
+  if start_error is None {
+    publish_event(self.events, Ended(self.address, outcome))
+  }
   match (start_error, cleanup_error, primary) {
     (Some(_), Some(error), _) | (Some(error), None, _) =>
       on_start_failure(error)

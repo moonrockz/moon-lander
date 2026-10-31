@@ -250,6 +250,9 @@ fn[M, R] Scope::run_actor(
     init() catch {
       error => return StartFailed(error)
     }
+    // The actor can receive after initialization; publish before the first
+    // receive runs. A failed initializer never reaches this point.
+    publish_event(target.life.events, Started(target.life.address))
     // Processing ends here, inside the child scope: admission closes and asks
     // wake before the children are cancelled and their cleanup runs.
     let ran : Result[RunEnd, Error] = try {
@@ -293,7 +296,8 @@ fn[M, R] Scope::run_actor(
   life.cancel_task = (self.spawn_task)(() => {
     life.run(cleanup, on_start_failure~, () => {
       if children {
-        scope(run)
+        // Child scopes of actors reuse the parent channel.
+        scope(events?=self.events, run)
       } else {
         run(Scope::closed())
       }

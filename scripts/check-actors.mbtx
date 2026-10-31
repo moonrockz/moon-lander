@@ -458,6 +458,21 @@ async test "external consumers cannot take a message outside a receive or break 
         "fn probe() -> Unit { let _ : @actors.Receive[Counter, Int] = { steps: fn(_) { abort(\"x\") } } }",
         "4036",
       ),
+      // RuntimeEvents has no public publish: only the runtime may publish.
+      (
+        "fn probe(event : @actors.ActorEvent) -> Unit { let events = @actors.RuntimeEvents::new(); events.publish(event) }",
+        "4015",
+      ),
+      // ActorEvent constructors are read-only: only the runtime may make events.
+      ("fn probe() -> Unit { let _ = @actors.Started(abort(\"x\")) }", "4036"),
+      (
+        "fn probe() -> Unit { let _ : @actors.RuntimeEvents = { entries: [], last_id: 0, open: true } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.EventSubscription = { cancel: fn() { }, dropped: Ref(0) } }",
+        "4036",
+      ),
     ] {
     @fs.write_file("\{dir}/probe.mbt", probe_prelude + source)
     let (code, out, err) = @process.collect_output(

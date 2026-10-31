@@ -10,14 +10,21 @@ pub struct Scope {
   /// What runs when the body returns, such as ending subscriptions, by key.
   priv exits : Map[Int, () -> Unit]
   priv mut last_exit : Int
+  /// The opt-in runtime event channel for this scope, if any.
+  priv events : RuntimeEvents?
 }
 
 ///|
 /// Run `body` with a new scope. Actors that `body` starts belong to the scope.
 /// When `body` returns, the scope stops accepting starts, cancels its live
 /// actors and returns after they and their cleanup end. An actor that fails
-/// fails the scope and cancels the other actors and `body`.
-pub async fn[X] scope(body : async (Scope) -> X) -> X {
+/// fails the scope and cancels the other actors and `body`. With `events`, the
+/// scope publishes lifecycle events to that channel; without it, it publishes
+/// nothing. Child scopes of actors in this scope use the same channel.
+pub async fn[X] scope(
+  events? : RuntimeEvents,
+  body : async (Scope) -> X,
+) -> X {
   @aio.with_task_group(group => {
     let scope = {
       spawn_task: task => {
@@ -28,6 +35,7 @@ pub async fn[X] scope(body : async (Scope) -> X) -> X {
       names: Map([]),
       exits: Map([]),
       last_exit: 0,
+      events,
     }
     defer {
       scope.open = false
@@ -50,6 +58,7 @@ fn Scope::closed() -> Scope {
     names: Map([]),
     exits: Map([]),
     last_exit: 0,
+    events: None,
   }
 }
 
@@ -79,7 +88,7 @@ fn Scope::begin(
   if name is Some(name) {
     self.names[name] = address
   }
-  Lifetime::new(address, close_mailbox, () => {
+  Lifetime::new(address, close_mailbox, self.events, () => {
     if name is Some(name) &&
       self.names.get(name) is Some(owner) &&
       owner == address {

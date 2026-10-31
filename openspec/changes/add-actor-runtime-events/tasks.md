@@ -16,18 +16,18 @@ Bead: lander-d0y.1
 
 Bead: lander-d0y.2
 
-Depends on: group 1.
+Depends on: none; runs in parallel with group 1.
 
-- [ ] 2.1 Add `RuntimeEvents` with `new`, `subscribe`, `close` and `subscriber_count` and no public publish, `EventSubscription` with `unsubscribe` and `dropped_count`, and the optional `events` argument of `scope`; verify subscription end at unsubscribe and scope exit, subscribe after close, and a compile failure for an application publish
-- [ ] 2.2 Publish `Started` and `Ended` from the runtime, with child scopes that use the parent channel and top-level scopes that use only their own; verify lifecycle order, the failed end value, no events for a failed initializer, child actor events, the separate top-level scope and one channel for two scopes, with acknowledgement-based tests on wasm, js and native
-- [ ] 2.3 Deliver with non-waiting admission in subscription order: drop and count on full, remove on closed, and publish no event about event delivery; verify the slow subscriber, the ended subscriber and the no-feedback scenarios, and that a scope without a channel publishes nothing
-- [ ] 2.4 Add a runnable example of a test that waits for an `Ended` event instead of polling `status()`; verify it compiles and runs on all runtime targets with `mise run check:actors`
+- [x] 2.1 Add `RuntimeEvents` with `new`, `subscribe`, `close` and `subscriber_count` and no public publish, `EventSubscription` with `unsubscribe` and `dropped_count`, and the optional `events` argument of `scope`; verify subscription end at unsubscribe and scope exit, subscribe after close, and a compile failure for an application publish
+- [x] 2.2 Publish `Started` and `Ended` from the runtime, with child scopes that use the parent channel and top-level scopes that use only their own; verify lifecycle order, the failed end value, no events for a failed initializer, child actor events, the separate top-level scope and one channel for two scopes, with acknowledgement-based tests on wasm, js and native
+- [x] 2.3 Deliver with non-waiting admission in subscription order: drop and count on full, remove on closed, and publish no event about event delivery; verify the slow subscriber, the ended subscriber and the no-feedback scenarios, and that a scope without a channel publishes nothing
+- [x] 2.4 Add a runnable example of a test that waits for an `Ended` event instead of polling `status()`; verify it compiles and runs on all runtime targets with `mise run check:actors`
 
 ## 3. Undelivered events and payloads
 
 Bead: lander-d0y.3
 
-Depends on: group 2.
+Depends on: groups 1 and 2.
 
 - [ ] 3.1 Publish `Undelivered` with the `Full`, `Closed` and `Discarded` reasons from `try_send`, `reenqueue`, `send` and the mailbox discard path; verify queue order before `Ended` on cancellation, no events for a close snapshot, and closed sends after the end, on wasm, js and native
 - [ ] 3.2 Add the optional `payload` argument to `start`, `start_with`, `spawn` and `respond`, encode only for an undelivered event with at least one subscription, and give each subscriber an independent copy; verify the no-subscriber encoder count of zero, independent payloads, the default omitted payload and no payload for service closures

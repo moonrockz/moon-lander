@@ -215,7 +215,7 @@ pub enum PolicyMismatch {
   RunnerEnvironment(actual~ : String?)
   /// The statement has the predicate type `actual` (`None` without a
   /// statement), not `expected`.
-  PredicateTypeMismatch(expected~ : String, actual~ : String?)
+  PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
 } derive(Eq, Debug)
 
 ///|
@@ -252,7 +252,7 @@ pub fn PolicyMismatch::message(self : PolicyMismatch) -> String {
     RunnerEnvironment(actual~) =>
       "the runner environment is \{shown(actual)}, not \"github-hosted\""
     PredicateTypeMismatch(expected~, actual~) =>
-      "the predicate type is \{shown(actual)}, not \{expected.escape()}"
+      "the predicate type is \{shown(actual.map(value => value.to_string()))}, not \{expected.to_string().escape()}"
   }
 }
 
@@ -369,8 +369,8 @@ fn Policy::mismatch(
   }
   if self.predicate_type is Some(expected) {
     let actual = statement.map(statement => statement.predicate_type)
-    guard actual == Some(expected.to_string()) else {
-      return Some(PredicateTypeMismatch(expected=expected.to_string(), actual~))
+    guard actual == Some(expected) else {
+      return Some(PredicateTypeMismatch(expected~, actual~))
     }
   }
   None

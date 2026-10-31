@@ -433,7 +433,7 @@ fn check_sct(leaf : Leaf, issuer : @x509.Certificate, root : TrustedRoot) -> Uni
   for sct in scts {
     guard root.ctlog(sct.log_id) is Some(log) else { continue }
     guard log.key is Usable(key) else { continue }
-    let time = Instant::from_unix_seconds(sct.timestamp / 1000L)
+    let time = Instant::from_unix_millis(sct.timestamp)
     guard log.valid.contains(time) else { continue }
     if sct.verify(key, issuer.spki, tbs) {
       return
@@ -529,8 +529,11 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
     in_toto_statement_types.contains(statement_type) else {
     raise invalid(Statement("the payload is not an in-toto statement"))
   }
-  guard json_field(json, "predicateType") is Some(String(predicate_type)) else {
+  guard json_field(json, "predicateType") is Some(String(predicate_text)) else {
     raise invalid(Statement("the statement has no predicate type"))
+  }
+  let predicate_type = PredicateType::parse(predicate_text) catch {
+    err => raise invalid(Statement(err.message()))
   }
   guard json_field(json, "subject") is Some(Array(items)) && items.length() <= max_subjects else {
     raise invalid(Statement("the statement has no subject list, or more than \{max_subjects}"))

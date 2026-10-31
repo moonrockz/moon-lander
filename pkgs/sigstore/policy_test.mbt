@@ -268,6 +268,6 @@ test "a provenance bundle does not pass a policy for another predicate type" {
     is Rejected(Invalid(Policy([PredicateTypeMismatch(expected~, actual~)]))) else {
     fail("expected a predicate type mismatch")
   }
-  assert_eq(expected, "https://spdx.dev/Document/v2.3")
-  assert_eq(actual, Some("https://slsa.dev/provenance/v1"))
+  assert_eq(expected.to_string(), "https://spdx.dev/Document/v2.3")
+  assert_eq(actual, Some(@sigstore.PredicateType::slsa_provenance_v1()))
 }

@@ -23,6 +23,19 @@ pub fn Instant::from_unix_seconds(seconds : Int64) -> Instant {
 }
 
 ///|
+/// The instant `millis` milliseconds after 1970-01-01T00:00:00Z, as an SCT
+/// gives it, with the millisecond part kept.
+fn Instant::from_unix_millis(millis : Int64) -> Instant {
+  let seconds = millis / 1000L
+  let rest = (millis % 1000L).to_int()
+  if rest < 0 {
+    { seconds: seconds - 1L, nanos: (rest + 1000) * 1_000_000 }
+  } else {
+    { seconds, nanos: rest * 1_000_000 }
+  }
+}
+
+///|
 /// Whole seconds since 1970-01-01T00:00:00Z, rounded down.
 pub fn Instant::unix_seconds(self : Instant) -> Int64 {
   self.seconds

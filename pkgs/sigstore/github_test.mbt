@@ -87,7 +87,7 @@ test "real GitHub attestations verify with the public-good root" {
         assert_eq(facts.claims.runner_environment, Some("github-hosted"))
         assert_eq(facts.claims.source_repository_ref, Some(case.git_ref))
         guard facts.statement is Some(statement) else { fail("no statement") }
-        assert_eq(statement.predicate_type, "https://slsa.dev/provenance/v1")
+        assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())
       }
       Rejected(reason) => fail("\{case.bundle}: \{reason.message()}")
     }

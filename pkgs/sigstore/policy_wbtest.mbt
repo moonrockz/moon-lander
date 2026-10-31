@@ -325,7 +325,10 @@ fn Policy::check_claims(self : Policy, claims : CertificateClaims) -> PolicyMism
 
 ///|
 fn statement_of(predicate_type : String) -> Statement {
-  { predicate_type, subjects: [], payload: b"" }
+  let parsed = PredicateType::parse(predicate_type) catch {
+    _ => abort("bad predicate type \{predicate_type}")
+  }
+  { predicate_type: parsed, subjects: [], payload: b"" }
 }
 
 ///|
@@ -340,15 +343,15 @@ test "a GitHub workflow policy requires SLSA provenance by default" {
     policy.mismatch(claims, Some(statement_of("https://spdx.dev/Document/v2.3"))),
     Some(
       PredicateTypeMismatch(
-        expected="https://slsa.dev/provenance/v1",
-        actual=Some("https://spdx.dev/Document/v2.3"),
+        expected=PredicateType::slsa_provenance_v1(),
+        actual=Some(statement_of("https://spdx.dev/Document/v2.3").predicate_type),
       ),
     ),
   )
   // A message-signature bundle has no statement.
   assert_eq(
     policy.mismatch(claims, None),
-    Some(PredicateTypeMismatch(expected="https://slsa.dev/provenance/v1", actual=None)),
+    Some(PredicateTypeMismatch(expected=PredicateType::slsa_provenance_v1(), actual=None)),
   )
 }
 

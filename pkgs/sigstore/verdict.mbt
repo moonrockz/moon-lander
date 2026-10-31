@@ -174,7 +174,7 @@ pub extend Subject with @debug.Debug::{to_repr}
 ///|
 /// The in-toto statement of a verified DSSE bundle.
 pub struct Statement {
-  predicate_type : String
+  predicate_type : PredicateType
   subjects : Array[Subject]
   /// The exact payload bytes that the signature covers.
   payload : Bytes

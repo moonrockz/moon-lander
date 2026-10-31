@@ -277,7 +277,7 @@ pub enum PolicyMismatch {
   IdentityMismatch(expected~ : String, actual~ : Array[String])
   ClaimMismatch(claim~ : Claim, expected~ : String, actual~ : String?)
   RunnerEnvironment(actual~ : String?)
-  PredicateTypeMismatch(expected~ : String, actual~ : String?)
+  PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
 } derive(Eq, @debug.Debug)
 pub fn PolicyMismatch::equal(Self, Self) -> Bool
 pub fn PolicyMismatch::message(Self) -> String
@@ -306,7 +306,7 @@ pub fn Rejection::not_equal(Self, Self) -> Bool
 pub fn Rejection::to_repr(Self) -> @debug.Repr
 
 pub struct Statement {
-  predicate_type : String
+  predicate_type : PredicateType
   subjects : Array[Subject]
   payload : Bytes
 } derive(Eq, @debug.Debug)

@@ -119,7 +119,7 @@ test "scenario: pass" {
   let verdict = verify_morphir(morphir_policy())
   guard verdict is Verified(facts) else { fail(outcome(verdict)) }
   guard facts.statement is Some(statement) else { fail("no statement") }
-  assert_eq(statement.predicate_type, "https://slsa.dev/provenance/v1")
+  assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())
   assert_eq(statement.subjects.length(), 4)
   assert_eq(
     statement.subjects[0].sha256.map(digest => digest.to_string()),

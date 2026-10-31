@@ -177,34 +177,38 @@ test "read_statement refuses a payload that is not a statement" {
     Some(Invalid(Statement("the payload is not JSON, or has a duplicate key"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://example.com/v1\",\"predicateType\":\"p\",\"subject\":[]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"not a uri\",\"subject\":[]}"),
+    Some(Invalid(Statement("Invalid predicate type \"not a uri\": use an absolute URI"))),
+  )
+  assert_eq(
+    reason("{\"_type\":\"https://example.com/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[]}"),
     Some(Invalid(Statement("the payload is not an in-toto statement"))),
   )
   assert_eq(
     reason("{\"_type\":\"https://in-toto.io/Statement/v0.1\",\"subject\":[]}"),
     Some(Invalid(Statement("the statement has no predicate type"))),
   )
-  assert_true(reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\"}") is Some(Invalid(Statement(_))))
+  assert_true(reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\"}") is Some(Invalid(Statement(_))))
   assert_true(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\"}]}") is
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"name\":\"a\"}]}") is
     Some(Invalid(Statement(_))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}"),
     Some(Invalid(Statement("a subject digest is not hex"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}"),
     Some(Invalid(Statement("a subject digest is not a string"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"digest\":{\"sha256\":\"\{"ab".repeat(31)}\"}}]}"),
+    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"\{"ab".repeat(31)}\"}}]}"),
     Some(Invalid(Statement("a subject sha256 digest does not have 32 bytes"))),
   )
   // Upper-case hex is read as lower-case; a subject without sha256 is kept.
   let statement = read_statement(
     @encoding.utf8(
-      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[{\"name\":\"a\",\"digest\":{\"sha256\":\"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB\"}},{\"digest\":{\"sha512\":\"00\"}}]}",
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"name\":\"a\",\"digest\":{\"sha256\":\"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB\"}},{\"digest\":{\"sha512\":\"00\"}}]}",
     ),
   ) catch {
     Stop(_) => fail("refused")
@@ -223,7 +227,7 @@ test "read_statement limits subjects and digests" {
   fn subjects(count : Int, digests : Int) -> Bytes {
     let digest_map = Array::makei(digests, index => "\"d\{index}\":\"00\"").join(",")
     let items = Array::make(count, "{\"digest\":{\{digest_map}}}").join(",")
-    @encoding.utf8("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"p\",\"subject\":[\{items}]}")
+    @encoding.utf8("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[\{items}]}")
   }
 
   assert_eq(step_rejection(() => ignore(read_statement(subjects(1024, 1)))), None)
@@ -236,4 +240,19 @@ test "read_statement limits subjects and digests" {
     step_rejection(() => ignore(read_statement(subjects(1, 33)))) is
     Some(Invalid(Statement(_))),
   )
+}
+
+///|
+test "an SCT time keeps its milliseconds" {
+  let sct = Instant::from_unix_millis(1792133282023L)
+  assert_eq(sct.unix_seconds(), 1792133282L)
+  // A CT log validity that ends 13 ms before the SCT does not hold it, and
+  // one that starts 13 ms after it does not hold it either.
+  let end = parse_timestamp("2026-10-16T06:48:02.010Z").unwrap()
+  assert_true(end < sct)
+  assert_false(({ start: None, end: Some(end) } : Period).contains(sct))
+  let start = parse_timestamp("2026-10-16T06:48:02.036Z").unwrap()
+  assert_false(({ start: Some(start), end: None } : Period).contains(sct))
+  assert_true(({ start: Some(end), end: Some(start) } : Period).contains(sct))
+  assert_eq(Instant::from_unix_millis(-1L).unix_seconds(), -1L)
 }

@@ -284,3 +284,60 @@ test "days_in_month and unix_seconds" {
   assert_eq(@der.unix_seconds(1969, 12, 31, 23, 59, 59), -1L)
   assert_eq(@der.unix_seconds(2038, 1, 19, 3, 14, 8), 2147483648L)
 }
+
+///|
+fn generalized(text : String) -> (Int64, Int) raise {
+  let content = @encoding.utf8(text)
+  let header = Bytes::from_array([b'\x18', content.length().to_byte()])
+  @der.parse(Bytes::from_array([..header.to_array(), ..content.to_array()])).generalized_time()
+}
+
+///|
+test "GeneralizedTime reads canonical fractions" {
+  assert_eq(generalized("20261026192009Z"), (1793042409L, 0))
+  assert_eq(generalized("20261026192009.5Z"), (1793042409L, 500_000_000))
+  assert_eq(generalized("20261026192009.123456789Z"), (1793042409L, 123_456_789))
+  assert_eq(generalized("20261026192009.001Z"), (1793042409L, 1_000_000))
+  for
+    bad in [
+      "20261026192009.Z", "20261026192009.50Z", "20261026192009.1234567891Z", "20261026192009+0000",
+      "20261026192009.5", "20261026192009,5Z", "2026102619200Z", "20261026192009.5aZ",
+    ] {
+    let failed = try {
+      ignore(generalized(bad))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(failed, msg=bad)
+  }
+}
+
+///|
+fn string_element(tag : Int, text : Bytes) -> @der.Element raise {
+  @der.parse(Bytes::from_array([tag.to_byte(), text.length().to_byte(), ..text.to_array()]))
+}
+
+///|
+test "PrintableString and IA5String keep to their character sets" {
+  assert_eq(string_element(@der.PRINTABLE_STRING, b"Az09 '()+,-./:=?").text(), "Az09 '()+,-./:=?")
+  for bad in [b"a@b", b"a*b", b"a_b", b"a\x00b", b"\xc3\xa9"] {
+    let failed = try {
+      ignore(string_element(@der.PRINTABLE_STRING, bad).text())
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(failed)
+  }
+  assert_eq(string_element(@der.IA5_STRING, b"a@b_*\x7f").text(), "a@b_*\u{7f}")
+  let failed = try {
+    ignore(string_element(@der.IA5_STRING, b"\x80").text())
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(failed)
+  // UTF8String accepts any UTF-8.
+  assert_eq(string_element(@der.UTF8_STRING, b"\xc3\xa9").text(), "é")
+}

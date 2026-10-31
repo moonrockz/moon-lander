@@ -305,3 +305,15 @@ test "SCT list framing rules" {
   ])
   assert_eq(list_outcome(octets(two)), "ok 2")
 }
+
+///|
+test "an empty SCT list is refused" {
+  // OCTET STRING { u16 list length 0 }.
+  let refused = try {
+    ignore(@sct.parse_list(b"\x04\x02\x00\x00"))
+    None
+  } catch {
+    BadSct(rule) => Some(rule)
+  }
+  assert_eq(refused, Some("the SCT list is empty"))
+}

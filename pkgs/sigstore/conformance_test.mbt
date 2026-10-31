@@ -78,7 +78,7 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
     Rejected(Unsupported(feature)) =>
       match feature {
         PublicKeyMaterial => "unsupported public key"
-        TimestampAuthority => "unsupported timestamp authority"
+        TimestampAlgorithm(_) => "unsupported timestamp algorithm"
         RekorV2 => "unsupported Rekor v2"
         EntryKind(..) => "unsupported entry kind"
         KeyType(_) => "unsupported key type"
@@ -99,6 +99,9 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
         PayloadType(_) => "payload type"
         ContentSignature => "content signature"
         Statement(_) => "statement"
+        Timestamp(_) => "timestamp"
+        TimestampAuthority(_) => "timestamp authority"
+        TimestampTime(..) => "timestamp time"
         ArtifactDigestMismatch(_) => "artifact digest"
         Policy(_) => "policy"
       }
@@ -107,9 +110,9 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
 
 ///|
 /// The expected outcome of each sigstore-conformance case at `acb38c9`. Cases
-/// that end in `_fail` must not pass. Rekor v2, Rekor v1 `intoto/0.0.2`,
-/// managed-key and timestamp authority cases are out of scope (design SCOPE-1) and must give a
-/// not-supported reason or fail to parse.
+/// that end in `_fail` must not pass. Rekor v2 and managed-key cases are out of
+/// scope and must give a not-supported reason or fail to parse. The `intoto-*`
+/// cases pair Rekor v1 `intoto/0.0.2` entries with RFC 3161 timestamps.
 let expected_outcomes : Array[(String, String)] = [
   ("bundle-empty-certificate-chain_fail", "parse"),
   ("bundle-from-wrong-instance_fail", "transparency log"),
@@ -132,12 +135,12 @@ let expected_outcomes : Array[(String, String)] = [
   ("inclusion-proof-corrupted-hash_fail", "inclusion proof"),
   ("incorrect-public-key_fail", "transparency log"),
   ("integrated-time-in-future_fail", "certificate validity"),
-  ("intoto-expired-certificate_fail", "unsupported entry kind"),
-  ("intoto-log-entry-mismatch_fail", "unsupported entry kind"),
+  ("intoto-expired-certificate_fail", "certificate validity"),
+  ("intoto-log-entry-mismatch_fail", "transparency log body"),
   ("intoto-missing-inclusion-proof_fail", "parse"),
-  ("intoto-set-outside-signing-cert-validity_fail", "unsupported entry kind"),
-  ("intoto-tsa-timestamp-outside-cert-validity_fail", "unsupported entry kind"),
-  ("intoto-with-custom-trust-root", "unsupported entry kind"),
+  ("intoto-set-outside-signing-cert-validity_fail", "certificate validity"),
+  ("intoto-tsa-timestamp-outside-cert-validity_fail", "certificate validity"),
+  ("intoto-with-custom-trust-root", "pass"),
   ("invalid-checkpoint-signature_fail", "checkpoint"),
   ("invalid-ct-key_fail", "certificate timestamp"),
   ("invalid-inclusion-proof_fail", "parse"),
@@ -200,4 +203,10 @@ test "every conformance case gives its expected outcome" {
       assert_true(expected == "pass" || expected.has_prefix("unsupported"), msg=name)
     }
   }
+}
+
+///|
+test "scenario: conformance in-toto bundle with a timestamp" {
+  assert_eq(run_case("intoto-with-custom-trust-root"), "pass")
+  assert_eq(run_case("intoto-tsa-timestamp-outside-cert-validity_fail"), "certificate validity")
 }

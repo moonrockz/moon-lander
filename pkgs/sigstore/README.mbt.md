@@ -14,10 +14,10 @@ The verifier does these checks, in this order, with the rules of
 
 | Step | Check |
 | --- | --- |
-| Transparency log | The Rekor v1 entry is from a log of the trusted root. Its signed entry timestamp (SET) verifies, and its integrated time is in the log's validity and not after "now" |
+| Time sources | Each Rekor v1 entry is from a log of the trusted root, its signed entry timestamp (SET) verifies, and its integrated time is in the log's validity. Each RFC 3161 timestamp is signed by a timestamp authority of the trusted root and covers the bundle signature. Every time is not after "now", and there is at least one |
 | Inclusion | The RFC 6962 inclusion proof gives the root hash of a checkpoint that the log key signed |
-| Certificate | The Fulcio leaf chains to a certificate authority of the trusted root at the integrated time, for code signing |
-| Certificate timestamp | An embedded SCT from a trusted CT log verifies |
+| Certificate | The Fulcio leaf chains to a certificate authority of the trusted root at every verified time, for code signing |
+| Certificate timestamp | When the root of that authority lists CT logs, an embedded SCT from one of them verifies |
 | Log body | The logged signature, certificate and payload hash are those of the bundle |
 | Content | The DSSE signature (or message signature) verifies with the leaf key |
 | Artifact | A subject of the in-toto statement (or the message digest) is the artifact digest |
@@ -52,7 +52,7 @@ test "verify the attestation of a GitHub release" {
       now~,
     ) {
     Verified(facts) => {
-      assert_eq(facts.integrated_time.unix_seconds(), 1716998983L)
+      assert_eq(facts.times[0].time.unix_seconds(), 1716998983L)
       assert_eq(facts.claims.source_repository_ref, Some("refs/heads/trunk"))
       guard facts.statement is Some(statement) else { fail("no statement") }
       assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())
@@ -118,6 +118,48 @@ Owner and repository names compare without regard to case, as on GitHub. Workflo
 paths and refs compare exactly. Give `alternatives=` to accept one of several
 publishers; the verdict names the policy that matched.
 
+## Choose a trusted root
+
+GitHub signs attestations with two Sigstore instances, so the module pins two
+roots. Both need no I/O:
+
+| Root | Holds | Signs |
+| --- | --- | --- |
+| `TrustedRoot::public_good()` | Rekor and CT logs, Fulcio, a TSA | Attestations of public repositories |
+| `TrustedRoot::github()` | GitHub's Fulcio and TSA, no logs | Attestations of private repositories, and release attestations of immutable releases |
+| `TrustedRoot::github_attestations()` | Both | All of them; a public-good leaf still needs its SCT, and a GitHub leaf needs none |
+
+`TrustedRoot::combine` joins any parsed roots in the same way. `VerifiedBundle.times`
+lists each verified time and its source: a log entry or a timestamp authority.
+
+## Verify an immutable release
+
+A GitHub immutable release has a release attestation. GitHub signs it, so the
+certificate names no workflow; the statement names the repository and the tag.
+`Policy::github_release` matches them, and the artifact digest is the SHA-256 of a
+release asset:
+
+```mbt check
+///|
+test "verify a release asset of an immutable release" {
+  let verdict = @sigstore.verify(
+    @sigstore.Bundle::parse(github_fixture("release-cli-2.103.3.sigstore.json")),
+    @sigstore.ArtifactDigest::parse(
+      "sha256:4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d",
+    ),
+    @sigstore.TrustedRoot::github_attestations(),
+    @sigstore.Policy::github_release(
+      @sigstore.GitHubRepository::parse("cli/cli"),
+      tag=@sigstore.ReleaseTag::parse("v2.103.3"),
+    ).repository_id(@sigstore.GitHubId::parse("212613049")),
+    now=@sigstore.Instant::from_unix_seconds(1794000000L),
+  )
+  guard verdict is Verified(facts) else { fail("not verified") }
+  guard facts.times is [{ source: Authority(uri~), .. }] else { fail("not a timestamp") }
+  assert_eq(uri, "timestamp.githubapp.com")
+}
+```
+
 ## Read a rejection
 
 A `Verdict` is `Verified(VerifiedBundle)` or `Rejected(Rejection)`. A rejection
@@ -149,15 +191,17 @@ test "a policy for another repository rejects the bundle" {
 ## Scope
 
 Supported: bundle media types v0.1, v0.2 and v0.3; DSSE envelopes with in-toto
-statements, and message signatures; Fulcio certificates; Rekor v1 entries of kind
-`dsse` and `hashedrekord` 0.0.1; ECDSA P-256 and P-384. This covers the attestations
-that `actions/attest` makes for public repositories.
+statements, and message signatures; Fulcio certificates of the public-good and
+GitHub instances; Rekor v1 entries of kind `dsse` and `hashedrekord` 0.0.1 and
+`intoto` 0.0.2; RFC 3161 timestamps with ECDSA; ECDSA P-256 and P-384. This covers
+the attestations that `actions/attest` makes for public and private repositories,
+and the release attestations of GitHub immutable releases (release assets).
 
-Not supported yet, each with an `Unsupported` reason: Rekor v2 entries, RFC 3161
-timestamps (the only time source of attestations from private repositories and of
-GitHub immutable releases), managed-key bundles, and Ed25519 or RSA keys. A Sigstore
-TUF client that refreshes the trusted root is a later change; give
-`TrustedRoot::parse` a newer root when the public-good keys change.
+Not supported yet, each with an `Unsupported` reason: Rekor v2 entries, managed-key
+bundles, Ed25519 or RSA keys, and RSA timestamps. Release verification of the tag
+commit (a SHA-1 digest) and GitHub data-residency roots are not covered. A TUF client
+that refreshes the trusted roots is a later change; give `TrustedRoot::parse` a newer
+root when the keys change.
 
 ## Cryptography
 

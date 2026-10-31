@@ -74,20 +74,28 @@ priv struct TrustedLog {
   log_id : Bytes
   key : TrustedKey
   valid : Period
+  /// The position of the parsed root that listed the log in a combined root.
+  source : Int
 }
 
 ///|
 /// A certificate authority or a timestamp authority.
 priv struct Authority {
   uri : String
-  /// The chain from the first intermediate to the root.
+  /// The chain as the trusted root lists it: for a certificate authority the
+  /// intermediates then the root; for a timestamp authority the leaf first.
   chain : Array[@x509.Certificate]
   valid : Period
+  /// The position of the parsed root that listed the authority in a combined
+  /// root. A leaf of the authority needs an SCT from a CT log of the same
+  /// root when that root lists CT logs, and a log entry from a transparency
+  /// log of the same root when it lists those (design ROOT-1).
+  source : Int
 }
 
 ///|
-/// The keys and certificates that verification trusts. Only
-/// `TrustedRoot::parse` and `TrustedRoot::public_good` make it.
+/// The keys and certificates that verification trusts. `TrustedRoot::parse`,
+/// the pinned roots and `TrustedRoot::combine` make it.
 pub struct TrustedRoot {
   priv tlogs : Array[TrustedLog]
   priv authorities : Array[Authority]
@@ -147,6 +155,80 @@ pub fn TrustedRoot::public_good() -> TrustedRoot {
   TrustedRoot::parse(public_good_document) catch {
     err => abort("the pinned public-good root does not parse: \{err.message()}")
   }
+}
+
+///|
+/// The pinned trusted root of GitHub's Sigstore instance (the
+/// `trusted_root.json` target of `https://tuf-repo.github.com`, SHA-256
+/// `484cdfe1…fbb7`). It holds the certificate and timestamp authorities of
+/// private-repository and release attestations, and no log. It needs no I/O.
+pub fn TrustedRoot::github() -> TrustedRoot {
+  TrustedRoot::parse(github_document) catch {
+    err => abort("the pinned GitHub root does not parse: \{err.message()}")
+  }
+}
+
+///|
+/// The pinned GitHub `trusted_root.json` text.
+pub fn github_trusted_root_json() -> String {
+  github_document
+}
+
+///|
+/// One root that trusts the logs and authorities of each of `roots`. Each
+/// certificate authority keeps the SCT rule of its own root.
+pub fn TrustedRoot::combine(roots : ArrayView[TrustedRoot]) -> TrustedRoot {
+  let tlogs = []
+  let authorities = []
+  let ctlogs = []
+  let timestamp_authorities = []
+  // A combined root can itself be combined: renumber its sources after the
+  // sources already taken.
+  let mut next = 0
+  for root in roots {
+    let base = next
+    let mut used = 0
+    let retag = (source : Int) => {
+      if source + 1 > used {
+        used = source + 1
+      }
+      base + source
+    }
+    for log in root.tlogs {
+      tlogs.push({ ..log, source: retag(log.source) })
+    }
+    for log in root.ctlogs {
+      ctlogs.push({ ..log, source: retag(log.source) })
+    }
+    for authority in root.authorities {
+      authorities.push({ ..authority, source: retag(authority.source) })
+    }
+    for authority in root.timestamp_authorities {
+      timestamp_authorities.push({ ..authority, source: retag(authority.source) })
+    }
+    next = base + (if used == 0 { 1 } else { used })
+  }
+  { tlogs, authorities, ctlogs, timestamp_authorities }
+}
+
+///|
+/// Whether the root with position `source` lists CT logs.
+fn TrustedRoot::lists_ctlogs(self : TrustedRoot, source : Int) -> Bool {
+  self.ctlogs.iter().any(log => log.source == source)
+}
+
+///|
+/// Whether the root with position `source` lists transparency logs.
+fn TrustedRoot::lists_tlogs(self : TrustedRoot, source : Int) -> Bool {
+  self.tlogs.iter().any(log => log.source == source)
+}
+
+///|
+/// The public-good and GitHub roots combined: one root for public-repository,
+/// private-repository and release attestations from GitHub. A public-good leaf
+/// still needs its SCT; a GitHub leaf needs none.
+pub fn TrustedRoot::github_attestations() -> TrustedRoot {
+  TrustedRoot::combine([TrustedRoot::public_good(), TrustedRoot::github()])
 }
 
 ///|
@@ -236,6 +318,7 @@ fn read_log(json : Json, path : String, require_start : Bool) -> TrustedLog rais
     log_id: log.require_object("logId", ["keyId"]).require_bytes("keyId"),
     key: trusted_key,
     valid,
+    source: 0,
   }
 }
 
@@ -260,15 +343,11 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
     uri: authority.string("uri").unwrap_or(""),
     chain: certificates,
     valid: read_period(authority, "validFor"),
+    source: 0,
   }
 }
 
 ///|
-fn TrustedRoot::tlog(self : TrustedRoot, log_id : BytesView) -> TrustedLog? {
-  self.tlogs.iter().find_first(log => log.log_id[:] == log_id)
-}
-
-///|
-fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView) -> TrustedLog? {
-  self.ctlogs.iter().find_first(log => log.log_id[:] == log_id)
+fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView, source~ : Int) -> TrustedLog? {
+  self.ctlogs.iter().find_first(log => log.log_id[:] == log_id && log.source == source)
 }

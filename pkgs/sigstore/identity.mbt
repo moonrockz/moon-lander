@@ -9,6 +9,7 @@ pub enum IdentityKind {
   Ref
   NumericId
   Predicate
+  Tag
 } derive(Eq, Debug)
 
 ///|
@@ -40,6 +41,7 @@ pub fn IdentityError::message(self : IdentityError) -> String {
     Ref => "Git ref"
     NumericId => "GitHub ID"
     Predicate => "predicate type"
+    Tag => "release tag"
   }
   "Invalid \{name} \{text.escape()}: \{rule}"
 }
@@ -366,6 +368,12 @@ pub fn PredicateType::parse(text : String) -> PredicateType raise IdentityError 
 }
 
 ///|
+/// The in-toto release predicate v0.2, which GitHub immutable releases use.
+pub fn PredicateType::github_release_v0_2() -> PredicateType {
+  { uri: "https://in-toto.io/attestation/release/v0.2" }
+}
+
+///|
 /// SLSA provenance v1, the predicate type of `actions/attest` build provenance.
 pub fn PredicateType::slsa_provenance_v1() -> PredicateType {
   { uri: "https://slsa.dev/provenance/v1" }
@@ -378,3 +386,39 @@ pub impl Show for PredicateType with output(self, logger) {
 
 ///|
 pub extend PredicateType with Show::{output, to_string}
+
+///|
+/// The tag of a GitHub release, for example `v2.103.3`.
+pub struct ReleaseTag {
+  priv name : String
+} derive(Eq, Debug)
+
+///|
+pub extend ReleaseTag with Eq::{equal, not_equal}
+
+///|
+pub extend ReleaseTag with @debug.Debug::{to_repr}
+
+///|
+/// Parse a release tag: a Git tag name, not empty, with no `refs/` prefix, no
+/// space, control character, `..` or `@{`, and not starting or ending with `/`.
+pub fn ReleaseTag::parse(text : String) -> ReleaseTag raise IdentityError {
+  let fail = rule => InvalidIdentity(kind=Tag, text~, rule~)
+  guard !text.is_empty() else { raise fail("the tag is empty") }
+  guard !text.has_prefix("refs/") else { raise fail("give the tag name without refs/tags/") }
+  guard !has_space_or_control(text) && !text.contains("..") && !text.contains("@{") else {
+    raise fail("a tag has no space, control character, '..' or '@{'")
+  }
+  guard !text.has_prefix("/") && !text.has_suffix("/") else {
+    raise fail("a tag does not start or end with '/'")
+  }
+  { name: text }
+}
+
+///|
+pub impl Show for ReleaseTag with output(self, logger) {
+  logger.write_string(self.name)
+}
+
+///|
+pub extend ReleaseTag with Show::{output, to_string}

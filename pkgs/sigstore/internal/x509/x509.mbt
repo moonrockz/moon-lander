@@ -35,6 +35,8 @@ pub struct BasicConstraints {
 pub struct Certificate {
   /// All of the DER bytes.
   raw : Bytes
+  /// The content bytes of the serial number INTEGER.
+  serial : Bytes
   /// The DER bytes of the TBSCertificate, which the issuer signs.
   tbs : Bytes
   signature_algorithm : String
@@ -72,6 +74,13 @@ pub const EKU_CODE_SIGNING : String = "1.3.6.1.5.5.7.3.3"
 
 ///|
 pub const EKU_ANY : String = "2.5.29.37.0"
+
+///|
+pub const EKU_TIME_STAMPING : String = "1.3.6.1.5.5.7.3.8"
+
+///|
+/// Key usage contentCommitment (bit 1), which a timestamping leaf may have.
+pub const KEY_USAGE_CONTENT_COMMITMENT : Int = 2
 
 ///|
 pub const SCT_LIST_OID : String = "1.3.6.1.4.1.11129.2.4.2"
@@ -117,7 +126,7 @@ fn parse_der(raw : BytesView) -> Certificate raise {
     None => 0
   }
   guard version == 2 else { raise BadCertificate("not an X.509 v3 certificate") }
-  ignore(fields.expect(@der.INTEGER))
+  let serial = fields.expect(@der.INTEGER).content.to_owned()
   // RFC 5280, section 4.1.1.2: the same AlgorithmIdentifier, parameters too.
   let inner_algorithm = fields.expect(@der.SEQUENCE)
   ignore(read_algorithm(inner_algorithm))
@@ -140,6 +149,7 @@ fn parse_der(raw : BytesView) -> Certificate raise {
   fields.finish()
   let certificate = {
     raw: raw.to_owned(),
+    serial,
     tbs: tbs.raw.to_owned(),
     signature_algorithm: algorithm,
     signature: signature.to_owned(),
@@ -424,4 +434,28 @@ fn rebuild(tbs : Bytes, oid : String) -> Bytes raise @der.DerError {
     }
   }
   @der.encode(@der.SEQUENCE, Bytes::from_array(out))
+}
+
+///|
+/// The reason that this certificate cannot sign RFC 3161 timestamps, or
+/// `None`: the extended key usage must be critical and hold only timeStamping,
+/// a key usage must allow digitalSignature or contentCommitment, the
+/// certificate must not be a CA, and it must have no unknown critical extension.
+pub fn Certificate::timestamp_signer_problem(self : Certificate) -> String? {
+  guard self.extension("2.5.29.37") is Some(eku) &&
+    eku.critical &&
+    self.extended_key_usage == Some([EKU_TIME_STAMPING]) else {
+    return Some("the signer does not have a critical extended key usage of only timeStamping")
+  }
+  if self.key_usage is Some(bits) &&
+    (bits & (KEY_USAGE_DIGITAL_SIGNATURE | KEY_USAGE_CONTENT_COMMITMENT)) == 0 {
+    return Some("the signer key usage does not allow signatures")
+  }
+  if self.basic_constraints is Some({ is_ca: true, .. }) {
+    return Some("the signer is a certificate authority")
+  }
+  if self.unhandled_critical() is Some(oid) {
+    return Some("the signer has the unknown critical extension \{oid}")
+  }
+  None
 }

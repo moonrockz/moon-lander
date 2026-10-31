@@ -137,7 +137,7 @@ test "scenario: leaf expired at log time (certificate validity bounds)" {
   let not_after = leaf.certificate.not_after
   assert_true(not_before <= 1792133282L && 1792133282L <= not_after)
   fn at(seconds : Int64) -> Rejection? {
-    step_rejection(() => check_certificate(leaf, root, Instant::from_unix_seconds(seconds)))
+    step_rejection(() => ignore(check_certificate(leaf, root, Instant::from_unix_seconds(seconds))))
   }
 
   // Both bounds are inclusive.

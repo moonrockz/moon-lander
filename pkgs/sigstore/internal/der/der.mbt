@@ -307,9 +307,30 @@ pub fn Element::text(self : Element) -> String raise DerError {
     self.tag == IA5_STRING else {
     raise Malformed("expected a string")
   }
+  if self.tag == PRINTABLE_STRING {
+    for byte in self.content {
+      guard is_printable(byte) else {
+        raise Malformed("PrintableString has a character outside its set")
+      }
+    }
+  } else if self.tag == IA5_STRING {
+    for byte in self.content {
+      guard byte < b'\x80' else { raise Malformed("IA5String has a byte above 0x7f") }
+    }
+  }
   @utf8.decode(self.content) catch {
     _ => raise Malformed("string is not UTF-8")
   }
+}
+
+///|
+/// A character of the PrintableString set (X.680, section 41.4):
+/// `A-Z a-z 0-9`, space and `' ( ) + , - . / : = ?`.
+fn is_printable(byte : Byte) -> Bool {
+  (byte >= b'A' && byte <= b'Z') ||
+  (byte >= b'a' && byte <= b'z') ||
+  (byte >= b'0' && byte <= b'9') ||
+  [b' ', b'\'', b'(', b')', b'+', b',', b'-', b'.', b'/', b':', b'=', b'?'].contains(byte)
 }
 
 ///|
@@ -425,4 +446,39 @@ pub fn encode(tag : Int, content : BytesView) -> Bytes {
     out.push(byte)
   }
   Bytes::from_array(out)
+}
+
+///|
+/// The time of a GeneralizedTime with an optional fraction of a second, as
+/// seconds since 1970 and nanoseconds. DER requires the `Z` form and a fraction
+/// with no trailing zero (X.690, section 11.7), of at most nine digits here.
+pub fn Element::generalized_time(self : Element) -> (Int64, Int) raise DerError {
+  guard self.tag == GENERALIZED_TIME else { raise Malformed("expected GeneralizedTime") }
+  let text = @utf8.decode(self.content) catch {
+    _ => raise Malformed("time is not ASCII")
+  }
+  guard text.length() >= 15 && text[text.length() - 1] == 'Z'.to_int().to_uint16() else {
+    raise Malformed("GeneralizedTime form")
+  }
+  let whole = text[:14].to_owned() + "Z"
+  let mut nanos = 0
+  if text.length() > 15 {
+    guard text[14] == '.'.to_int().to_uint16() else { raise Malformed("GeneralizedTime form") }
+    let fraction = text[15:text.length() - 1].to_owned()
+    guard fraction.length() >= 1 && fraction.length() <= 9 else {
+      raise Malformed("GeneralizedTime fraction length")
+    }
+    guard !fraction.has_suffix("0") else {
+      raise Malformed("GeneralizedTime fraction has a trailing zero")
+    }
+    for char in fraction {
+      guard char >= '0' && char <= '9' else { raise Malformed("time has a non-digit") }
+      nanos = nanos * 10 + (char.to_int() - '0'.to_int())
+    }
+    for _ in fraction.length()..<9 {
+      nanos = nanos * 10
+    }
+  }
+  let seconds = { tag: GENERALIZED_TIME, content: @utf8.encode(whole)[:], raw: self.raw }.time()
+  (seconds, nanos)
 }

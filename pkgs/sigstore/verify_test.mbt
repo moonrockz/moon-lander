@@ -127,14 +127,16 @@ test "scenario: pass" {
       "sha256:03d190b8ef97d354f9aca6854542979c36ce5f77c68a3d80de28ac1a77c432bd",
     ),
   )
-  assert_eq(facts.integrated_time.unix_seconds(), 1792133282L)
+  assert_eq(facts.times[0].time.unix_seconds(), 1792133282L)
   assert_eq(facts.claims.subject_names, [
     "https://github.com/finos/morphir-rust/.github/workflows/release-provider-snapshot.yml@refs/tags/provider-snapshot/v0.2.0",
   ])
   assert_eq(facts.policy_index, 0)
-  assert_eq(facts.log_index, 3275146211L)
+  assert_eq(facts.times.length(), 1)
+  guard facts.times[0].source is Log(log_id~, log_index~) else { fail("not a log time") }
+  assert_eq(log_index, 3275146211L)
   assert_eq(
-    facts.log_id,
+    log_id,
     @encoding.decode_base64("wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0="),
   )
   assert_eq(facts.claims.issuer, Some("https://token.actions.githubusercontent.com"))
@@ -256,7 +258,14 @@ test "scenario: leaf expired at log time" {
 
 ///|
 test "scenario: unknown CT log" {
-  let root = changed_root(doc => set_field(doc, "", "ctlogs", Json::array([])))
+  // The root keeps only the `ctfe.sigstore.dev/test` log, so it still lists CT
+  // logs, but not the one that signed the leaf's SCT.
+  let root = changed_root(doc => {
+    let logs = array_at(doc, "ctlogs")
+    let first = logs[0]
+    logs.clear()
+    logs.push(first)
+  })
   let verdict = verify_morphir(morphir_policy(), root~)
   guard verdict is Rejected(Invalid(CertificateTimestamp(reason))) else { fail(outcome(verdict)) }
   assert_eq(reason, "no SCT from a trusted CT log verifies")
@@ -387,7 +396,7 @@ test "one mutation for each step of the pipeline" {
           }),
         )
       },
-      "unsupported timestamp authority",
+      "timestamp",
     ),
     (
       "two signatures",
@@ -530,8 +539,9 @@ test "one mutation for each step of the pipeline" {
     workflow=@sigstore.WorkflowPath::parse(morphir_case().workflow),
   )
   assert_eq(outcome(verify_morphir(other)), "policy")
+  // A root without CT logs does not require an SCT (design ROOT-1).
   let no_ctlogs = changed_root(doc => set_field(doc, "", "ctlogs", Json::array([])))
-  assert_eq(outcome(verify_morphir(morphir_policy(), root=no_ctlogs)), "certificate timestamp")
+  assert_eq(outcome(verify_morphir(morphir_policy(), root=no_ctlogs)), "pass")
   let no_cas = changed_root(doc => set_field(doc, "", "certificateAuthorities", Json::array([])))
   assert_eq(outcome(verify_morphir(morphir_policy(), root=no_cas)), "certificate chain")
   let no_tlogs = changed_root(doc => array_at(doc, "tlogs").truncate(1))

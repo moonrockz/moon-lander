@@ -4,13 +4,13 @@ pub enum Feature {
   /// The content is signed by a key that the bundle names by a hint, not by a
   /// certificate (managed keys).
   PublicKeyMaterial
-  /// The only time source is an RFC 3161 timestamp, as in bundles from
-  /// private repositories and GitHub immutable releases.
-  TimestampAuthority
+  /// An RFC 3161 timestamp uses an algorithm that the verifier does not
+  /// support, for example an RSA signature.
+  TimestampAlgorithm(String)
   /// A Rekor v2 (rekor-tiles) entry.
   RekorV2
-  /// A Rekor entry kind and version other than `dsse/0.0.1` and
-  /// `hashedrekord/0.0.1`.
+  /// A Rekor entry kind and version other than `dsse/0.0.1`,
+  /// `hashedrekord/0.0.1` and `intoto/0.0.2`.
   EntryKind(kind~ : String, version~ : String)
   /// A key type, for example `Ed25519`.
   KeyType(String)
@@ -41,6 +41,13 @@ pub enum Failure {
   InclusionProof(String)
   /// The checkpoint does not verify or has another root hash.
   Checkpoint(String)
+  /// An RFC 3161 timestamp cannot be read, does not verify, or is not for the
+  /// bundle signature.
+  Timestamp(String)
+  /// No timestamp authority of the trusted root signed a timestamp at its time.
+  TimestampAuthority(String)
+  /// A timestamp time is later than "now".
+  TimestampTime(time~ : Instant, now~ : Instant)
   /// The leaf certificate cannot be read or used.
   Certificate(CertificateProblem)
   /// The leaf certificate was not valid at the integrated time.
@@ -123,7 +130,7 @@ pub fn Rejection::message(self : Rejection) -> String {
     Unsupported(feature) => {
       let name = match feature {
         PublicKeyMaterial => "public key (managed key) bundles"
-        TimestampAuthority => "bundles whose only time source is an RFC 3161 timestamp"
+        TimestampAlgorithm(name) => "RFC 3161 timestamps with \{name}"
         RekorV2 => "Rekor v2 log entries"
         EntryKind(kind~, version~) => "Rekor entries of kind \{kind} \{version}"
         KeyType(kind) => "\{kind} keys"
@@ -140,6 +147,9 @@ pub fn Rejection::message(self : Rejection) -> String {
         TransparencyLogBody(text) => "transparency log body: \{text}"
         InclusionProof(text) => "inclusion proof: \{text}"
         Checkpoint(text) => "checkpoint: \{text}"
+        Timestamp(text) => "timestamp: \{text}"
+        TimestampAuthority(text) => "timestamp authority: \{text}"
+        TimestampTime(time~, now~) => "the timestamp time \{time} is after now (\{now})"
         Certificate(problem) => "certificate: \{problem.message()}"
         CertificateValidity(not_before~, not_after~, time~) =>
           "the certificate is valid from \{not_before} to \{not_after}, not at \{time}"
@@ -175,6 +185,7 @@ pub extend Subject with @debug.Debug::{to_repr}
 /// The in-toto statement of a verified DSSE bundle.
 pub struct Statement {
   predicate_type : PredicateType
+  priv predicate : Json
   subjects : Array[Subject]
   /// The exact payload bytes that the signature covers.
   payload : Bytes
@@ -184,7 +195,44 @@ pub struct Statement {
 pub extend Statement with Eq::{equal, not_equal}
 
 ///|
+/// A copy of the predicate JSON, as the statement gives it. The copy keeps
+/// the verified statement immutable.
+pub fn Statement::predicate(self : Statement) -> Json {
+  @json.parse(self.predicate.stringify()) catch {
+    _ => abort("a parsed predicate does not parse again")
+  }
+}
+
+///|
 pub extend Statement with @debug.Debug::{to_repr}
+
+///|
+/// What gave a verified time.
+pub enum TimeSource {
+  /// The signed entry timestamp of a transparency log entry.
+  Log(log_id~ : Bytes, log_index~ : Int64)
+  /// An RFC 3161 timestamp of the authority with this URI.
+  Authority(uri~ : String)
+} derive(Eq, Debug)
+
+///|
+pub extend TimeSource with Eq::{equal, not_equal}
+
+///|
+pub extend TimeSource with @debug.Debug::{to_repr}
+
+///|
+/// A time at which the bundle was signed, and what gave it.
+pub struct VerifiedTime {
+  time : Instant
+  source : TimeSource
+} derive(Eq, Debug)
+
+///|
+pub extend VerifiedTime with Eq::{equal, not_equal}
+
+///|
+pub extend VerifiedTime with @debug.Debug::{to_repr}
 
 ///|
 /// The facts of a verified bundle.
@@ -195,10 +243,9 @@ pub struct VerifiedBundle {
   /// alternatives in order.
   policy_index : Int
   claims : CertificateClaims
-  /// The key ID of the transparency log.
-  log_id : Bytes
-  log_index : Int64
-  integrated_time : Instant
+  /// Each verified time, in the order: log entries, then timestamps. The
+  /// leaf certificate was valid at each one.
+  times : Array[VerifiedTime]
 } derive(Eq, Debug)
 
 ///|

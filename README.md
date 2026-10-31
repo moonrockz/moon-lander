@@ -107,7 +107,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:openrpc-artifacts` | Reject stale artifact metaschemas and the associated OpenRPC license |
 | `mise run build:openrpc-unicode` | Generate portable regex identifier tables from frozen Unicode data |
 | `mise run check:openrpc-unicode` | Reject stale identifier tables and the associated Unicode license |
-| `mise run build:sigstore-assets` | Generate the pinned Sigstore public-good root and the test fixtures from `pkgs/sigstore/testdata/` |
+| `mise run build:sigstore-assets` | Generate the pinned Sigstore public-good and GitHub roots and the test fixtures from `pkgs/sigstore/testdata/` |
 | `mise run check:sigstore-assets` | Reject a stale Sigstore root or fixture file, or changed test data, without rewriting |
 | `mise run build:site` | Build the docs site into `_site/` (args: `--main`, `--tree next` for `_site/next/`, or `--tree <minor>` for `_site/v/<minor>/`) |
 | `mise run dev:site` | Build the docs site, serve it at `http://127.0.0.1:4173/moon-lander/` and build it again after a change |
@@ -257,11 +257,14 @@ script. Also update the assessed versions above.
   imported as `@sigstore`. It verifies Sigstore bundles and GitHub artifact
   attestations against a trusted root, a publisher identity policy and a given
   time, on all four targets. It does no network, file or clock I/O. It embeds
-  the pinned Sigstore public-good root. DER, X.509, ECDSA, SCT and
+  the pinned Sigstore public-good root and the root of GitHub's Sigstore
+  instance, so it verifies public-repository, private-repository and
+  immutable-release attestations. DER, X.509, ECDSA, SCT, RFC 3161 and
   transparency-log checks are internal packages. Like `moonrockz/openrpc`, it is
   not a framework layer: it imports `moonbitstack/mooncrypt` and no Moon-Lander
   module. Its requirements are in `openspec/specs/sigstore-bundle-verification/`,
-  `openspec/specs/sigstore-trusted-root/` and `openspec/specs/sigstore-identity-policy/`.
+  `openspec/specs/sigstore-signed-timestamps/`, `openspec/specs/sigstore-trusted-root/`
+  and `openspec/specs/sigstore-identity-policy/`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
   builds the static site at `https://moonrockz.github.io/moon-lander/` with
   `moonrockz/telescope@0.5.1`. It owns the Moon-Lander landing page and content adapters.

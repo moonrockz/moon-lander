@@ -65,11 +65,15 @@ fn case_policy(case : GitHubCase) -> @sigstore.Policy raise {
 }
 
 ///|
-fn verify_case(case : GitHubCase, policy : @sigstore.Policy) -> @sigstore.Verdict raise {
+fn verify_case(
+  case : GitHubCase,
+  policy : @sigstore.Policy,
+  root? : @sigstore.TrustedRoot = @sigstore.TrustedRoot::public_good(),
+) -> @sigstore.Verdict raise {
   @sigstore.verify(
     @sigstore.Bundle::parse(fixture(@fixtures.github, case.bundle)),
     @sigstore.ArtifactDigest::parse(case.digest),
-    @sigstore.TrustedRoot::public_good(),
+    root,
     policy,
     now=later,
   )
@@ -80,8 +84,9 @@ test "real GitHub attestations verify with the public-good root" {
   for case in github_cases() {
     match verify_case(case, case_policy(case)) {
       Verified(facts) => {
-        assert_eq(facts.integrated_time.unix_seconds(), case.integrated_time)
-        assert_eq(facts.log_index, case.log_index)
+        assert_eq(facts.times[0].time.unix_seconds(), case.integrated_time)
+        guard facts.times[0].source is Log(log_index~, ..) else { fail("not a log time") }
+        assert_eq(log_index, case.log_index)
         assert_eq(facts.claims.subject_names, [case.san])
         assert_eq(facts.claims.issuer, Some("https://token.actions.githubusercontent.com"))
         assert_eq(facts.claims.runner_environment, Some("github-hosted"))

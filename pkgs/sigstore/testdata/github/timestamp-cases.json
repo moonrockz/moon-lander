@@ -1,0 +1,37 @@
+[
+  {
+    "bundle": "release-cli-2.103.3.sigstore.json",
+    "kind": "release",
+    "artifact": "gh_2.103.3_linux_amd64.tar.gz",
+    "digest": "sha256:4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d",
+    "repository": "cli/cli",
+    "repositoryId": "212613049",
+    "ownerId": "59704711",
+    "tag": "v2.103.3",
+    "predicateType": "https://in-toto.io/attestation/release/v0.2",
+    "timestamp": 1793042409
+  },
+  {
+    "bundle": "cli-test-data/github_release_bundle.json",
+    "kind": "release",
+    "artifact": "github_release_artifact.zip",
+    "digest": "sha256:e15b593c6ab8d7725a3cc82226ef816cac6bf9c70eed383bd459295cc65f5ec3",
+    "repository": "bdehamer/delme",
+    "repositoryId": "905988044",
+    "ownerId": "398027",
+    "tag": "v6",
+    "predicateType": "https://in-toto.io/attestation/release/v0.1"
+  },
+  {
+    "bundle": "cli-test-data/github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl",
+    "kind": "workflow",
+    "artifact": "github_provenance_demo-0.0.12-py3-none-any.whl",
+    "digest": "sha256:ae57936def59bc4c75edd3a837d89bcefc6d3a5e31d55a6fa7a71624f92c3c3b",
+    "repository": "actions/attest-demo",
+    "repositoryId": "763287532",
+    "ownerId": "44036562",
+    "workflow": ".github/workflows/build-python.yml",
+    "ref": "refs/heads/main",
+    "predicateType": "https://slsa.dev/provenance/v1"
+  }
+]

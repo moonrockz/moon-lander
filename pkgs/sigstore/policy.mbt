@@ -64,6 +64,8 @@ fn read_claims(leaf : @x509.Certificate) -> CertificateClaims raise @x509.X509Er
 ///|
 priv enum Identity {
   ExactName(SubjectName)
+  /// A GitHub release of `repository` at `tag`, signed by GitHub.
+  Release(GitHubRepository, ReleaseTag)
   SignerWorkflow(GitHubRepository, WorkflowPath, GitRef?)
 }
 
@@ -71,7 +73,8 @@ priv enum Identity {
 /// A publisher identity that a signing certificate must have. A policy is an
 /// immutable value; each method returns a new policy with one more claim.
 pub struct Policy {
-  priv issuer : Issuer
+  /// `None` for a release policy: release certificates have no issuer.
+  priv issuer : Issuer?
   priv identity : Identity
   priv source_repository : GitHubRepository?
   priv source_owner : GitHubOwner?
@@ -83,7 +86,7 @@ pub struct Policy {
 }
 
 ///|
-fn Policy::new(issuer : Issuer, identity : Identity) -> Policy {
+fn Policy::new(issuer : Issuer?, identity : Identity) -> Policy {
   {
     issuer,
     identity,
@@ -103,7 +106,7 @@ pub fn Policy::subject_name(
   name : SubjectName,
   issuer? : Issuer = Issuer::github_actions(),
 ) -> Policy {
-  Policy::new(issuer, ExactName(name))
+  Policy::new(Some(issuer), ExactName(name))
 }
 
 ///|
@@ -116,7 +119,7 @@ pub fn Policy::signer_workflow(
   git_ref? : GitRef,
   issuer? : Issuer = Issuer::github_actions(),
 ) -> Policy {
-  Policy::new(issuer, SignerWorkflow(repository, path, git_ref))
+  Policy::new(Some(issuer), SignerWorkflow(repository, path, git_ref))
 }
 
 ///|
@@ -151,6 +154,26 @@ pub fn Policy::predicate_type(self : Policy, predicate_type : PredicateType) -> 
 }
 
 ///|
+/// The SAN of GitHub release attestations on github.com.
+let release_signer : String = "https://dotcom.releases.github.com"
+
+///|
+/// A policy for a GitHub immutable release: GitHub signed it (SAN
+/// `https://dotcom.releases.github.com`, and the certificate has no OIDC
+/// issuer extension, as no workflow certificate does), the statement has the
+/// predicate type `predicate_type` (by default release v0.2), and its predicate
+/// names `repository` (ASCII case ignored), `tag` and the purl
+/// `pkg:github/<owner>/<repo>@<tag>`. Verify it with a release asset digest and
+/// the GitHub root. `repository_id` and `owner_id` pin the predicate IDs.
+pub fn Policy::github_release(
+  repository : GitHubRepository,
+  tag~ : ReleaseTag,
+  predicate_type? : PredicateType = PredicateType::github_release_v0_2(),
+) -> Policy {
+  Policy::new(None, Release(repository, tag)).predicate_type(predicate_type)
+}
+
+///|
 /// Also require the source repository claim (`.1.12`).
 pub fn Policy::source_repository(self : Policy, repository : GitHubRepository) -> Policy {
   { ..self, source_repository: Some(repository) }
@@ -163,13 +186,15 @@ pub fn Policy::source_owner(self : Policy, owner : GitHubOwner) -> Policy {
 }
 
 ///|
-/// Also require the source repository ID claim (`.1.15`).
+/// Also require the source repository ID claim (`.1.15`), or for a release
+/// policy the predicate `repositoryId`.
 pub fn Policy::repository_id(self : Policy, id : GitHubId) -> Policy {
   { ..self, repository_id: Some(id) }
 }
 
 ///|
-/// Also require the source repository owner ID claim (`.1.17`).
+/// Also require the source repository owner ID claim (`.1.17`), or for a
+/// release policy the predicate `ownerId`.
 pub fn Policy::owner_id(self : Policy, id : GitHubId) -> Policy {
   { ..self, owner_id: Some(id) }
 }
@@ -216,6 +241,8 @@ pub enum PolicyMismatch {
   /// The statement has the predicate type `actual` (`None` without a
   /// statement), not `expected`.
   PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
+  /// The release predicate field `field` is `actual`, not `expected`.
+  ReleaseMismatch(field~ : ReleaseField, expected~ : String, actual~ : String?)
 } derive(Eq, Debug)
 
 ///|
@@ -253,6 +280,17 @@ pub fn PolicyMismatch::message(self : PolicyMismatch) -> String {
       "the runner environment is \{shown(actual)}, not \"github-hosted\""
     PredicateTypeMismatch(expected~, actual~) =>
       "the predicate type is \{shown(actual.map(value => value.to_string()))}, not \{expected.to_string().escape()}"
+    ReleaseMismatch(field~, expected~, actual~) => {
+      let name = match field {
+        Issuer => "certificate issuer"
+        Repository => "repository"
+        Tag => "tag"
+        Purl => "purl"
+        RepositoryId => "repository ID"
+        OwnerId => "owner ID"
+      }
+      "the release \{name} is \{shown(actual)}, not \{expected.escape()}"
+    }
   }
 }
 
@@ -269,11 +307,18 @@ fn Policy::mismatch(
   claims : CertificateClaims,
   statement : Statement?,
 ) -> PolicyMismatch? {
-  let issuer = self.issuer.to_string()
-  guard claims.issuer == Some(issuer) else {
-    return Some(IssuerMismatch(expected=issuer, actual=claims.issuer))
+  if self.issuer is Some(required) {
+    let issuer = required.to_string()
+    guard claims.issuer == Some(issuer) else {
+      return Some(IssuerMismatch(expected=issuer, actual=claims.issuer))
+    }
   }
   match self.identity {
+    Release(_, _) => {
+      guard claims.subject_names.contains(release_signer) else {
+        return Some(IdentityMismatch(expected=release_signer, actual=claims.subject_names))
+      }
+    }
     ExactName(name) => {
       let expected = name.to_string()
       guard claims.subject_names.contains(expected) else {
@@ -329,26 +374,34 @@ fn Policy::mismatch(
       )
     }
   }
-  if self.repository_id is Some(id) {
-    guard claims.source_repository_identifier == Some(id.to_string()) else {
-      return Some(
-        ClaimMismatch(
-          claim=RepositoryId,
-          expected=id.to_string(),
-          actual=claims.source_repository_identifier,
-        ),
-      )
+  // A release policy matches the predicate IDs; the workflow claims below,
+  // such as the source ref, still apply and fail on a release certificate.
+  if self.identity is Release(repository, tag) {
+    if self.release_mismatch(repository, tag, claims, statement) is Some(reason) {
+      return Some(reason)
     }
-  }
-  if self.owner_id is Some(id) {
-    guard claims.source_repository_owner_identifier == Some(id.to_string()) else {
-      return Some(
-        ClaimMismatch(
-          claim=OwnerId,
-          expected=id.to_string(),
-          actual=claims.source_repository_owner_identifier,
-        ),
-      )
+  } else {
+    if self.repository_id is Some(id) {
+      guard claims.source_repository_identifier == Some(id.to_string()) else {
+        return Some(
+          ClaimMismatch(
+            claim=RepositoryId,
+            expected=id.to_string(),
+            actual=claims.source_repository_identifier,
+          ),
+        )
+      }
+    }
+    if self.owner_id is Some(id) {
+      guard claims.source_repository_owner_identifier == Some(id.to_string()) else {
+        return Some(
+          ClaimMismatch(
+            claim=OwnerId,
+            expected=id.to_string(),
+            actual=claims.source_repository_owner_identifier,
+          ),
+        )
+      }
     }
   }
   if self.source_ref is Some(git_ref) {
@@ -374,4 +427,134 @@ fn Policy::mismatch(
     }
   }
   None
+}
+
+///|
+/// A field of the release predicate that a release policy matches.
+pub enum ReleaseField {
+  /// The certificate has an OIDC issuer, so it is not a release certificate.
+  Issuer
+  Repository
+  Tag
+  Purl
+  RepositoryId
+  OwnerId
+} derive(Eq, Debug)
+
+///|
+pub extend ReleaseField with Eq::{equal, not_equal}
+
+///|
+pub extend ReleaseField with @debug.Debug::{to_repr}
+
+///|
+/// The first reason that the release statement does not match, or `None`.
+fn Policy::release_mismatch(
+  self : Policy,
+  repository : GitHubRepository,
+  tag : ReleaseTag,
+  claims : CertificateClaims,
+  statement : Statement?,
+) -> PolicyMismatch? {
+  // GitHub release certificates have no OIDC issuer; a Fulcio leaf of a
+  // workflow always has one, so it cannot pass as a release.
+  if claims.issuer is Some(issuer) {
+    return Some(ReleaseMismatch(field=Issuer, expected="no OIDC issuer", actual=Some(issuer)))
+  }
+  if self.predicate_type is Some(expected) {
+    let actual = statement.map(statement => statement.predicate_type)
+    guard actual == Some(expected) else {
+      return Some(PredicateTypeMismatch(expected~, actual~))
+    }
+  }
+  guard statement is Some(statement) else {
+    return Some(ReleaseMismatch(field=Repository, expected=repository.to_string(), actual=None))
+  }
+  fn field(name : String) -> String? {
+    if statement.predicate is Object(map) && map.get(name) is Some(String(value)) {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  let actual_repository = field("repository")
+  guard equal_ignoring_case(actual_repository, repository.to_string()) else {
+    return Some(
+      ReleaseMismatch(field=Repository, expected=repository.to_string(), actual=actual_repository),
+    )
+  }
+  let actual_tag = field("tag")
+  guard actual_tag == Some(tag.to_string()) else {
+    return Some(ReleaseMismatch(field=Tag, expected=tag.to_string(), actual=actual_tag))
+  }
+  // The package name is case-insensitive like the repository; the version is the exact tag.
+  let expected_purl = "pkg:github/\{repository}@\{tag}"
+  let actual_purl = field("purl")
+  let prefix = "pkg:github/\{repository}@"
+  let purl_matches = match actual_purl {
+    Some(purl) =>
+      purl.length() > prefix.length() &&
+      purl[:prefix.length()].to_lower() == prefix.to_lower() &&
+      percent_decode(purl[prefix.length():].to_owned()) == Some(tag.to_string())
+    None => false
+  }
+  guard purl_matches else {
+    return Some(ReleaseMismatch(field=Purl, expected=expected_purl, actual=actual_purl))
+  }
+  if self.repository_id is Some(id) {
+    let actual = field("repositoryId")
+    guard actual == Some(id.to_string()) else {
+      return Some(ReleaseMismatch(field=RepositoryId, expected=id.to_string(), actual~))
+    }
+  }
+  if self.owner_id is Some(id) {
+    let actual = field("ownerId")
+    guard actual == Some(id.to_string()) else {
+      return Some(ReleaseMismatch(field=OwnerId, expected=id.to_string(), actual~))
+    }
+  }
+  None
+}
+
+///|
+/// The text of a purl component with its `%XX` escapes decoded as UTF-8
+/// bytes, or `None` when an escape is not two hex digits or the bytes are not
+/// UTF-8.
+fn percent_decode(text : String) -> String? {
+  let bytes : Array[Byte] = []
+  let encoded = @utf8.encode(text)
+  let mut i = 0
+  while i < encoded.length() {
+    let byte = encoded[i]
+    if byte == b'%' {
+      guard i + 2 < encoded.length() else { return None }
+      let high = hex_digit(encoded[i + 1].to_int())
+      let low = hex_digit(encoded[i + 2].to_int())
+      guard high >= 0 && low >= 0 else { return None }
+      bytes.push((high * 16 + low).to_byte())
+      i += 3
+    } else {
+      bytes.push(byte)
+      i += 1
+    }
+  }
+  @utf8.decode(Bytes::from_array(bytes)) catch {
+    _ => None
+  } noraise {
+    decoded => Some(decoded)
+  }
+}
+
+///|
+fn hex_digit(code : Int) -> Int {
+  if code >= '0'.to_int() && code <= '9'.to_int() {
+    code - '0'.to_int()
+  } else if code >= 'a'.to_int() && code <= 'f'.to_int() {
+    code - 'a'.to_int() + 10
+  } else if code >= 'A'.to_int() && code <= 'F'.to_int() {
+    code - 'A'.to_int() + 10
+  } else {
+    -1
+  }
 }

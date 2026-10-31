@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn github_trusted_root_json() -> String
+
 pub fn public_good_trusted_root_json() -> String
 
 pub fn verify(Bundle, ArtifactDigest, TrustedRoot, Policy, now~ : Instant, alternatives? : Array[Policy]) -> Verdict
@@ -133,6 +135,9 @@ pub enum Failure {
   TransparencyLogBody(String)
   InclusionProof(String)
   Checkpoint(String)
+  Timestamp(String)
+  TimestampAuthority(String)
+  TimestampTime(time~ : Instant, now~ : Instant)
   Certificate(CertificateProblem)
   CertificateValidity(not_before~ : Instant, not_after~ : Instant, time~ : Instant)
   CertificateChain(String)
@@ -149,7 +154,7 @@ pub fn Failure::to_repr(Self) -> @debug.Repr
 
 pub enum Feature {
   PublicKeyMaterial
-  TimestampAuthority
+  TimestampAlgorithm(String)
   RekorV2
   EntryKind(kind~ : String, version~ : String)
   KeyType(String)
@@ -216,6 +221,7 @@ pub enum IdentityKind {
   Ref
   NumericId
   Predicate
+  Tag
 } derive(Eq, @debug.Debug)
 pub fn IdentityKind::equal(Self, Self) -> Bool
 pub fn IdentityKind::not_equal(Self, Self) -> Bool
@@ -261,6 +267,7 @@ pub fn KeyStatus::to_repr(Self) -> @debug.Repr
 pub struct Policy {
   // private fields
 }
+pub fn Policy::github_release(GitHubRepository, tag~ : ReleaseTag, predicate_type? : PredicateType) -> Self
 pub fn Policy::github_workflow(GitHubRepository, workflow~ : WorkflowPath, git_ref? : GitRef, hosted_runner_only? : Bool, predicate_type? : PredicateType) -> Self
 pub fn Policy::hosted_runners_only(Self) -> Self
 pub fn Policy::owner_id(Self, GitHubId) -> Self
@@ -278,6 +285,7 @@ pub enum PolicyMismatch {
   ClaimMismatch(claim~ : Claim, expected~ : String, actual~ : String?)
   RunnerEnvironment(actual~ : String?)
   PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
+  ReleaseMismatch(field~ : ReleaseField, expected~ : String, actual~ : String?)
 } derive(Eq, @debug.Debug)
 pub fn PolicyMismatch::equal(Self, Self) -> Bool
 pub fn PolicyMismatch::message(Self) -> String
@@ -288,6 +296,7 @@ pub struct PredicateType {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn PredicateType::equal(Self, Self) -> Bool
+pub fn PredicateType::github_release_v0_2() -> Self
 pub fn PredicateType::not_equal(Self, Self) -> Bool
 pub fn PredicateType::output(Self, &Logger) -> Unit
 pub fn PredicateType::parse(String) -> Self raise IdentityError
@@ -305,13 +314,38 @@ pub fn Rejection::message(Self) -> String
 pub fn Rejection::not_equal(Self, Self) -> Bool
 pub fn Rejection::to_repr(Self) -> @debug.Repr
 
+pub enum ReleaseField {
+  Issuer
+  Repository
+  Tag
+  Purl
+  RepositoryId
+  OwnerId
+} derive(Eq, @debug.Debug)
+pub fn ReleaseField::equal(Self, Self) -> Bool
+pub fn ReleaseField::not_equal(Self, Self) -> Bool
+pub fn ReleaseField::to_repr(Self) -> @debug.Repr
+
+pub struct ReleaseTag {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ReleaseTag::equal(Self, Self) -> Bool
+pub fn ReleaseTag::not_equal(Self, Self) -> Bool
+pub fn ReleaseTag::output(Self, &Logger) -> Unit
+pub fn ReleaseTag::parse(String) -> Self raise IdentityError
+pub fn ReleaseTag::to_repr(Self) -> @debug.Repr
+pub fn ReleaseTag::to_string(Self) -> String
+pub impl Show for ReleaseTag
+
 pub struct Statement {
   predicate_type : PredicateType
   subjects : Array[Subject]
   payload : Bytes
+  // private fields
 } derive(Eq, @debug.Debug)
 pub fn Statement::equal(Self, Self) -> Bool
 pub fn Statement::not_equal(Self, Self) -> Bool
+pub fn Statement::predicate(Self) -> Json
 pub fn Statement::to_repr(Self) -> @debug.Repr
 
 pub struct Subject {
@@ -333,6 +367,14 @@ pub fn SubjectName::to_repr(Self) -> @debug.Repr
 pub fn SubjectName::to_string(Self) -> String
 pub impl Show for SubjectName
 
+pub enum TimeSource {
+  Log(log_id~ : Bytes, log_index~ : Int64)
+  Authority(uri~ : String)
+} derive(Eq, @debug.Debug)
+pub fn TimeSource::equal(Self, Self) -> Bool
+pub fn TimeSource::not_equal(Self, Self) -> Bool
+pub fn TimeSource::to_repr(Self) -> @debug.Repr
+
 pub struct TrustedLogSummary {
   base_url : String
   key : KeyStatus
@@ -341,6 +383,9 @@ pub struct TrustedLogSummary {
 pub struct TrustedRoot {
   // private fields
 }
+pub fn TrustedRoot::combine(ArrayView[Self]) -> Self
+pub fn TrustedRoot::github() -> Self
+pub fn TrustedRoot::github_attestations() -> Self
 pub fn TrustedRoot::parse(StringView) -> Self raise TrustedRootError
 pub fn TrustedRoot::public_good() -> Self
 pub fn TrustedRoot::summary(Self) -> TrustedRootSummary
@@ -364,13 +409,19 @@ pub struct VerifiedBundle {
   statement : Statement?
   policy_index : Int32
   claims : CertificateClaims
-  log_id : Bytes
-  log_index : Int64
-  integrated_time : Instant
+  times : Array[VerifiedTime]
 } derive(Eq, @debug.Debug)
 pub fn VerifiedBundle::equal(Self, Self) -> Bool
 pub fn VerifiedBundle::not_equal(Self, Self) -> Bool
 pub fn VerifiedBundle::to_repr(Self) -> @debug.Repr
+
+pub struct VerifiedTime {
+  time : Instant
+  source : TimeSource
+} derive(Eq, @debug.Debug)
+pub fn VerifiedTime::equal(Self, Self) -> Bool
+pub fn VerifiedTime::not_equal(Self, Self) -> Bool
+pub fn VerifiedTime::to_repr(Self) -> @debug.Repr
 
 pub struct WorkflowPath {
   // private fields

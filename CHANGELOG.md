@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 - 2026-10-31
+
+All twelve libraries share this minor version. The Sigstore verifier module is
+published for the first time. Existing public APIs remain compatible.
 
 ### Added
 
@@ -18,6 +21,15 @@
   target runs zero sigstore tests, `mise run check:sigstore-assets` rejects a
   stale generated root or fixture, and the manual `mise run bench:sigstore`
   times one verification.
+- `Policy::github_workflow` requires SLSA provenance v1 by default, as
+  `gh attestation verify` does; give `predicate_type=` for another type.
+
+### Not supported yet
+
+- RFC 3161 timestamps (the only time source of attestations from private
+  repositories and GitHub immutable releases), Rekor v2 entries, managed-key
+  bundles and Ed25519 or RSA keys give `Rejected(Unsupported(...))`. A Sigstore
+  TUF client that refreshes the trusted root is a later change.
 
 ## 0.9.0 - 2026-10-30
 

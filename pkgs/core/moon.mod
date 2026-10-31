@@ -1,6 +1,6 @@
 name = "moonrockz/moon-lander-core"
 
-version = "0.9.0"
+version = "0.10.0"
 
 description = "Shared domain types of the Moon-Lander framework"
 

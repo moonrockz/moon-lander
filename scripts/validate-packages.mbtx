@@ -2,6 +2,7 @@
 import {
   "moonbitlang/async@0.22.5",
   "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
   "moonbitlang/x@0.5.6/sys",
 }
 ----
@@ -15,8 +16,8 @@ import {
 /// - No module except the unpublished docs tool `apps/site` imports a UI library.
 /// - Each framework module imports only the framework modules below it, and core imports no
 ///   module (openspec split-framework-modules, design D8).
-/// - The actors module imports no external module except `moonbitlang/async` (openspec
-///   add-typed-actors).
+/// - The actors module imports only async and Ion externally, and actors packages use only
+///   the Ion data model package (openspec add-actor-runtime-events).
 ///
 /// A member is active when its line starts, after whitespace, with a quoted path (`"pkgs/x"` or
 /// `"./pkgs/x"`). A commented-out entry starts with `#`, so it does not count.
@@ -89,7 +90,7 @@ let framework : Array[(String, String, Array[String])] = [
 /// modules that the module can import. A framework module that is not in this table, and is not
 /// core or logging, has no limit on its external imports.
 let external_limits : Array[(String, Array[String])] = [
-  ("pkgs/actors", ["moonbitlang/async"]),
+  ("pkgs/actors", ["moonbitlang/async", "moonrockz/ion"]),
   ("pkgs/moonx", ["moonbitlang/x"]),
 ]
 
@@ -231,6 +232,43 @@ fn dependency_errors(path : String, manifest : String) -> Array[String] {
 }
 
 ///|
+/// Report Ion imports outside the data model in an actors package manifest.
+fn actors_package_errors(path : String, manifest : String) -> Array[String] {
+  guard path.has_prefix("pkgs/actors/") else { return [] }
+  imported_modules(manifest).filter_map(name => {
+    if (name == "moonrockz/ion" || name.has_prefix("moonrockz/ion/")) &&
+      name != "moonrockz/ion/ion" {
+      Some(
+        "\{path} imports \{name}; actors packages import only moonrockz/ion/ion from Ion",
+      )
+    } else {
+      None
+    }
+  })
+}
+
+///|
+/// Check every package below a module, including nested packages and test imports.
+async fn package_import_errors(dir : String) -> Array[String] {
+  let errors = []
+  if @fs.exists("\{dir}/moon.pkg") {
+    errors.append(
+      actors_package_errors(
+        "\{dir}/moon.pkg",
+        @fs.read_file("\{dir}/moon.pkg").text(),
+      ),
+    )
+  }
+  for entry in @fs.readdir(dir) {
+    guard entry != "_build" && entry != ".mooncakes" else { continue }
+    let child = "\{dir}/\{entry}"
+    guard @fs.kind(child) is Directory else { continue }
+    errors.append(package_import_errors(child))
+  }
+  errors
+}
+
+///|
 /// Parse the active members out of `moon.work`, without a leading `./`.
 fn members(work : String) -> Array[String] {
   let found = []
@@ -311,6 +349,11 @@ async fn main {
     }
     for message in dependency_errors(path, manifest) {
       error(message)
+    }
+    if path == "pkgs/actors" {
+      for message in package_import_errors(path) {
+        error(message)
+      }
     }
     if !has_package(path) {
       error("\{path} has no moon.pkg in its tree")
@@ -626,13 +669,14 @@ test "the framework has nine modules in the dependency direction" {
 }
 
 ///|
-test "actors imports core and async, but no other framework or external module" {
+test "actors imports core, async and Ion, but no other framework or external module" {
   let manifest =
     #|name = "moonrockz/moon-lander-actors"
     #|
     #|import {
     #|  "moonrockz/moon-lander-core@0.7.3",
     #|  "moonbitlang/async@0.22.5",
+    #|  "moonrockz/ion@0.6.0",
     #|}
   assert_eq(dependency_errors("pkgs/actors", manifest), [])
   assert_eq(
@@ -654,11 +698,11 @@ test "actors imports core and async, but no other framework or external module" 
       ],
     )
   }
-  for name in ["moonbitlang/x", "moonrockz/ion", "moonbit-community/toml"] {
+  for name in ["moonbitlang/x", "moonbit-community/toml"] {
     assert_eq(
       dependency_errors("pkgs/actors", "import {\n  \"\{name}@0.1.0\",\n}\n"),
       [
-        "pkgs/actors imports \{name}; moonrockz/moon-lander-actors imports no external module except moonbitlang/async",
+        "pkgs/actors imports \{name}; moonrockz/moon-lander-actors imports no external module except moonbitlang/async, moonrockz/ion",
       ],
     )
   }
@@ -741,5 +785,69 @@ test "Moonx is an isolated optional leaf and never imports canonical async" {
     [
       "pkgs/moonx imports moonbitlang/async; moonrockz/moon-lander-moonx imports no external module except moonbitlang/x",
     ],
+  )
+}
+
+///|
+test "actors packages import only the Ion data model" {
+  let allowed = "import { \"moonrockz/ion/ion\", \"moonbitlang/core/debug\", }"
+  assert_eq(actors_package_errors("pkgs/actors/moon.pkg", allowed), [])
+  assert_eq(actors_package_errors("pkgs/actors/runtime/moon.pkg", allowed), [])
+  for
+    name in [
+      "moonrockz/ion/text", "moonrockz/ion/binary", "moonrockz/ion/schema", "moonrockz/ion/json",
+      "moonrockz/ion",
+    ] {
+    let manifest = "import { \"\{name}\" @codec } for \"test\""
+    assert_eq(
+      actors_package_errors("pkgs/actors/nested/probe/moon.pkg", manifest),
+      [
+        "pkgs/actors/nested/probe/moon.pkg imports \{name}; actors packages import only moonrockz/ion/ion from Ion",
+      ],
+    )
+    assert_eq(actors_package_errors("pkgs/config/moon.pkg", manifest), [])
+    assert_eq(actors_package_errors("pkgs/actors-other/moon.pkg", manifest), [])
+  }
+  assert_eq(
+    actors_package_errors(
+      "pkgs/actors/moon.pkg", "// import { \"moonrockz/ion/text\" }\nimport { \"moonrockz/ion/ion\" }",
+    ),
+    [],
+  )
+}
+
+///|
+async test "validation checks nested actor packages and names a forbidden Ion import" {
+  let script = @fs.realpath("validate-packages.mbtx")
+  let dir = @fs.tmpdir(prefix="lander-actors-imports")
+  defer @fs.rmdir(dir, recursive=true)
+  let work = StringBuilder()
+  work.write_string("members = [\n")
+  for (folder, name, _) in framework {
+    @fs.mkdir("\{dir}/\{folder}", recursive=true, allow_exist=true)
+    @fs.write_file("\{dir}/\{folder}/moon.mod", "name = \"\{name}\"\n")
+    @fs.write_file("\{dir}/\{folder}/moon.pkg", "")
+    work.write_string("  \"\{folder}\",\n")
+  }
+  work.write_string("]\n")
+  @fs.write_file("\{dir}/moon.work", work.to_string())
+  @fs.write_file(
+    "\{dir}/pkgs/actors/moon.mod",
+    "name = \"moonrockz/moon-lander-actors\"\nimport { \"moonrockz/ion@0.6.0\" }\n",
+  )
+  @fs.mkdir("\{dir}/pkgs/actors/nested/probe", recursive=true)
+  let package_path = "\{dir}/pkgs/actors/nested/probe/moon.pkg"
+  @fs.write_file(package_path, "import { \"moonrockz/ion/ion\" }")
+  let (code, out, err) = @process.collect_output("moonx", [script], cwd=dir)
+  assert_eq(code, 0, msg=out.text() + err.text())
+  @fs.write_file(package_path, "import { \"moonrockz/ion/text\" } for \"test\"")
+  let (code, out, err) = @process.collect_output("moonx", [script], cwd=dir)
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg=output)
+  assert_true(
+    output.contains(
+      "pkgs/actors/nested/probe/moon.pkg imports moonrockz/ion/text",
+    ),
+    msg=output,
   )
 }

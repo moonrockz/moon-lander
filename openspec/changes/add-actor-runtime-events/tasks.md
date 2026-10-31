@@ -1,6 +1,6 @@
 # Tasks: Add actor runtime events
 
-Status: approved on 2026-10-31. No implementation task is complete. Epic
+Status: approved on 2026-10-31. Implementation progress is tracked below. Epic
 `lander-d0y` holds one story for each group. Each group includes its own tests
 and runnable documentation.
 
@@ -8,9 +8,9 @@ and runnable documentation.
 
 Bead: lander-d0y.1
 
-- [ ] 1.1 Add `moonrockz/ion@0.6.0` to `pkgs/actors/moon.mod` and `moonrockz/ion/ion` to the actors package imports; add `moonrockz/ion` to the actors external limit in `scripts/validate-packages.mbtx`, with a package-level check that actors packages import no other Ion package; verify the accept and reject scenarios of the dependency requirement with task script tests and `mise run validate`
-- [ ] 1.2 Add `PayloadPolicy[M]` to the portable root with `omit`, `ion`, `json` and `encode`, and `omit` as the default; verify an Ion-native protocol (decimal and timestamp), a `derive(ToJson)` protocol through the bridge, a redacting encoder and a wrong-policy compile failure on wasm, wasm-gc, js and native
-- [ ] 1.3 Document the payload forms and the secret warning in the actors README with compiled examples; verify the README tests and the isolated actors candidate consumer with the Ion dependency
+- [x] 1.1 Add `moonrockz/ion@0.6.0` to `pkgs/actors/moon.mod` and `moonrockz/ion/ion` to the actors package imports; add `moonrockz/ion` to the actors external limit in `scripts/validate-packages.mbtx`, with a package-level check that actors packages import no other Ion package; verify the accept and reject scenarios of the dependency requirement with task script tests and `mise run validate`
+- [x] 1.2 Add `PayloadPolicy[M]` to the portable root with `omit`, `ion`, `json` and `encode`, and `omit` as the default; verify an Ion-native protocol (decimal and timestamp), a `derive(ToJson)` protocol through the bridge, a redacting encoder and a wrong-policy compile failure on wasm, wasm-gc, js and native
+- [x] 1.3 Document the payload forms and the secret warning in the actors README with compiled examples; verify the README tests and the isolated actors candidate consumer with the Ion dependency
 
 ## 2. Runtime event channel and lifecycle events
 

@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/debug",
+  "moonrockz/ion/ion",
 }
 
 import {

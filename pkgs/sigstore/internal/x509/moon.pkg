@@ -11,3 +11,8 @@ import {
   "moonbitlang/core/json",
   "moonrockz/sigstore/internal/fixtures",
 } for "test"
+
+import {
+  "moonbitlang/core/json",
+  "moonrockz/sigstore/internal/fixtures",
+} for "wbtest"

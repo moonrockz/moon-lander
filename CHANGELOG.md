@@ -27,7 +27,10 @@
 - `Failure` gains `Timestamp`, `TimestampAuthority` and `TimestampTime`;
   `Feature::TimestampAuthority` becomes `Feature::TimestampAlgorithm`; `Statement`
   gains `predicate`. A caller that matches every case adds the new arms.
-- Every log entry and every timestamp of a bundle must verify.
+- Every log entry and every timestamp of a bundle must verify. A leaf whose
+  certificate authority comes from a root that lists transparency logs (such as
+  public good) still needs a log entry from one of them; a timestamp alone is not
+  enough. An SCT must come from a CT log of the same root as its authority.
 
 ## 0.10.0 - 2026-10-31
 

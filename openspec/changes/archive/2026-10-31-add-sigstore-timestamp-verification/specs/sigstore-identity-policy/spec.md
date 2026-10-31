@@ -26,8 +26,9 @@ require an issuer, because GitHub release certificates have no issuer extension.
 A release policy SHALL require the SAN `https://dotcom.releases.github.com`, a
 statement with predicate type `https://in-toto.io/attestation/release/v0.2`, and a
 predicate whose `repository` (without regard to ASCII case), `tag` and `purl`
-(`pkg:github/<owner>/<repo>@<tag>`) match the policy. It SHALL optionally require the
-predicate `repositoryId` and `ownerId`.
+(`pkg:github/<owner>/<repo>@<tag>`, version percent-decoded) match the policy, and a
+certificate with no OIDC issuer extension. It SHALL optionally require the predicate
+`repositoryId` and `ownerId`. A workflow claim added to a release policy SHALL fail.
 
 #### Scenario: Release asset
 
@@ -43,3 +44,13 @@ predicate `repositoryId` and `ownerId`.
 
 - **WHEN** the release policy requires repository ID `1` and the predicate has `212613049`
 - **THEN** the verdict fails with a release mismatch reason that names the repository ID
+
+#### Scenario: Workflow certificate with the release SAN
+
+- **WHEN** a certificate has the SAN `https://dotcom.releases.github.com` and an OIDC issuer
+- **THEN** a release policy fails with a release mismatch reason that names the issuer
+
+#### Scenario: Workflow claim on a release policy
+
+- **WHEN** a release policy also requires the source ref `refs/heads/main`
+- **THEN** the release attestation fails, because its certificate has no source ref

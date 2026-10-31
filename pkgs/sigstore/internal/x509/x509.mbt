@@ -76,6 +76,13 @@ pub const EKU_CODE_SIGNING : String = "1.3.6.1.5.5.7.3.3"
 pub const EKU_ANY : String = "2.5.29.37.0"
 
 ///|
+pub const EKU_TIME_STAMPING : String = "1.3.6.1.5.5.7.3.8"
+
+///|
+/// Key usage contentCommitment (bit 1), which a timestamping leaf may have.
+pub const KEY_USAGE_CONTENT_COMMITMENT : Int = 2
+
+///|
 pub const SCT_LIST_OID : String = "1.3.6.1.4.1.11129.2.4.2"
 
 ///|
@@ -427,4 +434,28 @@ fn rebuild(tbs : Bytes, oid : String) -> Bytes raise @der.DerError {
     }
   }
   @der.encode(@der.SEQUENCE, Bytes::from_array(out))
+}
+
+///|
+/// The reason that this certificate cannot sign RFC 3161 timestamps, or
+/// `None`: the extended key usage must be critical and hold only timeStamping,
+/// a key usage must allow digitalSignature or contentCommitment, the
+/// certificate must not be a CA, and it must have no unknown critical extension.
+pub fn Certificate::timestamp_signer_problem(self : Certificate) -> String? {
+  guard self.extension("2.5.29.37") is Some(eku) &&
+    eku.critical &&
+    self.extended_key_usage == Some([EKU_TIME_STAMPING]) else {
+    return Some("the signer does not have a critical extended key usage of only timeStamping")
+  }
+  if self.key_usage is Some(bits) &&
+    (bits & (KEY_USAGE_DIGITAL_SIGNATURE | KEY_USAGE_CONTENT_COMMITMENT)) == 0 {
+    return Some("the signer key usage does not allow signatures")
+  }
+  if self.basic_constraints is Some({ is_ca: true, .. }) {
+    return Some("the signer is a certificate authority")
+  }
+  if self.unhandled_critical() is Some(oid) {
+    return Some("the signer has the unknown critical extension \{oid}")
+  }
+  None
 }

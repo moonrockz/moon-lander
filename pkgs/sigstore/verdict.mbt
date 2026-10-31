@@ -185,8 +185,7 @@ pub extend Subject with @debug.Debug::{to_repr}
 /// The in-toto statement of a verified DSSE bundle.
 pub struct Statement {
   predicate_type : PredicateType
-  /// The predicate JSON, as the statement gives it.
-  predicate : Json
+  priv predicate : Json
   subjects : Array[Subject]
   /// The exact payload bytes that the signature covers.
   payload : Bytes
@@ -194,6 +193,15 @@ pub struct Statement {
 
 ///|
 pub extend Statement with Eq::{equal, not_equal}
+
+///|
+/// A copy of the predicate JSON, as the statement gives it. The copy keeps
+/// the verified statement immutable.
+pub fn Statement::predicate(self : Statement) -> Json {
+  @json.parse(self.predicate.stringify()) catch {
+    _ => abort("a parsed predicate does not parse again")
+  }
+}
 
 ///|
 pub extend Statement with @debug.Debug::{to_repr}

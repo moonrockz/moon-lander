@@ -52,7 +52,9 @@ fail. A root without CT logs SHALL NOT require an SCT.
 The verifier SHALL check each Rekor v1 entry of the bundle: it is from a log in the
 trusted root, with a valid signed entry timestamp, an integrated time inside the log's
 validity and not after "now", and a body whose kind, signature, certificate and payload
-hash match the bundle. A bundle MAY have no entry when a timestamp gives its time.
+hash match the bundle. A bundle MAY have no entry when a timestamp gives its time and
+no root of an authority that issued the leaf lists transparency logs; when one does, an
+entry from one of that root's logs SHALL verify.
 
 #### Scenario: Bad signed entry timestamp
 
@@ -68,6 +70,11 @@ hash match the bundle. A bundle MAY have no entry when a timestamp gives its tim
 
 - **WHEN** the entry body holds a signature that differs from the bundle signature
 - **THEN** the verdict fails with a transparency log body reason
+
+#### Scenario: Public-good leaf with only a timestamp
+
+- **WHEN** the log entry is removed from a bundle whose leaf chains to an authority of a root that lists transparency logs, and a valid timestamp remains
+- **THEN** the verdict fails with a transparency log reason
 
 ## ADDED Requirements
 

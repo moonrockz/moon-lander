@@ -101,16 +101,20 @@ test "an embedded certificate never becomes the signer" {
   let open : Period = { start: None, end: None }
   // The self-signed certificate as the trusted leaf: the token's signer is
   // another certificate, so it is refused.
-  let as_leaf : Authority = { uri: "test", chain: self_signed, valid: open, sct_required: false }
+  let as_leaf : Authority = { uri: "test", chain: self_signed, valid: open, source: 0 }
   assert_true(timestamp_signer(token, as_leaf, time) is Some(_))
 }
 
 ///|
 test "the SCT rule follows the root that listed each authority" {
   let combined = TrustedRoot::github_attestations()
-  let flags = combined.authorities.map(authority => authority.sct_required)
+  let flags = combined.authorities.map(authority => combined.lists_ctlogs(authority.source))
   // Public good has two CAs and CT logs; GitHub has six CAs and none.
   assert_eq(flags, [true, true, false, false, false, false, false, false])
+  assert_eq(combined.authorities.map(authority => combined.lists_tlogs(authority.source)), flags)
+  // Combining a combined root keeps each source apart.
+  let twice = TrustedRoot::combine([combined, TrustedRoot::github()])
+  assert_eq(twice.authorities.map(authority => authority.source), [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2])
   assert_eq(combined.timestamp_authorities.length(), 7)
 }
 
@@ -121,7 +125,7 @@ test "a leaf is checked at the timestamp time" {
   let leaf = read_leaf(raw) catch { Stop(_) => fail("leaf") }
   let after = Instant::from_unix_seconds(leaf.certificate.not_after + 1L)
   let failure = try {
-    check_certificate(leaf, TrustedRoot::github(), after)
+    ignore(check_certificate(leaf, TrustedRoot::github(), after))
     None
   } catch {
     Stop(rejection) => Some(rejection)
@@ -130,7 +134,7 @@ test "a leaf is checked at the timestamp time" {
   let inside = Instant::from_unix_seconds(leaf.certificate.not_after)
   assert_true(
     (try {
-      check_certificate(leaf, TrustedRoot::github(), inside)
+      ignore(check_certificate(leaf, TrustedRoot::github(), inside))
       true
     } catch {
       Stop(_) => false
@@ -138,4 +142,120 @@ test "a leaf is checked at the timestamp time" {
   )
   // A fraction of a second after the last valid second is outside.
   assert_false(valid_at(leaf.certificate, Instant::from_parts(leaf.certificate.not_after, 1)))
+}
+
+///|
+fn concat(parts : Array[BytesView]) -> Bytes {
+  let out : Array[Byte] = []
+  for part in parts {
+    for byte in part {
+      out.push(byte)
+    }
+  }
+  Bytes::from_array(out)
+}
+
+///|
+/// The TimeStampResp with its SignedData `certificates` replaced. The set is
+/// outside the signed attributes, so the signature stays valid.
+fn with_certificates(response : Bytes, certificates : Array[Bytes]) -> Bytes raise {
+  let outer = @der.parse_tag(response, @der.SEQUENCE).children()
+  let status = outer.next()
+  let content_info = outer.next().children()
+  let oid = content_info.next()
+  let signed_data = content_info.next().children().next().children()
+  let head = [signed_data.next().raw, signed_data.next().raw, signed_data.next().raw]
+  let rest = []
+  while !signed_data.is_empty() {
+    let element = signed_data.next()
+    if element.tag != @der.context(0) {
+      rest.push(element.raw)
+    }
+  }
+  let certificate_set = @der.encode(@der.context(0), concat(certificates.map(c => c[:])))
+  let body = @der.encode(@der.SEQUENCE, concat([..head, certificate_set[:], ..rest]))
+  let info = @der.encode(@der.SEQUENCE, concat([oid.raw, @der.encode(@der.context(0), body)[:]]))
+  @der.encode(@der.SEQUENCE, concat([status.raw, info[:]]))
+}
+
+///|
+/// The GitHub timestamp authority that signed the release token.
+fn release_authority(token : @timestamp.Timestamp) -> Authority {
+  TrustedRoot::github()
+  .timestamp_authorities
+  .iter()
+  .find_first(authority => {
+    let leaf = authority.chain[0]
+    leaf.issuer == token.signer_issuer && leaf.serial == token.signer_serial
+  })
+  .unwrap()
+}
+
+///|
+test "a CA-only authority takes the signer from the token" {
+  let response = release_bundle().timestamps[0]
+  let token = @timestamp.parse(response)
+  let authority = release_authority(token)
+  let time = Instant::from_parts(token.seconds, token.nanos)
+  let ca_only = { ..authority, chain: authority.chain[1:].to_owned() }
+  // Without an embedded certificate there is no signer.
+  assert_eq(timestamp_signer(token, ca_only, time), Some("the token has no certificate for its signer"))
+  // With the leaf embedded, the signer chains to the authority.
+  let leaf = authority.chain[0].raw
+  let embedded = @timestamp.parse(with_certificates(response, [leaf]))
+  assert_eq(embedded.certificates.length(), 1)
+  assert_eq(timestamp_signer(embedded, ca_only, time), None)
+  assert_true(embedded.verify_signature(@signature.PublicKey::from_spki(authority.chain[0].spki)))
+  // Another authority's leaf does not name the signer.
+  let others = TrustedRoot::github().timestamp_authorities.filter(other => other.chain[0].raw != leaf)
+  let other_leaf = @timestamp.parse(with_certificates(response, [others[0].chain[0].raw]))
+  assert_eq(timestamp_signer(other_leaf, ca_only, time), Some("the token has no certificate for its signer"))
+  // The right leaf with the chain of another instance's authority does not chain.
+  let public = TrustedRoot::public_good().timestamp_authorities[0]
+  let other_ca = { ..public, chain: public.chain[1:].to_owned(), valid: { start: None, end: None } }
+  assert_eq(timestamp_signer(embedded, other_ca, time), Some("no certificate of the authority issued the leaf"))
+  // With a listed leaf, an embedded certificate is never the signer: the
+  // trusted leaf still decides.
+  assert_eq(timestamp_signer(other_leaf, authority, time), None)
+}
+
+///|
+/// The response with the first occurrence of `pattern` after `from` changed.
+fn change_after(response : Bytes, pattern : Bytes, from~ : Int = 0) -> (Bytes, Int) {
+  let bytes = response.to_array()
+  for i in from..<(bytes.length() - pattern.length()) {
+    if Bytes::from_array(bytes[i:i + pattern.length()]) == pattern {
+      let last = i + pattern.length() - 1
+      bytes[last] = bytes[last] ^ 1
+      return (Bytes::from_array(bytes), i)
+    }
+  }
+  abort("pattern not found")
+}
+
+///|
+test "the signed attributes must name the TSTInfo and the signer" {
+  let response = release_bundle().timestamps[0]
+  let token = @timestamp.parse(response)
+  let authority = release_authority(token)
+  let time = Instant::from_parts(token.seconds, token.nanos)
+  // The signingCertificateV2 hash is the SHA-256 of the signer.
+  let (changed_hash, _) = change_after(response, @signature.sha256(authority.chain[0].raw))
+  assert_eq(
+    timestamp_signer(@timestamp.parse(changed_hash), authority, time),
+    Some("the signing certificate attribute names another certificate"),
+  )
+  // id-ct-TSTInfo is the encapsulated content type, and then the content type
+  // attribute; a changed attribute value is refused.
+  let oid = b"\x06\x0b\x2a\x86\x48\x86\xf7\x0d\x01\x09\x10\x01\x04"
+  let (_, first) = change_after(response, oid)
+  let (changed_type, _) = change_after(response, oid, from=first + 1)
+  let refused = try {
+    ignore(@timestamp.parse(changed_type))
+    None
+  } catch {
+    BadTimestamp(rule) => Some(rule)
+    _ => None
+  }
+  assert_eq(refused, Some("the content type attribute is not id-ct-TSTInfo"))
 }

@@ -372,3 +372,69 @@ test "a policy can require another predicate type, or none" {
   // Policy::signer_workflow alone does not require a predicate type.
   assert_eq(Policy::signer_workflow(repository, workflow).mismatch(claims, None), None)
 }
+
+///|
+fn release_statement(repository : String, tag : String, purl : String) -> Statement {
+  let parsed = PredicateType::github_release_v0_2()
+  let predicate = Json::object({
+    "repository": Json::string(repository),
+    "tag": Json::string(tag),
+    "purl": Json::string(purl),
+  })
+  { predicate_type: parsed, predicate, subjects: [], payload: b"" }
+}
+
+///|
+fn cli_release() -> Policy raise {
+  Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v2.103.3"))
+}
+
+///|
+let release_claims : CertificateClaims = {
+  ..rust_claims,
+  issuer: None,
+  subject_names: ["https://dotcom.releases.github.com"],
+  runner_environment: None,
+  source_repository_ref: None,
+  source_repository_uri: None,
+}
+
+///|
+test "a release policy fails closed" {
+  let statement = Some(release_statement("cli/cli", "v2.103.3", "pkg:github/cli/cli@v2.103.3"))
+  assert_eq(cli_release().mismatch(release_claims, statement), None)
+  // A certificate with an OIDC issuer is not a release certificate, even with
+  // the release SAN.
+  assert_true(
+    cli_release().mismatch({ ..release_claims, issuer: Some("https://token.actions.githubusercontent.com") }, statement)
+    is Some(ReleaseMismatch(field=Issuer, ..)),
+  )
+  // Workflow claims that a release certificate cannot give fail.
+  let with_ref = cli_release().source_ref(GitRef::parse("refs/heads/main"))
+  assert_true(with_ref.mismatch(release_claims, statement) is Some(ClaimMismatch(claim=SourceRef, actual=None, ..)))
+  assert_true(
+    cli_release().hosted_runners_only().mismatch(release_claims, statement) is Some(RunnerEnvironment(actual=None)),
+  )
+  // Without a statement, the release does not match.
+  assert_true(cli_release().mismatch(release_claims, None) is Some(PredicateTypeMismatch(actual=None, ..)))
+}
+
+///|
+test "the purl version is the percent-decoded exact tag" {
+  let policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("release/1.0"))
+  let mismatch = (purl : String) => {
+    let statement = { ..release_statement("cli/cli", "release/1.0", purl), predicate_type: PredicateType::github_release_v0_2() }
+    policy.mismatch(release_claims, Some(statement))
+  }
+  assert_eq(mismatch("pkg:github/cli/cli@release%2F1.0"), None)
+  assert_eq(mismatch("pkg:github/cli/cli@release/1.0"), None)
+  assert_eq(mismatch("PKG:GITHUB/CLI/CLI@release%2f1.0"), None)
+  for bad in ["pkg:github/cli/cli@release%2F1.1", "pkg:github/cli/cli@release%G0", "pkg:github/cli/cli", "pkg:github/cli/go-gh@release/1.0"] {
+    assert_true(mismatch(bad) is Some(ReleaseMismatch(field=Purl, ..)), msg=bad)
+  }
+  // A tag with '@' is split after the repository, not at the last '@'.
+  let at_policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v1@x"))
+  let at_statement = release_statement("cli/cli", "v1@x", "pkg:github/cli/cli@v1%40x")
+  assert_eq(at_policy.mismatch(release_claims, Some(at_statement)), None)
+  assert_eq(percent_decode("a%2"), None)
+}

@@ -315,6 +315,7 @@ pub fn Rejection::not_equal(Self, Self) -> Bool
 pub fn Rejection::to_repr(Self) -> @debug.Repr
 
 pub enum ReleaseField {
+  Issuer
   Repository
   Tag
   Purl
@@ -338,12 +339,13 @@ pub impl Show for ReleaseTag
 
 pub struct Statement {
   predicate_type : PredicateType
-  predicate : Json
   subjects : Array[Subject]
   payload : Bytes
+  // private fields
 } derive(Eq, @debug.Debug)
 pub fn Statement::equal(Self, Self) -> Bool
 pub fn Statement::not_equal(Self, Self) -> Bool
+pub fn Statement::predicate(Self) -> Json
 pub fn Statement::to_repr(Self) -> @debug.Repr
 
 pub struct Subject {

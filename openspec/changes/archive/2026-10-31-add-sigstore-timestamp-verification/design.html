@@ -139,7 +139,7 @@ asset subject with the file's SHA-256.</p>
 DER reader. It reads DER only (no BER), and it is stricter than sigstore-go in three
 places: the encapsulated content type must be id-ct-TSTInfo, the contentType attribute
 must be present with that value, and a signingCertificateV2 hash, when present, must equal
-the SHA-256 of the signer. All real tokens pass these rules. A token without signed
+the hash (SHA-256 by default) of the signer that the attribute names. All real tokens pass these rules. A token without signed
 attributes fails, as RFC 3161 requires them. GeneralizedTime with a fraction is read for
 genTime (no trailing zeros, <code>Z</code> only).</p>
 
@@ -151,7 +151,9 @@ issuer and serial, and it must chain to the authority. The path is checked at ge
 the same validity, CA and critical-extension rules as Fulcio paths. The leaf EKU must be
 critical and hold only timeStamping; key usage, when present, must allow digitalSignature or
 contentCommitment. ECDSA P-256 and P-384 with SHA-256, SHA-384 or SHA-512 (from the
-signature OID) are supported; an RSA TSA gives <code>Unsupported(KeyType("RSA"))</code>.</p>
+signature OID) are supported; an RSA TSA gives <code>Unsupported(TimestampAlgorithm(...))</code>.
+The chain is checked before the signer key is read, so an embedded certificate that does not
+chain gives an invalid verdict, not a not-supported one.</p>
 
 <h3 id="time-2">TIME-2. Every time source must verify</h3>
 <p><span class="label owner">Owner, approved 2026-10-31.</span> The verified times are each log entry's
@@ -171,6 +173,13 @@ This follows gh's instance choice, but by the authority that actually issued the
 by the issuer <code>O=</code> text. Alternatives: an SCT rule by root only (a combined root would
 then require SCTs from GitHub leaves); or a list of roots in <code>verify</code> (a larger API change).</p>
 
+<p><strong>After the pre-merge review (2026-10-31):</strong> each log and authority keeps
+the position of its source root. A root that lists transparency logs also requires a verified
+entry from one of its logs, because gh requires a log entry for public good and a public TSA
+timestamp alone would hide a signature from log monitors. Every authority that issues the leaf
+counts, so the order of combined roots cannot weaken either rule, and an SCT must come from a
+CT log of the same root as its issuing authority.</p>
+
 <h3 id="root-2">ROOT-2. Pin GitHub's root from its TUF target</h3>
 <p><span class="label call">Call.</span> Store the content-addressed TUF target bytes as
 <code>testdata/github/trusted_root.json</code>, list it in <code>SHA256SUMS</code>, and let
@@ -186,7 +195,11 @@ ignored), <code>tag</code> (exact) and <code>purl</code> (<code>pkg:github/&lt;o
 <code>.repository_id(...)</code> and <code>.owner_id(...)</code> pin the predicate IDs. A new
 <code>PolicyMismatch::ReleaseMismatch(field~, expected~, actual~)</code> names the field. The
 artifact digest is the SHA-256 of a release asset; the tag commit (SHA-1) is out of scope.
-<code>Statement</code> keeps the raw predicate JSON for this check. Subjects with a <code>uri</code> and
+<code>Statement</code> keeps the predicate JSON for this check; <code>Statement::predicate()</code>
+gives a copy, so a verified result stays immutable. After review: a release policy also
+requires a certificate with no OIDC issuer (every workflow certificate has one), and workflow
+claims added to a release policy fail instead of being ignored. The purl version is
+percent-decoded and split after <code>pkg:github/&lt;owner&gt;/&lt;repo&gt;@</code>. Subjects with a <code>uri</code> and
 no <code>name</code> already parse.</p>
 
 <h3 id="log-2">LOG-2. Rekor v1 in-toto entries</h3>
@@ -200,7 +213,7 @@ reason. Drop this group if you want the smallest change.</p>
 <p><span class="label call">Call.</span> <code>VerifiedBundle</code> replaces <code>log_id</code>,
 <code>log_index</code> and <code>integrated_time</code> with <code>times : Array[VerifiedTime]</code>, where
 <code>VerifiedTime</code> has a <code>time</code> and a <code>source</code>:
-<code>TransparencyLog(log_id~, log_index~)</code> or <code>TimestampAuthority(uri~)</code>. A bundle can
+<code>Log(log_id~, log_index~)</code> or <code>Authority(uri~)</code>. A bundle can
 now have no log entry, so the old fields cannot stay. New <code>Failure</code> cases:
 <code>Timestamp(String)</code>, <code>TimestampAuthority(String)</code> and
 <code>TimestampTime(time~, now~)</code>. <code>Feature::TimestampAuthority</code> is removed.</p>

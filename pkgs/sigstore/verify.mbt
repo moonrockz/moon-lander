@@ -33,11 +33,13 @@ let max_subject_digests : Int = 32
 ///|
 /// Verify a Sigstore bundle for an artifact.
 ///
-/// The verdict passes when the bundle was logged in a transparency log of
-/// `root`, its certificate chains to a certificate authority of `root` at the
-/// log's integrated time, its signature covers content that names `artifact`,
-/// and its certificate matches `policy` or one of `alternatives`. `now` only
-/// bounds the integrated time. The function does no I/O and reads no clock.
+/// The verdict passes when each transparency log entry and RFC 3161
+/// timestamp of the bundle verifies against `root` (at least one, and an entry
+/// when the root of the leaf's authority lists transparency logs), the
+/// certificate chains to a certificate authority of `root` at every verified
+/// time, the signature covers content that names `artifact`, and the
+/// certificate matches `policy` or one of `alternatives`. `now` only bounds the
+/// verified times. The function does no I/O and reads no clock.
 pub fn verify(
   bundle : Bundle,
   artifact : ArtifactDigest,
@@ -78,9 +80,12 @@ fn run(
   let leaf = read_leaf(raw_leaf)
   // Every time source must verify (design TIME-2).
   let times : Array[VerifiedTime] = []
+  // The source roots of the logs of the verified entries.
+  let entry_sources : Array[Int] = []
   for entry in bundle.entries {
-    let time = check_entry(entry, root, now)
+    let (time, source) = check_entry(entry, root, now)
     times.push({ time, source: Log(log_id=entry.log_id, log_index=entry.log_index) })
+    entry_sources.push(source)
   }
   let signature = match bundle.content {
     Dsse(envelope) => envelope.signatures[0]
@@ -94,8 +99,26 @@ fn run(
       TransparencyLog("the bundle has no transparency log entry and no timestamp"),
     )
   }
+  let issuing_sources : Array[Int] = []
   for verified in times {
-    check_certificate(leaf, root, verified.time)
+    for source in check_certificate(leaf, root, verified.time) {
+      if !issuing_sources.contains(source) {
+        issuing_sources.push(source)
+      }
+    }
+  }
+  // A root that lists transparency logs requires an entry in one of them for
+  // its leaves, as `gh attestation verify` requires a log entry for public
+  // good: a timestamp alone does not make a signature visible to log monitors.
+  let log_sources = issuing_sources.filter(source => root.lists_tlogs(source))
+  if !log_sources.is_empty() {
+    guard entry_sources.iter().any(source => log_sources.contains(source)) else {
+      raise invalid(
+        TransparencyLog(
+          "the leaf's certificate authority requires an entry in one of its transparency logs",
+        ),
+      )
+    }
   }
   for entry in bundle.entries {
     check_body(bundle, entry, leaf)
@@ -134,12 +157,13 @@ fn read_leaf(raw : Bytes) -> Leaf raise Stop {
 
 ///|
 /// Check one Rekor v1 entry: its log, its signed entry timestamp, its time and
-/// its inclusion proof. Give the verified integrated time.
+/// its inclusion proof. Give the verified integrated time and the source root
+/// of the log.
 fn check_entry(
   entry : LogEntry,
   root : TrustedRoot,
   now : Instant,
-) -> Instant raise Stop {
+) -> (Instant, Int) raise Stop {
   match (entry.kind, entry.version) {
     ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") | ("intoto", "0.0.2") => ()
     ("dsse", "0.0.2") | ("hashedrekord", "0.0.2") => raise unsupported(RekorV2)
@@ -175,7 +199,7 @@ fn check_entry(
   if entry.proof is Some(proof) {
     check_inclusion(entry, proof, key)
   }
-  time
+  (time, log.source)
 }
 
 ///|
@@ -350,9 +374,10 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
 }
 
 ///|
-/// The certificate chain at `time`, from the leaf to the root, for a trusted
-/// certificate authority whose validity holds `time`.
-fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Unit raise Stop {
+/// Check the leaf and its chain at `time` to each trusted certificate
+/// authority whose validity holds `time`, and the SCT rule. Give the source
+/// roots of the authorities that issued the leaf.
+fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Array[Int] raise Stop {
   let certificate = leaf.certificate
   guard valid_at(certificate, time) else {
     raise invalid(
@@ -378,20 +403,23 @@ fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Unit ra
     raise invalid(Certificate(LeafIsAuthority))
   }
   let mut reason = "no trusted certificate authority issued the leaf"
+  // Every authority that issued the leaf counts, so the result does not
+  // depend on their order in a combined root.
+  let issuers : Array[(@x509.Certificate, Int)] = []
   for authority in root.authorities {
     guard authority.valid.contains(time) else { continue }
     match chain_from(certificate, authority.chain, time, @x509.EKU_CODE_SIGNING) {
-      Ok(issuer) => {
-        // The SCT rule of the root that listed the authority (design ROOT-1).
-        if authority.sct_required {
-          check_sct(leaf, issuer, root)
-        }
-        return
-      }
+      Ok(issuer) => issuers.push((issuer, authority.source))
       Err(text) => reason = text
     }
   }
-  raise invalid(CertificateChain(reason))
+  guard !issuers.is_empty() else { raise invalid(CertificateChain(reason)) }
+  // The SCT rule of the roots that listed the authorities (design ROOT-1).
+  let requiring = issuers.filter(issuer => root.lists_ctlogs(issuer.1))
+  if !requiring.is_empty() {
+    check_sct(leaf, requiring, root)
+  }
+  issuers.map(issuer => issuer.1)
 }
 
 ///|
@@ -467,13 +495,6 @@ fn valid_at(certificate : @x509.Certificate, time : Instant) -> Bool {
 }
 
 ///|
-let eku_time_stamping : String = "1.3.6.1.5.5.7.3.8"
-
-///|
-/// Key usage contentCommitment (bit 1), which a timestamping leaf may have.
-let key_usage_content_commitment : Int = 2
-
-///|
 /// Verify one RFC 3161 timestamp of the bundle signature `signature` against
 /// the timestamp authorities of `root`, and give its time.
 fn check_timestamp(
@@ -547,20 +568,8 @@ fn timestamp_signer(
   guard valid_at(signer, time) else {
     return Some("the timestamp authority certificate is not valid at the timestamp time")
   }
-  guard signer.extension("2.5.29.37") is Some(eku) &&
-    eku.critical &&
-    signer.extended_key_usage == Some([eku_time_stamping]) else {
-    return Some("the signer does not have a critical extended key usage of only timeStamping")
-  }
-  if signer.key_usage is Some(bits) &&
-    (bits & (@x509.KEY_USAGE_DIGITAL_SIGNATURE | key_usage_content_commitment)) == 0 {
-    return Some("the signer key usage does not allow signatures")
-  }
-  if signer.basic_constraints is Some({ is_ca: true, .. }) {
-    return Some("the signer is a certificate authority")
-  }
-  if signer.unhandled_critical() is Some(oid) {
-    return Some("the signer has the unknown critical extension \{oid}")
+  if signer.timestamp_signer_problem() is Some(problem) {
+    return Some(problem)
   }
   if token.signing_certificate is Some(reference) {
     guard @signature.digest(reference.hash, signer.raw) == reference.cert_hash else {
@@ -572,6 +581,12 @@ fn timestamp_signer(
       return Some("the signing time is outside the signer validity")
     }
   }
+  // The chain comes before the key, so a certificate that does not chain
+  // gives an invalid verdict, not "not supported".
+  guard !issuers.is_empty() else { return Some("the authority has no issuer certificate") }
+  if chain_from(signer, issuers, time, @x509.EKU_TIME_STAMPING) is Err(text) {
+    return Some(text)
+  }
   let key = @signature.PublicKey::from_spki(signer.spki) catch {
     UnsupportedKey(kind) => raise unsupported(TimestampAlgorithm("\{kind} keys"))
     BadKey(rule) => return Some("bad signer key: \{rule}")
@@ -579,16 +594,18 @@ fn timestamp_signer(
   guard token.verify_signature(key) else {
     return Some("the timestamp signature does not verify")
   }
-  guard !issuers.is_empty() else { return Some("the authority has no issuer certificate") }
-  match chain_from(signer, issuers, time, eku_time_stamping) {
-    Ok(_) => None
-    Err(text) => Some(text)
-  }
+  None
 }
 
 ///|
 /// Require one embedded SCT from a trusted CT log that verifies.
-fn check_sct(leaf : Leaf, issuer : @x509.Certificate, root : TrustedRoot) -> Unit raise Stop {
+/// Require one embedded SCT that verifies with a CT log of the same root as
+/// one of the issuing authorities in `issuers`.
+fn check_sct(
+  leaf : Leaf,
+  issuers : Array[(@x509.Certificate, Int)],
+  root : TrustedRoot,
+) -> Unit raise Stop {
   guard leaf.certificate.extension(@x509.SCT_LIST_OID) is Some(extension) else {
     raise invalid(CertificateTimestamp("the leaf has no embedded SCT"))
   }
@@ -599,12 +616,15 @@ fn check_sct(leaf : Leaf, issuer : @x509.Certificate, root : TrustedRoot) -> Uni
     err => raise invalid(Certificate(Unreadable(err.message())))
   }
   for sct in scts {
-    guard root.ctlog(sct.log_id) is Some(log) else { continue }
-    guard log.key is Usable(key) else { continue }
-    let time = Instant::from_unix_millis(sct.timestamp)
-    guard log.valid.contains(time) else { continue }
-    if sct.verify(key, issuer.spki, tbs) {
-      return
+    for issuer in issuers {
+      let (certificate, source) = issuer
+      guard root.ctlog(sct.log_id, source~) is Some(log) else { continue }
+      guard log.key is Usable(key) else { continue }
+      let time = Instant::from_unix_millis(sct.timestamp)
+      guard log.valid.contains(time) else { continue }
+      if sct.verify(key, certificate.spki, tbs) {
+        return
+      }
     }
   }
   raise invalid(CertificateTimestamp("no SCT from a trusted CT log verifies"))

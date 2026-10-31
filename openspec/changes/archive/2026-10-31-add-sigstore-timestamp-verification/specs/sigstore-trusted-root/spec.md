@@ -18,15 +18,17 @@ check that digest.
 ### Requirement: Combine trusted roots
 
 The library SHALL combine several trusted roots into one value that trusts the logs
-and authorities of each. Each certificate authority SHALL keep the rule of its own
-root: an SCT is required only when that root lists CT logs.
+and authorities of each. Each certificate authority SHALL keep the rules of its own
+root: an SCT from one of that root's CT logs when it lists CT logs, and a log entry
+from one of its transparency logs when it lists those. The order of the roots SHALL
+NOT change a verdict.
 
 #### Scenario: GitHub attestations root
 
 - **WHEN** a caller verifies a public-good bundle and a GitHub-instance bundle with `TrustedRoot::github_attestations()`
 - **THEN** both verdicts pass, the public-good leaf needs its SCT and the GitHub leaf needs none
 
-#### Scenario: Public-good leaf without SCT
+#### Scenario: Public-good leaf without a usable SCT
 
-- **WHEN** the SCT extension is removed from a public-good leaf and the bundle is verified with the combined root
-- **THEN** the verdict fails, because the public-good root lists CT logs
+- **WHEN** the public-good part of a combined root lists only a CT log that did not sign the leaf's SCT
+- **THEN** the verdict fails with a certificate timestamp reason, in either order of the roots

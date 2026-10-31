@@ -285,3 +285,41 @@ test "scenario: GitHub attestations root keeps the public-good SCT rule" {
   let verdict = verify_morphir(morphir_policy(), root=combined)
   guard verdict is Rejected(Invalid(CertificateTimestamp(_))) else { fail(outcome(verdict)) }
 }
+
+///|
+test "scenario: a public-good leaf with only a timestamp needs a log entry" {
+  // The conformance in-toto bundle has a Rekor v1 entry and a timestamp, and its
+  // root lists a transparency log. Without the entry, the timestamp alone does
+  // not pass.
+  let name = "intoto-with-custom-trust-root"
+  let doc = conformance_document(name)
+  array_at(doc, "verificationMaterial.tlogEntries").clear()
+  assert_eq(verify_conformance_document(name, doc), "transparency log")
+}
+
+///|
+test "the SCT rule does not depend on the order of combined roots" {
+  // A root with the public-good CAs and no CT logs, and a root with the
+  // public-good CAs and only another CT log: the leaf's SCT is still required.
+  let lax = changed_root(doc => array_at(doc, "ctlogs").clear())
+  let other_log = changed_root(doc => {
+    let logs = array_at(doc, "ctlogs")
+    let first = logs[0]
+    logs.clear()
+    logs.push(first)
+  })
+  for roots in [[lax, other_log], [other_log, lax]] {
+    let verdict = verify_morphir(morphir_policy(), root=@sigstore.TrustedRoot::combine(roots))
+    guard verdict is Rejected(Invalid(CertificateTimestamp(_))) else { fail(outcome(verdict)) }
+  }
+}
+
+///|
+test "scenario: workflow claim on a release policy" {
+  let case = timestamp_case("release")
+  let policy = release_policy(case).source_ref(@sigstore.GitRef::parse("refs/heads/main"))
+  let verdict = verify_timestamp_document(case, timestamp_document(case), policy, now=after_release)
+  guard verdict is Rejected(Invalid(Policy([ClaimMismatch(claim=SourceRef, actual=None, ..)]))) else {
+    fail(outcome(verdict))
+  }
+}

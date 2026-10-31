@@ -74,6 +74,8 @@ priv struct TrustedLog {
   log_id : Bytes
   key : TrustedKey
   valid : Period
+  /// The position of the parsed root that listed the log in a combined root.
+  source : Int
 }
 
 ///|
@@ -84,14 +86,16 @@ priv struct Authority {
   /// intermediates then the root; for a timestamp authority the leaf first.
   chain : Array[@x509.Certificate]
   valid : Period
-  /// Whether a leaf of this authority needs an SCT: true when the root that
-  /// listed the authority also lists CT logs (design ROOT-1).
-  sct_required : Bool
+  /// The position of the parsed root that listed the authority in a combined
+  /// root. A leaf of the authority needs an SCT from a CT log of the same
+  /// root when that root lists CT logs, and a log entry from a transparency
+  /// log of the same root when it lists those (design ROOT-1).
+  source : Int
 }
 
 ///|
-/// The keys and certificates that verification trusts. Only
-/// `TrustedRoot::parse` and `TrustedRoot::public_good` make it.
+/// The keys and certificates that verification trusts. `TrustedRoot::parse`,
+/// the pinned roots and `TrustedRoot::combine` make it.
 pub struct TrustedRoot {
   priv tlogs : Array[TrustedLog]
   priv authorities : Array[Authority]
@@ -174,15 +178,49 @@ pub fn github_trusted_root_json() -> String {
 /// One root that trusts the logs and authorities of each of `roots`. Each
 /// certificate authority keeps the SCT rule of its own root.
 pub fn TrustedRoot::combine(roots : ArrayView[TrustedRoot]) -> TrustedRoot {
-  {
-    tlogs: roots.iter().flat_map(root => root.tlogs.iter()).collect(),
-    authorities: roots.iter().flat_map(root => root.authorities.iter()).collect(),
-    ctlogs: roots.iter().flat_map(root => root.ctlogs.iter()).collect(),
-    timestamp_authorities: roots
-      .iter()
-      .flat_map(root => root.timestamp_authorities.iter())
-      .collect(),
+  let tlogs = []
+  let authorities = []
+  let ctlogs = []
+  let timestamp_authorities = []
+  // A combined root can itself be combined: renumber its sources after the
+  // sources already taken.
+  let mut next = 0
+  for root in roots {
+    let base = next
+    let mut used = 0
+    let retag = (source : Int) => {
+      if source + 1 > used {
+        used = source + 1
+      }
+      base + source
+    }
+    for log in root.tlogs {
+      tlogs.push({ ..log, source: retag(log.source) })
+    }
+    for log in root.ctlogs {
+      ctlogs.push({ ..log, source: retag(log.source) })
+    }
+    for authority in root.authorities {
+      authorities.push({ ..authority, source: retag(authority.source) })
+    }
+    for authority in root.timestamp_authorities {
+      timestamp_authorities.push({ ..authority, source: retag(authority.source) })
+    }
+    next = base + (if used == 0 { 1 } else { used })
   }
+  { tlogs, authorities, ctlogs, timestamp_authorities }
+}
+
+///|
+/// Whether the root with position `source` lists CT logs.
+fn TrustedRoot::lists_ctlogs(self : TrustedRoot, source : Int) -> Bool {
+  self.ctlogs.iter().any(log => log.source == source)
+}
+
+///|
+/// Whether the root with position `source` lists transparency logs.
+fn TrustedRoot::lists_tlogs(self : TrustedRoot, source : Int) -> Bool {
+  self.tlogs.iter().any(log => log.source == source)
 }
 
 ///|
@@ -220,13 +258,7 @@ fn parse_root(text : StringView) -> TrustedRoot raise {
   let timestamp_authorities = root
     .array("timestampAuthorities")
     .mapi((index, json) => read_authority(json, "\{root.at("timestampAuthorities")}[\{index}]"))
-  let sct_required = !ctlogs.is_empty()
-  {
-    tlogs,
-    authorities: authorities.map(authority => { ..authority, sct_required }),
-    ctlogs,
-    timestamp_authorities,
-  }
+  { tlogs, authorities, ctlogs, timestamp_authorities }
 }
 
 ///|
@@ -286,6 +318,7 @@ fn read_log(json : Json, path : String, require_start : Bool) -> TrustedLog rais
     log_id: log.require_object("logId", ["keyId"]).require_bytes("keyId"),
     key: trusted_key,
     valid,
+    source: 0,
   }
 }
 
@@ -310,7 +343,7 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
     uri: authority.string("uri").unwrap_or(""),
     chain: certificates,
     valid: read_period(authority, "validFor"),
-    sct_required: false,
+    source: 0,
   }
 }
 
@@ -320,6 +353,6 @@ fn TrustedRoot::tlog(self : TrustedRoot, log_id : BytesView) -> TrustedLog? {
 }
 
 ///|
-fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView) -> TrustedLog? {
-  self.ctlogs.iter().find_first(log => log.log_id[:] == log_id)
+fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView, source~ : Int) -> TrustedLog? {
+  self.ctlogs.iter().find_first(log => log.log_id[:] == log_id && log.source == source)
 }

@@ -307,9 +307,30 @@ pub fn Element::text(self : Element) -> String raise DerError {
     self.tag == IA5_STRING else {
     raise Malformed("expected a string")
   }
+  if self.tag == PRINTABLE_STRING {
+    for byte in self.content {
+      guard is_printable(byte) else {
+        raise Malformed("PrintableString has a character outside its set")
+      }
+    }
+  } else if self.tag == IA5_STRING {
+    for byte in self.content {
+      guard byte < b'\x80' else { raise Malformed("IA5String has a byte above 0x7f") }
+    }
+  }
   @utf8.decode(self.content) catch {
     _ => raise Malformed("string is not UTF-8")
   }
+}
+
+///|
+/// A character of the PrintableString set (X.680, section 41.4):
+/// `A-Z a-z 0-9`, space and `' ( ) + , - . / : = ?`.
+fn is_printable(byte : Byte) -> Bool {
+  (byte >= b'A' && byte <= b'Z') ||
+  (byte >= b'a' && byte <= b'z') ||
+  (byte >= b'0' && byte <= b'9') ||
+  [b' ', b'\'', b'(', b')', b'+', b',', b'-', b'.', b'/', b':', b'=', b'?'].contains(byte)
 }
 
 ///|

@@ -32,15 +32,15 @@ Bead: lander-19l.3
 
 Bead: lander-19l.4
 
-- [ ] 4.1 Verify `intoto/0.0.2` bodies; update the pinned conformance outcomes so the `intoto-*` cases pass or fail with their real reason, and verify both scenarios of "Verify in-toto log entries"
+- [x] 4.1 Verify `intoto/0.0.2` bodies; update the pinned conformance outcomes so the `intoto-*` cases pass or fail with their real reason, and verify both scenarios of "Verify in-toto log entries"
 
 ## 5. Strictness fixes, documentation and landing
 
 Bead: lander-19l.5
 
-- [ ] 5.1 Refuse an empty SCT list and check the PrintableString and IA5String character sets; verify each rule on each side of its limit
-- [ ] 5.2 Update `pkgs/sigstore/README.mbt.md` (timestamps, the GitHub roots, the release policy, a runnable release example) and the `CHANGELOG.md` Unreleased section with the breaking changes; verify the README examples run on four targets
-- [ ] 5.3 Run `mise run format`, `mise run check`, `mise run test:native-zig` and `mise exec -- openspec validate --all --strict`; verify that each passes
+- [x] 5.1 Refuse an empty SCT list and check the PrintableString and IA5String character sets; verify each rule on each side of its limit
+- [x] 5.2 Update `pkgs/sigstore/README.mbt.md` (timestamps, the GitHub roots, the release policy, a runnable release example) and the `CHANGELOG.md` Unreleased section with the breaking changes; verify the README examples run on four targets
+- [x] 5.3 Run `mise run format`, `mise run check`, `mise run test:native-zig` and `mise exec -- openspec validate --all --strict`; verify that each passes
 
 ## Workflow follow-up
 

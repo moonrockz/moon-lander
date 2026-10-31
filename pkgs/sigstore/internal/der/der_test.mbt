@@ -312,3 +312,32 @@ test "GeneralizedTime reads canonical fractions" {
     assert_true(failed, msg=bad)
   }
 }
+
+///|
+fn string_element(tag : Int, text : Bytes) -> @der.Element raise {
+  @der.parse(Bytes::from_array([tag.to_byte(), text.length().to_byte(), ..text.to_array()]))
+}
+
+///|
+test "PrintableString and IA5String keep to their character sets" {
+  assert_eq(string_element(@der.PRINTABLE_STRING, b"Az09 '()+,-./:=?").text(), "Az09 '()+,-./:=?")
+  for bad in [b"a@b", b"a*b", b"a_b", b"a\x00b", b"\xc3\xa9"] {
+    let failed = try {
+      ignore(string_element(@der.PRINTABLE_STRING, bad).text())
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(failed)
+  }
+  assert_eq(string_element(@der.IA5_STRING, b"a@b_*\x7f").text(), "a@b_*\u{7f}")
+  let failed = try {
+    ignore(string_element(@der.IA5_STRING, b"\x80").text())
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(failed)
+  // UTF8String accepts any UTF-8.
+  assert_eq(string_element(@der.UTF8_STRING, b"\xc3\xa9").text(), "é")
+}

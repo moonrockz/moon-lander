@@ -61,6 +61,10 @@ pub fn parse_list(extension_value : BytesView) -> Array[Sct] raise SctError {
   let outer = { bytes: list.content, at: 0 }
   let entries = { bytes: outer.vector(2), at: 0 }
   guard outer.at == outer.bytes.length() else { raise BadSct("trailing bytes") }
+  guard entries.bytes.length() > 0 else {
+    // RFC 6962, section 3.3: the list has at least one SCT.
+    raise BadSct("the SCT list is empty")
+  }
   let scts = []
   while entries.at < entries.bytes.length() {
     let item = { bytes: entries.vector(2), at: 0 }

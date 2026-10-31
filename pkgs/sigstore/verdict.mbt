@@ -9,8 +9,8 @@ pub enum Feature {
   TimestampAlgorithm(String)
   /// A Rekor v2 (rekor-tiles) entry.
   RekorV2
-  /// A Rekor entry kind and version other than `dsse/0.0.1` and
-  /// `hashedrekord/0.0.1`.
+  /// A Rekor entry kind and version other than `dsse/0.0.1`,
+  /// `hashedrekord/0.0.1` and `intoto/0.0.2`.
   EntryKind(kind~ : String, version~ : String)
   /// A key type, for example `Ed25519`.
   KeyType(String)

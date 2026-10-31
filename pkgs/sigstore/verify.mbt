@@ -141,7 +141,7 @@ fn check_entry(
   now : Instant,
 ) -> Instant raise Stop {
   match (entry.kind, entry.version) {
-    ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") => ()
+    ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") | ("intoto", "0.0.2") => ()
     ("dsse", "0.0.2") | ("hashedrekord", "0.0.2") => raise unsupported(RekorV2)
     (kind, version) => raise unsupported(EntryKind(kind~, version~))
   }
@@ -292,6 +292,35 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
         raise invalid(TransparencyLogBody("the logged signature differs from the envelope"))
       }
       guard same_certificate(body_base64(json_field(logged, "verifier"), "verifier"), leaf) else {
+        raise invalid(TransparencyLogBody("the logged certificate differs from the leaf"))
+      }
+    }
+    ("intoto", Dsse(envelope)) => {
+      // Rekor stores the envelope with the signature and payload base64 twice.
+      let content = body_object(json_field(spec, "content"), "content")
+      let logged_envelope = body_object(json_field(content, "envelope"), "content.envelope")
+      let payload_hash = body_object(json_field(content, "payloadHash"), "content.payloadHash")
+      guard body_string(json_field(payload_hash, "algorithm"), "payloadHash.algorithm") ==
+        "sha256" &&
+        body_string(json_field(payload_hash, "value"), "payloadHash.value").to_lower() ==
+        @encoding.encode_hex(@signature.sha256(envelope.payload)) else {
+        raise invalid(TransparencyLogBody("the payload hash differs from the payload"))
+      }
+      guard json_field(logged_envelope, "signatures") is Some(Array(signatures)) &&
+        signatures.length() == 1 else {
+        raise invalid(TransparencyLogBody("the body does not have one signature"))
+      }
+      let logged = signatures[0]
+      let signature_text = @utf8.decode(body_base64(json_field(logged, "sig"), "sig")) catch {
+        _ => raise invalid(TransparencyLogBody("sig is not text"))
+      }
+      let logged_signature = @encoding.decode_base64(signature_text) catch {
+        _ => raise invalid(TransparencyLogBody("sig is not base64 twice"))
+      }
+      guard logged_signature == envelope.signatures[0] else {
+        raise invalid(TransparencyLogBody("the logged signature differs from the envelope"))
+      }
+      guard same_certificate(body_base64(json_field(logged, "publicKey"), "publicKey"), leaf) else {
         raise invalid(TransparencyLogBody("the logged certificate differs from the leaf"))
       }
     }
@@ -566,7 +595,6 @@ fn check_sct(leaf : Leaf, issuer : @x509.Certificate, root : TrustedRoot) -> Uni
   let scts = @sct.parse_list(extension.value) catch {
     BadSct(rule) => raise invalid(CertificateTimestamp(rule))
   }
-  guard !scts.is_empty() else { raise invalid(CertificateTimestamp("the SCT list is empty")) }
   let tbs = leaf.certificate.tbs_without(@x509.SCT_LIST_OID) catch {
     err => raise invalid(Certificate(Unreadable(err.message())))
   }

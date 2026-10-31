@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `moonrockz/sigstore` verifies RFC 3161 timestamps (TimeStampResp, CMS SignedData
+  and its signed attributes, the TSA chain at the timestamp time, the imprint over
+  the bundle signature). Bundles with no transparency log entry verify when a
+  timestamp gives their time, as for attestations of private repositories and the
+  release attestations of GitHub immutable releases.
+- `TrustedRoot::github()` pins the trusted root of GitHub's Sigstore instance (TUF
+  target SHA-256 `484cdfe1…fbb7`). `TrustedRoot::combine` and
+  `TrustedRoot::github_attestations()` join roots; an SCT is required only for
+  authorities whose root lists CT logs.
+- `Policy::github_release(repository, tag~)` with `ReleaseTag`,
+  `PredicateType::github_release_v0_2()` and `PolicyMismatch::ReleaseMismatch` match
+  the release predicate (repository, tag, purl, optional repository and owner IDs).
+- Rekor v1 `intoto/0.0.2` entries verify.
+- An empty SCT list, and PrintableString or IA5String text outside its character
+  set, are refused.
+
+### Changed (breaking)
+
+- `VerifiedBundle` replaces `log_id`, `log_index` and `integrated_time` with
+  `times : Array[VerifiedTime]`, each with a `TimeSource` (`Log` or `Authority`).
+- `Failure` gains `Timestamp`, `TimestampAuthority` and `TimestampTime`;
+  `Feature::TimestampAuthority` becomes `Feature::TimestampAlgorithm`; `Statement`
+  gains `predicate`. A caller that matches every case adds the new arms.
+- Every log entry and every timestamp of a bundle must verify.
+
 ## 0.10.0 - 2026-10-31
 
 All twelve libraries share this minor version. The Sigstore verifier module is

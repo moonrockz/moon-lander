@@ -174,7 +174,8 @@ parent-only `moonrockz/moon-lander-moonx`, and the umbrella
 `moonrockz/moon-lander`. Each imports only the modules below it
 (`mise run validate` checks this). The logging module imports only the MoonBit core
 library; `logging-hosting-async` imports core, logging and `moonbitlang/async`, never
-config, mediator or hosting; `actors` imports core and `moonbitlang/async` only.
+config, mediator or hosting; `actors` imports only core, `moonbitlang/async` and
+`moonrockz/ion`, with only the `moonrockz/ion/ion` package from Ion.
 Moonx imports no framework module or canonical async, and no other framework
 module imports Moonx. Its `/launch` command is a process adapter, not an
 application command model. The module names are provisional.

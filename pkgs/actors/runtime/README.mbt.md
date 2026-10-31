@@ -746,3 +746,102 @@ async test "a worker pool with direct send for work and a topic for observations
   assert_true(seen.contains("worker 1 did job 3"))
 }
 ```
+
+## Runtime events
+
+A scope can take an opt-in `RuntimeEvents` channel. The runtime publishes
+typed `ActorEvent` values to it: `Started` when an actor can receive, and
+`Ended` with the same `ActorEnd` that `status()` reports. Child scopes of
+actors reuse the parent channel. A separate top-level `scope` call uses only
+the channel its caller gives. Without a channel, a scope publishes nothing.
+
+`RuntimeEvents` has `subscribe`, `close` and `subscriber_count`, but no
+publish. Only the runtime publishes, so application code cannot inject a false
+event: `events.publish(...)` does not compile. Delivery uses non-waiting
+`try_send` in subscription order. A full subscriber drops that event and
+increments `EventSubscription::dropped_count()`; a closed destination is
+removed. The runtime never waits for a subscriber and never publishes an event
+about event delivery.
+
+An actor that has no initializer (`start`, `spawn`, `respond`, `create`) is
+announced with `Started` before its handle is returned. `start_with` announces
+it after its initializer ends, and a failed initializer publishes neither
+`Started` nor `Ended`.
+
+```mbt check
+///|
+async test "wait for Ended instead of polling status" {
+  let events = @actors.RuntimeEvents::new()
+  let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
+  @actors.scope(events~) <| scope => {
+    ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
+    let worker = scope.start((), (_, message : Int) => {
+      if message == 0 {
+        @actors.Stop
+      } else {
+        @actors.Continue(())
+      }
+    })
+    ignore(probe.get())
+    worker.send(1)
+    worker.send(0)
+    match probe.get() {
+      Ended(address, Completed) => {
+        assert_eq(address, worker.address())
+        assert_true(worker.status() is Ended(Completed))
+      }
+      other => fail("expected Ended(Completed), got \{other.to_string()}")
+    }
+  }
+}
+```
+
+### Undelivered messages
+
+`Undelivered(address, reason, payload~)` reports a message that the target
+actor did not get:
+
+| Reason      | When                                                                 |
+| ----------- | -------------------------------------------------------------------- |
+| `Full`      | `try_send` or `reenqueue` found the mailbox full                     |
+| `Closed`    | `send`, `try_send`, `ask` or `tell` found the actor closing or ended |
+| `Discarded` | stop, cancellation or failure removed a queued message               |
+
+For one actor, `Started` comes first and its `Discarded` events, in queue
+order, come before `Ended`. After `Ended`, only `Closed` events follow. The
+messages that `close` gives back in its `Pending` snapshot are not undelivered,
+so they publish no event.
+
+The payload is `None` unless the actor's `payload` argument selects one: see
+"Message payloads" in the policy README. `start`, `start_with`, `spawn` and
+`respond` (for the request) take `payload`; `create` does not, because service
+messages are closures. The runtime calls the encoder only for an undelivered
+event and only when the channel has a subscription. Each subscriber gets its
+own copy of the payload.
+
+```mbt check
+///|
+async test "count dead letters with a payload" {
+  let events = @actors.RuntimeEvents::new()
+  let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
+  @actors.scope(events~) <| scope => {
+    ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
+    let counter = scope.start(
+      0,
+      (count, by : Int) => @actors.Continue(count + by),
+      payload=@actors.PayloadPolicy::json(),
+    )
+    ignore(counter.close())
+    assert_eq(counter.to_ref().try_send(5), Closed)
+    assert_true(probe.get() is Started(_))
+    match probe.get() {
+      Undelivered(address, Closed, payload=Some(payload)) => {
+        assert_eq(address, counter.address())
+        assert_true(payload.equals(@ion.Ion::int(5)))
+      }
+      other => fail("expected Undelivered, got \{other.to_string()}")
+    }
+    assert_true(probe.get() is Ended(_, Completed))
+  }
+}
+```

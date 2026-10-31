@@ -26,12 +26,13 @@ pub async fn[M] ActorRef::send(
 }
 
 ///|
-/// Admit `message` without waiting: `Accepted`, `Full` or `Closed`.
+/// Admit `message` without waiting: `Accepted`, `Full` or `Closed`. A
+/// rejection publishes an undelivered event when the scope has a channel.
 pub fn[M] ActorRef::try_send(
   self : ActorRef[M],
   message : M,
 ) -> @policy.Admission {
-  self.mailbox.admit(message, None)
+  self.mailbox.offer(message)
 }
 
 ///|
@@ -97,7 +98,7 @@ pub async fn[M, R] Actor::join(self : Actor[M, R]) -> R {
         Some(value) => value
         None => abort("an actor completed without a result")
       }
-    MailboxClosed => raise Closed(self.address())
+    MailboxClosed => raise ActorError::Closed(self.address())
     Failed(error) => raise error
     Cancelled => raise ActorCancelled(self.address())
   }
@@ -152,7 +153,7 @@ pub fn[M, R] Actor::cancel(self : Actor[M, R]) -> Unit {
   guard life.outcome is None else { return }
   life.closing = true
   life.cancel_requested = true
-  ignore(self.target.mailbox.close())
+  self.target.mailbox.discard()
   (life.cancel_task)()
 }
 
@@ -222,33 +223,49 @@ fn default_cleanup_limit() -> @lander_core.TimeLimit {
 }
 
 ///|
-/// Make the mailbox and lifetime of a new actor.
+/// Make the mailbox and lifetime of a new actor. With a channel, the mailbox
+/// publishes undelivered events, with the payload that `payload` selects.
+/// Without one, it does no event work.
 fn[M] Scope::new_ref(
   self : Scope,
   mailbox : @policy.MailboxPolicy,
   name : @policy.ActorName?,
+  payload : (M) -> @ion.Ion?,
 ) -> ActorRef[M] raise ActorError {
   let mailbox = Mailbox::new(mailbox)
-  { mailbox, life: self.begin(name, () => ignore(mailbox.close())) }
+  let life = self.begin(name, () => mailbox.discard())
+  if life.events is Some(channel) {
+    mailbox.undelivered = Some((message, reason) => {
+      channel.publish_undelivered(life.address, reason, payload, message)
+    })
+  }
+  { mailbox, life }
 }
 
 ///|
 /// Start the task of an actor. `init` runs first in the task; then the actor
 /// runs the receive that `make` gives. With `children`, the actor gets a child
-/// scope that ends before the actor.
+/// scope that ends before the actor. An actor without `init` can receive at
+/// once, so it is announced before the handle is returned; that keeps its
+/// start event before all of its other events.
 fn[M, R] Scope::run_actor(
   self : Scope,
   target : ActorRef[M],
   cleanup : Cleanup,
   children~ : Bool,
-  init~ : async () -> Unit = () => (),
+  init? : async () -> Unit,
   on_start_failure~ : (Error) -> Unit = _ => (),
   make : (ActorContext[M]) -> Receive[M, R] raise,
 ) -> Actor[M, R] {
   let result = Ref(None)
   let run = async fn(children : Scope) -> BodyEnd {
-    init() catch {
-      error => return StartFailed(error)
+    if init is Some(init) {
+      init() catch {
+        error => return StartFailed(error)
+      }
+      // The actor can receive after initialization; publish before the first
+      // receive runs. A failed initializer never reaches this point.
+      publish_event(target.life.events, Started(target.life.address))
     }
     // Processing ends here, inside the child scope: admission closes and asks
     // wake before the children are cancelled and their cleanup runs.
@@ -293,12 +310,16 @@ fn[M, R] Scope::run_actor(
   life.cancel_task = (self.spawn_task)(() => {
     life.run(cleanup, on_start_failure~, () => {
       if children {
-        scope(run)
+        // Child scopes of actors reuse the parent channel.
+        scope(events?=self.events, run)
       } else {
         run(Scope::closed())
       }
     })
   })
+  if init is None {
+    publish_event(life.events, Started(life.address))
+  }
   { target, result }
 }
 
@@ -310,6 +331,8 @@ fn[M, R] Scope::run_actor(
 /// (5 seconds by default). The actor belongs to this scope. This runs
 /// `receive_loop(initial, handler)`. With `name`, the scope reserves the name
 /// first; a name that a live actor of this scope holds raises `NameInUse`.
+/// `payload` selects the payload of this actor's undelivered events; the
+/// default omits it.
 pub fn[S, M] Scope::start(
   self : Scope,
   initial : S,
@@ -318,8 +341,33 @@ pub fn[S, M] Scope::start(
   on_stop? : async () -> Unit,
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
+  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, Unit] raise ActorError {
-  let target = self.new_ref(mailbox, name)
+  self.start_encoded(
+    initial,
+    handler,
+    mailbox,
+    on_stop,
+    cleanup_limit,
+    name,
+    message => payload.apply(message),
+  )
+}
+
+///|
+/// `start` with the payload function of the mailbox messages, for actors
+/// whose messages wrap the protocol, such as `respond`.
+fn[S, M] Scope::start_encoded(
+  self : Scope,
+  initial : S,
+  handler : async (S, M) -> Next[S],
+  mailbox : @policy.MailboxPolicy,
+  on_stop : (async () -> Unit)?,
+  cleanup_limit : @lander_core.TimeLimit,
+  name : @policy.ActorName?,
+  payload : (M) -> @ion.Ion?,
+) -> Actor[M, Unit] raise ActorError {
+  let target = self.new_ref(mailbox, name, payload)
   let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
   self.run_actor(target, cleanup, children=false, _ => {
     receive_loop(initial, handler).map(_ => ())
@@ -346,6 +394,7 @@ pub fn Setup::on_stop(self : Setup, cleanup : async () -> Unit) -> Unit {
 /// runs in the actor task. Return the handle only after `init` ends. When
 /// `init` fails or is cancelled, run the registered cleanup, then raise the
 /// cause to this caller; no actor stays live and the scope does not fail.
+/// `payload` works as in `start`.
 pub async fn[S, M] Scope::start_with(
   self : Scope,
   init : async (Setup) -> S,
@@ -353,8 +402,9 @@ pub async fn[S, M] Scope::start_with(
   mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
+  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, Unit] {
-  let target = self.new_ref(mailbox, name)
+  let target = self.new_ref(mailbox, name, message => payload.apply(message))
   target.life.started = false
   let setup : Setup = { steps: [] }
   let state = Ref(None)
@@ -405,8 +455,8 @@ fn[S, M] initialized_loop(
 /// Start an actor that runs the receive that `make` gives with the actor's
 /// context. The actor ends with the result of that receive; an error of
 /// `make` fails the actor. Actors that start in the context's scope belong to
-/// this actor and end before it. `on_stop` and `cleanup_limit` work as in
-/// `start`.
+/// this actor and end before it. `on_stop`, `cleanup_limit` and `payload`
+/// work as in `start`.
 pub fn[M, R] Scope::spawn(
   self : Scope,
   make : (ActorContext[M]) -> Receive[M, R] raise,
@@ -414,8 +464,9 @@ pub fn[M, R] Scope::spawn(
   on_stop? : async () -> Unit,
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
+  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, R] raise ActorError {
-  let target = self.new_ref(mailbox, name)
+  let target = self.new_ref(mailbox, name, message => payload.apply(message))
   let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
   self.run_actor(target, cleanup, children=true, make)
 }

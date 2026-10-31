@@ -2,6 +2,10 @@ import {
   "moonrockz/moon-lander-actors/runtime" @actors,
   "moonrockz/moon-lander-core" @lander_core,
   "moonbitlang/async" @aio,
+  "moonrockz/moon-lander-logging" @logging,
+  "moonrockz/ion/ion",
+  "moonrockz/ion/json" @ion_json,
+  "moonrockz/ion/text" @ion_text,
 } for "test"
 
 // No wasm-gc: the actor runtime needs the `moonbitlang/async` event loop.

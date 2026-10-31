@@ -458,6 +458,39 @@ async test "external consumers cannot take a message outside a receive or break 
         "fn probe() -> Unit { let _ : @actors.Receive[Counter, Int] = { steps: fn(_) { abort(\"x\") } } }",
         "4036",
       ),
+      // RuntimeEvents has no public publish: only the runtime may publish.
+      (
+        "fn probe(event : @actors.ActorEvent) -> Unit { let events = @actors.RuntimeEvents::new(); events.publish(event) }",
+        "4015",
+      ),
+      // ActorEvent constructors are read-only: only the runtime may make events.
+      ("fn probe() -> Unit { let _ = @actors.Started(abort(\"x\")) }", "4036"),
+      (
+        "fn probe() -> Unit { let _ : @actors.RuntimeEvents = { entries: [], last_id: 0, open: true } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ : @actors.EventSubscription = { cancel: fn() { }, dropped: Ref(0) } }",
+        "4036",
+      ),
+      (
+        "fn probe() -> Unit { let _ = @actors.ActorEvent::Undelivered(abort(\"x\"), abort(\"x\"), payload=None) }",
+        "4036",
+      ),
+      // A payload policy needs the codec of the actor protocol.
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.start(0, (count, _ : Counter) => @actors.Continue(count), payload=@actors.PayloadPolicy::ion())) }",
+        "ToIon",
+      ),
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.spawn((_ : @actors.ActorContext[Counter]) => @actors.receive_all(_ => ()), payload=@actors.PayloadPolicy::json())) }",
+        "ToJson",
+      ),
+      // Service messages are closures, so `create` has no payload argument.
+      (
+        "fn probe(scope : @actors.Scope) -> Unit raise { ignore(scope.create(0, payload=@actors.PayloadPolicy::omit())) }",
+        "payload",
+      ),
     ] {
     @fs.write_file("\{dir}/probe.mbt", probe_prelude + source)
     let (code, out, err) = @process.collect_output(
@@ -468,5 +501,84 @@ async test "external consumers cannot take a message outside a receive or break 
     let output = out.text() + err.text()
     assert_true(code != 0, msg="Invalid API use compiled: " + source)
     assert_true(output.contains(diagnostic), msg=source + "\n" + output)
+  }
+}
+
+///|
+async test "portable payload policies reject missing codecs and raising encoders on all targets" {
+  let root = @fs.realpath("..")
+  let dir = @fs.tmpdir(prefix="lander-payload-api")
+  defer @fs.rmdir(dir, recursive=true)
+  copy_api_package("\{root}/pkgs/core", "\{dir}/core")
+  copy_api_package("\{root}/pkgs/actors", "\{dir}/actors")
+  @fs.write_file(
+    "\{dir}/moon.work",
+    "members = [\".\", \"core\", \"actors\"]\n",
+  )
+  let manifest = @fs.read_file("\{root}/pkgs/actors/moon.mod").text()
+  let version = manifest_version(manifest)
+  @fs.write_file(
+    "\{dir}/moon.mod",
+    manifest
+    .replace(
+      old="name = \"moonrockz/moon-lander-actors\"",
+      new="name = \"fixture/payload-api\"",
+    )
+    .replace(
+      old="import {",
+      new="import {\n  \"moonrockz/moon-lander-actors@\{version}\",",
+    ),
+  )
+  @fs.write_file(
+    "\{dir}/moon.pkg",
+    "import {\n  \"moonrockz/moon-lander-actors\" @policy,\n  \"moonrockz/ion/ion\",\n}\n",
+  )
+  let prelude = "pub(all) enum Protocol { Message(() -> Unit) }\n"
+  let valid = "pub fn probe() -> @ion.Ion? { let p : @policy.PayloadPolicy[Protocol] = @policy.PayloadPolicy::omit(); p.apply(Message(() => ())) }\n"
+  @fs.write_file("\{dir}/probe.mbt", prelude + valid)
+  for target in all_targets {
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["check", "--deny-warn", "--target", target, "."],
+      cwd=dir,
+    )
+    assert_eq(code, 0, msg=target + "\n" + out.text() + err.text())
+  }
+  for
+    (source, diagnostic) in [
+      (
+        "pub fn probe() -> @policy.PayloadPolicy[Protocol] { @policy.PayloadPolicy::ion() }",
+        "ToIon",
+      ),
+      (
+        "pub fn probe() -> @policy.PayloadPolicy[Protocol] { @policy.PayloadPolicy::json() }",
+        "ToJson",
+      ),
+      (
+        "priv suberror EncodeError { Failed }\npub fn probe() -> @policy.PayloadPolicy[Protocol] { @policy.PayloadPolicy::encode(fn(_ : Protocol) -> @ion.Ion raise EncodeError { raise Failed }) }",
+        "4118",
+      ),
+      (
+        "pub fn probe() -> @policy.PayloadPolicy[Protocol] { { encoder: None } }",
+        "4036",
+      ),
+    ] {
+    @fs.write_file("\{dir}/probe.mbt", prelude + source)
+    for target in all_targets {
+      let (code, out, err) = @process.collect_output(
+        "moon",
+        ["check", "--target", target, "."],
+        cwd=dir,
+      )
+      let output = out.text() + err.text()
+      assert_true(
+        code != 0,
+        msg="Invalid payload policy compiled on " + target + ": " + source,
+      )
+      assert_true(
+        output.contains(diagnostic),
+        msg=target + "\n" + source + "\n" + output,
+      )
+    }
   }
 }

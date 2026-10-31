@@ -473,7 +473,7 @@ async fn main {
         let leaks = actor_graph_leaks(graph)
         guard leaks.is_empty() else {
           fail(
-            "The actors consumer graph has \{leaks.join(", ")}; actors needs only core and async: \{graph}",
+            "The actors consumer graph has \{leaks.join(", ")}; actors needs only core, async and Ion: \{graph}",
           )
         }
       }
@@ -764,7 +764,7 @@ fn actor_graph_leaks(graph : String) -> Array[String] {
     Sigstore,
   ].map(library => library.name())
   forbidden.push_iter(
-    ["moonbit-community/toml", "moonbit-community/yaml", "moonrockz/ion"].iter(),
+    ["moonbit-community/toml", "moonbit-community/yaml"].iter(),
   )
   forbidden.filter(name => {
     graph.contains(name + "@") || graph.contains(name + " ->")
@@ -787,6 +787,12 @@ test "a standalone actor graph has no application module or parser" {
     #|   ├─ moonbitlang/async -> moonbitlang/async@0.22.5
     #|   └─ moonrockz/moon-lander-core -> moonrockz/moon-lander-core@0.7.3
   assert_eq(actor_graph_leaks(standalone), [])
+  assert_eq(
+    actor_graph_leaks(
+      standalone + "\n   └─ moonrockz/ion -> moonrockz/ion@0.6.0\n",
+    ),
+    [],
+  )
   let leaking = standalone +
     "\n   ├─ moonrockz/moon-lander-logging -> moonrockz/moon-lander-logging@0.7.3" +
     "\n   └─ moonbit-community/toml -> moonbit-community/toml@0.5.0\n"

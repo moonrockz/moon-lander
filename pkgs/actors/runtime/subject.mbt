@@ -5,6 +5,9 @@
 pub struct Subject[M] {
   priv admit : async (M, (() -> Unit)?) -> Unit
   priv offer : (M) -> @policy.Admission
+  /// Like `offer`, but a rejection publishes no runtime event. The runtime
+  /// event channel uses it, so an event delivery causes no event.
+  priv offer_quietly : (M) -> @policy.Admission
   priv life : Lifetime?
   priv closed : ActorError
 }
@@ -24,12 +27,22 @@ pub fn[M] Subject::try_send(self : Subject[M], message : M) -> @policy.Admission
 }
 
 ///|
+/// Admit `message` without waiting and without a runtime event on rejection.
+fn[M] Subject::try_send_quietly(
+  self : Subject[M],
+  message : M,
+) -> @policy.Admission {
+  (self.offer_quietly)(message)
+}
+
+///|
 /// A destination of messages of type `N` that maps each message with `f`
 /// and sends it to this destination.
 pub fn[M, N] Subject::contramap(self : Subject[M], f : (N) -> M) -> Subject[N] {
   {
     admit: (message, discard) => (self.admit)(f(message), discard),
     offer: message => (self.offer)(f(message)),
+    offer_quietly: message => (self.offer_quietly)(f(message)),
     life: self.life,
     closed: self.closed,
   }
@@ -42,7 +55,8 @@ pub fn[M] ActorRef::to_subject(self : ActorRef[M]) -> Subject[M] {
     admit: (message, discard) => {
       self.mailbox.put(self.life.address, message, discard?=discard)
     },
-    offer: message => self.mailbox.admit(message, None),
+    offer: message => self.mailbox.offer(message),
+    offer_quietly: message => self.mailbox.admit(message, None),
     life: Some(self.life),
     closed: Closed(self.life.address),
   }
@@ -52,16 +66,18 @@ pub fn[M] ActorRef::to_subject(self : ActorRef[M]) -> Subject[M] {
 /// The destination of a one-shot reply. The first message is delivered;
 /// later ones report closed.
 pub fn[M] Subject::from_reply(reply : Reply[M]) -> Subject[M] {
+  let offer : (M) -> @policy.Admission = message => {
+    match reply.send(message) {
+      Delivered => Accepted
+      Expired => Closed
+    }
+  }
   {
     admit: (message, _) => {
       guard reply.send(message) is Delivered else { raise DestinationClosed }
     },
-    offer: message => {
-      match reply.send(message) {
-        Delivered => Accepted
-        Expired => Closed
-      }
-    },
+    offer,
+    offer_quietly: offer,
     life: None,
     closed: DestinationClosed,
   }
@@ -70,20 +86,22 @@ pub fn[M] Subject::from_reply(reply : Reply[M]) -> Subject[M] {
 ///|
 /// The destination of an async queue. A closed queue reports closed.
 pub fn[M] Subject::from_queue(queue : @aio.Queue[M]) -> Subject[M] {
+  let offer : (M) -> @policy.Admission = message => {
+    let admitted = queue.try_put(message) catch { _ => return Closed }
+    if admitted {
+      Accepted
+    } else {
+      Full
+    }
+  }
   {
     admit: (message, _) => {
       queue.put(message) catch {
         _ => raise DestinationClosed
       }
     },
-    offer: message => {
-      let admitted = queue.try_put(message) catch { _ => return Closed }
-      if admitted {
-        Accepted
-      } else {
-        Full
-      }
-    },
+    offer,
+    offer_quietly: offer,
     life: None,
     closed: DestinationClosed,
   }
@@ -118,6 +136,7 @@ pub fn[M] Subject::new(
       guard send(message) is Admitted else { raise DestinationClosed }
     },
     offer: try_send,
+    offer_quietly: try_send,
     life: None,
     closed: DestinationClosed,
   }

@@ -746,3 +746,47 @@ async test "a worker pool with direct send for work and a topic for observations
   assert_true(seen.contains("worker 1 did job 3"))
 }
 ```
+
+## Runtime events
+
+A scope can take an opt-in `RuntimeEvents` channel. The runtime publishes
+typed `ActorEvent` values to it: `Started` when an actor can receive, and
+`Ended` with the same `ActorEnd` that `status()` reports. Child scopes of
+actors reuse the parent channel. A separate top-level `scope` call uses only
+the channel its caller gives. Without a channel, a scope publishes nothing.
+
+`RuntimeEvents` has `subscribe`, `close` and `subscriber_count`, but no
+publish. Only the runtime publishes, so application code cannot inject a false
+event: `events.publish(...)` does not compile. Delivery uses non-waiting
+`try_send` in subscription order. A full subscriber drops that event and
+increments `EventSubscription::dropped_count()`; a closed destination is
+removed. The runtime never waits for a subscriber and never publishes an event
+about event delivery.
+
+```mbt check
+///|
+async test "wait for Ended instead of polling status" {
+  let events = @actors.RuntimeEvents::new()
+  let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
+  @actors.scope(events~) <| scope => {
+    ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
+    let worker = scope.start((), (_, message : Int) => {
+      if message == 0 {
+        @actors.Stop
+      } else {
+        @actors.Continue(())
+      }
+    })
+    ignore(probe.get())
+    worker.send(1)
+    worker.send(0)
+    match probe.get() {
+      Ended(address, Completed) => {
+        assert_eq(address, worker.address())
+        assert_true(worker.status() is Ended(Completed))
+      }
+      other => fail("expected Ended(Completed), got \{other.to_string()}")
+    }
+  }
+}
+```

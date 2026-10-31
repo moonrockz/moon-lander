@@ -6,6 +6,7 @@ import {
   "moonbitlang/async@0.22.5/http",
   "moonbitlang/async@0.22.5/socket",
   "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
   "moonbitlang/x@0.5.6/crypto",
@@ -54,6 +55,18 @@ fn ApprovedArchiveDigest::parse(
 }
 
 ///|
+fn ApprovedArchiveDigest::parse_sidecar(
+  text : String,
+) -> ApprovedArchiveDigest raise DigestError {
+  // Match the stock client's SHA256SUM parsing. The filename is informational;
+  // the requested asset URL and the byte digest establish the identity.
+  let token = String::from_iter(
+    text.trim().iter().take_while(c => !c.is_whitespace()),
+  )
+  ApprovedArchiveDigest::parse(token.to_lower())
+}
+
+///|
 fn ApprovedArchiveDigest::check(
   self : ApprovedArchiveDigest,
   bytes : Bytes,
@@ -63,6 +76,38 @@ fn ApprovedArchiveDigest::check(
     self.text,
     msg="Bytes differ from the expected SHA-256 digest",
   )
+}
+
+///|
+suberror PublicDownloadError {
+  UnexpectedDownloadStatus(url~ : String, code~ : Int32)
+  MissingRedirectLocation(url~ : String)
+  DownloadRedirectLimit(url~ : String)
+}
+
+///|
+/// HTTP URLs enter the client boundary here. The pinned client parses each URL
+/// but does not follow redirects. Keep the default registry as the entry point;
+/// its Location header selects the CDN, without adding a downloader prerequisite.
+async fn download_public_resource(url : String) -> Bytes {
+  let mut current = url
+  // Eight redirects plus the final response. A cycle fails after nine requests.
+  for _ in 0..<9 {
+    let (response, body) = @http.get(current)
+    match response.code {
+      200 => return body.binary()
+      301 | 302 | 303 | 307 | 308 => {
+        guard response.headers.get(@http.CaseInsensitiveString("Location"))
+          is Some(location) &&
+          !location.is_empty() else {
+          raise MissingRedirectLocation(url=current)
+        }
+        current = location
+      }
+      code => raise UnexpectedDownloadStatus(url=current, code~)
+    }
+  }
+  raise DownloadRedirectLimit(url=current)
 }
 
 ///|
@@ -329,13 +374,11 @@ async fn prepare(
   match published {
     None => copy_tree("pkgs/moonx", stage + "/library")
     Some(digest) => {
-      let (response, body) = @http.get(
+      let archive = download_public_resource(
         "https://download.mooncakes.io/user/moonrockz/moon-lander-moonx/" +
         version +
         ".zip",
       )
-      assert_eq(response.code, 200)
-      let archive = body.binary()
       digest.check(archive)
       @fs.write_file(stage + "/published.zip", archive)
       assert_eq(
@@ -1455,15 +1498,13 @@ async fn published_moonx(
   guard @json.parse(output.text()) is { "kind": "help", "exit_status": 0, .. } else {
     fail(output.text())
   }
-  let asset = "https://download.mooncakes.io/assets/moonrockz/moon-lander-moonx@" +
+  let asset = "https://download.mooncakes.io/prebuild/moonrockz/moon-lander-moonx@" +
     version +
     "/launch/launch.wasm"
-  let (response, body) = @http.get(asset + ".sha256")
-  assert_eq(response.code, 200)
-  let advertised = ApprovedArchiveDigest::parse(body.text().trim().to_owned())
-  let (response, body) = @http.get(asset)
-  assert_eq(response.code, 200)
-  advertised.check(body.binary())
+  let sidecar = download_public_resource(asset + ".sha256")
+  let advertised = ApprovedArchiveDigest::parse_sidecar(@utf8.decode(sidecar))
+  let asset_bytes = download_public_resource(asset)
+  advertised.check(asset_bytes)
   assert_eq(verify_cached_asset(home, advertised), 1)
   let stops : Array[Json] = []
   let transports = [
@@ -1906,6 +1947,15 @@ test "approved archive digest requires exact lower-case SHA256" {
   ApprovedArchiveDigest::parse(
     @crypto.bytes_to_hex_string(@crypto.sha256(b"archive")),
   ).check(b"archive")
+  try
+    ApprovedArchiveDigest::parse(
+      @crypto.bytes_to_hex_string(@crypto.sha256(b"approved archive")),
+    ).check(b"different archive")
+  catch {
+    _ => ()
+  } noraise {
+    _ => fail("Accepted bytes that differ from the approval digest")
+  }
   for
     (input, rule) in [
       ("", Sha256Length),
@@ -1925,6 +1975,28 @@ test "approved archive digest requires exact lower-case SHA256" {
       }
     } noraise {
       _ => fail("Accepted malformed archive digest")
+    }
+  }
+}
+
+///|
+test "public asset checksum accepts stock SHA256SUM output" {
+  let digest = "abcdef0123456789".repeat(4)
+  for
+    text in [
+      digest,
+      digest + "\n",
+      digest + "  launch.wasm\n",
+      digest + " *launch.wasm\r\n",
+      " \t" + digest.to_upper() + "\tlaunch.wasm\n",
+    ] {
+    assert_eq(ApprovedArchiveDigest::parse_sidecar(text).text, digest)
+  }
+  for input in ["", " \n", "xyz  launch.wasm", "g".repeat(64) + "  launch.wasm"] {
+    try ApprovedArchiveDigest::parse_sidecar(input) catch {
+      InvalidArchiveDigest(..) => ()
+    } noraise {
+      _ => fail("Accepted a malformed sidecar checksum")
     }
   }
 }
@@ -1967,4 +2039,119 @@ async test "stock root rejects invalid input before filesystem work" {
   } noraise {
     _ => fail("Accepted NUL stock root")
   }
+}
+
+///|
+async test "public downloads follow registry CDN redirects without changing bytes" {
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let base = "http://" + server.addr.to_string()
+  let payload = b"archive\x00\xff"
+  @async.with_timeout(10000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, connection) => {
+          if request.path == "/bytes" {
+            connection.send_response(200, "OK")
+            connection.write(payload)
+          } else {
+            let (code, next) = match request.path {
+              "/redirect302" => (302, "/redirect301")
+              "/redirect301" => (301, "/redirect303")
+              "/redirect303" => (303, "/redirect307")
+              "/redirect307" => (307, "/redirect308")
+              "/redirect308" => (308, "/bytes")
+              _ => fail("Unknown redirect fixture path")
+            }
+            connection.send_response(
+              code,
+              "Redirect",
+              extra_headers=Map::from_array([
+                (@http.CaseInsensitiveString("lOcAtIoN"), base + next),
+              ]),
+            )
+          }
+        })
+      })
+      assert_eq(download_public_resource(base + "/bytes"), payload)
+      assert_eq(download_public_resource(base + "/redirect302"), payload)
+    })
+  })
+}
+
+///|
+async test "public downloads enforce redirect budget and failure responses" {
+  let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+  defer server.close()
+  let base = "http://" + server.addr.to_string()
+  let loops = Ref(0)
+  let boundary = Ref(0)
+  @async.with_timeout(10000, () => {
+    @async.with_task_group(group => {
+      group.spawn_bg(no_wait=true, () => {
+        server.run_forever(allow_failure=true, (request, _, connection) => {
+          match request.path {
+            "/missing" => connection.send_response(302, "Redirect")
+            "/empty" =>
+              connection.send_response(
+                302,
+                "Redirect",
+                extra_headers=Map::from_array([
+                  (@http.CaseInsensitiveString("Location"), ""),
+                ]),
+              )
+            "/loop" | "/eight" => {
+              if request.path == "/loop" {
+                loops.val += 1
+              } else {
+                boundary.val += 1
+              }
+              if request.path == "/eight" && boundary.val == 9 {
+                connection.send_response(200, "OK")
+                connection.write(b"eight redirects")
+              } else {
+                connection.send_response(
+                  302,
+                  "Redirect",
+                  extra_headers=Map::from_array([
+                    (
+                      @http.CaseInsensitiveString("Location"),
+                      base + request.path,
+                    ),
+                  ]),
+                )
+              }
+            }
+            _ => connection.send_response(404, "Not Found")
+          }
+        })
+      })
+      for path in ["/missing", "/empty"] {
+        let url = base + path
+        try download_public_resource(url) catch {
+          MissingRedirectLocation(url=actual) => assert_eq(actual, url)
+          _ => fail("Expected missing redirect Location")
+        } noraise {
+          _ => fail("Accepted a redirect without Location")
+        }
+      }
+      let url = base + "/bad"
+      try download_public_resource(url) catch {
+        UnexpectedDownloadStatus(url=actual, code=404) => assert_eq(actual, url)
+        _ => fail("Expected HTTP status rejection")
+      } noraise {
+        _ => fail("Accepted a failed download")
+      }
+      let url = base + "/loop"
+      try download_public_resource(url) catch {
+        DownloadRedirectLimit(url=actual) => assert_eq(actual, url)
+        _ => fail("Expected redirect limit")
+      } noraise {
+        _ => fail("Accepted a redirect loop")
+      }
+      assert_eq(loops.val, 9)
+      assert_eq(download_public_resource(base + "/eight"), b"eight redirects")
+      assert_eq(boundary.val, 9)
+    })
+  })
 }

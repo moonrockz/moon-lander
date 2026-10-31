@@ -8,6 +8,7 @@ members = [
   "./pkgs/logging-hosting-async",
   "./pkgs/actors",
   "./pkgs/hosting",
+  "./pkgs/moonx",
   "./pkgs/lander",
   "./pkgs/notebooks",
   "./pkgs/openrpc",

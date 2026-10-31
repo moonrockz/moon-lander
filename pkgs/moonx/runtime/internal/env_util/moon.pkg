@@ -1,0 +1,10 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonrockz/moon-lander-moonx/runtime/types",
+}
+
+options(
+  "native-stub": [ "stub.c" ],
+)
+
+supported_targets = "wasm+native"

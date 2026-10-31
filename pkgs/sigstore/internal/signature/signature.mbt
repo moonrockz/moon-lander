@@ -156,7 +156,7 @@ pub fn PublicKey::from_spki(spki : BytesView) -> PublicKey raise KeyError {
     raise BadKey("a coordinate is not less than the field prime")
   }
   ignore(
-    @ecdsa.PublicKey::new(point, curve=kind.curve()) catch {
+    @ecdsa.PublicKey::new(aligned_point(point), curve=kind.curve()) catch {
       _ => raise BadKey("the point is not on the curve")
     },
   )
@@ -244,6 +244,31 @@ pub fn der_signature_to_raw(signature : BytesView, size : Int) -> Bytes? {
 }
 
 ///|
+/// A copy of `point` that starts 7 bytes into a new buffer, so that the
+/// coordinates after the 0x04 prefix start on an 8-byte boundary.
+///
+/// mooncrypt reads the coordinates with `BigInt::from_octets(point[1:...])`,
+/// and core reads big-endian 64-bit words with one load each. On native, a new
+/// buffer starts on an 8-byte boundary (after the 8-byte object header), so
+/// without this offset every load is misaligned. That is undefined behavior in
+/// C, and the zig (UBSan) native build aborts on it. Remove this when core reads
+/// unaligned words safely.
+fn aligned_point(point : BytesView) -> BytesView {
+  let buffer = FixedArray::make(7 + point.length(), b'\x00')
+  for i in 0..<point.length() {
+    buffer[7 + i] = point[i]
+  }
+  Bytes::from_array(buffer)[7:]
+}
+
+///|
+/// A copy of `bytes` in a new buffer, which starts on an 8-byte boundary, for
+/// the same reason as `aligned_point`.
+fn owned(bytes : BytesView) -> Bytes {
+  bytes.to_owned()
+}
+
+///|
 /// Verify a fixed-width `r ∥ s` signature over a digest that the caller made.
 pub fn PublicKey::verify_digest_raw(
   self : PublicKey,
@@ -252,13 +277,13 @@ pub fn PublicKey::verify_digest_raw(
 ) -> Bool {
   let size = digest.length()
   let key = @ecdsa.PublicKey::with_hash(
-    self.point,
+    aligned_point(self.point),
     () => ({ bytes: [], size } : Prehashed),
     curve=self.kind.curve(),
   ) catch {
     _ => return false
   }
-  @spec.Verifier::verify(key, digest, signature)
+  @spec.Verifier::verify(key, owned(digest), owned(signature))
 }
 
 ///|

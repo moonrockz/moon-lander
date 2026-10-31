@@ -137,10 +137,10 @@ Ask the owner before opening or merging a release pull request; merging it is
 the publication approval. The pull request sets the shared version with
 `scripts/versions.mbtx set X.Y.Z` and adds the `## X.Y.Z` section to
 `CHANGELOG.md`, and the workflow dry-runs its checks on it. After the merge the
-workflow runs `mise run check`, packages and audits the eleven libraries with
+workflow runs `mise run check`, packages and audits the twelve libraries with
 `mise run release:package`, and publishes them with the `MOONCAKES_USER_TOKEN`
 organization secret. The publication order is core, logging, config, mediator,
-logging-hosting-async, actors, hosting, the umbrella, notebooks, OpenRPC, then Sigstore. Every
+logging-hosting-async, actors, hosting, Moonx, the umbrella, notebooks, OpenRPC, then Sigstore. Every
 sibling import uses the shared release version. Repository access to the secret
 must be verified before the first run.
 
@@ -153,7 +153,9 @@ and source commit. Keep release gate `lander-4us.9` open until the public format
 override check passes on all four targets and its source SHA and archive checksum
 are recorded in the bead.
 
-`scripts/publish.mbtx` owns the explicit eleven-library allowlist.
+`scripts/publish.mbtx` owns the explicit twelve-library allowlist. The optional
+Moonx launcher also requires stock16/17 real-host, opaque transport, private
+payload and public prebuilt-asset qualification before release promotion.
 `mise run validate:publication` checks it against `moon.work` and the manifests.
 The workspace root, `tests/`, `apps/site` and generated consumer or fixture
 modules are private. The pinned toolchain refuses to publish private modules.

@@ -32,7 +32,7 @@ exists, so Moon-Lander will supply one.
 - Tests use vendored Sigstore conformance cases and real GitHub attestation bundles
   (cli/cli releases and finos/morphir-rust `provider-snapshot/v0.2.0`), on wasm,
   wasm-gc, js and native.
-- Add `moonrockz/sigstore` to the publication allowlist as the eleventh library.
+- Add `moonrockz/sigstore` to the publication allowlist as the twelfth library, after the optional `moonrockz/moon-lander-moonx` that landed first.
 
 Out of scope:
 
@@ -59,7 +59,7 @@ Out of scope:
 
 ### Modified Capabilities
 
-- `framework-publication`: the release publishes eleven libraries, with
+- `framework-publication`: the release publishes twelve libraries, with
   `moonrockz/sigstore` after `moonrockz/openrpc`.
 
 ## Tracking

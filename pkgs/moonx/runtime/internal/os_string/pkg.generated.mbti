@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/moon-lander-moonx/runtime/internal/os_string"
+
+import {
+  "moonrockz/moon-lander-moonx/runtime/internal/c_buffer",
+}
+
+// Values
+pub fn decode(@c_buffer.Buffer, offset? : Int32, len? : Int32) -> String
+
+pub let empty : OsString
+
+pub fn encode(StringView) -> OsString
+
+// Errors
+
+// Types and methods
+type OsString
+pub fn OsString::to_string(Self) -> String
+pub impl Show for OsString
+
+// Type aliases
+
+// Traits

@@ -1,6 +1,6 @@
 name = "moonrockz/sigstore"
 
-version = "0.8.0"
+version = "0.9.0"
 
 import {
   "moonbitstack/mooncrypt@0.4.4",

@@ -36,6 +36,10 @@ jobs:
         run: mise run check:browser-adapter
       - name: Validate workspace
         run: mise run validate
+      - name: Verify frozen Moonx runtime provenance
+        run: mise run check:moonx-runtime
+      - name: Verify frozen Moonx drift rejection
+        run: mise run check:moonx-drift
 
   # One job for each target tests it and then builds it in release mode. A separate build job
   # spent more time on setup than on its build (wasm, wasm-gc and js build in 6 to 12 s).
@@ -121,7 +125,7 @@ jobs:
     name: Test task scripts
     runs-on: ubuntu-latest
     needs: [lint]
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -141,6 +145,12 @@ jobs:
         run: mise run check:openrpc
       - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
+      - name: Qualify the Moonx launcher on stock 0.10.17
+        run: mise run check:moonx
+      - name: Qualify the Moonx launcher on stock 0.10.16
+        run: mise run check:moonx-stock16
+      - name: Run retained Moonx runtime tests sequentially
+        run: mise run check:moonx-retained
       - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
         run: mise run check:logging-sinks
       - name: Run the embedded driver with help and version, and check for exit imports
@@ -159,6 +169,14 @@ jobs:
         run: mise run check:framework-registry -- --cold-cache
       - name: Test task scripts
         run: mise run test:scripts
+      - name: Retain source-bound Moonx qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonx-linux
+          path: _build/moonx/*.json
+          if-no-files-found: ignore
+          overwrite: true
 
   # Real browser execution cannot be proved by Node tests. Build one fixture for
   # all three engines in one Linux job, required on the same events as other CI.
@@ -243,11 +261,25 @@ jobs:
       - name: Test the console drivers with native and js children
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:console -- --no-consumer
+      - name: Qualify Moonx finite and isolated console behavior on stock 0.10.17
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        run: mise run check:moonx
+      - name: Qualify Moonx finite and isolated console behavior on stock 0.10.16
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        run: mise run check:moonx-stock16
       # Real console, file, drain and CTRL_BREAK_EVENT behavior of the logging sinks in native,
       # Node.js and Bun children, and the isolated consumers.
       - name: Test the logging sinks with native, Node.js and Bun children
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:logging-sinks
+      - name: Retain actual Windows Moonx qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonx-windows
+          path: _build/moonx/*.json
+          if-no-files-found: ignore
+          overwrite: true
 
   # The core observation must also agree on every target on macOS.
   # Reuse the existing macOS setup and retain its Node/Bun adapter coverage. zig-cross cannot
@@ -275,6 +307,18 @@ jobs:
         run: mise run check:console
       - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
         run: mise run check:logging-sinks
+      - name: Qualify the Moonx launcher on stock 0.10.17
+        run: mise run check:moonx
+      - name: Qualify the Moonx launcher on stock 0.10.16
+        run: mise run check:moonx-stock16
+      - name: Retain source-bound Moonx qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonx-macos
+          path: _build/moonx/*.json
+          if-no-files-found: ignore
+          overwrite: true
 
   # The docs site. It runs on each pull request with no path filter, because a path-filtered
   # required check stays pending on other pull requests. It builds the site and does not deploy it.

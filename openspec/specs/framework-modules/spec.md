@@ -9,15 +9,15 @@ module that uses them.
 
 ### Requirement: Framework module set
 
-The workspace SHALL provide eight framework modules: `moonrockz/moon-lander-<name>`
+The workspace SHALL provide nine framework modules: `moonrockz/moon-lander-<name>`
 in `pkgs/<name>` for core, logging, config, mediator, hosting,
-logging-hosting-async and actors, and `moonrockz/moon-lander` in `pkgs/lander`.
+logging-hosting-async, actors and moonx, and `moonrockz/moon-lander` in `pkgs/lander`.
 Each MUST be a member of `moon.work`.
 
 #### Scenario: Members of the workspace
 
 - **WHEN** `mise run validate` reads `moon.work`
-- **THEN** it finds the eight framework modules in their folders, each with a `moon.mod` that gives its module name
+- **THEN** it finds the nine framework modules in their folders, each with a `moon.mod` that gives its module name
 
 #### Scenario: Old package paths are gone
 
@@ -38,6 +38,11 @@ Each MUST be a member of `moon.work`.
 
 - **WHEN** `moon.work` does not list `./pkgs/actors`
 - **THEN** `mise run validate` fails and names the folder `pkgs/actors`
+
+#### Scenario: Optional Moonx module is missing from the workspace
+
+- **WHEN** `moon.work` does not list `./pkgs/moonx`
+- **THEN** `mise run validate` fails and names the folder `pkgs/moonx`
 
 ### Requirement: Main package at the module root
 
@@ -62,12 +67,12 @@ Other packages of the module SHALL be below it, for example
 
 ### Requirement: Dependency direction
 
-A framework module SHALL import only the framework modules below it: config,
-mediator and logging-hosting-async import core and logging; actors imports core;
-hosting imports core, logging, config and logging-hosting-async;
-`moonrockz/moon-lander` can import all seven. Core and logging MUST import no
-module except `moonbitlang/core`. Logging-hosting-async and actors MAY import
-`moonbitlang/async`; actors MUST NOT import another external module.
+Config, mediator and logging-hosting-async SHALL import only core and logging;
+actors only core; hosting only core, logging, config and logging-hosting-async;
+the umbrella only those seven modules. Core and logging MUST import only core
+standard packages. Actors MUST use no external module except async. Moonx MUST
+import no framework module or canonical async. Other framework modules MUST NOT
+import moonx. Logging-hosting-async MAY import async.
 
 #### Scenario: Mediator without configuration parsers
 
@@ -129,10 +134,20 @@ module except `moonbitlang/core`. Logging-hosting-async and actors MAY import
 - **WHEN** `pkgs/actors/moon.mod` imports hosting or mediator
 - **THEN** `mise run validate` fails and names both modules
 
+#### Scenario: Canonical runtime enters the Moonx module
+
+- **WHEN** the Moonx module imports canonical async or a framework module
+- **THEN** dependency validation fails and names both modules
+
+#### Scenario: Umbrella imports the optional Moonx runtime
+
+- **WHEN** the umbrella or another framework module imports the Moonx module
+- **THEN** dependency validation fails before canonical and compatibility runtimes can be combined
+
 ### Requirement: One version for the framework modules
 
-The eight framework modules SHALL have the version of the root `moon.mod`. Each import
-of one framework module by another MUST use that version.
+The nine framework modules SHALL have the version of the root `moon.mod`. Each
+import of one framework module by another MUST use that version.
 
 #### Scenario: Version drift
 
@@ -142,7 +157,7 @@ of one framework module by another MUST use that version.
 #### Scenario: Set the version
 
 - **WHEN** a maintainer runs `moonx scripts/versions.mbtx set 0.4.0`
-- **THEN** the eight framework modules and each import of one by another get `0.4.0`
+- **THEN** the nine framework modules and each import of one by another get `0.4.0`
 
 #### Scenario: Optional logging runtime version drift
 
@@ -152,6 +167,11 @@ of one framework module by another MUST use that version.
 #### Scenario: Actors version drift
 
 - **WHEN** `pkgs/actors/moon.mod` has another version than the root `moon.mod`
+- **THEN** `mise run validate:versions` fails and names the file and both versions
+
+#### Scenario: Moonx version drift
+
+- **WHEN** `pkgs/moonx/moon.mod` has another version than the root `moon.mod`
 - **THEN** `mise run validate:versions` fails and names the file and both versions
 
 ### Requirement: Shared names live in core

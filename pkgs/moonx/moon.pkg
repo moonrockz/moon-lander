@@ -1,0 +1,7 @@
+import {
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonrockz/moon-lander-moonx" @moonx,
+} for "test"

@@ -72,6 +72,7 @@ let framework : Array[(String, String, Array[String])] = [
       "moonrockz/moon-lander-logging-hosting-async",
     ],
   ),
+  ("pkgs/moonx", "moonrockz/moon-lander-moonx", []),
   (
     "pkgs/lander",
     "moonrockz/moon-lander",
@@ -89,6 +90,7 @@ let framework : Array[(String, String, Array[String])] = [
 /// core or logging, has no limit on its external imports.
 let external_limits : Array[(String, Array[String])] = [
   ("pkgs/actors", ["moonbitlang/async"]),
+  ("pkgs/moonx", ["moonbitlang/x"]),
 ]
 
 ///|
@@ -211,7 +213,7 @@ fn dependency_errors(path : String, manifest : String) -> Array[String] {
   let errors = []
   for name in imported_modules(manifest) {
     let is_framework = framework.iter().any(other => other.1 == name)
-    if allowed.is_empty() {
+    if path == "pkgs/core" || path == "pkgs/logging" {
       errors.push(
         "\{path} imports \{name}; \{own} imports no module except moonbitlang/core",
       )
@@ -568,7 +570,7 @@ test "the module name of a moon.mod" {
 test "each framework module folder is a member with its module name" {
   let active = [
     "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async",
-    "pkgs/actors", "pkgs/hosting", "pkgs/lander",
+    "pkgs/actors", "pkgs/hosting", "pkgs/moonx", "pkgs/lander",
   ]
   let names : Map[String, String] = Map([])
   for entry in framework {
@@ -616,10 +618,10 @@ test "each framework module folder is a member with its module name" {
 }
 
 ///|
-test "the framework has eight modules in the dependency direction" {
+test "the framework has nine modules in the dependency direction" {
   assert_eq(framework.map(entry => entry.0), [
     "pkgs/core", "pkgs/logging", "pkgs/config", "pkgs/mediator", "pkgs/logging-hosting-async",
-    "pkgs/actors", "pkgs/hosting", "pkgs/lander",
+    "pkgs/actors", "pkgs/hosting", "pkgs/moonx", "pkgs/lander",
   ])
 }
 
@@ -692,7 +694,7 @@ test "only the umbrella can import actors" {
 }
 
 ///|
-test "the external limit applies only to actors" {
+test "the actors and Moonx external limits leave other modules unchanged" {
   let manifest =
     #|import {
     #|  "moonrockz/moon-lander-core@0.7.3",
@@ -705,4 +707,39 @@ test "the external limit applies only to actors" {
     ] {
     assert_eq(dependency_errors(path, manifest), [], msg=path)
   }
+}
+
+///|
+test "Moonx is an isolated optional leaf and never imports canonical async" {
+  assert_eq(
+    dependency_errors("pkgs/moonx", "import {\n  \"moonbitlang/x@0.5.6\",\n}\n"),
+    [],
+  )
+  for entry in framework {
+    if entry.0 == "pkgs/moonx" {
+      continue
+    }
+    assert_eq(
+      dependency_errors(
+        "pkgs/moonx",
+        "import {\n  \"" + entry.1 + "@0.8.0\",\n}\n",
+      ).length(),
+      1,
+    )
+    assert_eq(
+      dependency_errors(
+        entry.0,
+        "import {\n  \"moonrockz/moon-lander-moonx@0.8.0\",\n}\n",
+      ).length(),
+      1,
+    )
+  }
+  assert_eq(
+    dependency_errors(
+      "pkgs/moonx", "import {\n  \"moonbitlang/async@0.22.5\",\n}\n",
+    ),
+    [
+      "pkgs/moonx imports moonbitlang/async; moonrockz/moon-lander-moonx imports no external module except moonbitlang/x",
+    ],
+  )
 }

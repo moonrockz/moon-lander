@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fix-moonx-public-downloads</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body><main>
+<h1>fix-moonx-public-downloads</h1>
+<p class="meta">OpenSpec change | 2026-10-30 | lander-pq1.5</p>
+<nav class="toc" aria-label="Contents"><ul>
+<li><a href="#context">Context</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+</ul></nav>
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">the proposal</a> for the failure. The source ZIP,
+Wasm asset and checksum sidecar use the same public registry host. Its normal
+response redirects to a CDN. The pinned async HTTP client sends one request.</p>
+<h2 id="goals">Goals and non-goals</h2>
+<p>Keep the public URL as the entry point and follow its redirects before checking
+the response bytes. Keep this repair in the unpublished checker. Do not change
+the launcher, published files, versions, signal contract or runtime.</p>
+<h2 id="decisions">Decisions</h2>
+<h3 id="http-1">HTTP-1. Call: one bounded download boundary</h3>
+<p>Use canonical async HTTP for all three downloads. Follow 301, 302, 303, 307 and
+308 Location responses, with a limit of eight redirects. Require a final 200
+response. Missing Location, other response codes and an exhausted limit fail
+with typed download errors. The registry supplies absolute CDN URLs. Do not
+pin its current CDN hostname or replace the default registry.</p>
+<p>Keeping three one-request calls fails on the real registry. A hard-coded CDN
+URL bypasses the public entry point. An external downloader adds a tool
+prerequisite. The shared async boundary avoids those alternatives.</p>
+<h3 id="hash-1">HASH-1. Call: preserve approval identity</h3>
+<p>Use the default <code>download.mooncakes.io/prebuild/</code> asset endpoint
+from the pinned stock registry client. Read the first whitespace-delimited
+checksum token from its SHA256SUM sidecar and normalize its hex case, as that
+client does. A sidecar filename is not an authority for the downloaded URL.</p>
+<p>Return exact response bytes. Check the source ZIP against the original
+workflow-approved digest before extraction. Parse the downloaded sidecar and
+check the Wasm asset and cold Moonx cache against it. Never infer an approval
+digest from the public archive.</p>
+<h3 id="rel-1">REL-1. Owner: workflow-only release recovery</h3>
+<p>The existing owner authorization covers publication of 0.9.0 through the
+Release workflow. All eleven modules are already uploaded. The follow-up must
+keep their files unchanged and prove the new approval map equals artifact
+13023517211 from run 41148930827. Use a fresh workflow run after the reviewed
+fix merges. Keep the separate public-proof gate open until it passes.</p>
+<p>macOS and Linux package ZIP entry order differs. Compare local package hashes
+with the pre-fix local baseline and verify published package files have no source
+changes. Require Linux CI's actual archive map to equal the original approval
+before merge and promotion. Local repack bytes do not replace that approval.</p>
+<h2 id="risks">Risks and trade-offs</h2>
+<table><thead><tr><th>Risk</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>A redirect cycle never completes</td><td>Test and enforce the redirect limit.</td></tr>
+<tr><td>A redirect serves different bytes</td><td>Retain the original archive and asset digest checks.</td></tr>
+<tr><td>Recovery changes an uploaded module</td><td>Compare all eleven approval hashes before promotion. Never overwrite an upload.</td></tr>
+</tbody></table>
+<h2 id="migration">Migration plan</h2>
+<p>Add a local HTTP regression, repair the three call sites, run both cold public
+stock qualifiers against the original approval, and run required checks. Archive
+this tooling change in its reviewed pull request. After merge, run Release on
+the new source and retain both approval maps, workflow and consumer receipts.
+If verification fails, keep release promotion blocked.</p>
+<p>Protocol reference: <a href="https://github.com/moonbitlang/moon/blob/3778465/crates/mooncake/src/registry/client.rs">stock 0.10.17 registry client</a>.
+The SHA256SUM and default endpoint tests in that source confirm both forms.</p>
+</main></body></html>

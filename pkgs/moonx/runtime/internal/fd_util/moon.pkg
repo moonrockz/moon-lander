@@ -1,0 +1,22 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonrockz/moon-lander-moonx/runtime/types",
+  "moonrockz/moon-lander-moonx/runtime/os_error",
+  "moonrockz/moon-lander-moonx/runtime/internal/env_util",
+  "moonrockz/moon-lander-moonx/runtime/internal/os_string",
+}
+
+options(
+  "native-stub": [ "stub.c" ],
+  targets: {
+    "deprecated.mbt": [ "native", "wasm" ],
+    "fd_util.mbt": [ "native" ],
+    "fd_util.wasm.mbt": [ "wasm" ],
+    "pipe.mbt": [ "native" ],
+    "pipe.wasm.mbt": [ "wasm" ],
+    "stat.mbt": [ "native" ],
+    "stat.wasm.mbt": [ "wasm" ],
+  },
+)
+
+supported_targets = "wasm+native"

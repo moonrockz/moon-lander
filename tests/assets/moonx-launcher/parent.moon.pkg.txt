@@ -1,0 +1,7 @@
+import {
+  "moonrockz/moon-lander-moonx" @moonx,
+  "moonrockz/moon-lander-moonx/driver",
+  "moonbitlang/core/env",
+}
+supported_targets = "wasm+native"
+pkgtype(kind: "executable")

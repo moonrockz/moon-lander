@@ -17,12 +17,14 @@ async fn main {
   println("🔍 Running all checks...")
   for
     task in [
-      "check:node-adapter", "check:browser-adapter", "check:browser-fixture", "lint",
-      "validate", "test", "check:mediator", "check:actors", "check:logging", "check:sigstore",
-      "check:logging-sinks", "check:embedded", "check:config", "check:formats", "check:formats-registry",
-      "check:openrpc-assets", "check:openrpc-artifacts", "check:openrpc-unicode",
-      "check:sigstore-assets", "check:openrpc", "qualify:openrpc", "check:openrpc-registry",
-      "check:framework-registry", "test:scripts", "build", "test:browser",
+      "check:node-adapter", "check:browser-adapter", "check:browser-fixture", "check:moonx-runtime",
+      "check:moonx-drift", "lint", "validate", "test", "check:mediator", "check:actors",
+      "check:logging", "check:sigstore", "check:logging-sinks", "check:embedded",
+      "check:moonx", "check:moonx-stock16", "check:moonx-retained", "check:config",
+      "check:formats", "check:formats-registry", "check:openrpc-assets", "check:openrpc-artifacts",
+      "check:openrpc-unicode", "check:sigstore-assets", "check:openrpc", "qualify:openrpc",
+      "check:openrpc-registry", "check:framework-registry", "test:scripts", "build",
+      "test:browser",
     ] {
     println("")
     println("=== \{task} ===")

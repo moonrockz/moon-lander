@@ -1,0 +1,41 @@
+// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.
+import {
+  "moonrockz/moon-lander-moonx/runtime/internal/event_loop",
+  "moonrockz/moon-lander-moonx/runtime/internal/coroutine",
+  "moonrockz/moon-lander-moonx/runtime/internal/fd_util",
+  "moonrockz/moon-lander-moonx/runtime/internal/os_string",
+  "moonrockz/moon-lander-moonx/runtime/internal/c_buffer",
+  "moonrockz/moon-lander-moonx/runtime/pipe",
+  "moonrockz/moon-lander-moonx/runtime/stdio",
+  "moonrockz/moon-lander-moonx/runtime" @async,
+  "moonrockz/moon-lander-moonx/runtime/io",
+  "moonrockz/moon-lander-moonx/runtime/fs",
+  "moonrockz/moon-lander-moonx/runtime/signal",
+  "moonrockz/moon-lander-moonx/runtime/os_error",
+}
+
+max_concurrent_tests = 5
+
+options(
+  "native-stub": [ "unix.c", "windows.c" ],
+  targets: {
+    "deprecated.mbt": [ "native", "wasm" ],
+    "process.mbt": [ "native", "wasm" ],
+    "unix.mbt": [ "native", "wasm" ],
+    "windows.mbt": [ "native", "wasm" ],
+    "wasm.mbt": [ "wasm" ],
+    "basic_test.mbt": [ "native", "wasm" ],
+    "cancel_test.mbt": [ "native", "wasm" ],
+    "cancellation.mbt": [ "native", "wasm" ],
+    "commands_for_test.mbt": [ "native", "wasm" ],
+    "cwd_test.mbt": [ "native", "wasm" ],
+    "env_test.mbt": [ "native", "wasm" ],
+    "helper_test.mbt": [ "native", "wasm" ],
+    "redirect.mbt": [ "native", "wasm" ],
+    "redirect_test.mbt": [ "native", "wasm" ],
+    "spawn_in_group_test.mbt": [ "native", "wasm" ],
+    "wait_test.mbt": [ "native", "wasm" ],
+  },
+)
+
+supported_targets = "wasm+native"

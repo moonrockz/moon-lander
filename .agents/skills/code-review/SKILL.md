@@ -24,6 +24,11 @@ point here. Change the checklist here, not in a wrapper.
    finding.
 5. Vendored upstream code in `pkgs/hosting/vendor/` is out of scope for the
    checklist. Review only its difference from upstream, as its `README.md` says.
+   The owner-approved frozen source in `pkgs/moonx/runtime/` is also reviewed by
+   its declared difference from upstream: inspect `scripts/moonx-runtime.mbtx`,
+   `runtime/provenance.json` and `RUNTIME.md`, and run the provenance check.
+   Review new facade, driver, test harness and local semantic patches normally;
+   do not refactor unchanged upstream types to satisfy facade type conventions.
 
 Use the compiler for mechanical questions. You can run `moon check --deny-warn
 --target all`, `moon test` with a target, and `mise exec -- openspec validate --all

@@ -89,8 +89,12 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:logging-sinks` | Run console, file, drain and signal scenarios in native, Node.js and Bun children, the ESM load, and the isolated logging consumers |
 | `mise run check:config` | Run core/profile acceptance, native/js profile files, and compare complete observations on all four targets |
 | `mise run check:formats` | Verify parser trimming, linked format overrides and leak rejection on all four targets |
-| `mise run check:framework-registry` | Audit all eleven candidate archives and build isolated registry consumers on supported targets |
-| `mise run check:framework-published` | Release-only gate for all eleven public archives and approved checksums |
+| `mise run check:framework-registry` | Audit all twelve candidate archives and build isolated registry consumers on supported targets |
+| `mise run check:framework-published` | Release-only gate for all twelve public archives and approved checksums |
+| `mise run check:moonx` | Qualify the optional launcher with the primary stock compiler and a real Node-owned host |
+| `mise run check:moonx-stock16` | Qualify the same public APIs with pinned stock 0.10.16 |
+| `mise run check:moonx-runtime` | Reconstruct and verify frozen source, patches, licenses and provenance |
+| `mise run check:moonx-retained` | Run retained upstream native and Wasm tests sequentially |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
 | `mise run check:formats-published` | Release-only gate for the public registry candidate on all four targets |
 | `mise run check:openrpc-assets` | Verify pinned OpenRPC and draft-07 sources and deliberate asset failures |
@@ -188,7 +192,7 @@ script. Also update the assessed versions above.
 
 ## Layout and current scope
 
-- `moon.mod` holds the shared version, currently `0.8.0`.
+- `moon.mod` holds the shared version, currently `0.9.0`.
 - `moon.work` lists the workspace members.
 - `pkgs/core/` contains [`moonrockz/moon-lander-core`](pkgs/core/README.mbt.md),
   imported as `@lander_core`: the shared domain types `AppName` and `TimeLimit`.
@@ -229,6 +233,15 @@ script. Also update the assessed versions above.
 - `pkgs/lander/` contains the `moonrockz/moon-lander` library, imported
   as `@lander`: the `cli` entry, the re-exports, and `version()`, which provides a
   build and test smoke check.
+- `pkgs/moonx/` contains the optional
+  [`moonrockz/moon-lander-moonx`](pkgs/moonx/README.mbt.md): immutable portable
+  process/payload plans and a Wasm/native driver with an isolated frozen runtime.
+  It owns original POSIX signal forwarding and private Node payload cleanup.
+  Stock Windows Moonrun delivers Ctrl-C as Ctrl-Break with genuine Node-host
+  Quit/131; the guide documents this limitation and full parent status. The
+  [public `/launch` command](pkgs/moonx/launch/README.md) is a thin driver caller;
+  application result schemas stay application-owned. No other framework module
+  imports it, and its executable must not mix with canonical async.
 - `pkgs/notebooks/` contains [`moonrockz/notebooks`](pkgs/notebooks/README.md),
   migrated from Moonbase with its existing module name and package paths. It
   provides immutable Jupyter and DIB models, codecs, metadata, typed cursors
@@ -269,6 +282,13 @@ publishes releases.
 
 ## Releases
 
+The `0.9.0` release adds the optional Moonx parent launcher with typed process
+plans, private Node payloads and completion after cleanup. POSIX preserves
+original SIGINT/SIGTERM. Stock Windows Moonrun delivers Ctrl-C as Ctrl-Break,
+with genuine Node-host Quit/131 and the original parent cause and status.
+See the [launcher guide](pkgs/moonx/GUIDE.md). Run its public command with
+`moonx moonrockz/moon-lander-moonx/launch@0.9.0 --json --help`.
+
 The `0.8.0` release adds the optional typed actors module, notebook virtual file
 trees and DIB/Jupyter source conversion. It also adds the branded Telescope docs
 site and landing page. Actors are the tenth published library; their runtime
@@ -302,9 +322,10 @@ queries, runtime cell capability inspection, and Ion-backed metadata. See
 
 Release versions are shared across workspace members. The framework modules
 listed above, `moonrockz/notebooks`, `moonrockz/openrpc` and `moonrockz/sigstore`
-are in the publication allowlist and publish to mooncakes.io.
-`moonrockz/sigstore` joins the next release as the eleventh library. Install a module at an exact version,
-for example `moon add moonrockz/moon-lander@0.8.0`. The workspace root, docs site, `tests`
+are in the publication allowlist and publish to mooncakes.io. The optional
+`moonrockz/moon-lander-moonx` is the eleventh library, and `moonrockz/sigstore`
+joins the next release as the twelfth. Install a module at an exact version,
+for example `moon add moonrockz/moon-lander@0.9.0`. The workspace root, docs site, `tests`
 and generated consumers are private and excluded by the publication allowlist.
 GitHub releases identify the source commit with a `vX.Y.Z` tag.
 
@@ -313,7 +334,7 @@ pull request that sets the version with `scripts/versions.mbtx set X.Y.Z` and
 adds the `## X.Y.Z` section to `CHANGELOG.md`. The Release workflow dry-runs
 its checks on that pull request. Merging it to `main` is the owner's approval:
 the workflow then runs the full check, publishes the public modules with the
-`MOONCAKES_USER_TOKEN` organization secret, verifies all eleven published archives against approved checksums, runs isolated
+`MOONCAKES_USER_TOKEN` organization secret, verifies all twelve published archives against approved checksums, runs isolated
 registry consumers and the format override checks on supported targets, and creates the GitHub
 release. See [the contributing guide](CONTRIBUTING.md).
 

@@ -1,0 +1,977 @@
+----
+import {
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.6/crypto",
+}
+----
+
+///|
+/// Reproduce the frozen launcher runtime from checked-in, digest-pinned upstream
+/// archives. Never read a live dependency cache or modify the canonical async.
+let runtime_namespace = "moonrockz/moon-lander-moonx/runtime"
+
+///|
+let archive_path = "tests/assets/moonx-runtime/async-0.22.5.zip"
+
+///|
+let archive_digest = "142776b3fac385b8ee97e62fb3213b02a80595ae1a4a80ede6419f452eab01c2"
+
+///|
+let fixture_path = "tests/assets/moonx-runtime/async-11749dec-source.tar.gz"
+
+///|
+let fixture_digest = "50dbf06cf3ae54b2b7cd320fdc3f88ff7f0f9c04cdff347a08861455f21b4c17"
+
+///|
+let destination = "pkgs/moonx/runtime"
+
+///|
+struct SourceFile {
+  path : String
+  upstream_sha256 : String
+  generated_sha256 : String
+  modification : String
+} derive(ToJson)
+
+///|
+fn digest(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn checked_archive(path : String, expected : String) -> Unit {
+  guard digest(@fs.read_file(path).binary()) == expected else {
+    fail("Frozen upstream archive digest mismatch: " + path)
+  }
+}
+
+///|
+fn production_manifest(text : String) -> String {
+  let result : Array[String] = []
+  let block : Array[String] = []
+  let mut in_import = false
+  for line in text.split("\n") {
+    if line.trim() == "import {" {
+      in_import = true
+    }
+    if in_import {
+      block.push(line.to_owned())
+      if line.trim().has_prefix("}") {
+        in_import = false
+        if !line.contains(" for ") {
+          result.append(block)
+        }
+        block.clear()
+      }
+    } else {
+      result.push(line.to_owned())
+    }
+  }
+  result.join("\n")
+}
+
+///|
+fn imports(text : String) -> Array[String] {
+  let found : Array[String] = []
+  for line in text.split("\n") {
+    let line = line.trim()
+    if line.has_prefix("\"moonbitlang/async") {
+      let path = line[1:].split("\"").next().unwrap()
+      found.push(
+        path
+        .strip_prefix("moonbitlang/async")
+        .unwrap()
+        .trim_start(chars="/")
+        .to_owned(),
+      )
+    }
+  }
+  found
+}
+
+///|
+/// Exact frozen-source anchors deliberately fail closed after any input change.
+fn patch_once(
+  text : String,
+  old : String,
+  replacement : String,
+) -> String raise {
+  assert_eq(text.split(old).to_array().length(), 2)
+  text.replace_all(old~, new=replacement)
+}
+
+///|
+fn transform(
+  pkg : String,
+  file : String,
+  source : String,
+) -> (String, String) raise {
+  if file == "moon.pkg" {
+    let manifest = production_manifest(source)
+      .replace_all(
+        old="\"moonbitlang/async\"",
+        new="\"" + runtime_namespace + "\" @async",
+      )
+      .replace_all(
+        old="\"moonbitlang/async/",
+        new="\"" + runtime_namespace + "/",
+      )
+    return (
+      "// Modified by Moon-Lander: isolated namespace; production imports only; Wasm/native runtime.\n" +
+      manifest +
+      "\n\nsupported_targets = \"wasm+native\"\n",
+      "namespace imports; remove test imports; declare runtime targets",
+    )
+  }
+  if pkg == "" && file.has_prefix("integration") && file.has_suffix(".mbt") {
+    return (
+      "// Modified by Moon-Lander: explicit synchronous public runtime entry.\n" +
+      source
+      .replace_all(old="run_async_main", new="run")
+      .replace_all(
+        old="/// This function is used for integration of `moonbitlang/async`\n/// into the MoonBit toolchain, do not call directly.",
+        new="/// Run an isolated launcher runtime from a synchronous entry point.",
+      )
+      .replace_all(
+        old="#doc(hidden)",
+        new="// Explicit entry for a synchronous launcher main.",
+      ),
+      "expose explicit synchronous run entry",
+    )
+  }
+  if pkg == "internal/event_loop" && file == "event_loop.mbt" {
+    let text = patch_once(
+      source, "  mut killed_by_signal : Int32?", "  mut killed_by_signal : Int32?\n  mut first_received_signal : Int32?",
+    )
+    let text = patch_once(
+      text, "    killed_by_signal: None,", "    killed_by_signal: None,\n    first_received_signal: None,",
+    )
+    let text = patch_once(
+      text, "    // signal\n    if self.main", "    // Retain the first OS identity before cancellation reaches a child handler.\n    if self.first_received_signal is None {\n      self.first_received_signal = Some(job_id ^ (1 << 31))\n    }\n    // signal\n    if self.main",
+    )
+    return (
+      "// Modified by Moon-Lander: first-signal observer; upstream cancellation/exit policy retained.\n" +
+      text +
+      "\n///|\npub fn first_received_signal() -> Int32? {\n  match curr_loop.val {\n    Some(evloop) => evloop.first_received_signal\n    None => None\n  }\n}\n\n///|\npub fn exit_cancellation_signal() -> Int32? {\n  match curr_loop.val {\n    Some(evloop) => evloop.killed_by_signal\n    None => None\n  }\n}\n",
+      "latch first received signal before cancellation; expose first and existing exit-policy observer boundaries",
+    )
+  }
+  if pkg == "process" && file == "cancellation.mbt" {
+    let text = patch_once(
+      source, "  signal~ : @signal.Signal = default_signal,\n) -> CancellationHandler",
+      "  signal~ : @signal.Signal = default_signal,\n  on_force~ : () -> Unit = () => (),\n) -> CancellationHandler",
+    )
+    let text = patch_once(
+      text, "    kill_process(pid)", "    on_force()\n    kill_process(pid)",
+    )
+    return (
+      "// Modified by Moon-Lander: notify the owner immediately before forced termination.\n" +
+      text,
+      "optional synchronous notification immediately before hard kill; default behavior unchanged",
+    )
+  }
+  (source, "unchanged")
+}
+
+///|
+let observer =
+  #|// Added by Moon-Lander; generated by scripts/moonx-runtime.mbtx.
+  #|///|
+  #|/// The first OS cancellation signal observed by this isolated runtime.
+  #|/// This value is available before a process cancellation handler runs.
+  #|#cfg(any(target="wasm", target="native"))
+  #|pub fn received_cancellation_signal() -> Signal? {
+  #|  signal_for_code(@event_loop.first_received_signal())
+  #|}
+  #|
+  #|///|
+  #|/// The signal currently selected by the unchanged upstream runtime exit policy.
+  #|/// A later signal can change this while the first forwarding identity stays fixed.
+  #|pub fn exit_cancellation_signal() -> Signal? {
+  #|  signal_for_code(@event_loop.exit_cancellation_signal())
+  #|}
+  #|
+  #|///|
+  #|fn signal_for_code(code : Int?) -> Signal? {
+  #|  guard code is Some(code) else { return None }
+  #|  for signal in [SIGINT, SIGTERM, SIGHUP, SIGBREAK] {
+  #|    if signal.to_int() == code { return Some(signal) }
+  #|  }
+  #|  None
+  #|}
+
+///|
+async fn files_below(root : String, relative~ : String = "") -> Array[String] {
+  let result : Array[String] = []
+  for file in @fs.readdir(root + "/" + relative) {
+    let path = if relative.is_empty() { file } else { relative + "/" + file }
+    if @fs.kind(root + "/" + path) == Directory {
+      result.append(files_below(root, relative=path))
+    } else if !file.has_suffix(".mbti") {
+      result.push(path)
+    }
+  }
+  result.sort()
+  result
+}
+
+///|
+async fn same_tree(expected : String, actual : String) -> Bool {
+  if !@fs.exists(actual) {
+    return false
+  }
+  let files = files_below(expected)
+  if files_below(actual) != files {
+    return false
+  }
+  for file in files {
+    if digest(@fs.read_file(expected + "/" + file).binary()) !=
+      digest(@fs.read_file(actual + "/" + file).binary()) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+async fn drift_test(stage : String) -> Unit {
+  let expected = stage + "/runtime"
+  let altered = stage + "/altered"
+  @fs.mkdir(altered)
+  for file in files_below(expected) {
+    let parts = file.split("/").to_array()
+    if parts.length() > 1 {
+      @fs.mkdir(
+        altered + "/" + parts[:parts.length() - 1].join("/"),
+        recursive=true,
+        allow_exist=true,
+      )
+    }
+    @fs.write_file(altered + "/" + file, @fs.read_file(expected + "/" + file))
+  }
+  assert_true(same_tree(expected, altered))
+  let file = "/internal/event_loop/event_loop.mbt"
+  @fs.write_file(
+    altered + file,
+    @fs.read_file(expected + file).text() + "\n// undeclared patch\n",
+  )
+  assert_false(same_tree(expected, altered))
+  @fs.write_file(altered + file, @fs.read_file(expected + file))
+  @fs.write_file(altered + "/undeclared.mbt", "// undeclared source\n")
+  assert_false(same_tree(expected, altered))
+  @fs.remove(altered + "/undeclared.mbt")
+  @fs.remove(altered + "/signal/received.mbt")
+  assert_false(same_tree(expected, altered))
+  println("Drift checks rejected modified, added and missing source files.")
+}
+
+///|
+async fn reproduce(stage : String) -> Unit {
+  checked_archive(archive_path, archive_digest)
+  checked_archive(fixture_path, fixture_digest)
+  let source = stage + "/upstream"
+  let generated = stage + "/runtime"
+  @fs.mkdir(source, recursive=true)
+  @fs.mkdir(generated, recursive=true)
+  // Windows tar supports zip; Unix uses unzip to preserve the registry layout.
+  let (command, args) = if @env.get_env_var("OS") == Some("Windows_NT") {
+    ("tar", ["-xf", archive_path, "-C", source])
+  } else {
+    ("unzip", ["-q", archive_path, "-d", source])
+  }
+  assert_eq(@process.run(command, args), 0)
+  let fixtures = stage + "/fixtures"
+  @fs.mkdir(fixtures)
+  assert_eq(@process.run("tar", ["-xzf", fixture_path, "-C", fixtures]), 0)
+  let tagged_source = fixtures +
+    "/async-11749dec32e2b4de8cc8a6101e18110019c29893/src"
+  let queue = ["", "process", "signal", "stdio"]
+  let visited : Map[String, Bool] = Map([])
+  let records : Array[(String, String, String)] = []
+  let mut cursor = 0
+  while cursor < queue.length() {
+    let pkg = queue[cursor]
+    cursor += 1
+    if visited.contains(pkg) {
+      continue
+    }
+    visited.set(pkg, true)
+    let dir = source + "/src/" + pkg
+    queue.append(
+      imports(production_manifest(@fs.read_file(dir + "/moon.pkg").text())),
+    )
+    @fs.mkdir(generated + "/" + pkg, recursive=true, allow_exist=true)
+    let names = @fs.readdir(dir)
+    names.sort()
+    for file in names {
+      if file.has_suffix("_test.mbt") ||
+        file.has_suffix("_wbtest.mbt") ||
+        file.has_suffix(".mbti") ||
+        file.has_prefix("README") ||
+        @fs.kind(dir + "/" + file) != Regular {
+        continue
+      }
+      let path = if pkg.is_empty() { file } else { pkg + "/" + file }
+      let original = @fs.read_file(dir + "/" + file)
+      assert_eq(
+        digest(original.binary()),
+        digest(@fs.read_file(tagged_source + "/" + path).binary()),
+        msg="Fixture tag does not match the production registry source: " + path,
+      )
+      let (text, modification) = transform(pkg, file, original.text())
+      @fs.write_file(generated + "/" + path, text)
+      records.push((path, digest(original.binary()), modification))
+    }
+  }
+  @fs.write_file(generated + "/signal/received.mbt", observer + "\n")
+  // Format in an isolated module so the expected tree matches the repository
+  // formatter, without reading or rewriting the destination under comparison.
+  @fs.write_file(
+    stage + "/moon.mod",
+    "name = \"moonrockz/moon-lander-moonx\"\nversion = \"0.0.0\"\nsource = \"runtime\"\n",
+  )
+  @fs.write_file(stage + "/moon.work", "members = [\".\"]\n")
+  assert_eq(@process.run("moon", ["fmt"], cwd=stage), 0)
+  let entries : Array[SourceFile] = []
+  records.sort_by((a, b) => a.0.compare(b.0))
+  for (path, original, modification) in records {
+    entries.push({
+      path,
+      upstream_sha256: original,
+      generated_sha256: digest(@fs.read_file(generated + "/" + path).binary()),
+      modification,
+    })
+  }
+  let provenance : Json = {
+    "schema_version": 1,
+    "upstream_module": "moonbitlang/async@0.22.5",
+    "upstream_archive": "https://download.mooncakes.io/user/moonbitlang/async/0.22.5.zip",
+    "upstream_archive_sha256": archive_digest,
+    "fixture_commit": "11749dec32e2b4de8cc8a6101e18110019c29893",
+    "fixture_archive": "https://codeload.github.com/moonbitlang/async/tar.gz/11749dec32e2b4de8cc8a6101e18110019c29893",
+    "fixture_archive_sha256": fixture_digest,
+    "fixture_production_source_match": true,
+    "upstream_observer_issue": "https://github.com/moonbitlang/async/issues/706",
+    "files": Json(entries),
+    "added_observer_sha256": digest(
+      @fs.read_file(generated + "/signal/received.mbt").binary(),
+    ),
+  }
+  @fs.write_file(
+    generated + "/provenance.json",
+    provenance.stringify(indent=2) + "\n",
+  )
+  @fs.write_file(generated + "/LICENSE", @fs.read_file(source + "/LICENSE"))
+}
+
+///|
+/// Adapt the compiler's canonical-async test entry to this independently named
+/// runtime. Test bodies and assertions remain upstream source.
+fn explicit_test_entry(source : String, main~ : Bool = false) -> String raise {
+  let result : Array[String] = []
+  let mut wrapping = false
+  for line in source.split("\n") {
+    if line.has_prefix("async test ") || (main && line == "async fn main {") {
+      assert_false(wrapping)
+      assert_true(line.has_suffix("{"))
+      let header = line.strip_prefix("async ").unwrap().to_owned()
+      result.push(header)
+      result.push(
+        if main {
+          "  @async.run(() => {"
+        } else {
+          "  @runtime_testing.run(() => {"
+        },
+      )
+      wrapping = true
+    } else if wrapping && line == "}" {
+      result.push("  })")
+      result.push("}")
+      wrapping = false
+    } else {
+      result.push(
+        if wrapping {
+          "  " + line.to_owned()
+        } else {
+          line.to_owned()
+        },
+      )
+    }
+  }
+  assert_false(wrapping)
+  result.join("\n")
+}
+
+///|
+fn rename_imports(source : String) -> String {
+  source
+  .replace_all(
+    old="\"moonbitlang/async\"",
+    new="\"" + runtime_namespace + "\" @async",
+  )
+  .replace_all(old="\"moonbitlang/async/", new="\"" + runtime_namespace + "/")
+}
+
+///|
+fn testing_import(source : String, group : String) -> String {
+  let closing = "} for \"" + group + "\""
+  let entry = "  \"" + runtime_namespace + "/testing\" @runtime_testing,\n"
+  if source.contains(closing) {
+    source.replace_all(old=closing, new=entry + closing)
+  } else {
+    source + "\nimport {\n" + entry + closing + "\n"
+  }
+}
+
+///|
+/// Replace only the frozen fixture builder, whose upstream artifact path is no
+/// longer produced by these stock compilers. The artifact comes from moon's
+/// public --build-only output, not a guessed build path.
+fn fixture_builder(
+  source : String,
+  name : String,
+  kind : String,
+) -> String raise {
+  let lines = source.split("\n").to_array()
+  let result : Array[String] = []
+  let mut replacing = false
+  let mut replaced = false
+  for line in lines {
+    if (kind == "function" && line.has_prefix("fn make_test_prog(")) ||
+      (kind == "cat" && line.has_prefix("let cat :")) ||
+      (kind == "lock" && line.has_prefix("let lock_file_prog :")) {
+      assert_false(replaced)
+      replacing = true
+      replaced = true
+      if kind == "function" {
+        result.push("fn make_test_prog(name : String) -> @async.Lazy[String] {")
+        result.push("  Lazy(() => @runtime_testing.test_program(name))")
+        result.push("}")
+      } else {
+        let variable = if kind == "cat" { "cat" } else { "lock_file_prog" }
+        result.push(
+          "let " +
+          variable +
+          " : @async.Lazy[String] = Lazy(() => @runtime_testing.test_program(\"" +
+          name +
+          "\"))",
+        )
+      }
+    } else if replacing {
+      if (kind == "function" && line == "}") ||
+        (kind != "function" && line == "})") {
+        replacing = false
+      }
+    } else {
+      result.push(line.to_owned())
+    }
+  }
+  assert_true(replaced && !replacing)
+  result.join("\n")
+}
+
+///|
+async fn retained_tests(stage : String, target : String) -> Unit {
+  let module_dir = stage + "/retained"
+  let source = stage + "/upstream/src"
+  let runtime = module_dir + "/src/runtime"
+  @fs.mkdir(runtime, recursive=true)
+  // Retain test-only dependencies in this unpublished workspace, including
+  // upstream C fixtures. They never enter the production runtime closure.
+  for file in files_below(source) {
+    let parent = file.split("/").to_array()
+    if parent.length() > 1 {
+      @fs.mkdir(
+        runtime + "/" + parent[:parent.length() - 1].join("/"),
+        recursive=true,
+        allow_exist=true,
+      )
+    }
+    let original = @fs.read_file(source + "/" + file)
+    let mut text = original.text()
+    if file == "signal/signal_test.mbt" {
+      text = adapt_signal_tests(text)
+    }
+    if file == "process/wait_test.mbt" {
+      text = adapt_basic_wait(text)
+    }
+    if file == "fs/lock_test.mbt" {
+      text = adapt_lock_tests(text)
+    }
+    if file == "process/cancel_test.mbt" {
+      text = adapt_process_cancel_tests(text)
+    }
+    if file == "all_any_test.mbt" {
+      // Source locations change when wrapping the compiler entry. Preserve the
+      // exact semantic error assertion without an upstream line-number snapshot.
+      text = patch_once(
+        text, "  debug_inspect(\n    @test_util.expect_error_async(() => (@async.any([]) : Unit)),\n    content=(\n      #|Failure(\"src/all_any_test.mbt:288:42-288:56@moonbitlang/async FAILED: no tasks provided to any()\")\n    ),\n  )",
+        "  match @test_util.expect_error_async(() => (@async.any([]) : Unit)) {\n    Failure(message) => assert_true(message.has_suffix(\"no tasks provided to any()\"))\n    _ => fail(\"Expected the upstream Failure case\")\n  }",
+      )
+    }
+    if file.has_suffix(".mbt") || file.has_suffix(".mbt.md") {
+      text = explicit_test_entry(text)
+    }
+    if file.has_suffix("_test.mbt") ||
+      file.has_suffix("_wbtest.mbt") ||
+      file.has_suffix(".mbt.md") {
+      text = text.replace_all(old="src/fs", new="src/runtime/fs")
+    }
+    if file == "process/commands_for_test.mbt" ||
+      file == "signal/signal_test.mbt" {
+      text = fixture_builder(text, "", "function")
+    } else if file == "stdio/stdio_test.mbt" {
+      text = fixture_builder(text, "cat", "cat")
+    } else if file == "fs/lock_test.mbt" {
+      text = fixture_builder(text, "lock_file", "lock")
+    }
+    if file.has_suffix("moon.pkg") {
+      text = rename_imports(text)
+      let directory = source +
+        "/" +
+        file.strip_suffix("moon.pkg").unwrap().to_owned()
+      let mut blackbox = false
+      let mut whitebox = false
+      for name in @fs.readdir(directory) {
+        if name.has_suffix("_test.mbt") ||
+          name.has_suffix(".mbt.md") ||
+          name.has_suffix("_wbtest.mbt") {
+          if @fs.read_file(directory + "/" + name)
+            .text()
+            .contains("async test ") {
+            if name.has_suffix("_wbtest.mbt") {
+              whitebox = true
+            } else {
+              blackbox = true
+            }
+          }
+        }
+      }
+      if blackbox {
+        text = testing_import(text, "test")
+      }
+      if whitebox {
+        text = testing_import(text, "wbtest")
+      }
+      if file == "moon.pkg" {
+        text = text.replace_all(
+          old="} for \"test\"",
+          new="  \"" + runtime_namespace + "\" @async,\n} for \"test\"",
+        )
+      }
+    }
+    @fs.write_file(runtime + "/" + file, text)
+  }
+  // Compile the actual committed production implementation, retaining the
+  // original test manifests' test-only imports and target declarations.
+  for file in files_below(destination) {
+    if file.has_suffix(".mbt") || file.has_suffix(".c") {
+      @fs.write_file(
+        runtime + "/" + file,
+        @fs.read_file(destination + "/" + file),
+      )
+    }
+  }
+  let fixtures = stage + "/fixtures"
+  let fixture_source = fixtures +
+    "/async-11749dec32e2b4de8cc8a6101e18110019c29893"
+  for folder in ["test_programs", "test_directory"] {
+    for file in files_below(fixture_source + "/" + folder) {
+      let path = folder + "/" + file
+      let parts = path.split("/").to_array()
+      @fs.mkdir(
+        module_dir + "/" + parts[:parts.length() - 1].join("/"),
+        recursive=true,
+        allow_exist=true,
+      )
+      let original = @fs.read_file(fixture_source + "/" + path)
+      if file.has_suffix(".mbt") {
+        let text = if path == "test_programs/sleep/main.mbt" {
+          adapt_sleep_fixture(original.text())
+        } else if path == "test_programs/spawn/main.mbt" {
+          adapt_spawn_fixture(original.text())
+        } else {
+          original.text()
+        }
+        @fs.write_file(
+          module_dir + "/" + path,
+          explicit_test_entry(text, main=true),
+        )
+      } else if file.has_suffix("moon.pkg") {
+        let renamed = rename_imports(original.text())
+        let renamed = if path == "test_programs/spawn/moon.pkg" {
+          patch_once(
+            renamed,
+            "import {",
+            "import {\n  \"" + runtime_namespace + "/stdio\",",
+          )
+        } else {
+          renamed
+        }
+        @fs.write_file(
+          module_dir + "/" + path,
+          if renamed.contains("\"" + runtime_namespace + "\"") {
+            renamed
+          } else {
+            renamed.replace_all(
+              old="import {",
+              new="import {\n  \"" + runtime_namespace + "\" @async,",
+            )
+          },
+        )
+      } else {
+        @fs.write_file(module_dir + "/" + path, original)
+      }
+    }
+  }
+  @fs.write_file(
+    module_dir + "/moon.mod",
+    "name = \"moonrockz/moon-lander-moonx\"\nversion = \"0.0.0\"\nsource = \"src\"\n",
+  )
+  @fs.write_file(
+    module_dir + "/LICENSE",
+    @fs.read_file(stage + "/upstream/LICENSE"),
+  )
+  @fs.write_file(
+    module_dir + "/moon.work",
+    "members = [\".\", \"./test_programs\"]\n",
+  )
+  @fs.write_file(
+    module_dir + "/test_programs/moon.mod",
+    "name = \"moonbitlang/async_test_programs\"\nversion = \"0.0.1\"\nsource = \".\"\nimport { \"moonrockz/moon-lander-moonx@0.0.0\" }\npreferred_target = \"native\"\n",
+  )
+  @fs.mkdir(runtime + "/testing")
+  @fs.write_file(
+    runtime + "/testing/moon.pkg",
+    "import { \"" +
+    runtime_namespace +
+    "/internal/event_loop\", \"" +
+    runtime_namespace +
+    "/process\", \"" +
+    runtime_namespace +
+    "\" @async, \"moonbitlang/core/json\" }\n",
+  )
+  let testing_source =
+    #|///|
+    #|pub fn run(f : async () -> Unit) -> Unit raise {
+    #|  @event_loop.with_event_loop(f)
+    #|}
+    #|///|
+    #|pub async fn wait_ready(ready : @async.Semaphore) -> Unit {
+    #|  @async.with_timeout(10000, () => ready.acquire())
+    #|}
+    #|///|
+    #|pub async fn test_program(name : String) -> String {
+    #|  let (code, out, err) = @process.collect_output("moon", [
+    #|    "run", "--build-only", "--target", "native", "test_programs/" + name,
+    #|  ])
+    #|  assert_eq(code, 0, msg=err.text())
+    #|  guard @json.parse(out.text()) is { "artifacts_path": [String(path)], .. } else {
+    #|    fail("Missing fixture build artifact: " + out.text())
+    #|  }
+    #|  path
+    #|}
+  @fs.write_file(runtime + "/testing/testing.mbt", testing_source)
+  let packages = files_below(destination)
+    .filter(file => file.has_suffix("moon.pkg"))
+    .map(file => {
+      "src/runtime/" + file.strip_suffix("moon.pkg").unwrap().to_owned()
+    })
+  assert_eq(
+    @process.run(
+      "moon",
+      ["test", "--target", target] + packages,
+      cwd=module_dir,
+    ),
+    0,
+  )
+}
+
+///|
+async fn main {
+  let args = @env.args()[1:].to_owned()
+  assert_true(
+    args == ["--check"] ||
+    args == ["--write"] ||
+    args == ["--test-drift"] ||
+    args == ["--test-all"] ||
+    args == ["--test", "native"] ||
+    args == ["--test", "wasm"],
+    msg="Use --check, --write, --test-drift, --test-all or --test native|wasm",
+  )
+  if args == ["--test-all"] {
+    // Original upstream timestamp tests share fixed /tmp names. Run these
+    // retained real-I/O suites sequentially, never as concurrent target jobs.
+    for target in ["native", "wasm"] {
+      let stage = @fs.tmpdir(prefix="lander-moonx-retained")
+      defer @fs.rmdir(stage, recursive=true)
+      reproduce(stage)
+      assert_true(same_tree(stage + "/runtime", destination))
+      retained_tests(stage, target)
+    }
+    return
+  }
+  let stage = @fs.tmpdir(prefix="lander-moonx-runtime")
+  defer @fs.rmdir(stage, recursive=true)
+  reproduce(stage)
+  if args == ["--test-drift"] {
+    drift_test(stage)
+    return
+  }
+  if args[0] == "--test" {
+    assert_true(
+      same_tree(stage + "/runtime", destination),
+      msg="Frozen runtime drift before retained tests",
+    )
+    retained_tests(stage, args[1])
+    return
+  }
+  let expected = stage + "/runtime"
+  let files = files_below(expected)
+  if args == ["--write"] {
+    @fs.mkdir(destination, recursive=true, allow_exist=true)
+    for file in files {
+      let parts = file.split("/").to_array()
+      if parts.length() > 1 {
+        @fs.mkdir(
+          destination + "/" + parts[:parts.length() - 1].join("/"),
+          recursive=true,
+          allow_exist=true,
+        )
+      }
+      @fs.write_file(
+        destination + "/" + file,
+        @fs.read_file(expected + "/" + file),
+      )
+    }
+    @fs.write_file("pkgs/moonx/LICENSE", @fs.read_file(expected + "/LICENSE"))
+    println("Generated \{files.length()} frozen runtime files.")
+  } else {
+    assert_true(
+      same_tree(expected, destination),
+      msg="Frozen runtime source or file-set drift; regenerate deliberately",
+    )
+    assert_eq(
+      digest(@fs.read_file("pkgs/moonx/LICENSE").binary()),
+      digest(@fs.read_file(expected + "/LICENSE").binary()),
+    )
+    println("Frozen runtime source, patches, provenance and license verified.")
+  }
+}
+
+///|
+fn patch_exactly(
+  text : String,
+  old : String,
+  replacement : String,
+  matches : Int32,
+) -> String raise {
+  assert_eq(text.split(old).to_array().length(), matches + 1)
+  text.replace_all(old~, new=replacement)
+}
+
+///|
+/// Readiness flags belong only to the unpublished original test program. They
+/// acknowledge the real handler stage before a parent requests cancellation.
+fn adapt_sleep_fixture(source : String) -> String raise {
+  let text = patch_once(
+    source, "  let mut wait_on_init = false", "  let mut wait_on_init = false\n  let mut ready_before_init = false\n  let mut ready_after_setup = false",
+  )
+  let text = patch_once(
+    text, "      [\"-wait-on-init\", .. rest] => {", "      [\"-ready-before-init\", .. rest] => {\n        ready_before_init = true\n        continue rest\n      }\n      [\"-ready-after-setup\", .. rest] => {\n        ready_after_setup = true\n        continue rest\n      }\n      [\"-wait-on-init\", .. rest] => {",
+  )
+  let text = patch_once(
+    text, "  if wait_on_init {", "  if ready_before_init { @stdio.stdout.write(\"UPSTREAM_READY\\n\") }\n  if wait_on_init {",
+  )
+  patch_once(
+    text, "  @async.sleep(time)", "  if ready_after_setup { @stdio.stdout.write(\"UPSTREAM_READY\\n\") }\n  @async.sleep(time)",
+  )
+}
+
+///|
+fn adapt_signal_tests(source : String) -> String raise {
+  let text = patch_exactly(
+    source, "    let (r, w) = @process.read_from_process()", "    let (r, w) = @process.read_from_process()\n    let ready = @async.Semaphore(1, initial_value=0)",
+    3,
+  )
+  let text = patch_exactly(
+    text, "      defer r.close()\n      while r.read_some() is Some(data) {", "      defer r.close()\n      assert_eq(r.read_until(\"\\n\"), Some(\"UPSTREAM_READY\"))\n      ready.release()\n      while r.read_some() is Some(data) {",
+    3,
+  )
+  let text = patch_exactly(
+    text, "\"10000\", \"-use-default-handler\"", "\"10000\", \"-ready-after-setup\", \"-use-default-handler\"",
+    3,
+  )
+  let text = patch_exactly(
+    text, "    @async.sleep(500)", "    @runtime_testing.wait_ready(ready)", 3,
+  )
+  let text = patch_exactly(
+    text, "    let (r2, w2) = @process.read_from_process()", "    let (r2, w2) = @process.read_from_process()\n    let ready = @async.Semaphore(1, initial_value=0)\n    let exited = @async.Semaphore(1, initial_value=0)",
+    2,
+  )
+  let reader_before =
+    #|      defer r2.close()
+    #|      while r2.read_some() is Some(data) {
+    #|        let data = @utf8.decode(data).replace_all(old="\r\n", new="\n").trim()
+    #|        log.push("from process: \{data}")
+    #|      }
+  let reader_after =
+    #|      defer r2.close()
+    #|      assert_eq(r2.read_until("\n"), Some("UPSTREAM_READY"))
+    #|      ready.release()
+    #|      while r2.read_some() is Some(data) {
+    #|        let data = @utf8.decode(data).replace_all(old="\r\n", new="\n").trim()
+    #|        log.push("from process: \{data}")
+    #|        exited.release()
+    #|      }
+  let text = patch_exactly(text, reader_before, reader_after, 2)
+  let text = patch_once(
+    text, "\"2000\", \"-wait-on-init\"", "\"2000\", \"-ready-before-init\", \"-wait-on-init\"",
+  )
+  let text = patch_once(
+    text, "\"500\", \"-wait-on-init\"", "\"500\", \"-ready-after-setup\", \"-wait-on-init\"",
+  )
+  let first_before =
+    #|    @async.sleep(250)
+    #|    proc.cancel()
+    #|    log.push("cancelling task running process")
+    #|    @async.sleep(250)
+  let first_after =
+    #|    @runtime_testing.wait_ready(ready)
+    #|    proc.cancel()
+    #|    log.push("cancelling task running process")
+    #|    @runtime_testing.wait_ready(exited)
+  let text = patch_once(text, first_before, first_after)
+  let second_before =
+    #|    w1.write("whatever")
+    #|    @async.sleep(250)
+    #|    proc.cancel()
+    #|    log.push("cancelling task running process")
+  let second_after =
+    #|    w1.write("whatever")
+    #|    @runtime_testing.wait_ready(ready)
+    #|    proc.cancel()
+    #|    log.push("cancelling task running process")
+    #|    @runtime_testing.wait_ready(exited)
+  patch_once(text, second_before, second_after)
+}
+
+///|
+/// Keep the original basic-wait test, using a controlled child release rather
+/// than a startup-duration assumption. It must remain pending before release
+/// and return the actual status after release.
+fn adapt_basic_wait(source : String) -> String raise {
+  let start = source.find("async test \"basic wait\" {").unwrap()
+  let length = source[start:].find("\n}\n").unwrap() + 3
+  let original = source[start:start + length].to_owned()
+  let replacement =
+    #|async test "basic wait" {
+    #|  let test_prog = sleep_prog.wait()
+    #|  let (input, writer) = @process.write_to_process()
+    #|  defer writer.close()
+    #|  let (reader, output) = @process.read_from_process()
+    #|  defer reader.close()
+    #|  @async.with_task_group() <| group => {
+    #|    let waiting = group.spawn(() => @process.run(test_prog,
+    #|      ["0", "-use-default-handler", "-wait-on-init", "-ready-before-init"],
+    #|      stdin=input, stdout=output))
+    #|    assert_eq(reader.read_until("\n"), Some("UPSTREAM_READY"))
+    #|    assert_true(waiting.try_wait() is None)
+    #|    writer.write("release")
+    #|    assert_eq(waiting.wait(), 0)
+    #|  }
+    #|}
+  patch_once(source, original, replacement)
+}
+
+///|
+fn adapt_lock_tests(source : String) -> String raise {
+  // A cold child can start after the upstream 250ms sleep. In that case the
+  // parent acquires the exclusive lock first and waits forever for the child.
+  // Keep every lock assertion, but return only after the child owns its lock.
+  let original =
+    #|  group.spawn() <| () => {
+    #|    defer r.close()
+    #|    while r.read_until("\n") is Some(line) {
+    #|      log.push(prefix + line)
+    #|    }
+    #|  }
+  let replacement =
+    #|  let ready = @async.Semaphore(1, initial_value=0)
+    #|  let reader = group.spawn(() => {
+    #|    defer r.close()
+    #|    while r.read_until("\n") is Some(line) {
+    #|      log.push(prefix + line)
+    #|      if line == "acquired lock" { ready.release() }
+    #|    }
+    #|  })
+    #|  @runtime_testing.wait_ready(ready)
+    #|  reader
+  patch_once(source, original, replacement)
+}
+
+///|
+fn adapt_spawn_fixture(source : String) -> String raise {
+  let text = patch_once(
+    source, "  let (is_orphan, args) = match args {", "  let (ready, args) = match args {\n    [\"-ready-after-spawn\", .. rest] => (true, rest)\n    args => (false, args)\n  }\n  let (is_orphan, args) = match args {",
+  )
+  patch_once(
+    text, "    let pid = @process.spawn_orphan(cmd, args)\n    ignore(@process.wait_pid(pid))",
+    "    let pid = @process.spawn_orphan(cmd, args)\n    if ready { @stdio.stdout.write(\"SPAWN_READY\\n\") }\n    ignore(@process.wait_pid(pid))",
+  )
+}
+
+///|
+fn adapt_process_cancel_tests(source : String) -> String raise {
+  let mut text = source
+  for
+    name in ["cancel process", "cancel process timeout", "cancel process hard"] {
+    let start = text.find("async test \"" + name + "\" {").unwrap()
+    let length = text[start:].find("\n}\n").unwrap() + 3
+    let original = text[start:start + length].to_owned()
+    let changed = patch_once(
+      original, "    let (r, w) = @process.read_from_process()", "    let (r, w) = @process.read_from_process()\n    let ready = @async.Semaphore(1, initial_value=0)",
+    )
+    let changed = if name == "cancel process timeout" {
+      patch_once(
+        changed, "[\"-swallow-cancel-signal\", \"10000\"]", "[\"-swallow-cancel-signal\", \"10000\", \"-ready-after-setup\"]",
+      )
+    } else {
+      patch_once(changed, "[\"10000\"]", "[\"10000\", \"-ready-after-setup\"]")
+    }
+    let changed = patch_once(
+      changed, "      defer r.close()", "      defer r.close()\n      assert_eq(r.read_until(\"\\n\"), Some(\"UPSTREAM_READY\"))\n      ready.release()",
+    )
+    let changed = patch_once(
+      changed, "    @async.sleep(500)", "    @runtime_testing.wait_ready(ready)",
+    )
+    text = patch_once(text, original, changed)
+  }
+  let start = text
+    .find("async test \"do not kill orphan children on hard cancel\" {")
+    .unwrap()
+  let original = text[start:].to_owned()
+  let replacement =
+    #|async test "do not kill orphan children on hard cancel" {
+    #|  let spawn = spawn_prog.wait()
+    #|  let sleep = sleep_prog.wait()
+    #|  let (r, w) = @process.read_from_process()
+    #|  defer r.close()
+    #|  @async.with_task_group(group => {
+    #|    let process = group.spawn(() => @process.run(spawn,
+    #|      ["-ready-after-spawn", "-orphan", sleep, "450", "-print-after-sleep", "after sleep"],
+    #|      stdout=w, cancel_handler=@process.hard_cancel()))
+    #|    assert_eq(r.read_until("\n"), Some("SPAWN_READY"))
+    #|    // Keep the real 300ms hard-cancel deadline, after actual orphan creation.
+    #|    @async.sleep(300)
+    #|    process.cancel()
+    #|  })
+    #|  inspect(r.read_all().text().trim(), content="after sleep")
+    #|}
+    #|
+  patch_once(text, original, replacement)
+}

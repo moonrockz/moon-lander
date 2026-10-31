@@ -35,6 +35,8 @@ pub struct BasicConstraints {
 pub struct Certificate {
   /// All of the DER bytes.
   raw : Bytes
+  /// The content bytes of the serial number INTEGER.
+  serial : Bytes
   /// The DER bytes of the TBSCertificate, which the issuer signs.
   tbs : Bytes
   signature_algorithm : String
@@ -117,7 +119,7 @@ fn parse_der(raw : BytesView) -> Certificate raise {
     None => 0
   }
   guard version == 2 else { raise BadCertificate("not an X.509 v3 certificate") }
-  ignore(fields.expect(@der.INTEGER))
+  let serial = fields.expect(@der.INTEGER).content.to_owned()
   // RFC 5280, section 4.1.1.2: the same AlgorithmIdentifier, parameters too.
   let inner_algorithm = fields.expect(@der.SEQUENCE)
   ignore(read_algorithm(inner_algorithm))
@@ -140,6 +142,7 @@ fn parse_der(raw : BytesView) -> Certificate raise {
   fields.finish()
   let certificate = {
     raw: raw.to_owned(),
+    serial,
     tbs: tbs.raw.to_owned(),
     signature_algorithm: algorithm,
     signature: signature.to_owned(),

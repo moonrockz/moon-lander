@@ -284,3 +284,31 @@ test "days_in_month and unix_seconds" {
   assert_eq(@der.unix_seconds(1969, 12, 31, 23, 59, 59), -1L)
   assert_eq(@der.unix_seconds(2038, 1, 19, 3, 14, 8), 2147483648L)
 }
+
+///|
+fn generalized(text : String) -> (Int64, Int) raise {
+  let content = @encoding.utf8(text)
+  let header = Bytes::from_array([b'\x18', content.length().to_byte()])
+  @der.parse(Bytes::from_array([..header.to_array(), ..content.to_array()])).generalized_time()
+}
+
+///|
+test "GeneralizedTime reads canonical fractions" {
+  assert_eq(generalized("20261026192009Z"), (1793042409L, 0))
+  assert_eq(generalized("20261026192009.5Z"), (1793042409L, 500_000_000))
+  assert_eq(generalized("20261026192009.123456789Z"), (1793042409L, 123_456_789))
+  assert_eq(generalized("20261026192009.001Z"), (1793042409L, 1_000_000))
+  for
+    bad in [
+      "20261026192009.Z", "20261026192009.50Z", "20261026192009.1234567891Z", "20261026192009+0000",
+      "20261026192009.5", "20261026192009,5Z", "2026102619200Z", "20261026192009.5aZ",
+    ] {
+    let failed = try {
+      ignore(generalized(bad))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(failed, msg=bad)
+  }
+}

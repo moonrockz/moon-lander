@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonrockz/sigstore/internal/timestamp"
+
+import {
+  "moonbitlang/core/debug",
+  "moonrockz/sigstore/internal/signature",
+}
+
+// Values
+pub const SIGNED_DATA : String = "1.2.840.113549.1.7.2"
+
+pub const TST_INFO : String = "1.2.840.113549.1.9.16.1.4"
+
+pub fn parse(BytesView) -> Timestamp raise TimestampError
+
+// Errors
+pub(all) suberror TimestampError {
+  BadTimestamp(String)
+  UnsupportedTimestamp(String)
+} derive(@debug.Debug)
+pub fn TimestampError::message(Self) -> String
+pub fn TimestampError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct SigningCertificate {
+  hash : @signature.HashAlgorithm
+  cert_hash : Bytes
+}
+
+pub struct Timestamp {
+  seconds : Int64
+  nanos : Int32
+  imprint_hash : @signature.HashAlgorithm
+  imprint : Bytes
+  tst_info : Bytes
+  signer_issuer : Bytes
+  signer_serial : Bytes
+  certificates : Array[Bytes]
+  digest_hash : @signature.HashAlgorithm
+  message_digest : Bytes
+  content_type : String
+  signing_time : Int64?
+  signing_certificate : SigningCertificate?
+  signed_attributes : Bytes
+  signature_hash : @signature.HashAlgorithm?
+  signature : Bytes
+}
+pub fn Timestamp::verify_signature(Self, @signature.PublicKey) -> Bool
+
+// Type aliases
+
+// Traits

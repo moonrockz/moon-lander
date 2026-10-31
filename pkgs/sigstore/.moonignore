@@ -10,3 +10,7 @@
 !/testdata/conformance/LICENSE
 !/testdata/conformance/NOTICE
 !/testdata/wycheproof/LICENSE
+!/testdata/github/cli-test-data/LICENSE
+!/testdata/github/cli-test-data/NOTICE
+!/testdata/timestamp-authority/LICENSE
+!/testdata/timestamp-authority/NOTICE

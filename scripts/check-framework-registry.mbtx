@@ -842,8 +842,10 @@ test "archive audit rejects missing licenses and nested tooling" {
 /// (moon resolves test imports when it builds the archived module), and the
 /// license notices of the vendored data in those fixtures.
 let sigstore_archive_files : Array[String] = [
-  "README.mbt.md", "public_good.generated.mbt", "internal/fixtures/moon.pkg", "testdata/README.md",
-  "testdata/conformance/LICENSE", "testdata/conformance/NOTICE", "testdata/wycheproof/LICENSE",
+  "README.mbt.md", "public_good.generated.mbt", "github_root.generated.mbt", "internal/fixtures/moon.pkg",
+  "testdata/README.md", "testdata/conformance/LICENSE", "testdata/conformance/NOTICE",
+  "testdata/wycheproof/LICENSE", "testdata/github/cli-test-data/LICENSE", "testdata/github/cli-test-data/NOTICE",
+  "testdata/timestamp-authority/LICENSE", "testdata/timestamp-authority/NOTICE",
 ]
 
 ///|

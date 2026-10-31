@@ -426,3 +426,38 @@ pub fn encode(tag : Int, content : BytesView) -> Bytes {
   }
   Bytes::from_array(out)
 }
+
+///|
+/// The time of a GeneralizedTime with an optional fraction of a second, as
+/// seconds since 1970 and nanoseconds. DER requires the `Z` form and a fraction
+/// with no trailing zero (X.690, section 11.7), of at most nine digits here.
+pub fn Element::generalized_time(self : Element) -> (Int64, Int) raise DerError {
+  guard self.tag == GENERALIZED_TIME else { raise Malformed("expected GeneralizedTime") }
+  let text = @utf8.decode(self.content) catch {
+    _ => raise Malformed("time is not ASCII")
+  }
+  guard text.length() >= 15 && text[text.length() - 1] == 'Z'.to_int().to_uint16() else {
+    raise Malformed("GeneralizedTime form")
+  }
+  let whole = text[:14].to_owned() + "Z"
+  let mut nanos = 0
+  if text.length() > 15 {
+    guard text[14] == '.'.to_int().to_uint16() else { raise Malformed("GeneralizedTime form") }
+    let fraction = text[15:text.length() - 1].to_owned()
+    guard fraction.length() >= 1 && fraction.length() <= 9 else {
+      raise Malformed("GeneralizedTime fraction length")
+    }
+    guard !fraction.has_suffix("0") else {
+      raise Malformed("GeneralizedTime fraction has a trailing zero")
+    }
+    for char in fraction {
+      guard char >= '0' && char <= '9' else { raise Malformed("time has a non-digit") }
+      nanos = nanos * 10 + (char.to_int() - '0'.to_int())
+    }
+    for _ in fraction.length()..<9 {
+      nanos = nanos * 10
+    }
+  }
+  let seconds = { tag: GENERALIZED_TIME, content: @utf8.encode(whole)[:], raw: self.raw }.time()
+  (seconds, nanos)
+}

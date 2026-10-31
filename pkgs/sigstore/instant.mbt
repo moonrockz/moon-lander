@@ -23,6 +23,12 @@ pub fn Instant::from_unix_seconds(seconds : Int64) -> Instant {
 }
 
 ///|
+/// The instant `nanos` nanoseconds (0 to 999 999 999) after `seconds`.
+fn Instant::from_parts(seconds : Int64, nanos : Int) -> Instant {
+  { seconds, nanos }
+}
+
+///|
 /// The instant `millis` milliseconds after 1970-01-01T00:00:00Z, as an SCT
 /// gives it, with the millisecond part kept.
 fn Instant::from_unix_millis(millis : Int64) -> Instant {

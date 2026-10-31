@@ -1,0 +1,6 @@
+response-injected-certs.tsr.b64 is the base64 text of
+pkg/verification/testdata/response-injected-certs.tsr from
+sigstore/timestamp-authority at commit cc4f1acee883a0e92f9e7a579273a2bb9eb26032,
+licensed under the Apache License 2.0 (LICENSE in this folder). It is a timestamp
+response with certificates injected into the SignedData, which must not become the
+signer.

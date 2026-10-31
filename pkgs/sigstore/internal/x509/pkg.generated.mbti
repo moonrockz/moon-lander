@@ -40,6 +40,7 @@ pub struct BasicConstraints {
 
 pub struct Certificate {
   raw : Bytes
+  serial : Bytes
   tbs : Bytes
   signature_algorithm : String
   signature : Bytes

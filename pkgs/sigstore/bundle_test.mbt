@@ -259,8 +259,9 @@ test "protobuf JSON: int64 as a string and as a number" {
     now=later,
   )
   guard verdict is Verified(facts) else { fail(outcome(verdict)) }
-  assert_eq(facts.log_index, 3275146211L)
-  assert_eq(facts.integrated_time.unix_seconds(), 1792133282L)
+  assert_eq(facts.times.length(), 1)
+  assert_true(facts.times[0].source is Log(log_index=3275146211L, ..))
+  assert_eq(facts.times[0].time.unix_seconds(), 1792133282L)
   // A number that is not an integer, and a text that is not one, fail.
   let fraction = text.replace(old="\"logIndex\":\"3275146211\"", new="\"logIndex\":3275146211.5")
   assert_eq(

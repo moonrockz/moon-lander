@@ -328,7 +328,7 @@ fn statement_of(predicate_type : String) -> Statement {
   let parsed = PredicateType::parse(predicate_type) catch {
     _ => abort("bad predicate type \{predicate_type}")
   }
-  { predicate_type: parsed, subjects: [], payload: b"" }
+  { predicate_type: parsed, predicate: Json::null(), subjects: [], payload: b"" }
 }
 
 ///|

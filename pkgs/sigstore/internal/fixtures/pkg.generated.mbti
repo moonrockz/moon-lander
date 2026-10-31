@@ -6,6 +6,8 @@ pub let conformance : Array[(String, String)]
 
 pub let github : Array[(String, String)]
 
+pub let timestamp_authority : Array[(String, String)]
+
 pub let wycheproof : Array[(String, String)]
 
 // Errors

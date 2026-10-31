@@ -52,7 +52,7 @@ test "verify the attestation of a GitHub release" {
       now~,
     ) {
     Verified(facts) => {
-      assert_eq(facts.integrated_time.unix_seconds(), 1716998983L)
+      assert_eq(facts.times[0].time.unix_seconds(), 1716998983L)
       assert_eq(facts.claims.source_repository_ref, Some("refs/heads/trunk"))
       guard facts.statement is Some(statement) else { fail("no statement") }
       assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())

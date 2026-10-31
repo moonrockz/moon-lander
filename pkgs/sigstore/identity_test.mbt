@@ -67,6 +67,7 @@ fn kind_name(kind : @sigstore.IdentityKind) -> String {
     Ref => "Ref"
     NumericId => "NumericId"
     Predicate => "Predicate"
+    Tag => "Tag"
   }
 }
 
@@ -296,4 +297,25 @@ test "a predicate type is an absolute URI" {
     }
     assert_true(failed, msg=text)
   }
+}
+
+///|
+test "a release tag is a tag name" {
+  for text in ["v2.103.3", "1.0", "release/2026-10", "v1.0.0-rc.1", "x"] {
+    assert_eq(@sigstore.ReleaseTag::parse(text).to_string(), text)
+  }
+  for text in ["", "refs/tags/v1", "v 1", "v1..2", "a@{b", "/v1", "v1/", "v1\n"] {
+    let failed = try {
+      ignore(@sigstore.ReleaseTag::parse(text))
+      false
+    } catch {
+      InvalidIdentity(kind=Tag, text=got, ..) => got == text
+      _ => false
+    }
+    assert_true(failed, msg=text)
+  }
+  assert_eq(
+    @sigstore.PredicateType::github_release_v0_2().to_string(),
+    "https://in-toto.io/attestation/release/v0.2",
+  )
 }

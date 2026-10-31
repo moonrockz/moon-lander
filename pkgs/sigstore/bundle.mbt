@@ -136,7 +136,8 @@ pub struct Bundle {
   priv material : Material
   priv content : Content
   priv entries : Array[LogEntry]
-  priv timestamps : Int
+  /// The DER TimeStampResp of each RFC 3161 timestamp.
+  priv timestamps : Array[Bytes]
 }
 
 ///|
@@ -217,15 +218,15 @@ fn parse_bundle(text : StringView) -> Bundle raise {
   }
   let timestamps = match material.object("timestampVerificationData", ["rfc3161Timestamps"]) {
     Some(data) => {
-      let list = data.array("rfc3161Timestamps")
-      for index, item in list {
-        ignore(fields(item, "\{data.at("rfc3161Timestamps")}[\{index}]", ["signedTimestamp"]).require_bytes("signedTimestamp"))
-      }
-      list.length()
+      data
+      .array("rfc3161Timestamps")
+      .mapi((index, item) => fields(item, "\{data.at("rfc3161Timestamps")}[\{index}]", [
+          "signedTimestamp",
+        ]).require_bytes("signedTimestamp"))
     }
-    None => 0
+    None => []
   }
-  guard timestamps <= max_entries else {
+  guard timestamps.length() <= max_entries else {
     raise Shape(material.at("timestampVerificationData"), "more than \{max_entries} timestamps")
   }
   { version, material: key_material, content, entries, timestamps }

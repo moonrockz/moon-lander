@@ -78,7 +78,7 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
     Rejected(Unsupported(feature)) =>
       match feature {
         PublicKeyMaterial => "unsupported public key"
-        TimestampAuthority => "unsupported timestamp authority"
+        TimestampAlgorithm(_) => "unsupported timestamp algorithm"
         RekorV2 => "unsupported Rekor v2"
         EntryKind(..) => "unsupported entry kind"
         KeyType(_) => "unsupported key type"
@@ -99,6 +99,9 @@ fn outcome(verdict : @sigstore.Verdict) -> String {
         PayloadType(_) => "payload type"
         ContentSignature => "content signature"
         Statement(_) => "statement"
+        Timestamp(_) => "timestamp"
+        TimestampAuthority(_) => "timestamp authority"
+        TimestampTime(..) => "timestamp time"
         ArtifactDigestMismatch(_) => "artifact digest"
         Policy(_) => "policy"
       }

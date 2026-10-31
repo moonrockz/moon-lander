@@ -7,6 +7,7 @@ import {
   "moonrockz/sigstore/internal/encoding",
   "moonrockz/sigstore/internal/signature",
   "moonrockz/sigstore/internal/sct",
+  "moonrockz/sigstore/internal/timestamp",
   "moonrockz/sigstore/internal/tlog",
   "moonrockz/sigstore/internal/x509",
 }

@@ -1,0 +1,9 @@
+These bundles are copied without change from cli/cli,
+pkg/cmd/attestation/test/data/, at commit 9490d20. cli/cli is licensed under the
+MIT License; LICENSE in this folder is its license text.
+
+github_release_bundle.json is a GitHub release attestation (predicate release
+v0.1) for github_release_artifact.zip. The bundle with the .jsonl name is a
+private-repository SLSA provenance attestation of
+github_provenance_demo-0.0.12-py3-none-any.whl from GitHub's Sigstore instance.
+The artifacts are not copied; their SHA-256 digests are in ../timestamp-cases.json.

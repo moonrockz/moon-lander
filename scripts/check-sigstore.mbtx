@@ -30,7 +30,7 @@ let all_targets : Array[String] = ["wasm", "wasm-gc", "js", "native"]
 let paths : Array[String] = [
   "pkgs/sigstore", "pkgs/sigstore/internal/der", "pkgs/sigstore/internal/encoding",
   "pkgs/sigstore/internal/signature", "pkgs/sigstore/internal/x509", "pkgs/sigstore/internal/tlog",
-  "pkgs/sigstore/internal/sct",
+  "pkgs/sigstore/internal/sct", "pkgs/sigstore/internal/timestamp",
 ]
 
 ///|
@@ -102,7 +102,7 @@ async fn main {
 
 ///|
 test "legs give each sigstore package on each target" {
-  assert_eq(legs(all_targets).length(), 28)
+  assert_eq(legs(all_targets).length(), 32)
   assert_false(paths.contains("pkgs/sigstore/internal/fixtures"))
   assert_eq(legs(["wasm-gc"]), [
     ("pkgs/sigstore", "wasm-gc"),
@@ -112,6 +112,7 @@ test "legs give each sigstore package on each target" {
     ("pkgs/sigstore/internal/x509", "wasm-gc"),
     ("pkgs/sigstore/internal/tlog", "wasm-gc"),
     ("pkgs/sigstore/internal/sct", "wasm-gc"),
+    ("pkgs/sigstore/internal/timestamp", "wasm-gc"),
   ])
 }
 

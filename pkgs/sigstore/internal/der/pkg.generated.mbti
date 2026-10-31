@@ -62,6 +62,7 @@ pub struct Element {
 pub fn Element::bit_string_bytes(Self) -> BytesView raise DerError
 pub fn Element::boolean(Self) -> Bool raise DerError
 pub fn Element::children(Self) -> Reader raise DerError
+pub fn Element::generalized_time(Self) -> (Int64, Int32) raise DerError
 pub fn Element::named_bits(Self) -> Int32 raise DerError
 pub fn Element::oid(Self) -> String raise DerError
 pub fn Element::small_int(Self) -> Int32 raise DerError

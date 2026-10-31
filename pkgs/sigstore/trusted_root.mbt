@@ -80,9 +80,13 @@ priv struct TrustedLog {
 /// A certificate authority or a timestamp authority.
 priv struct Authority {
   uri : String
-  /// The chain from the first intermediate to the root.
+  /// The chain as the trusted root lists it: for a certificate authority the
+  /// intermediates then the root; for a timestamp authority the leaf first.
   chain : Array[@x509.Certificate]
   valid : Period
+  /// Whether a leaf of this authority needs an SCT: true when the root that
+  /// listed the authority also lists CT logs (design ROOT-1).
+  sct_required : Bool
 }
 
 ///|
@@ -150,6 +154,46 @@ pub fn TrustedRoot::public_good() -> TrustedRoot {
 }
 
 ///|
+/// The pinned trusted root of GitHub's Sigstore instance (the
+/// `trusted_root.json` target of `https://tuf-repo.github.com`, SHA-256
+/// `484cdfe1…fbb7`). It holds the certificate and timestamp authorities of
+/// private-repository and release attestations, and no log. It needs no I/O.
+pub fn TrustedRoot::github() -> TrustedRoot {
+  TrustedRoot::parse(github_document) catch {
+    err => abort("the pinned GitHub root does not parse: \{err.message()}")
+  }
+}
+
+///|
+/// The pinned GitHub `trusted_root.json` text.
+pub fn github_trusted_root_json() -> String {
+  github_document
+}
+
+///|
+/// One root that trusts the logs and authorities of each of `roots`. Each
+/// certificate authority keeps the SCT rule of its own root.
+pub fn TrustedRoot::combine(roots : ArrayView[TrustedRoot]) -> TrustedRoot {
+  {
+    tlogs: roots.iter().flat_map(root => root.tlogs.iter()).collect(),
+    authorities: roots.iter().flat_map(root => root.authorities.iter()).collect(),
+    ctlogs: roots.iter().flat_map(root => root.ctlogs.iter()).collect(),
+    timestamp_authorities: roots
+      .iter()
+      .flat_map(root => root.timestamp_authorities.iter())
+      .collect(),
+  }
+}
+
+///|
+/// The public-good and GitHub roots combined: one root for public-repository,
+/// private-repository and release attestations from GitHub. A public-good leaf
+/// still needs its SCT; a GitHub leaf needs none.
+pub fn TrustedRoot::github_attestations() -> TrustedRoot {
+  TrustedRoot::combine([TrustedRoot::public_good(), TrustedRoot::github()])
+}
+
+///|
 /// The pinned public-good `trusted_root.json` text.
 pub fn public_good_trusted_root_json() -> String {
   public_good_document
@@ -176,7 +220,13 @@ fn parse_root(text : StringView) -> TrustedRoot raise {
   let timestamp_authorities = root
     .array("timestampAuthorities")
     .mapi((index, json) => read_authority(json, "\{root.at("timestampAuthorities")}[\{index}]"))
-  { tlogs, authorities, ctlogs, timestamp_authorities }
+  let sct_required = !ctlogs.is_empty()
+  {
+    tlogs,
+    authorities: authorities.map(authority => { ..authority, sct_required }),
+    ctlogs,
+    timestamp_authorities,
+  }
 }
 
 ///|
@@ -260,6 +310,7 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
     uri: authority.string("uri").unwrap_or(""),
     chain: certificates,
     valid: read_period(authority, "validFor"),
+    sct_required: false,
   }
 }
 

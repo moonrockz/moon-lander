@@ -21,7 +21,11 @@ fn main raise {
     now=@library.Instant::from_unix_seconds(1793000000L),
   )
   match verdict {
-    Verified(facts) => assert_eq(facts.log_index, 97913918L)
+    Verified(facts) => {
+      guard facts.times is [{ source: Log(log_index=97913918L, ..), .. }] else {
+        fail("unexpected verified times")
+      }
+    }
     Rejected(reason) => fail("the bundle did not verify: \{reason.message()}")
   }
   println("ok")

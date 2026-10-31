@@ -9,24 +9,24 @@ runs on wasm, wasm-gc, js and native, and `mise run test:native-zig` passes too.
 
 Bead: lander-19l.1
 
-- [ ] 1.1 Add GitHub's TUF target `trusted_root.json` (SHA-256 `484cdfe1…fbb7`) to `testdata/github-root/`, `SHA256SUMS` and the generator, and add `TrustedRoot::github()`; verify the digest test, the summary (six CAs, six TSAs, no logs) and `mise run check:sigstore-assets`
-- [ ] 1.2 Read GeneralizedTime with a fraction in `internal/der`; verify canonical fractions pass and trailing zeros, a bare `.`, offsets and more than nine digits fail
-- [ ] 1.3 Add `internal/timestamp`: TimeStampResp status, SignedData with one signer, id-ct-TSTInfo, TSTInfo fields and signed attributes; verify the cli/cli `v2.103.3` token gives genTime `2026-10-26T19:20:09Z`, a SHA-256 imprint and a signature that verifies with GitHub TSA 5, and that status 1, a changed TSTInfo and a changed signature fail
+- [x] 1.1 Add GitHub's TUF target `trusted_root.json` (SHA-256 `484cdfe1…fbb7`) to `testdata/github-root/`, `SHA256SUMS` and the generator, and add `TrustedRoot::github()`; verify the digest test, the summary (six CAs, six TSAs, no logs) and `mise run check:sigstore-assets`
+- [x] 1.2 Read GeneralizedTime with a fraction in `internal/der`; verify canonical fractions pass and trailing zeros, a bare `.`, offsets and more than nine digits fail
+- [x] 1.3 Add `internal/timestamp`: TimeStampResp status, SignedData with one signer, id-ct-TSTInfo, TSTInfo fields and signed attributes; verify the cli/cli `v2.103.3` token gives genTime `2026-10-26T19:20:09Z`, a SHA-256 imprint and a signature that verifies with GitHub TSA 5, and that status 1, a changed TSTInfo and a changed signature fail
 
 ## 2. Timestamp trust, time sources and the SCT rule
 
 Bead: lander-19l.2
 
-- [ ] 2.1 Check the TSA chain at genTime (trusted leaf equals signer, embedded certificates only as intermediates, critical EKU of exactly timeStamping, key usage, authority validity), the imprint over the signature bytes, and genTime not after "now"; verify each scenario of `sigstore-signed-timestamps` and the timestamp-authority `response-injected-certs.tsr` case
-- [ ] 2.2 Combine time sources in `verify` (TIME-2) and replace the log fields of `VerifiedBundle` with `times`; verify the private-repository provenance bundle from cli/cli test data, a bundle with no time source, a leaf expired at the timestamp time, and that the 0.10.0 GitHub fixtures still pass
-- [ ] 2.3 Add `TrustedRoot::combine` and `TrustedRoot::github_attestations()` with the SCT rule of each source root; verify both scenarios of "Combine trusted roots" and the "GitHub instance leaf" scenario
+- [x] 2.1 Check the TSA chain at genTime (trusted leaf equals signer, embedded certificates only as intermediates, critical EKU of exactly timeStamping, key usage, authority validity), the imprint over the signature bytes, and genTime not after "now"; verify each scenario of `sigstore-signed-timestamps` and the timestamp-authority `response-injected-certs.tsr` case
+- [x] 2.2 Combine time sources in `verify` (TIME-2) and replace the log fields of `VerifiedBundle` with `times`; verify the private-repository provenance bundle from cli/cli test data, a bundle with no time source, a leaf expired at the timestamp time, and that the 0.10.0 GitHub fixtures still pass
+- [x] 2.3 Add `TrustedRoot::combine` and `TrustedRoot::github_attestations()` with the SCT rule of each source root; verify both scenarios of "Combine trusted roots" and the "GitHub instance leaf" scenario
 
 ## 3. Release-attestation policy
 
 Bead: lander-19l.3
 
-- [ ] 3.1 Make the policy issuer optional inside `Policy`, and add `PredicateType::github_release_v0_2()`, `Policy::github_release(repository, tag~)` with `.repository_id` and `.owner_id`, and `PolicyMismatch::ReleaseMismatch`; verify each scenario of "Match a GitHub release attestation" and "Release certificate without issuer"
-- [ ] 3.2 Add the cli/cli `v2.103.3` release attestation and the MIT cli/cli release v0.1 bundle with their asset digests and license notice; verify a pass for each, and one mutation for each release rule
+- [x] 3.1 Make the policy issuer optional inside `Policy`, and add `PredicateType::github_release_v0_2()`, `Policy::github_release(repository, tag~)` with `.repository_id` and `.owner_id`, and `PolicyMismatch::ReleaseMismatch`; verify each scenario of "Match a GitHub release attestation" and "Release certificate without issuer"
+- [x] 3.2 Add the cli/cli `v2.103.3` release attestation and the MIT cli/cli release v0.1 bundle with their asset digests and license notice; verify a pass for each, and one mutation for each release rule
 
 ## 4. Rekor v1 in-toto entries
 

@@ -24,6 +24,14 @@ fn label_event(event : @actors.ActorEvent) -> String {
         Failed(_) => "ended \{address.to_string()} failed"
         Cancelled => "ended \{address.to_string()} cancelled"
       }
+    Undelivered(address, reason, ..) => {
+      let why = match reason {
+        Full => "full"
+        Closed => "closed"
+        Discarded => "discarded"
+      }
+      "undelivered \{address.to_string()} \{why}"
+    }
   }
 }
 

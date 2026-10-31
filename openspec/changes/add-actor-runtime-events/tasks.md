@@ -29,9 +29,9 @@ Bead: lander-d0y.3
 
 Depends on: groups 1 and 2.
 
-- [ ] 3.1 Publish `Undelivered` with the `Full`, `Closed` and `Discarded` reasons from `try_send`, `reenqueue`, `send` and the mailbox discard path; verify queue order before `Ended` on cancellation, no events for a close snapshot, and closed sends after the end, on wasm, js and native
-- [ ] 3.2 Add the optional `payload` argument to `start`, `start_with`, `spawn` and `respond`, encode only for an undelivered event with at least one subscription, and give each subscriber an independent copy; verify the no-subscriber encoder count of zero, independent payloads, the default omitted payload and no payload for service closures
-- [ ] 3.3 Add runnable examples of a dead-letter counter and of a bridge actor that writes events to a logger through `@ion/json.to_json`, in the unpublished acceptance tests; verify the examples and that no published module imports logging for them
+- [x] 3.1 Publish `Undelivered` with the `Full`, `Closed` and `Discarded` reasons from `try_send`, `reenqueue`, `send` and the mailbox discard path; verify queue order before `Ended` on cancellation, no events for a close snapshot, and closed sends after the end, on wasm, js and native
+- [x] 3.2 Add the optional `payload` argument to `start`, `start_with`, `spawn` and `respond`, encode only for an undelivered event with at least one subscription, and give each subscriber an independent copy; verify the no-subscriber encoder count of zero, independent payloads, the default omitted payload and no payload for service closures
+- [x] 3.3 Add runnable examples of a dead-letter counter and of a bridge actor that writes events to a logger through `@ion/json.to_json`, in the unpublished acceptance tests; verify the examples and that no published module imports logging for them
 
 ## 4. Integration
 

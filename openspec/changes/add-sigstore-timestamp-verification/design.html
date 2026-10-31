@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>add-sigstore-timestamp-verification: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; --ok: #1b7f3b; --no: #b42318; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; --ok: #6fd68f; --no: #ff8a80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; vertical-align: top; }
+svg { max-width: 100%; height: auto; }
+.label { font-weight: 600; }
+.owner { color: var(--no); } .call { color: var(--ok); }
+svg text { fill: var(--fg); font: 13px system-ui, sans-serif; }
+svg rect { fill: var(--panel); stroke: var(--line); }
+svg line, svg path { stroke: var(--muted); fill: none; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>add-sigstore-timestamp-verification: design</h1>
+<p class="meta">OpenSpec change | 2026-10-31 | approved by the owner on 2026-10-31</p>
+
+<nav class="toc" aria-label="Contents">
+<ul>
+<li><a href="#context">Context</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#research">Research findings</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+<li><a href="#open-questions">Open questions</a></li>
+</ul>
+</nav>
+
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">proposal.md</a>. The requirements are in
+<a href="specs/sigstore-signed-timestamps/spec.md">sigstore-signed-timestamps</a> and the
+deltas for <a href="specs/sigstore-bundle-verification/spec.md">bundle verification</a>,
+<a href="specs/sigstore-trusted-root/spec.md">trusted root</a> and
+<a href="specs/sigstore-identity-policy/spec.md">identity policy</a>. The research read
+sigstore-go <code>be417d9</code> (the same as v1.3.0, which gh pins), timestamp-authority
+<code>cc4f1ac</code>, digitorus/timestamp <code>b4b58b9</code>, digitorus/pkcs7
+<code>d678ea5</code>, cli/cli <code>9490d20</code>, in-toto/attestation <code>50bf017</code>
+and sigstore-conformance <code>acb38c9</code>. Where this design is stricter than
+sigstore-go, it says so.</p>
+<table>
+<thead><tr><th>Attestation</th><th>Leaf</th><th>Time source</th><th>Identity</th></tr></thead>
+<tbody>
+<tr><td>Public repository (0.10.0 verifies it)</td><td>Public-good Fulcio, 10 minutes, SCT</td><td>Rekor v1 SET</td><td>Fulcio OIDC claims</td></tr>
+<tr><td>Private repository</td><td>GitHub Fulcio <code>l2</code>, 10 minutes, no SCT</td><td>RFC 3161, <code>timestamp.githubapp.com</code></td><td>Fulcio OIDC claims <code>.1.1</code> to <code>.1.22</code></td></tr>
+<tr><td>Immutable release</td><td>GitHub Fulcio <code>l1</code>, one year, no SCT, no OIDC claims</td><td>RFC 3161, <code>timestamp.githubapp.com</code></td><td>SAN <code>https://dotcom.releases.github.com</code>; repository and tag in the release predicate</td></tr>
+</tbody>
+</table>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p><strong>Goals:</strong> verify the three kinds above with the same verdicts as
+<code>gh attestation verify</code> and <code>gh release verify-asset</code>; keep one pure,
+synchronous <code>verify</code> call; let one combined root serve all GitHub attestations.</p>
+<p><strong>Non-goals:</strong> the proposal's out-of-scope list, BER input, and timestamp
+signatures other than ECDSA.</p>
+
+<h2 id="research">Research findings</h2>
+<h3 id="research-tsa">RFC 3161 as sigstore-go verifies it</h3>
+<ol>
+<li><code>signedTimestamp</code> is a whole TimeStampResp: <code>SEQUENCE { PKIStatusInfo, ContentInfo }</code>. Status must be 0 (granted); trailing bytes fail. At most 32 timestamps.</li>
+<li>The ContentInfo is id-signedData with exactly one signerInfo, identified by issuer and serial number. sigstore-go does not check that the content type is id-ct-TSTInfo.</li>
+<li>TSTInfo: version, policy, messageImprint, serialNumber, genTime (GeneralizedTime, optional fraction), accuracy, ordering, nonce, tsa, extensions. Only genTime is the time; the imprint hash is SHA-256, SHA-384 or SHA-512, and must not be empty.</li>
+<li>Signed attributes: messageDigest equals the hash of the TSTInfo bytes; signingTime, when present, is inside the signer validity. pkcs7 does not check contentType or the ESS signing certificate. The signature covers the attributes re-encoded as a DER SET (tag <code>0x31</code> instead of <code>[0]</code>).</li>
+<li>The signature hash comes from an <code>ecdsa-with-SHA*</code> OID. GitHub signs with SHA-384 on P-384; the public-good TSA signs with SHA-256 on <strong>P-384</strong>.</li>
+<li>The trusted-root TSA chain is leaf first. When it has a leaf, the signer must equal it; embedded certificates go only into the intermediate pool. The chain is checked at genTime; the leaf EKU is critical and is exactly timeStamping; an intermediate has no EKU, timeStamping or any EKU.</li>
+<li>The imprint is the hash of the signature bytes: the DSSE <code>signatures[0].sig</code> or the message signature. Checked on the release bundle: SHA-256 of the signature is <code>e381bcd6…2ac8</code>, the imprint.</li>
+<li>The TSA <code>validFor</code> contains genTime, both bounds inclusive. sigstore-go does not compare genTime with "now".</li>
+<li>Failing timestamps are dropped; the threshold counts the rest, once for each TSA URI.</li>
+</ol>
+<h3 id="research-gh">How gh combines time sources</h3>
+<p>gh picks the instance from the leaf issuer <code>O=</code>: public good gets
+<code>SCT(1) + TransparencyLog(1) + ObserverTimestamps(1)</code>; GitHub gets
+<code>SignedTimestamps(1)</code> only, with no log and no SCT. The leaf chain must verify at
+every verified time. GitHub's root has no CT logs, and its leaves have no SCT.</p>
+<h3 id="research-root">GitHub's trusted root</h3>
+<table>
+<thead><tr><th>Fact</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Source</td><td>TUF repository <code>https://tuf-repo.github.com</code>, target <code>trusted_root.json</code>; targets v10 (expires 2027-02-08), snapshot v82</td></tr>
+<tr><td>Pin</td><td>SHA-256 <code>484cdfe1a7c65479c5ba2a22193d1be90f0020db1997de696ab207434c62fbb7</code>, 31 645 bytes, at <code>https://tuf-repo.github.com/targets/484cdfe1…fbb7.trusted_root.json</code>. The second document of <code>gh attestation trusted-root</code> is the same JSON re-serialized (another digest), so pin the TUF bytes</td></tr>
+<tr><td>CAs</td><td>Six, <code>fulcio.githubapp.com</code>, chain <code>[l2, l1, Internal Services Root]</code>, P-384 with SHA-384; validity windows from 2023-10-27 to open</td></tr>
+<tr><td>TSAs</td><td>Six, <code>timestamp.githubapp.com</code>, chain <code>[TSA Timestamping, TSA intermediate, Internal Services Root]</code>, P-384, the same windows</td></tr>
+<tr><td>Logs</td><td>No transparency log and no CT log</td></tr>
+</tbody>
+</table>
+<h3 id="research-release">Release attestations</h3>
+<p>The cli/cli <code>v2.103.3</code> bundle: v0.3, no log entry, one timestamp (genTime
+<code>20261026192009Z</code>, policy <code>1.3.6.1.4.1.57264.2</code>), an empty <code>[0]</code>
+certificate set, signed attributes contentType, signingTime, messageDigest (SHA-384) and
+signingCertificateV2 (SHA-256 of the TSA leaf). <code>openssl ts -verify</code> passes against
+GitHub TSA 5. The predicate (<code>…/release/v0.2</code>) is
+<code>{databaseId, ownerId, packageId, purl: "pkg:github/cli/cli@v2.103.3", repository: "cli/cli", repositoryId, tag}</code>.
+The first subject is <code>{uri: purl, digest: {sha1: tag commit}}</code>, then one
+<code>{name, sha256}</code> for each asset. <code>gh release verify-asset</code> requires the SAN
+<code>^https://dotcom\.releases\.github\.com$</code>, any issuer, the tag in the predicate and an
+asset subject with the file's SHA-256.</p>
+<h3 id="research-fixtures">Test data</h3>
+<table>
+<thead><tr><th>Source</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td>cli/cli <code>v2.103.3</code> release attestation (downloaded 2026-10-31)</td><td>Release policy pass and mutations; TSA 5 and CA 5</td></tr>
+<tr><td>cli/cli <code>pkg/cmd/attestation/test/data/</code> (MIT): <code>github_release_bundle.json</code> (release v0.1, 2025), <code>github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl</code> and its wheel digest (private-repo SLSA, 2024), the <code>-missing-cert</code> variants</td><td>Older TSAs and CAs of the GitHub root; private-repo workflow policy</td></tr>
+<tr><td>sigstore-conformance <code>intoto-with-custom-trust-root</code>, <code>intoto-tsa-timestamp-outside-cert-validity_fail</code> and the other <code>intoto-*</code> cases</td><td>Rekor v1 <code>intoto/0.0.2</code> with a public-good-style TSA (P-384 with SHA-256)</td></tr>
+<tr><td>timestamp-authority <code>pkg/verification/testdata/response-injected-certs.tsr</code></td><td>A spoofed embedded certificate must not become the signer</td></tr>
+</tbody>
+</table>
+
+<h2 id="decisions">Decisions</h2>
+
+<h3 id="tsa-1">TSA-1. A strict internal timestamp package</h3>
+<p><span class="label call">Call.</span> Add <code>internal/timestamp</code> over the existing
+DER reader. It reads DER only (no BER), and it is stricter than sigstore-go in three
+places: the encapsulated content type must be id-ct-TSTInfo, the contentType attribute
+must be present with that value, and a signingCertificateV2 hash, when present, must equal
+the SHA-256 of the signer. All real tokens pass these rules. A token without signed
+attributes fails, as RFC 3161 requires them. GeneralizedTime with a fraction is read for
+genTime (no trailing zeros, <code>Z</code> only).</p>
+
+<h3 id="tsa-2">TSA-2. Signer and chain</h3>
+<p><span class="label call">Call.</span> For each TSA of the trusted root whose validity
+holds genTime: when its chain has a leaf, the signer is that leaf (an embedded certificate
+can never replace it); else the signer is the embedded certificate with the signerInfo's
+issuer and serial, and it must chain to the authority. The path is checked at genTime with
+the same validity, CA and critical-extension rules as Fulcio paths. The leaf EKU must be
+critical and hold only timeStamping; key usage, when present, must allow digitalSignature or
+contentCommitment. ECDSA P-256 and P-384 with SHA-256, SHA-384 or SHA-512 (from the
+signature OID) are supported; an RSA TSA gives <code>Unsupported(KeyType("RSA"))</code>.</p>
+
+<h3 id="time-2">TIME-2. Every time source must verify</h3>
+<p><span class="label owner">Owner, approved 2026-10-31.</span> The verified times are each log entry's
+integrated time and each timestamp's genTime. A timestamp or entry that does not verify fails
+the verdict, and genTime must not be later than "now". sigstore-go instead drops a failing
+timestamp when another time source meets its threshold. The strict rule is simpler to explain
+and cannot hide an attack in an extra timestamp; it can refuse a bundle that gh accepts only
+when the bundle holds a broken extra timestamp, which GitHub does not make.</p>
+
+<h3 id="root-1">ROOT-1. The SCT rule follows the root that issued the leaf</h3>
+<p><span class="label owner">Owner, approved 2026-10-31.</span> <code>TrustedRoot::combine(roots)</code> keeps,
+for each certificate authority, whether its source root lists CT logs. The SCT check runs
+only for authorities whose root lists CT logs. <code>TrustedRoot::github_attestations()</code>
+is the combination of the public-good and GitHub roots, so one root verifies public,
+private-repository and release attestations, and a public-good leaf still needs its SCT.
+This follows gh's instance choice, but by the authority that actually issued the leaf, not
+by the issuer <code>O=</code> text. Alternatives: an SCT rule by root only (a combined root would
+then require SCTs from GitHub leaves); or a list of roots in <code>verify</code> (a larger API change).</p>
+
+<h3 id="root-2">ROOT-2. Pin GitHub's root from its TUF target</h3>
+<p><span class="label call">Call.</span> Store the content-addressed TUF target bytes as
+<code>testdata/github/trusted_root.json</code>, list it in <code>SHA256SUMS</code>, and let
+<code>generate-sigstore-assets.mbtx</code> write <code>TrustedRoot::github()</code>. A test checks the
+digest <code>484cdfe1…fbb7</code>. A TUF client stays a later change.</p>
+
+<h3 id="pol-2">POL-2. Release policy</h3>
+<p><span class="label call">Call.</span> <code>Policy::github_release(repository, tag~)</code>
+requires the SAN <code>https://dotcom.releases.github.com</code>, no issuer (the policy's issuer
+becomes optional inside <code>Policy</code>), predicate type <code>…/release/v0.2</code> (a new
+<code>PredicateType::github_release_v0_2()</code>), and the predicate <code>repository</code> (ASCII case
+ignored), <code>tag</code> (exact) and <code>purl</code> (<code>pkg:github/&lt;owner&gt;/&lt;repo&gt;@&lt;tag&gt;</code>).
+<code>.repository_id(...)</code> and <code>.owner_id(...)</code> pin the predicate IDs. A new
+<code>PolicyMismatch::ReleaseMismatch(field~, expected~, actual~)</code> names the field. The
+artifact digest is the SHA-256 of a release asset; the tag commit (SHA-1) is out of scope.
+<code>Statement</code> keeps the raw predicate JSON for this check. Subjects with a <code>uri</code> and
+no <code>name</code> already parse.</p>
+
+<h3 id="log-2">LOG-2. Rekor v1 in-toto entries</h3>
+<p><span class="label call">Call, kept by the owner on 2026-10-31.</span> Accept <code>intoto/0.0.2</code> bodies: one envelope
+signature equal to the bundle signature, its PEM verifier equal to the leaf, and
+<code>payloadHash</code> equal to SHA-256 of the payload. This is small and makes six
+conformance cases (two of them with a TSA) test real behavior instead of a not-supported
+reason. Drop this group if you want the smallest change.</p>
+
+<h3 id="api-3">API-3. Verified times in the result</h3>
+<p><span class="label call">Call.</span> <code>VerifiedBundle</code> replaces <code>log_id</code>,
+<code>log_index</code> and <code>integrated_time</code> with <code>times : Array[VerifiedTime]</code>, where
+<code>VerifiedTime</code> has a <code>time</code> and a <code>source</code>:
+<code>TransparencyLog(log_id~, log_index~)</code> or <code>TimestampAuthority(uri~)</code>. A bundle can
+now have no log entry, so the old fields cannot stay. New <code>Failure</code> cases:
+<code>Timestamp(String)</code>, <code>TimestampAuthority(String)</code> and
+<code>TimestampTime(time~, now~)</code>. <code>Feature::TimestampAuthority</code> is removed.</p>
+
+<h3 id="str-1">STR-1. Two strictness fixes</h3>
+<p><span class="label call">Call.</span> An empty SCT list fails when an SCT is required.
+PrintableString accepts only <code>A–Z a–z 0–9 space ' ( ) + , - . / : = ?</code>; IA5String only
+bytes below <code>0x80</code>.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table>
+<thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>A TSA writes BER, which the DER reader refuses</td><td>GitHub and the public-good TSA write DER (checked); a refusal is a typed timestamp reason, not a pass</td></tr>
+<tr><td>GitHub rotates its root (new CA and TSA windows about every six months)</td><td>The pinned root covers all windows up to the open one; callers can pass a newer root; a TUF client follows</td></tr>
+<tr><td>Stricter than sigstore-go (TIME-2, TSA-1)</td><td>Each stricter rule is listed; real GitHub and conformance bundles pass</td></tr>
+<tr><td>No CRL or OCSP check of TSA certificates</td><td>Same as sigstore-go; the root's validity windows bound each authority</td></tr>
+<tr><td>Private-repository fixtures are from cli/cli test data (2024), not a fresh private bundle</td><td>They are real GitHub-instance bundles; the owner can add a fresh one from a private moonrockz repository later</td></tr>
+<tr><td>Breaking enum and result changes</td><td>Pre-1.0 minor version; listed in the proposal and the changelog</td></tr>
+</tbody>
+</table>
+
+<h2 id="migration">Migration plan</h2>
+<p>Callers that read <code>log_id</code>, <code>log_index</code> or <code>integrated_time</code> read
+<code>times</code> instead. Callers that match every <code>Failure</code> or <code>PolicyMismatch</code> case add the
+new arms, and drop <code>Feature::TimestampAuthority</code>. The next release, with owner approval,
+carries the change.</p>
+
+<h2 id="open-questions">Open questions</h2>
+<ul>
+<li>Whether to add a fresh private-repository attestation from a moonrockz private repository as a fixture. It does not change the design.</li>
+<li>Data-residency roots (<code>&lt;domain&gt;.trusted_root.json</code>) and SANs (<code>&lt;domain&gt;.releases.github.com</code>), for GitHub Enterprise Cloud with data residency.</li>
+</ul>
+
+</main>
+</body>
+</html>

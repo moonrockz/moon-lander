@@ -17,23 +17,27 @@ pub struct RequestActor[Req, Res] {
 /// Start an actor that answers each request with `handler(request)`. An error
 /// of `handler` ends the actor, fails its owner scope and wakes every pending
 /// caller with the cause. For a rejection that must not end the actor, give a
-/// response type such as `Result[Value, Rejection]`.
+/// response type such as `Result[Value, Rejection]`. `payload` selects the
+/// payload of an undelivered request from the request alone, as in `start`.
 pub fn[Req, Res] Scope::respond(
   self : Scope,
   handler : async (Req) -> Res,
   mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
   cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  payload? : @policy.PayloadPolicy[Req] = @policy.PayloadPolicy::default(),
 ) -> RequestActor[Req, Res] raise ActorError {
-  let actor = self.start(
+  let actor = self.start_encoded(
     (),
     (_, request : Request[Req, Res]) => {
       ignore(request.reply.send(handler(request.request)))
       Continue(())
     },
-    mailbox~,
-    on_stop?,
-    cleanup_limit~,
+    mailbox,
+    on_stop,
+    cleanup_limit,
+    None,
+    request => payload.apply(request.request),
   )
   { actor, }
 }

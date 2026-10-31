@@ -1,11 +1,31 @@
 ///|
-/// A runtime observation of an actor lifetime. Group 2 publishes only start and
-/// end; undelivered message events arrive in a later change.
+/// Why the runtime did not deliver a message to an actor.
+pub enum Undelivered {
+  /// A non-waiting send or `reenqueue` found the mailbox full.
+  Full
+  /// A send or non-waiting send found the actor closing or ended.
+  Closed
+  /// Stop, cancellation or failure removed the queued message.
+  Discarded
+} derive(Eq, Debug)
+
+///|
+pub extend Undelivered with Eq::{equal, not_equal}
+
+///|
+pub extend Undelivered with @debug.Debug::{to_repr}
+
+///|
+/// A runtime observation of an actor lifetime or of a message that the
+/// runtime did not deliver.
 pub enum ActorEvent {
   /// The actor can receive messages, after initialization.
   Started(ActorAddress)
   /// Processing and cleanup are complete. The end value matches `status()`.
   Ended(ActorAddress, ActorEnd)
+  /// The target actor did not get a message. The payload is present only when
+  /// the actor's payload policy selects one.
+  Undelivered(ActorAddress, Undelivered, payload~ : @ion.Ion?)
 } derive(Debug)
 
 ///|
@@ -23,6 +43,15 @@ pub fn ActorEvent::to_string(self : ActorEvent) -> String {
         Cancelled => "Cancelled"
       }
       "Ended(\{address.to_string()}, \{ending})"
+    }
+    Undelivered(address, reason, payload~) => {
+      let why = match reason {
+        Full => "Full"
+        Closed => "Closed"
+        Discarded => "Discarded"
+      }
+      let with_payload = if payload is Some(_) { ", payload" } else { "" }
+      "Undelivered(\{address.to_string()}, \{why}\{with_payload})"
     }
   }
 }
@@ -131,12 +160,68 @@ fn RuntimeEvents::publish(self : RuntimeEvents, event : ActorEvent) -> Unit {
   guard self.open else { return }
   let snapshot = self.entries.copy()
   for entry in snapshot {
-    match entry.subject.try_send(event) {
-      Accepted => ()
-      Full => entry.dropped.val += 1
-      Closed => self.remove(entry.id)
-    }
+    self.deliver(entry, event)
   }
+}
+
+///|
+/// Offer `event` to one subscriber without a runtime report of its own.
+fn RuntimeEvents::deliver(
+  self : RuntimeEvents,
+  entry : EventSubscriber,
+  event : ActorEvent,
+) -> Unit {
+  match entry.subject.try_send_quietly(event) {
+    Accepted => ()
+    Full => entry.dropped.val += 1
+    Closed => self.remove(entry.id)
+  }
+}
+
+///|
+/// Publish that `address` did not get `message`. Encode the payload only when
+/// the channel has a subscription, once; each subscriber but the last gets a
+/// deep copy, so no subscriber sees a change that another makes.
+fn[M] RuntimeEvents::publish_undelivered(
+  self : RuntimeEvents,
+  address : ActorAddress,
+  reason : Undelivered,
+  payload : (M) -> @ion.Ion?,
+  message : M,
+) -> Unit {
+  guard self.open && !self.entries.is_empty() else { return }
+  let encoded = payload(message)
+  let snapshot = self.entries.copy()
+  let last = snapshot.length() - 1
+  for index, entry in snapshot {
+    let payload = if index == last { encoded } else { encoded.map(copy_ion) }
+    self.deliver(entry, Undelivered(address, reason, payload~))
+  }
+}
+
+///|
+/// A deep copy of `value`: new arrays for its annotations and containers.
+/// Scalars hold immutable data and are shared. It uses no recursion.
+fn copy_ion(value : @ion.Ion) -> @ion.Ion {
+  value.fold_up(
+    scalar=scalar => scalar.with_annotations(scalar.annotations().copy()),
+    container=(original, children) => {
+      let rebuilt = match original.kind() {
+        Struct(_) =>
+          @ion.Ion::from_fields(
+            children.map(child => {
+              match child.0 {
+                Some(name) => @ion.Field::from_token(name, child.1)
+                None => abort("a struct field has a name")
+              }
+            }),
+          )
+        Sexp(_) => @ion.Ion::sexp(children.map(child => child.1))
+        _ => @ion.Ion::list(children.map(child => child.1))
+      }
+      rebuilt.with_annotations(original.annotations().copy())
+    },
+  )
 }
 
 ///|

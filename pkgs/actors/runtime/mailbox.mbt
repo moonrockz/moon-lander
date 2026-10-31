@@ -19,6 +19,9 @@ priv struct Mailbox[M] {
   space : @cond_var.Cond
   /// The number of producers that wait for space now.
   mut waiting_producers : Int
+  /// Publish an undelivered event for a message, when the owner scope has a
+  /// runtime event channel. `None` does no work.
+  mut undelivered : ((M, Undelivered) -> Unit)?
 }
 
 ///|
@@ -36,6 +39,7 @@ fn[M] Mailbox::new(policy : @policy.MailboxPolicy) -> Mailbox[M] {
     arrivals: @cond_var.Cond(),
     space: @cond_var.Cond(),
     waiting_producers: 0,
+    undelivered: None,
   }
 }
 
@@ -51,6 +55,7 @@ fn[M] Mailbox::fixed(messages : Array[M], admitting~ : Bool) -> Mailbox[M] {
     arrivals: @cond_var.Cond(),
     space: @cond_var.Cond(),
     waiting_producers: 0,
+    undelivered: None,
   }
 }
 
@@ -83,6 +88,30 @@ fn[M] Mailbox::admit(
 }
 
 ///|
+/// Publish that `message` was not delivered, when a channel is present.
+fn[M] Mailbox::report(
+  self : Mailbox[M],
+  message : M,
+  reason : Undelivered,
+) -> Unit {
+  if self.undelivered is Some(report) {
+    report(message, reason)
+  }
+}
+
+///|
+/// Admit `message` without waiting, and report a rejection as undelivered.
+fn[M] Mailbox::offer(self : Mailbox[M], message : M) -> @policy.Admission {
+  let admission = self.admit(message, None)
+  match admission {
+    Accepted => ()
+    Full => self.report(message, Full)
+    Closed => self.report(message, Closed)
+  }
+  admission
+}
+
+///|
 /// Wait for space, then admit. A cancellation while the producer waits leaves
 /// no message, and the condition variable removes the waiter.
 async fn[M] Mailbox::put(
@@ -94,7 +123,10 @@ async fn[M] Mailbox::put(
   for ;; {
     match self.admit(message, discard) {
       Accepted => return
-      Closed => fail_unless_cancelled(Closed(address))
+      Closed => {
+        self.report(message, Closed)
+        fail_unless_cancelled(ActorError::Closed(address))
+      }
       Full => {
         self.waiting_producers += 1
         defer {
@@ -118,10 +150,30 @@ fn[M] Mailbox::seal(self : Mailbox[M]) -> Unit {
 ///|
 /// Reject later admission, remove the queued messages, wake their askers and
 /// all waiters. The first close gives the removed messages, oldest first;
-/// later closes give `None`.
+/// later closes give `None`. The caller gets the messages, so they are not
+/// reported as undelivered.
 fn[M] Mailbox::close(self : Mailbox[M]) -> Array[M]? {
-  self.admitting = false
   let first = !self.closed
+  let pending = self.clear(_ => ())
+  if first {
+    Some(pending)
+  } else {
+    None
+  }
+}
+
+///|
+/// Like `close`, but report each removed message as discarded, oldest first,
+/// and give nothing. Stop, cancellation and failure use it.
+fn[M] Mailbox::discard(self : Mailbox[M]) -> Unit {
+  ignore(self.clear(message => self.report(message, Discarded)))
+}
+
+///|
+/// Reject later admission, remove the queued messages and wake all waiters.
+/// Call `removed` for each message, oldest first, then wake its asker.
+fn[M] Mailbox::clear(self : Mailbox[M], removed : (M) -> Unit) -> Array[M] {
+  self.admitting = false
   self.closed = true
   let pending = self.queue.iter().collect()
   let discards = self.discards.iter().collect()
@@ -129,16 +181,15 @@ fn[M] Mailbox::close(self : Mailbox[M]) -> Array[M]? {
   self.discards.clear()
   self.arrivals.broadcast()
   self.space.broadcast()
+  for message in pending {
+    removed(message)
+  }
   for discard in discards {
     if discard is Some(discard) {
       discard()
     }
   }
-  if first {
-    Some(pending)
-  } else {
-    None
-  }
+  pending
 }
 
 ///|

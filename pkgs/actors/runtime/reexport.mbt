@@ -9,4 +9,5 @@ pub using @policy {
   type ActorName,
   type NameError,
   type NameRule,
+  type PayloadPolicy,
 }

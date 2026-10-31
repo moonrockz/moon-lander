@@ -6,12 +6,14 @@ import {
   "moonbitlang/core/debug",
   "moonbitlang/core/deque",
   "moonbitlang/core/immut/sorted_map",
+  "moonrockz/ion/ion",
 }
 
 import {
   "moonrockz/moon-lander-actors/runtime" @actors,
   "moonrockz/moon-lander-core" @lander_core,
   "moonbitlang/async" @aio,
+  "moonrockz/ion/ion",
 } for "test"
 
 import {

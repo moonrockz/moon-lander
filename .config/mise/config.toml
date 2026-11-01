@@ -37,16 +37,16 @@ zig = "0.17.0"
 # `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | MOON_HOME=$(mise where http:moonbit) bash -s -- <version>`.
 
 [tools."http:moonbit"]
-version = "0.10.17+d971670cd"
+version = "0.10.18+6c83a7f62"
 bin_path = "bin"
 
 [tools."http:moonbit".platforms]
-linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-x86_64.tar.gz" }
-linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-aarch64.tar.gz" }
-macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-darwin-aarch64.tar.gz" }
-windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
 # No Windows arm64 build is published; Windows on Arm runs the x64 build under emulation.
-windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.18%2B6c83a7f62/moonbit-windows-x86_64.zip", format = "zip" }
 
 [env]
 _.path = ["./node_modules/.bin"]
@@ -112,8 +112,21 @@ description = "Execute retained upstream runtime tests (args: --test native|wasm
 run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx"
 
 [tasks."check:moonx"]
-description = "Qualify the optional launcher with the primary stock compiler"
-run = "moonx scripts/toolchain.mbtx scripts/check-moonx.mbtx"
+description = "Complete and qualify the pinned stock 0.10.17 consumer"
+run = "mise exec http:moonbit@0.10.18+6c83a7f62 -- moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx 0.10.17+d971670cd"
+
+# The primary compiler is newer than the stock pair that the Moonx spec qualifies, so stock
+# 0.10.17 is a task-scoped install too, like stock 0.10.16 below.
+[tasks."check:moonx".tools."http:moonbit"]
+version = "0.10.17+d971670cd"
+bin_path = "bin"
+
+[tasks."check:moonx".tools."http:moonbit".platforms]
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-darwin-aarch64.tar.gz" }
+windows-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
+windows-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-windows-x86_64.zip", format = "zip" }
 
 [tasks."check:moonx-retained"]
 description = "Run retained upstream native and Wasm runtime tests sequentially"
@@ -129,7 +142,7 @@ run = "moonx scripts/toolchain.mbtx scripts/moonx-runtime.mbtx --test-drift"
 
 [tasks."check:moonx-stock16"]
 description = "Complete and qualify the pinned stock 0.10.16 consumer"
-run = "mise exec http:moonbit@0.10.17+d971670cd -- moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx"
+run = "mise exec http:moonbit@0.10.18+6c83a7f62 -- moonx scripts/toolchain.mbtx scripts/qualify-moonx-stock.mbtx 0.10.16+b1a0e846e"
 
 # Task-scoped tools avoid installing the second stock compiler in unrelated jobs.
 # The primary compiler pin and its wrapper selection stay unchanged.
@@ -176,15 +189,26 @@ run = "moonx scripts/toolchain.mbtx scripts/versions.mbtx check"
 # runtime mode (ZIG_CROSS_RUNTIME) or a cross-build CI step; the pin is checked by scripts/cross-build.mbtx.
 [tasks."test:native-zig"]
 description = "Run native tests with zig as the C compiler"
-run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 exec host -- moonx scripts/test.mbtx native"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.2 exec host -- moonx scripts/test.mbtx native"
 
 [tasks."doctor:zig-cross"]
-description = "Diagnose zig-cross targets without building (args: targets, --json; set ZIG_CROSS_RUNTIME=sync for sync)"
-run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 doctor"
+description = "Diagnose zig-cross targets without building (args: targets, --json; the sync runtime needs stock 0.10.17, see build:cross)"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.2 doctor"
 
 [tasks."build:cross"]
-description = "Run doctor, then cross-build Linux arm64 (full runtime) and Darwin and Windows (sync runtime) programs (args: full, sync or target names)"
-run = "moonx scripts/toolchain.mbtx scripts/cross-build.mbtx"
+description = "Run doctor, then cross-build Linux arm64 (full runtime) and Darwin and Windows (sync runtime, stock 0.10.17) programs (args: full, sync or target names)"
+run = "mise exec http:moonbit@0.10.18+6c83a7f62 -- moonx scripts/toolchain.mbtx scripts/cross-build.mbtx"
+
+# zig-cross accepts the sync runtime only with stock MoonBit 0.10.17, so the sync plan of
+# scripts/cross-build.mbtx runs with this task-scoped install. The full plan uses the primary pin.
+[tasks."build:cross".tools."http:moonbit"]
+version = "0.10.17+d971670cd"
+bin_path = "bin"
+
+[tasks."build:cross".tools."http:moonbit".platforms]
+linux-x64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-linux-aarch64.tar.gz" }
+macos-arm64 = { url = "https://cli.moonbitlang.com/binaries/0.10.17%2Bd971670cd/moonbit-darwin-aarch64.tar.gz" }
 
 [tasks."test:node-adapter"]
 description = "Test the js config and hosting adapters on Node and Bun (args: node|bun)"
@@ -220,7 +244,7 @@ run = "moonx scripts/toolchain.mbtx scripts/browser.mbtx test"
 
 [tasks."test:browser-zig"]
 description = "Test the browser fixture with zig as the C compiler of the native parity reference (args: --verify-failures, --engines chromium,firefox,webkit)"
-run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.0 exec host -- moonx scripts/browser.mbtx test"
+run = "moonx scripts/toolchain.mbtx moonrockz/zig-cross@0.3.2 exec host -- moonx scripts/browser.mbtx test"
 
 [tasks."test:browser-failures"]
 description = "Prove browser assertion and missing-engine failures propagate"

@@ -1,19 +1,66 @@
 ----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/http",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/http",
+  "moonbitlang/async@0.22.7/process",
   "moonbitlang/core/env",
 }
 ----
 
 ///|
+/// A stock release that the Moonx spec qualifies. Each one is a task-scoped
+/// `http:moonbit` tool of its mise task, beside the newer primary pin.
+priv enum StockPin {
+  Stock16
+  Stock17
+}
+
+///|
+suberror StockPinError {
+  UnsupportedStockPin(String)
+}
+
+///|
+fn StockPin::parse(input : String) -> StockPin raise StockPinError {
+  match input {
+    "0.10.16+b1a0e846e" => Stock16
+    "0.10.17+d971670cd" => Stock17
+    _ => raise UnsupportedStockPin(input)
+  }
+}
+
+///|
+fn StockPin::text(self : StockPin) -> String {
+  match self {
+    Stock16 => "0.10.16+b1a0e846e"
+    Stock17 => "0.10.17+d971670cd"
+  }
+}
+
+///|
+test "StockPin accepts only the qualified stock releases" {
+  for pin in [Stock16, Stock17] {
+    assert_eq(StockPin::parse(pin.text()).text(), pin.text())
+  }
+  for input in ["", "0.10.18+6c83a7f62", "0.10.17", "0.10.16+b1a0e846e "] {
+    let result = Ok(StockPin::parse(input)) catch { error => Err(error) }
+    assert_true(result is Err(UnsupportedStockPin(_)))
+  }
+}
+
+///|
 /// Complete only the task-scoped official stock installation, then qualify it
 /// through explicit MOON_TOOLCHAIN_ROOT/MOON_HOME/PATH selection in the checker.
 /// Never replace the primary compiler, core or Moonrun with source builds.
+///
+/// Usage: `qualify-moonx-stock.mbtx STOCK_VERSION [checker arguments]`.
 async fn main {
-  let version = "0.10.16+b1a0e846e"
+  let args = @env.args()[1:].to_owned()
+  guard !args.is_empty() else {
+    fail("Use STOCK_VERSION [--published-checksum APPROVED_SHA256]")
+  }
+  let version = StockPin::parse(args[0]).text()
   let (code, out, err) = @process.collect_output("mise", [
     "where",
     "http:moonbit@" + version,
@@ -32,7 +79,13 @@ async fn main {
     assert_eq(response.code, 200)
     let installer = temporary + "/" + name
     @fs.write_file(installer, body.binary())
-    let environment = { "MOON_HOME": root, "MOONBIT_INSTALL_VERSION": version }
+    // The installer bundles the core with the stock moon. Select the stock compiler for it too:
+    // the inherited MOON_TOOLCHAIN_ROOT names the primary pin.
+    let environment = {
+      "MOON_HOME": root,
+      "MOON_TOOLCHAIN_ROOT": root,
+      "MOONBIT_INSTALL_VERSION": version,
+    }
     let code = if windows {
       @process.run(
         "pwsh",
@@ -74,7 +127,7 @@ async fn main {
     [
       "scripts/toolchain.mbtx", "scripts/check-moonx.mbtx", "--toolchain-root", root,
     ] +
-    @env.args()[1:].to_owned(),
+    args[1:].to_owned(),
   )
   assert_eq(code, 0)
 }

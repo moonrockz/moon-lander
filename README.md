@@ -125,7 +125,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |
 | `mise run build:browser-adapter` | Generate the production browser Web API adapter |
 | `mise run check:browser-adapter` | Reject stale production browser FFI without rewriting it |
-| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.3.0` |
+| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.3.2` |
 | `mise run doctor:zig-cross` | Diagnose zig-cross targets without building (args: targets, `--json`) |
 | `mise run build:cross` | Run doctor, then cross-build Linux arm64, macOS and Windows programs (args: plans `full`, `sync` or target names) |
 | `mise run clean` | Remove build artifacts |
@@ -141,8 +141,13 @@ build anything:
 
 ```shell
 mise run doctor:zig-cross -- linux-x64 darwin-arm64 windows-x64
-ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross -- --json
+mise run doctor:zig-cross -- --json
 ```
+
+zig-cross accepts the sync runtime only with stock MoonBit `0.10.17+d971670cd`.
+With the primary pin, `ZIG_CROSS_RUNTIME=sync` doctor reports
+`ZC_SYNC_UNAVAILABLE`. `mise run build:cross -- sync` installs that stock
+release as a task-scoped tool and runs the sync doctor and build with it.
 
 The JSON report (`schema_version: 1`) has a status, and findings with stable
 codes and next steps. Status `error` exits with 1. In a next step, replace
@@ -161,10 +166,11 @@ machine builds. The macOS and Windows jobs build `darwin-arm64` and
 | Plan | Runtime | Targets | Programs |
 | --- | --- | --- | --- |
 | `full` | full (default) | `linux-arm64` | `full_programs`: `tests/console-host-program` (hosting, the console signal stub and `moonbitlang/async`) and the sync programs |
-| `sync` | experimental `ZIG_CROSS_RUNTIME=sync` | `darwin-arm64`, `darwin-x64`, `windows-x64` | Only the programs in `sync_programs` of `scripts/cross-build.mbtx` |
+| `sync` | experimental `ZIG_CROSS_RUNTIME=sync`, with stock MoonBit `0.10.17+d971670cd` | `darwin-arm64`, `darwin-x64`, `windows-x64` | Only the programs in `sync_programs` of `scripts/cross-build.mbtx` |
 
-What a Linux machine can and cannot do, with zig-cross `0.3.0`, MoonBit
-`0.10.17+d971670cd` and Zig `0.17.0`:
+What a Linux machine can and cannot do, with zig-cross `0.3.2`, Zig `0.17.0`,
+MoonBit `0.10.18+6c83a7f62` for the full runtime and `0.10.17+d971670cd` for
+the sync runtime:
 
 | Code | What doctor reports | Result for Moon-Lander |
 | --- | --- | --- |
@@ -182,8 +188,7 @@ of each OS: on macOS, the native legs of `check:console`, `check:config` and
 recovery that doctor gives for excluded APIs.
 
 Before you add a program to `sync_programs`, run
-`ZIG_CROSS_RUNTIME=sync mise run doctor:zig-cross` and
-`mise run build:cross -- sync`. Before you change the zig-cross pin, a runtime
+`mise run build:cross -- sync`, which runs the sync doctor first. Before you change the zig-cross pin, a runtime
 mode or the CI cross-build job, run doctor on Linux and macOS. Record the codes
 in the pull request. Change the pin in `scripts/cross-build.mbtx`,
 `.config/mise/config.toml` and this file together; `mise run test:scripts` fails

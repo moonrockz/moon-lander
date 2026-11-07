@@ -1,2 +1,5 @@
-import { "moonrockz/moon-lander-logging-hosting-async" @library }
+import {
+  "moonrockz/moon-lander-logging-hosting-async" @library,
+}
+
 pkgtype(kind: "executable")

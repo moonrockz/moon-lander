@@ -1,7 +1,7 @@
 ///|
 /// The time that the bridge gives each direct diagnostic line after the final
 /// drain. A stalled standard error does not keep the process open longer.
-let diagnostic_limit : Int = 1000
+let diagnostic_limit : Int32 = 1000
 
 ///|
 /// Write `line` directly to standard error, outside the session, within
@@ -30,8 +30,10 @@ fn console_healthy(report : @sinks.SessionReport) -> Bool {
   report
   .destinations()
   .iter()
-  .any(destination => destination.target() is Console(StandardError) &&
-    destination.failure() is None)
+  .any(destination => {
+    destination.target() is Console(StandardError) &&
+    destination.failure() is None
+  })
 }
 
 ///|
@@ -125,7 +127,14 @@ pub async fn[S] run(
   signals? : @hosting.SignalProbe,
   completed? : @console.Completion,
 ) -> Unit {
-  run_with_session(settings, session => host(session.logger()), command, observer?, signals?, completed?)
+  run_with_session(
+    settings,
+    session => host(session.logger()),
+    command,
+    observer?,
+    signals?,
+    completed?,
+  )
 }
 
 ///|
@@ -154,16 +163,14 @@ pub async fn[S] run_with_session(
   signals? : @hosting.SignalProbe,
   completed? : @console.Completion,
 ) -> Unit {
-  @sink_runtime.with_session(
-    settings,
-    observer?,
-    session => {
-      let logger = session.logger()
-      let built = host(session)
-        |> @hosting.report_writer(
-          report_through(logger, settings, () => session.status()),
-        )
-      @console.run(built, command, signals?, completed?, finalize=selected => finalize(session, selected))
-    },
-  )
+  @sink_runtime.with_session(settings, observer?, session => {
+    let logger = session.logger()
+    let built = host(session)
+      |> @hosting.report_writer(
+        report_through(logger, settings, () => session.status()),
+      )
+    @console.run(built, command, signals?, completed?, finalize=selected => {
+      finalize(session, selected)
+    })
+  })
 }

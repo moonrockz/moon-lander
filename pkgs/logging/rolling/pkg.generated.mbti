@@ -9,20 +9,22 @@ import {
 // Values
 
 // Errors
+#derive(@debug.Debug)
 pub suberror RollingError {
   InvalidStem(input~ : String, rule~ : StemRule)
   NotPositiveByteLimit(bytes~ : Int64)
   NotPositiveFileCount(count~ : Int32)
   NegativeByteCount(bytes~ : Int64)
   SequenceExhausted(last~ : String)
-} derive(@debug.Debug)
+}
 pub fn RollingError::message(Self) -> String
 pub fn RollingError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct ByteCount {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn ByteCount::compare(Self, Self) -> Int32
 pub fn ByteCount::equal(Self, Self) -> Bool
 pub fn ByteCount::hash(Self) -> Int32
@@ -41,9 +43,10 @@ pub fn ByteCount::to_string(Self) -> String
 pub fn ByteCount::zero() -> Self
 pub impl Show for ByteCount
 
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct FileByteLimit {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn FileByteLimit::bytes(Int64) -> Self raise RollingError
 pub fn FileByteLimit::compare(Self, Self) -> Int32
 pub fn FileByteLimit::default() -> Self
@@ -58,28 +61,31 @@ pub fn FileByteLimit::op_lt(Self, Self) -> Bool
 pub fn FileByteLimit::to_int64(Self) -> Int64
 pub fn FileByteLimit::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FileFormat {
   Text
   JsonLines
-} derive(Eq, @debug.Debug)
+}
 pub fn FileFormat::default() -> Self
 pub fn FileFormat::equal(Self, Self) -> Bool
 pub fn FileFormat::extension(Self) -> String
 pub fn FileFormat::not_equal(Self, Self) -> Bool
 pub fn FileFormat::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FilePlan {
   Append(LogFileName)
   Open(LogFileName, existing_size~ : ByteCount)
   Roll(LogFileName, existing_size~ : ByteCount)
-} derive(Eq, @debug.Debug)
+}
 pub fn FilePlan::equal(Self, Self) -> Bool
 pub fn FilePlan::not_equal(Self, Self) -> Bool
 pub fn FilePlan::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct FileSet {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn FileSet::equal(Self, Self) -> Bool
 pub fn FileSet::format(Self) -> FileFormat
 pub fn FileSet::marker_name(Self) -> String
@@ -91,18 +97,20 @@ pub fn FileSet::retention(Self, Retention, Array[ListedFile], LogFileName) -> Ar
 pub fn FileSet::stem(Self) -> LogFileStem
 pub fn FileSet::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ListedFile {
   name : String
   size : ByteCount
   regular : Bool
-} derive(Eq, @debug.Debug)
+}
 pub fn ListedFile::equal(Self, Self) -> Bool
 pub fn ListedFile::not_equal(Self, Self) -> Bool
 pub fn ListedFile::to_repr(Self) -> @debug.Repr
 
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct LogFileName {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn LogFileName::compare(Self, Self) -> Int32
 pub fn LogFileName::epoch_day(Self) -> Int64?
 pub fn LogFileName::equal(Self, Self) -> Bool
@@ -119,9 +127,10 @@ pub fn LogFileName::to_repr(Self) -> @debug.Repr
 pub fn LogFileName::to_string(Self) -> String
 pub impl Show for LogFileName
 
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct LogFileStem {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn LogFileStem::compare(Self, Self) -> Int32
 pub fn LogFileStem::equal(Self, Self) -> Bool
 pub fn LogFileStem::hash(Self) -> Int32
@@ -137,9 +146,10 @@ pub fn LogFileStem::to_repr(Self) -> @debug.Repr
 pub fn LogFileStem::to_string(Self) -> String
 pub impl Show for LogFileStem
 
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct RetainedFileCount {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn RetainedFileCount::compare(Self, Self) -> Int32
 pub fn RetainedFileCount::count(Int32) -> Self raise RollingError
 pub fn RetainedFileCount::default() -> Self
@@ -154,28 +164,31 @@ pub fn RetainedFileCount::op_lt(Self, Self) -> Bool
 pub fn RetainedFileCount::to_int(Self) -> Int32
 pub fn RetainedFileCount::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Retention {
   KeepNewest(RetainedFileCount)
   KeepAll
-} derive(Eq, @debug.Debug)
+}
 pub fn Retention::default() -> Self
 pub fn Retention::equal(Self, Self) -> Bool
 pub fn Retention::not_equal(Self, Self) -> Bool
 pub fn Retention::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum RollingPolicy {
   Daily
   Size(FileByteLimit)
   DailyAndSize(FileByteLimit)
-} derive(Eq, @debug.Debug)
+}
 pub fn RollingPolicy::default() -> Self
 pub fn RollingPolicy::equal(Self, Self) -> Bool
 pub fn RollingPolicy::not_equal(Self, Self) -> Bool
 pub fn RollingPolicy::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct RollingState {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn RollingState::active(Self) -> LogFileName?
 pub fn RollingState::equal(Self, Self) -> Bool
 pub fn RollingState::file_set(Self) -> FileSet
@@ -188,6 +201,7 @@ pub fn RollingState::size(Self) -> ByteCount
 pub fn RollingState::to_repr(Self) -> @debug.Repr
 pub fn RollingState::wrote(Self, ByteCount) -> Self
 
+#derive(Eq, @debug.Debug)
 pub enum StemRule {
   Empty
   TooLong
@@ -195,7 +209,7 @@ pub enum StemRule {
   InvalidCharacter(Char)
   NumericSuffix
   ReservedDeviceName
-} derive(Eq, @debug.Debug)
+}
 pub fn StemRule::equal(Self, Self) -> Bool
 pub fn StemRule::not_equal(Self, Self) -> Bool
 pub fn StemRule::to_repr(Self) -> @debug.Repr

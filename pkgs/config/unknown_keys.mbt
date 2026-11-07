@@ -2,6 +2,7 @@
 /// What `bind_or` does with a configured key that the bound value does not
 /// hold. `FromJson` ignores unknown keys, so a misspelled key has no effect
 /// unless the check is on.
+#derive(Eq, Debug)
 pub(all) enum UnknownKeys {
   /// Ignore unknown keys, as `FromJson` does. The default.
   Allow
@@ -12,7 +13,7 @@ pub(all) enum UnknownKeys {
   /// section, and the keys below them. Use it for a decoder that accepts a key
   /// that its encoder does not write, for example an alias.
   RejectExcept(Array[String])
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend UnknownKeys with Eq::{equal, not_equal}
@@ -66,20 +67,20 @@ fn Config::check_unknown_keys(
             .any(listed => starts_with(listed, child_names))
           match written_fields.get(name) {
             Some(child) =>
-              walk(child_steps, child_names, { ion: field.value() }, child)
+              walk(child_steps, child_names, { ion: field.value(), }, child)
             // A table above a listed key path: the encoder may leave it out,
             // so check its keys against the listed paths only.
             None if ancestor && field.value().kind() is Struct(_) =>
               walk(
                 child_steps,
                 child_names,
-                { ion: field.value() },
+                { ion: field.value(), },
                 Json::object(Map([])),
               )
             None => {
               let path = decode_path_below(Some(key), child_steps)
               failures.push({
-                at: [{ path, blame: self.blame(path) }],
+                at: [{ path, blame: self.blame(path), }],
                 detail: unknown_key_detail,
               })
             }
@@ -88,7 +89,12 @@ fn Config::check_unknown_keys(
       (List(items) | Sexp(items), Array(written_items)) if items.length() ==
         written_items.length() =>
         for index, item in items {
-          walk([..steps, Index(index)], names, { ion: item }, written_items[index])
+          walk(
+            [..steps, Index(index)],
+            names,
+            { ion: item, },
+            written_items[index],
+          )
         }
       _ => ()
     }

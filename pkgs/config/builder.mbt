@@ -38,26 +38,26 @@ pub fn secret_syntax(
   builder : ConfigBuilder,
   syntax : SecretSyntax,
 ) -> ConfigBuilder {
-  { ..builder, secret_syntax: syntax }
+  { ..builder, secret_syntax: syntax, }
 }
 
 ///|
 /// Add `source` after the sources that the builder holds.
 pub fn add(builder : ConfigBuilder, source : ConfigSource) -> ConfigBuilder {
-  { ..builder, entries: [..builder.entries, Source(source)] }
+  { ..builder, entries: [..builder.entries, Source(source)], }
 }
 
 ///|
 /// Add a source provider. During the load, its sources take its place in
 /// merge order.
 pub fn provider(builder : ConfigBuilder, p : SourceProvider) -> ConfigBuilder {
-  { ..builder, entries: [..builder.entries, Provider(p)] }
+  { ..builder, entries: [..builder.entries, Provider(p)], }
 }
 
 ///|
 /// Register `format` after the formats that the builder holds.
 pub fn format(builder : ConfigBuilder, format : Format) -> ConfigBuilder {
-  { ..builder, formats: [..builder.formats, format.copy()] }
+  { ..builder, formats: [..builder.formats, format.copy()], }
 }
 
 ///|
@@ -112,20 +112,20 @@ pub fn env_vars(
   builder : ConfigBuilder,
   vars : Map[String, String],
 ) -> ConfigBuilder {
-  { ..builder, env_vars: Some(vars.copy()) }
+  { ..builder, env_vars: Some(vars.copy()), }
 }
 
 ///|
 /// Set the working directory of the run. A relative explicit file path joins
 /// it.
 pub fn working_dir(builder : ConfigBuilder, dir : String) -> ConfigBuilder {
-  { ..builder, working_dir: Some(dir) }
+  { ..builder, working_dir: Some(dir), }
 }
 
 ///|
 /// Set the platform of the run.
 pub fn platform(builder : ConfigBuilder, p : Platform) -> ConfigBuilder {
-  { ..builder, platform: Some(p) }
+  { ..builder, platform: Some(p), }
 }
 
 ///|
@@ -143,9 +143,9 @@ pub fn defaults(
 pub fn file(
   builder : ConfigBuilder,
   path : String,
-  role? : FileRole = Explicit,
+  role~ : FileRole = Explicit,
   name? : String,
-  priority? : Int,
+  priority? : Int32,
 ) -> ConfigBuilder {
   add(builder, ConfigSource::file(path, role~, name?, priority?))
 }

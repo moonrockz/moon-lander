@@ -3,6 +3,7 @@ package "moonrockz/sigstore"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -13,36 +14,41 @@ pub fn public_good_trusted_root_json() -> String
 pub fn verify(Bundle, ArtifactDigest, TrustedRoot, Policy, now~ : Instant, alternatives? : Array[Policy]) -> Verdict
 
 // Errors
+#derive(@debug.Debug)
 pub suberror BundleError {
   UnsupportedBundleMediaType(String)
   InvalidBundle(field~ : String, rule~ : String)
-} derive(@debug.Debug)
+}
 pub fn BundleError::message(Self) -> String
 pub fn BundleError::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub suberror DigestError {
   InvalidDigest(text~ : String, rule~ : DigestRule)
-} derive(@debug.Debug)
+}
 pub fn DigestError::message(Self) -> String
 pub fn DigestError::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub suberror IdentityError {
   InvalidIdentity(kind~ : IdentityKind, text~ : String, rule~ : String)
-} derive(@debug.Debug)
+}
 pub fn IdentityError::message(Self) -> String
 pub fn IdentityError::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub suberror TrustedRootError {
   UnsupportedTrustedRootMediaType(String)
   InvalidTrustedRoot(field~ : String, rule~ : String)
-} derive(@debug.Debug)
+}
 pub fn TrustedRootError::message(Self) -> String
 pub fn TrustedRootError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct ArtifactDigest {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ArtifactDigest::equal(Self, Self) -> Bool
 pub fn ArtifactDigest::not_equal(Self, Self) -> Bool
 pub fn ArtifactDigest::of_bytes(BytesView) -> Self
@@ -59,11 +65,12 @@ pub struct Bundle {
 pub fn Bundle::parse(StringView) -> Self raise BundleError
 pub fn Bundle::version(Self) -> BundleVersion
 
+#derive(Compare, Eq, @debug.Debug)
 pub enum BundleVersion {
   V0_1
   V0_2
   V0_3
-} derive(Compare, Eq, @debug.Debug)
+}
 pub fn BundleVersion::compare(Self, Self) -> Int32
 pub fn BundleVersion::equal(Self, Self) -> Bool
 pub fn BundleVersion::not_equal(Self, Self) -> Bool
@@ -73,6 +80,7 @@ pub fn BundleVersion::op_le(Self, Self) -> Bool
 pub fn BundleVersion::op_lt(Self, Self) -> Bool
 pub fn BundleVersion::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct CertificateClaims {
   issuer : String?
   subject_names : Array[String]
@@ -90,44 +98,48 @@ pub struct CertificateClaims {
   build_trigger : String?
   run_invocation_uri : String?
   source_repository_visibility : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn CertificateClaims::equal(Self, Self) -> Bool
 pub fn CertificateClaims::not_equal(Self, Self) -> Bool
 pub fn CertificateClaims::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum CertificateProblem {
   Unreadable(String)
   NotForCodeSigning
   NoDigitalSignature
   UnknownCriticalExtension(String)
   LeafIsAuthority
-} derive(Eq, @debug.Debug)
+}
 pub fn CertificateProblem::equal(Self, Self) -> Bool
 pub fn CertificateProblem::message(Self) -> String
 pub fn CertificateProblem::not_equal(Self, Self) -> Bool
 pub fn CertificateProblem::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Claim {
   SourceRepository
   SourceOwner
   RepositoryId
   OwnerId
   SourceRef
-} derive(Eq, @debug.Debug)
+}
 pub fn Claim::equal(Self, Self) -> Bool
 pub fn Claim::not_equal(Self, Self) -> Bool
 pub fn Claim::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum DigestRule {
   MissingAlgorithm
   UnsupportedAlgorithm(String)
   NotHex
   WrongLength(Int32)
-} derive(Eq, @debug.Debug)
+}
 pub fn DigestRule::equal(Self, Self) -> Bool
 pub fn DigestRule::not_equal(Self, Self) -> Bool
 pub fn DigestRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Failure {
   BundleShape(String)
   TransparencyLog(String)
@@ -147,11 +159,12 @@ pub enum Failure {
   Statement(String)
   ArtifactDigestMismatch(ArtifactDigest)
   Policy(Array[PolicyMismatch])
-} derive(Eq, @debug.Debug)
+}
 pub fn Failure::equal(Self, Self) -> Bool
 pub fn Failure::not_equal(Self, Self) -> Bool
 pub fn Failure::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum Feature {
   PublicKeyMaterial
   TimestampAlgorithm(String)
@@ -159,14 +172,15 @@ pub enum Feature {
   EntryKind(kind~ : String, version~ : String)
   KeyType(String)
   DigestAlgorithm(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn Feature::equal(Self, Self) -> Bool
 pub fn Feature::not_equal(Self, Self) -> Bool
 pub fn Feature::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct GitHubId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn GitHubId::equal(Self, Self) -> Bool
 pub fn GitHubId::not_equal(Self, Self) -> Bool
 pub fn GitHubId::output(Self, &Logger) -> Unit
@@ -175,9 +189,10 @@ pub fn GitHubId::to_repr(Self) -> @debug.Repr
 pub fn GitHubId::to_string(Self) -> String
 pub impl Show for GitHubId
 
+#derive(@debug.Debug)
 pub struct GitHubOwner {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn GitHubOwner::equal(Self, Self) -> Bool
 pub fn GitHubOwner::not_equal(Self, Self) -> Bool
 pub fn GitHubOwner::output(Self, &Logger) -> Unit
@@ -187,9 +202,10 @@ pub fn GitHubOwner::to_string(Self) -> String
 pub impl Eq for GitHubOwner
 pub impl Show for GitHubOwner
 
+#derive(@debug.Debug)
 pub struct GitHubRepository {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn GitHubRepository::equal(Self, Self) -> Bool
 pub fn GitHubRepository::not_equal(Self, Self) -> Bool
 pub fn GitHubRepository::output(Self, &Logger) -> Unit
@@ -201,9 +217,10 @@ pub fn GitHubRepository::url(Self) -> String
 pub impl Eq for GitHubRepository
 pub impl Show for GitHubRepository
 
+#derive(Eq, @debug.Debug)
 pub struct GitRef {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn GitRef::equal(Self, Self) -> Bool
 pub fn GitRef::not_equal(Self, Self) -> Bool
 pub fn GitRef::output(Self, &Logger) -> Unit
@@ -212,6 +229,7 @@ pub fn GitRef::to_repr(Self) -> @debug.Repr
 pub fn GitRef::to_string(Self) -> String
 pub impl Show for GitRef
 
+#derive(Eq, @debug.Debug)
 pub enum IdentityKind {
   IssuerUrl
   SubjectName
@@ -222,14 +240,15 @@ pub enum IdentityKind {
   NumericId
   Predicate
   Tag
-} derive(Eq, @debug.Debug)
+}
 pub fn IdentityKind::equal(Self, Self) -> Bool
 pub fn IdentityKind::not_equal(Self, Self) -> Bool
 pub fn IdentityKind::to_repr(Self) -> @debug.Repr
 
+#derive(Compare, Eq, @debug.Debug)
 pub struct Instant {
   // private fields
-} derive(Compare, Eq, @debug.Debug)
+}
 pub fn Instant::compare(Self, Self) -> Int32
 pub fn Instant::equal(Self, Self) -> Bool
 pub fn Instant::from_unix_seconds(Int64) -> Self
@@ -244,9 +263,10 @@ pub fn Instant::to_string(Self) -> String
 pub fn Instant::unix_seconds(Self) -> Int64
 pub impl Show for Instant
 
+#derive(Eq, @debug.Debug)
 pub struct Issuer {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn Issuer::equal(Self, Self) -> Bool
 pub fn Issuer::github_actions() -> Self
 pub fn Issuer::not_equal(Self, Self) -> Bool
@@ -256,10 +276,11 @@ pub fn Issuer::to_repr(Self) -> @debug.Repr
 pub fn Issuer::to_string(Self) -> String
 pub impl Show for Issuer
 
+#derive(Eq, @debug.Debug)
 pub enum KeyStatus {
   Supported
   Unsupported(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn KeyStatus::equal(Self, Self) -> Bool
 pub fn KeyStatus::not_equal(Self, Self) -> Bool
 pub fn KeyStatus::to_repr(Self) -> @debug.Repr
@@ -279,6 +300,7 @@ pub fn Policy::source_ref(Self, GitRef) -> Self
 pub fn Policy::source_repository(Self, GitHubRepository) -> Self
 pub fn Policy::subject_name(SubjectName, issuer? : Issuer) -> Self
 
+#derive(Eq, @debug.Debug)
 pub enum PolicyMismatch {
   IssuerMismatch(expected~ : String, actual~ : String?)
   IdentityMismatch(expected~ : String, actual~ : Array[String])
@@ -286,15 +308,16 @@ pub enum PolicyMismatch {
   RunnerEnvironment(actual~ : String?)
   PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
   ReleaseMismatch(field~ : ReleaseField, expected~ : String, actual~ : String?)
-} derive(Eq, @debug.Debug)
+}
 pub fn PolicyMismatch::equal(Self, Self) -> Bool
 pub fn PolicyMismatch::message(Self) -> String
 pub fn PolicyMismatch::not_equal(Self, Self) -> Bool
 pub fn PolicyMismatch::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct PredicateType {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn PredicateType::equal(Self, Self) -> Bool
 pub fn PredicateType::github_release_v0_2() -> Self
 pub fn PredicateType::not_equal(Self, Self) -> Bool
@@ -305,15 +328,17 @@ pub fn PredicateType::to_repr(Self) -> @debug.Repr
 pub fn PredicateType::to_string(Self) -> String
 pub impl Show for PredicateType
 
+#derive(Eq, @debug.Debug)
 pub enum Rejection {
   Unsupported(Feature)
   Invalid(Failure)
-} derive(Eq, @debug.Debug)
+}
 pub fn Rejection::equal(Self, Self) -> Bool
 pub fn Rejection::message(Self) -> String
 pub fn Rejection::not_equal(Self, Self) -> Bool
 pub fn Rejection::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum ReleaseField {
   Issuer
   Repository
@@ -321,14 +346,15 @@ pub enum ReleaseField {
   Purl
   RepositoryId
   OwnerId
-} derive(Eq, @debug.Debug)
+}
 pub fn ReleaseField::equal(Self, Self) -> Bool
 pub fn ReleaseField::not_equal(Self, Self) -> Bool
 pub fn ReleaseField::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct ReleaseTag {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ReleaseTag::equal(Self, Self) -> Bool
 pub fn ReleaseTag::not_equal(Self, Self) -> Bool
 pub fn ReleaseTag::output(Self, &Logger) -> Unit
@@ -337,28 +363,31 @@ pub fn ReleaseTag::to_repr(Self) -> @debug.Repr
 pub fn ReleaseTag::to_string(Self) -> String
 pub impl Show for ReleaseTag
 
+#derive(Eq, @debug.Debug)
 pub struct Statement {
   predicate_type : PredicateType
   subjects : Array[Subject]
   payload : Bytes
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn Statement::equal(Self, Self) -> Bool
 pub fn Statement::not_equal(Self, Self) -> Bool
-pub fn Statement::predicate(Self) -> Json
+pub fn Statement::predicate(Self) -> @json.Json
 pub fn Statement::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct Subject {
   name : String
   sha256 : ArtifactDigest?
-} derive(Eq, @debug.Debug)
+}
 pub fn Subject::equal(Self, Self) -> Bool
 pub fn Subject::not_equal(Self, Self) -> Bool
 pub fn Subject::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct SubjectName {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SubjectName::equal(Self, Self) -> Bool
 pub fn SubjectName::not_equal(Self, Self) -> Bool
 pub fn SubjectName::output(Self, &Logger) -> Unit
@@ -367,10 +396,11 @@ pub fn SubjectName::to_repr(Self) -> @debug.Repr
 pub fn SubjectName::to_string(Self) -> String
 pub impl Show for SubjectName
 
+#derive(Eq, @debug.Debug)
 pub enum TimeSource {
   Log(log_id~ : Bytes, log_index~ : Int64)
   Authority(uri~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn TimeSource::equal(Self, Self) -> Bool
 pub fn TimeSource::not_equal(Self, Self) -> Bool
 pub fn TimeSource::to_repr(Self) -> @debug.Repr
@@ -397,35 +427,39 @@ pub struct TrustedRootSummary {
   timestamp_authorities : Array[String]
 }
 
+#derive(Eq, @debug.Debug)
 pub enum Verdict {
   Verified(VerifiedBundle)
   Rejected(Rejection)
-} derive(Eq, @debug.Debug)
+}
 pub fn Verdict::equal(Self, Self) -> Bool
 pub fn Verdict::not_equal(Self, Self) -> Bool
 pub fn Verdict::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct VerifiedBundle {
   statement : Statement?
   policy_index : Int32
   claims : CertificateClaims
   times : Array[VerifiedTime]
-} derive(Eq, @debug.Debug)
+}
 pub fn VerifiedBundle::equal(Self, Self) -> Bool
 pub fn VerifiedBundle::not_equal(Self, Self) -> Bool
 pub fn VerifiedBundle::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct VerifiedTime {
   time : Instant
   source : TimeSource
-} derive(Eq, @debug.Debug)
+}
 pub fn VerifiedTime::equal(Self, Self) -> Bool
 pub fn VerifiedTime::not_equal(Self, Self) -> Bool
 pub fn VerifiedTime::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct WorkflowPath {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn WorkflowPath::equal(Self, Self) -> Bool
 pub fn WorkflowPath::not_equal(Self, Self) -> Bool
 pub fn WorkflowPath::output(Self, &Logger) -> Unit

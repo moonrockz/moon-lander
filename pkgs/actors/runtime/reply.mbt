@@ -1,12 +1,13 @@
 ///|
 /// The result of a reply.
+#derive(Eq, Debug)
 pub(all) enum ReplyOutcome {
   /// The waiting caller gets the value.
   Delivered
   /// No caller waits: the request already has a reply, timed out, or the
   /// caller was cancelled.
   Expired
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ReplyOutcome with Eq::{equal, not_equal}
@@ -16,12 +17,13 @@ pub extend ReplyOutcome with @debug.Debug::{to_repr}
 
 ///|
 /// How long an ask waits for admission and the reply together.
+#derive(Eq, Debug)
 pub(all) enum WaitPolicy {
   /// At most this long, from the start of the ask.
   Within(@lander_core.TimeLimit)
   /// Until the reply, or until the target ends. There is no deadline.
   UntilStopped
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend WaitPolicy with Eq::{equal, not_equal}
@@ -57,7 +59,7 @@ pub struct Reply[R] {
 
 ///|
 fn[R] Reply::new() -> Reply[R] {
-  { state: Waiting, changed: @cond_var.Cond() }
+  { state: Waiting, changed: @cond_var.Cond(), }
 }
 
 ///|
@@ -106,7 +108,8 @@ async fn[M, R] ask_through(
   // discarded request reports the failure.
   let discard = () => {
     match life {
-      Some({ ending: Some(Failed(error)), .. }) => reply.end_with(Ended(Failed(error)))
+      Some({ ending: Some(Failed(error)), .. }) =>
+        reply.end_with(Ended(Failed(error)))
       _ => reply.end_with(Discarded)
     }
   }
@@ -126,7 +129,8 @@ async fn[M, R] ask_through(
         Answered(value) => break value
         Ended(Failed(error)) =>
           match life {
-            Some(life) => fail_unless_cancelled(ActorFailed(life.address, error))
+            Some(life) =>
+              fail_unless_cancelled(ActorFailed(life.address, error))
             None => fail_unless_cancelled(closed)
           }
         Ended(_) | Discarded | Expired => fail_unless_cancelled(closed)
@@ -143,7 +147,10 @@ async fn[M, R] ask_through(
 
 ///|
 /// The answer of an ask, or `TimedOut` when the wait policy ended first.
-fn[R] answer_or_timeout(answer : R?, timeout : WaitPolicy) -> R raise ActorError {
+fn[R] answer_or_timeout(
+  answer : R?,
+  timeout : WaitPolicy,
+) -> R raise ActorError {
   match (answer, timeout) {
     (Some(value), _) => value
     (None, Within(limit)) => raise TimedOut(limit)
@@ -161,7 +168,7 @@ fn[R] answer_or_timeout(answer : R?, timeout : WaitPolicy) -> R raise ActorError
 pub async fn[M, R] ActorRef::ask(
   self : ActorRef[M],
   build : (Reply[R]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> R {
   answer_or_timeout(self.try_ask(build, timeout~), timeout)
 }
@@ -172,14 +179,12 @@ pub async fn[M, R] ActorRef::ask(
 pub async fn[M, R] ActorRef::try_ask(
   self : ActorRef[M],
   build : (Reply[R]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> R? {
   ask_through(
     build,
     timeout,
-    (message, discard) => {
-      self.mailbox.put(self.life.address, message, discard?=discard)
-    },
+    (message, discard) => self.mailbox.put(self.life.address, message, discard?),
     Some(self.life),
     Closed(self.life.address),
   )
@@ -190,7 +195,7 @@ pub async fn[M, R] ActorRef::try_ask(
 pub async fn[M, R, T] Actor::ask(
   self : Actor[M, R],
   build : (Reply[T]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> T {
   self.target.ask(build, timeout~)
 }
@@ -200,7 +205,7 @@ pub async fn[M, R, T] Actor::ask(
 pub async fn[M, R, T] Actor::try_ask(
   self : Actor[M, R],
   build : (Reply[T]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> T? {
   self.target.try_ask(build, timeout~)
 }

@@ -47,9 +47,10 @@ pub fn parse_tag(BytesView, Int32) -> Element raise DerError
 pub fn unix_seconds(Int32, Int32, Int32, Int32, Int32, Int32) -> Int64
 
 // Errors
+#derive(@debug.Debug)
 pub(all) suberror DerError {
   Malformed(String)
-} derive(@debug.Debug)
+}
 pub fn DerError::message(Self) -> String
 pub fn DerError::to_repr(Self) -> @debug.Repr
 

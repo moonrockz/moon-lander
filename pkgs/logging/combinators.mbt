@@ -2,19 +2,19 @@
 priv struct NullLogger {}
 
 ///|
-impl Logger for NullLogger with enabled(_self, _level) {
+impl Logger for NullLogger with fn enabled(_self, _level) {
   false
 }
 
 ///|
-impl Logger for NullLogger with log(_self, _event) {
+impl Logger for NullLogger with fn log(_self, _event) {
   ()
 }
 
 ///|
 /// A logger that enables no level and drops each event.
 pub fn null_logger() -> &Logger {
-  NullLogger::{  }
+  NullLogger::{ }
 }
 
 ///|
@@ -24,12 +24,12 @@ priv struct MinLevel {
 }
 
 ///|
-impl Logger for MinLevel with enabled(self, level) {
+impl Logger for MinLevel with fn enabled(self, level) {
   level >= self.minimum && self.inner.enabled(level)
 }
 
 ///|
-impl Logger for MinLevel with log(self, event) {
+impl Logger for MinLevel with fn log(self, event) {
   if Logger::enabled(self, event.level) {
     self.inner.log(event)
   }
@@ -40,7 +40,7 @@ impl Logger for MinLevel with log(self, event) {
 /// level is `minimum` or higher and `logger` enables it, and passes only the events
 /// of an enabled level to `logger`.
 pub fn min_level(logger : &Logger, minimum : Level) -> &Logger {
-  MinLevel::{ inner: logger, minimum }
+  MinLevel::{ inner: logger, minimum, }
 }
 
 ///|
@@ -49,12 +49,12 @@ priv struct FanOut {
 }
 
 ///|
-impl Logger for FanOut with enabled(self, level) {
+impl Logger for FanOut with fn enabled(self, level) {
   self.loggers.iter().any(logger => logger.enabled(level))
 }
 
 ///|
-impl Logger for FanOut with log(self, event) {
+impl Logger for FanOut with fn log(self, event) {
   for logger in self.loggers {
     if logger.enabled(event.level) {
       logger.log(event)
@@ -68,7 +68,7 @@ impl Logger for FanOut with log(self, event) {
 /// that enable its level. Later changes to the `loggers` array do not change the
 /// fan-out.
 pub fn fan_out(loggers : Array[&Logger]) -> &Logger {
-  FanOut::{ loggers: loggers.copy() }
+  FanOut::{ loggers: loggers.copy(), }
 }
 
 ///|
@@ -78,14 +78,14 @@ priv struct WithCategory {
 }
 
 ///|
-impl Logger for WithCategory with enabled(self, level) {
+impl Logger for WithCategory with fn enabled(self, level) {
   self.inner.enabled(level)
 }
 
 ///|
-impl Logger for WithCategory with log(self, event) {
+impl Logger for WithCategory with fn log(self, event) {
   if Logger::enabled(self, event.level) {
-    self.inner.log({ ..event, category: Some(self.name) })
+    self.inner.log({ ..event, category: Some(self.name), })
   }
 }
 
@@ -93,5 +93,5 @@ impl Logger for WithCategory with log(self, event) {
 /// Wrap `logger` with the category `name`, for example `morphir.build`. The
 /// wrapper sets that category on each event and does not change the other fields.
 pub fn with_category(logger : &Logger, name : String) -> &Logger {
-  WithCategory::{ inner: logger, name }
+  WithCategory::{ inner: logger, name, }
 }

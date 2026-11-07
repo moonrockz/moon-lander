@@ -1,6 +1,7 @@
 name = "moon-lander-workspace"
 
 // Tooling and tests must never publish. The pinned toolchain rejects private publication.
+
 private = true
 
 version = "0.11.0"

@@ -1,6 +1,7 @@
 ///|
 /// The discovery inputs that a host gives from its arguments. Every field
 /// defaults to "not given". Discovery never reads the arguments itself.
+#derive(Eq, Debug)
 pub(all) struct DiscoveryOptions {
   /// The environment name, for example from `--environment`.
   environment : String?
@@ -12,7 +13,7 @@ pub(all) struct DiscoveryOptions {
   project : String?
   /// Explicit profile selection; profiles remain opt-in.
   profiles : @config.ProfileSelection
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DiscoveryOptions with Eq::{equal, not_equal}
@@ -24,12 +25,12 @@ pub extend DiscoveryOptions with @debug.Debug::{to_repr}
 /// Options with every field not given.
 pub fn DiscoveryOptions::new(
   environment? : String,
-  config? : @config.SourceSelection[String] = Discover,
-  isolated? : Bool = false,
+  config~ : @config.SourceSelection[String] = Discover,
+  isolated~ : Bool = false,
   project? : String,
-  profiles? : @config.ProfileSelection = Unspecified,
+  profiles~ : @config.ProfileSelection = Unspecified,
 ) -> DiscoveryOptions {
-  { environment, config, isolated, project, profiles }
+  { environment, config, isolated, project, profiles, }
 }
 
 ///|
@@ -58,6 +59,7 @@ pub struct Conventions {
 
 ///|
 /// A standard part of a convention set, which `without` can remove.
+#derive(Eq, Debug)
 pub(all) enum Part {
   /// The system directory: `/etc/<app>`, or `%PROGRAMDATA%/<app>` on Windows.
   SystemDir
@@ -71,7 +73,7 @@ pub(all) enum Part {
   LocalOverrides
   /// `*.user.*` files next to each primary.
   UserOverrides
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Part with Eq::{equal, not_equal}
@@ -119,11 +121,7 @@ priv struct WorkspaceKeys {
 /// workspace.
 /// `prefix` defaults to the name in upper case with `-` changed to `_`, and
 /// `display` to the name.
-pub fn base(
-  name : String,
-  prefix? : String,
-  display? : String,
-) -> Conventions {
+pub fn base(name : String, prefix? : String, display? : String) -> Conventions {
   {
     name,
     prefix: prefix.unwrap_or(name.to_upper().replace_all(old="-", new="_")),
@@ -157,7 +155,12 @@ pub fn app_dirs(
   {
     ..base(name, prefix?, display?),
     parts: [
-      SystemDir, UserConfigDir, AppHome, Layouts, LocalOverrides, UserOverrides,
+      SystemDir,
+      UserConfigDir,
+      AppHome,
+      Layouts,
+      LocalOverrides,
+      UserOverrides,
     ],
     walk_up: true,
   }
@@ -217,7 +220,7 @@ pub fn user_overrides(conventions : Conventions) -> Conventions {
 ///|
 /// Remove one standard part, for example `without(SystemDir)`.
 pub fn without(conventions : Conventions, part : Part) -> Conventions {
-  { ..conventions, parts: conventions.parts.filter(p => p != part) }
+  { ..conventions, parts: conventions.parts.filter(p => p != part), }
 }
 
 ///|
@@ -225,7 +228,7 @@ fn Conventions::with_part(self : Conventions, part : Part) -> Conventions {
   if self.parts.contains(part) {
     self
   } else {
-    { ..self, parts: [..self.parts, part] }
+    { ..self, parts: [..self.parts, part], }
   }
 }
 
@@ -239,7 +242,7 @@ fn Conventions::has(self : Conventions, part : Part) -> Bool {
 /// relative `dir` joins the working directory. A working directory outside
 /// `dir` raises `OutsideBoundary`.
 pub fn boundary(conventions : Conventions, dir : String) -> Conventions {
-  { ..conventions, boundary: Some(dir) }
+  { ..conventions, boundary: Some(dir), }
 }
 
 ///|
@@ -253,7 +256,7 @@ pub fn legacy(
   format~ : @config.Format,
   decode~ : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError,
 ) -> Conventions {
-  { ..conventions, legacy: Some({ name, format, decode }) }
+  { ..conventions, legacy: Some({ name, format, decode, }), }
 }
 
 ///|
@@ -272,14 +275,14 @@ pub fn legacy(
 /// is never its own member.
 pub fn workspace(
   conventions : Conventions,
-  members? : String = "workspace.members",
-  exclude? : String = "workspace.exclude",
-  default_member? : String = "workspace.default_member",
-  project_name? : String = "project.name",
+  members~ : String = "workspace.members",
+  exclude~ : String = "workspace.exclude",
+  default_member~ : String = "workspace.default_member",
+  project_name~ : String = "project.name",
 ) -> Conventions {
   {
     ..conventions,
-    workspace: Some({ members, exclude, default_member, project_name }),
+    workspace: Some({ members, exclude, default_member, project_name, }),
   }
 }
 
@@ -293,7 +296,7 @@ pub fn member_scope_keys(
   conventions : Conventions,
   paths : Array[String],
 ) -> Conventions {
-  { ..conventions, member_scope: [..conventions.member_scope, ..paths] }
+  { ..conventions, member_scope: [..conventions.member_scope, ..paths], }
 }
 
 ///|
@@ -306,7 +309,7 @@ pub fn inherited_filter(
   conventions : Conventions,
   keys : Array[String],
 ) -> Conventions {
-  { ..conventions, inherited: [..conventions.inherited, ..keys] }
+  { ..conventions, inherited: [..conventions.inherited, ..keys], }
 }
 
 ///|
@@ -346,7 +349,7 @@ pub fn Conventions::display(self : Conventions) -> String {
 pub fn add(
   builder : @config.ConfigBuilder,
   conventions : Conventions,
-  options? : DiscoveryOptions = DiscoveryOptions::new(),
+  options~ : DiscoveryOptions = DiscoveryOptions::new(),
 ) -> @config.ConfigBuilder {
   @config.provider(builder, {
     name: conventions.display,
@@ -356,35 +359,47 @@ pub fn add(
 
 ///|
 /// Enable independent configuration profiles with an immutable policy.
-pub fn profiles(conventions : Conventions, policy : @profiles.Policy) -> Conventions {
-  { ..conventions, profiles: Some(policy) }
+pub fn profiles(
+  conventions : Conventions,
+  policy : @profiles.Policy,
+) -> Conventions {
+  { ..conventions, profiles: Some(policy), }
 }
 
 ///|
 /// Set the root selection policy. NearestFile retains the legacy discovery
 /// behavior. WorkspaceFirst inspects documents up to the first declared section.
-pub fn root_policy(conventions : Conventions, policy : RootPolicy) -> Conventions {
-  { ..conventions, root_policy: policy }
+pub fn root_policy(
+  conventions : Conventions,
+  policy : RootPolicy,
+) -> Conventions {
+  { ..conventions, root_policy: policy, }
 }
 
 ///|
 /// Select automatic single-member loading or leave the member walk to the caller.
-pub fn member_loading(conventions : Conventions, loading : MemberLoading) -> Conventions {
-  { ..conventions, member_loading: loading }
+pub fn member_loading(
+  conventions : Conventions,
+  loading : MemberLoading,
+) -> Conventions {
+  { ..conventions, member_loading: loading, }
 }
 
 ///|
 /// Whether this convention set reserves profile controls and its selector.
-pub fn Conventions::profiles_enabled(self : Conventions) -> Bool { self.profiles is Some(_) }
+pub fn Conventions::profiles_enabled(self : Conventions) -> Bool {
+  self.profiles is Some(_)
+}
 
 ///|
 /// How an explicit config selection participates in discovery.
+#derive(Eq, Debug)
 pub(all) enum SelectedFilePolicy {
   /// Use it as the project primary without walk-up (the default).
   Primary
   /// Retain discovery and move the selected file to one Explicit layer at 325.
   Overlay
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SelectedFilePolicy with Eq::{equal, not_equal}
@@ -395,6 +410,9 @@ pub extend SelectedFilePolicy with @debug.Debug::{to_repr}
 ///|
 /// Select explicit-primary compatibility or an overlay above base primaries
 /// and below members. Overlay paths resolve against the supplied working directory.
-pub fn selected_file_policy(conventions : Conventions, policy : SelectedFilePolicy) -> Conventions {
-  { ..conventions, selected_file: policy }
+pub fn selected_file_policy(
+  conventions : Conventions,
+  policy : SelectedFilePolicy,
+) -> Conventions {
+  { ..conventions, selected_file: policy, }
 }

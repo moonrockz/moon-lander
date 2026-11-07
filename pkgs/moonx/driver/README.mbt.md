@@ -24,17 +24,22 @@ fn command_example(raw_arguments : Array[String]) -> Unit raise {
 /// Body of a synchronous main with an application-owned embedded payload.
 fn payload_example() -> Unit raise {
   let entry = @moonx.RelativeFilePath::parse("entry.js")
-  let payload = @moonx.Payload::new([
-    @moonx.PayloadFile::new(
-      @moonx.RelativeFilePath::parse("package.json"),
-      b"{\"type\":\"module\"}",
-    ),
-    @moonx.PayloadFile::new(entry, b"console.log(process.cwd());"),
-  ], entry)
-  @driver.run(Node(@moonx.NodeLaunch::new(payload, @moonx.Arguments::empty())),
+  let payload = @moonx.Payload::new(
+    [
+      @moonx.PayloadFile::new(
+        @moonx.RelativeFilePath::parse("package.json"),
+        b"{\"type\":\"module\"}",
+      ),
+      @moonx.PayloadFile::new(entry, b"console.log(process.cwd());"),
+    ],
+    entry,
+  )
+  @driver.run(
+    Node(@moonx.NodeLaunch::new(payload, @moonx.Arguments::empty())),
     completed=outcome => {
       match outcome.result() {
-        NotStarted(_) => eprintln("Application may report its startup result here")
+        NotStarted(_) =>
+          eprintln("Application may report its startup result here")
         Started(_) => ()
       }
     },

@@ -1,11 +1,12 @@
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct Backend {
   out_dir : String
-  level : Int
-} derive(FromJson, ToJson, Debug, Eq)
+  level : Int32
+}
 
 ///|
-impl @config.Validate for Backend with validate(self) {
+impl @config.Validate for Backend with fn validate(self) {
   if self.level > 0 {
     []
   } else {
@@ -15,7 +16,7 @@ impl @config.Validate for Backend with validate(self) {
 
 ///|
 fn backend_default() -> Backend {
-  { out_dir: "out", level: 1 }
+  { out_dir: "out", level: 1, }
 }
 
 ///|
@@ -45,9 +46,9 @@ test "Each child is a named instance" {
   guard backends.get("ts") is Some(ts) else { fail("no ts instance") }
   @expect.expect(ts.name).to_equal(Some("ts"))
   @expect.expect(ts.key.to_string()).to_equal("backends.ts")
-  @expect.expect(ts.value).to_equal({ out_dir: "dist/ts", level: 1 })
+  @expect.expect(ts.value).to_equal({ out_dir: "dist/ts", level: 1, })
   guard backends.get("scala") is Some(scala) else { fail("no scala instance") }
-  @expect.expect(scala.value).to_equal({ out_dir: "out", level: 2 })
+  @expect.expect(scala.value).to_equal({ out_dir: "out", level: 2, })
   @expect.expect(backends.get("java") is None).to_be_true()
 }
 
@@ -89,11 +90,7 @@ test "an absent section gives no named instances" {
 ///|
 test "a child name with a dot keeps its quotes in the key text" {
   let config = load_files([
-    (
-      "/repo/morphir.toml",
-      Workspace,
-      "backends.\"eu.west\".level = 4",
-    ),
+    ("/repo/morphir.toml", Workspace, "backends.\"eu.west\".level = 4"),
   ])
   let keys = []
   let backends = @config.named(config, "backends", (config, key) => {
@@ -128,11 +125,10 @@ test "other errors of the binder pass through" {
     ("/repo/morphir.toml", Workspace, "backends.ts.level = 1"),
   ])
   try {
-    let _ : @config.NamedOptions[Backend] = @config.named(
-      config,
-      "backends",
-      (_, _) => raise @config.KeyNotFound(key=@config.KeyPath::parse("x")),
-    )
+    let _ : @config.NamedOptions[Backend] = @config.named(config, "backends", (
+      _,
+      _,
+    ) => raise @config.KeyNotFound(key=@config.KeyPath::parse("x")))
   } catch {
     KeyNotFound(..) => ()
     error => fail("expected KeyNotFound, got \{error.message()}")

@@ -2,6 +2,7 @@
 /// A concrete Jupyter traversal node. Notebooks contain cells; code cells
 /// contain outputs; Markdown and raw cells contain attachments. Output and
 /// attachment nodes are leaves. Metadata and MIME JSON use their own accessors.
+#derive(Eq, Debug)
 pub(all) enum Node {
   /// A root document whose children are its cells.
   Notebook(Notebook)
@@ -11,7 +12,7 @@ pub(all) enum Node {
   Output(Output)
   /// A named attachment leaf with its immutable MIME bundle.
   Attachment(name~ : String, data~ : MimeBundle)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Node with Eq::{equal, not_equal}

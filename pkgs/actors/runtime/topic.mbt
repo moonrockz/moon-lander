@@ -1,7 +1,7 @@
 ///|
 /// One subscription of a topic.
 priv struct Subscriber[M] {
-  id : Int
+  id : Int32
   subject : Subject[M]
   /// Remove the subscription's exit hook from its scope.
   release : () -> Unit
@@ -14,24 +14,24 @@ priv struct Subscriber[M] {
 /// mediator topic, which calls and awaits its handlers.
 pub struct Topic[M] {
   priv mut entries : Array[Subscriber[M]]
-  priv mut last_id : Int
+  priv mut last_id : Int32
   priv mut open : Bool
 }
 
 ///|
 /// A topic with no subscribers.
 pub fn[M] Topic::new() -> Topic[M] {
-  { entries: [], last_id: 0, open: true }
+  { entries: [], last_id: 0, open: true, }
 }
 
 ///|
 /// The number of subscriptions now.
-pub fn[M] Topic::subscriber_count(self : Topic[M]) -> Int {
+pub fn[M] Topic::subscriber_count(self : Topic[M]) -> Int32 {
   self.entries.length()
 }
 
 ///|
-fn[M] Topic::remove(self : Topic[M], id : Int) -> Unit {
+fn[M] Topic::remove(self : Topic[M], id : Int32) -> Unit {
   for entry in self.entries {
     if entry.id == id {
       (entry.release)()
@@ -68,7 +68,7 @@ pub fn[M] Scope::subscribe(
   let id = topic.last_id
   let cancel = () => topic.remove(id)
   let release = self.on_exit(cancel)
-  topic.entries.push({ id, subject, release })
+  topic.entries.push({ id, subject, release, })
   { cancel, }
 }
 

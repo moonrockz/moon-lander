@@ -14,9 +14,9 @@ priv struct Recorder {
   written : Array[String]
   mut stalled : Bool
   released : @async.CondVar
-  mut fail_from : Int
-  mut writes : Int
-  mut closes : Int
+  mut fail_from : Int32
+  mut writes : Int32
+  mut closes : Int32
 }
 
 ///|
@@ -39,36 +39,41 @@ fn Recorder::release(self : Recorder) -> Unit {
 }
 
 ///|
-fn Recorder::sink(self : Recorder, minimum? : @logging.Level = Trace) -> Sink {
-  Sink::new(self.target, minimum, record => "\{record.timestamp()} \{record.message()}\n", {
-    write: async fn(text) {
-      while self.stalled {
-        self.released.wait()
-        // A cancelled writer stops here, as a production adapter does.
-        if @async.is_being_cancelled() {
-          fail("cancelled")
+fn Recorder::sink(self : Recorder, minimum~ : @logging.Level = Trace) -> Sink {
+  Sink::new(
+    self.target,
+    minimum,
+    record => "\{record.timestamp()} \{record.message()}\n",
+    {
+      write: async fn(text) {
+        while self.stalled {
+          self.released.wait()
+          // A cancelled writer stops here, as a production adapter does.
+          if @async.is_being_cancelled() {
+            fail("cancelled")
+          }
         }
-      }
-      self.writes += 1
-      if self.fail_from >= 0 && self.writes > self.fail_from {
-        return Some(@sinks.SinkFailure::new(Write, self.target, "disk full"))
-      }
-      self.written.push(text)
-      None
+        self.writes += 1
+        if self.fail_from >= 0 && self.writes > self.fail_from {
+          return Some(@sinks.SinkFailure::new(Write, self.target, "disk full"))
+        }
+        self.written.push(text)
+        None
+      },
+      close: fn() {
+        self.closes += 1
+        []
+      },
     },
-    close: fn() {
-      self.closes += 1
-      []
-    },
-  })
+  )
 }
 
 ///|
 fn settings(
-  event_limit? : Int = 1024,
-  byte_limit? : Int64 = 8L * 1024L * 1024L,
-  record_limit? : Int64 = 1024L * 1024L,
-  drain_millis? : Int = 5000,
+  event_limit~ : Int32 = 1024,
+  byte_limit~ : Int64 = 8L * 1024L * 1024L,
+  record_limit~ : Int64 = 1024L * 1024L,
+  drain_millis~ : Int32 = 5000,
 ) -> @sinks.SessionSettings raise {
   @sinks.SessionSettings::new(
     event_limit=@sinks.QueueEventLimit::count(event_limit),
@@ -90,7 +95,11 @@ async fn[X] with_test_session(
 }
 
 ///|
-fn info(logger : &@logging.Logger, template : String, args : Array[Json]) -> Unit {
+fn info(
+  logger : &@logging.Logger,
+  template : String,
+  args : Array[Json],
+) -> Unit {
   logger.info(template, args)
 }
 
@@ -154,9 +163,10 @@ async test "a stalled writer bounds the queue by count and keeps the order" {
     output.release()
     session.close()
   })
-  assert_eq(output.written.map(line => line.split(" ").last().unwrap().to_owned()), [
-    "0\n", "1\n", "2\n",
-  ])
+  assert_eq(
+    output.written.map(line => line.split(" ").last().unwrap().to_owned()),
+    ["0\n", "1\n", "2\n"],
+  )
   assert_eq(report.dropped().queue_full(), 7L)
   assert_eq(report.dropped().total(), 7L)
 }
@@ -233,10 +243,9 @@ async test "a failed destination stops, counts undelivered records, and the othe
   assert_true(destinations[1].failure() is Some(_))
   assert_true(report.delivery_failed())
   assert_eq(observed, [Write])
-  assert_eq(
-    report.failure_messages(),
-    ["logging: write failed for files /logs/acme.log.lock: disk full"],
-  )
+  assert_eq(report.failure_messages(), [
+    "logging: write failed for files /logs/acme.log.lock: disk full",
+  ])
 }
 
 ///|
@@ -246,7 +255,7 @@ async test "a log call from the observer is dropped as reentrant" {
   // A healthy second destination keeps the level enabled.
   let healthy = Recorder::new(files_target())
   let calls = []
-  let logger_ref : Ref[SessionLogger?] = { val: None }
+  let logger_ref : Ref[SessionLogger?] = { val: None, }
   let report = with_test_session(
     settings(),
     [output.sink(), healthy.sink()],
@@ -276,7 +285,7 @@ suberror LoudError {
 
 ///|
 /// The text of the error logs through the session.
-impl Show for LoudError with output(self, logger) {
+impl Show for LoudError with fn output(self, logger) {
   let Loud(session_logger) = self
   info(session_logger, "from show", [])
   logger.write_string("loud")
@@ -297,7 +306,7 @@ async test "a log call from the Show of an error is dropped as reentrant" {
 ///|
 async test "close is idempotent and a late event is counted as closed" {
   let output = Recorder::new(Console(StandardError))
-  let logger_ref : Ref[SessionLogger?] = { val: None }
+  let logger_ref : Ref[SessionLogger?] = { val: None, }
   let (first, second) = with_test_session(settings(), [output.sink()], session => {
     logger_ref.val = Some(session.logger())
     info(session.logger(), "before", [])
@@ -329,7 +338,9 @@ async test "cancelling hosted close still drains once and concurrent finalizatio
     info(session.logger(), "accepted before close", [])
     @async.with_task_group(group => {
       let hosted_close = group.spawn(() => session.close())
-      while !session.status().closed() { @async.pause() }
+      while !session.status().closed() {
+        @async.pause()
+      }
       hosted_close.cancel()
       let final_close = group.spawn(() => session.close())
       output.release()
@@ -388,14 +399,12 @@ async test "a drain timeout ends close and counts the records it did not write" 
 ///|
 async test "with_session closes the session when the body raises" {
   let output = Recorder::new(Console(StandardError))
-  let result : Result[Unit, Error] = try {
-    Ok(
-      with_test_session(settings(), [output.sink()], session => {
-        info(session.logger(), "before the failure", [])
-        fail("body failed")
-      }),
-    )
-  } catch {
+  let result : Result[Unit, Error] = Ok(
+    with_test_session(settings(), [output.sink()], session => {
+      info(session.logger(), "before the failure", [])
+      fail("body failed")
+    }),
+  ) catch {
     error => Err(error)
   }
   assert_true(result is Err(_))

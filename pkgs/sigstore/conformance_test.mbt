@@ -22,7 +22,9 @@ fn conformance_cases() -> Array[String] {
   let names = []
   for entry in @fixtures.conformance {
     if entry.0.has_suffix("/bundle.sigstore.json") {
-      names.push(entry.0[:entry.0.length() - "/bundle.sigstore.json".length()].to_owned())
+      names.push(
+        entry.0[:entry.0.length() - "/bundle.sigstore.json".length()].to_owned(),
+      )
     }
   }
   names
@@ -166,11 +168,17 @@ let expected_outcomes : Array[(String, String)] = [
   ("rekor2-happy-path", "unsupported Rekor v2"),
   ("rekor2-no-inclusion-proof_fail", "parse"),
   ("rekor2-no-timestamp_fail", "unsupported Rekor v2"),
-  ("rekor2-timestamp-outside-trust-root-tsa-validity_fail", "unsupported Rekor v2"),
+  (
+    "rekor2-timestamp-outside-trust-root-tsa-validity_fail", "unsupported Rekor v2",
+  ),
   ("rekor2-timestamp-outside-tsa-cert-validity_fail", "unsupported Rekor v2"),
   ("rekor2-timestamp-payload-mismatch_fail", "unsupported Rekor v2"),
-  ("rekor2-timestamp-untrusted-tsa-with-embedded-cert_fail", "unsupported Rekor v2"),
-  ("rekor2-timestamp-untrusted-tsa-without-embedded-cert_fail", "unsupported Rekor v2"),
+  (
+    "rekor2-timestamp-untrusted-tsa-with-embedded-cert_fail", "unsupported Rekor v2",
+  ),
+  (
+    "rekor2-timestamp-untrusted-tsa-without-embedded-cert_fail", "unsupported Rekor v2",
+  ),
   ("rekor2-timestamp-with-embedded-cert", "unsupported Rekor v2"),
   ("rekor2-timestamp-with-expired-cert-chain", "unsupported Rekor v2"),
   ("rekor2-timestamp-with-incorrect-time_fail", "unsupported Rekor v2"),
@@ -200,7 +208,10 @@ test "every conformance case gives its expected outcome" {
     if name.has_suffix("_fail") {
       assert_true(expected != "pass", msg=name)
     } else {
-      assert_true(expected == "pass" || expected.has_prefix("unsupported"), msg=name)
+      assert_true(
+        expected == "pass" || expected.has_prefix("unsupported"),
+        msg=name,
+      )
     }
   }
 }
@@ -208,5 +219,8 @@ test "every conformance case gives its expected outcome" {
 ///|
 test "scenario: conformance in-toto bundle with a timestamp" {
   assert_eq(run_case("intoto-with-custom-trust-root"), "pass")
-  assert_eq(run_case("intoto-tsa-timestamp-outside-cert-validity_fail"), "certificate validity")
+  assert_eq(
+    run_case("intoto-tsa-timestamp-outside-cert-validity_fail"),
+    "certificate validity",
+  )
 }

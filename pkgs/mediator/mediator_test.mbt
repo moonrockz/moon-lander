@@ -5,9 +5,10 @@ struct Echo(String)
 struct Stop(Int32)
 
 ///|
+#derive(Debug)
 suberror AppError {
   Denied(String)
-} derive(Debug)
+}
 
 ///|
 test "two senders stay separate" {

@@ -5,4 +5,5 @@ import {
   "moonrockz/moon-lander-config/parsers/json5",
   "moonrockz/moon-lander-config/parsers/toml",
 }
+
 pkgtype(kind: "executable")

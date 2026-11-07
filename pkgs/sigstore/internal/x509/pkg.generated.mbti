@@ -30,9 +30,10 @@ pub fn parse(BytesView) -> Certificate raise X509Error
 pub fn signature_hash(String) -> @signature.HashAlgorithm?
 
 // Errors
+#derive(@debug.Debug)
 pub suberror X509Error {
   BadCertificate(String)
-} derive(@debug.Debug)
+}
 pub fn X509Error::message(Self) -> String
 pub fn X509Error::to_repr(Self) -> @debug.Repr
 

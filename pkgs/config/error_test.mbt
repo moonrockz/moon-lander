@@ -1,33 +1,28 @@
 ///|
 fn file_origin(role : @config.FileRole, path : String) -> @config.Origin {
-  { kind: File(role), source: "file", priority: 300, location: Some(path) }
+  { kind: File(role), source: "file", priority: 300, location: Some(path), }
 }
 
 ///|
 fn env_origin(variable : String) -> @config.Origin {
-  { kind: Environment, source: "env", priority: 600, location: Some(variable) }
+  { kind: Environment, source: "env", priority: 600, location: Some(variable), }
 }
 
 ///|
-fn located(
-  path : @config.DecodePath,
-  blame : @config.Blame,
-) -> @config.Located {
-  { path, blame }
+fn located(path : @config.DecodePath, blame : @config.Blame) -> @config.Located {
+  { path, blame, }
 }
 
 ///|
 fn at_key(text : String) -> @config.DecodePath {
-  { key: Some(key(text)), suffix: [] }
+  { key: Some(key(text)), suffix: [], }
 }
 
 ///|
 fn ambiguous_load() -> Unit raise @config.ConfigError {
-  raise Ambiguous(
-    display="App",
-    location="/w",
-    candidates=["/w/app.toml", "/w/app.yaml"],
-  )
+  raise Ambiguous(display="App", location="/w", candidates=[
+    "/w/app.toml", "/w/app.yaml",
+  ])
 }
 
 ///|
@@ -35,7 +30,7 @@ fn failed_decode() -> Unit raise @config.ConfigError {
   raise Decode(failure={
     at: [
       located(
-        { key: Some(key("targets")), suffix: [Index(1), Field("level")] },
+        { key: Some(key("targets")), suffix: [Index(1), Field("level")], },
         Set([file_origin(Member, "/repo/app/morphir.toml")]),
       ),
     ],
@@ -72,11 +67,11 @@ test "Binding failure is a configuration error" {
 ///|
 test "a decode path renders list indexes, quoted names, and the root" {
   let paths : Array[@config.DecodePath] = [
-    { key: Some(key("ir.strict_mode")), suffix: [] },
-    { key: Some(key("targets")), suffix: [Index(1), Field("level")] },
-    { key: Some(key("servers.\"eu.west\".port")), suffix: [] },
-    { key: Some(key("hosts")), suffix: [Index(0), Field("a.b"), Index(2)] },
-    { key: None, suffix: [] },
+    { key: Some(key("ir.strict_mode")), suffix: [], },
+    { key: Some(key("targets")), suffix: [Index(1), Field("level")], },
+    { key: Some(key("servers.\"eu.west\".port")), suffix: [], },
+    { key: Some(key("hosts")), suffix: [Index(0), Field("a.b"), Index(2)], },
+    { key: None, suffix: [], },
   ]
   @expect.expect(paths.map(path => path.to_string())).to_equal([
     "ir.strict_mode", "targets[1].level", "servers.\"eu.west\".port", "hosts[0].\"a.b\"[2]",
@@ -143,17 +138,13 @@ test "message for FileNotFound" {
 
 ///|
 test "message for UnsupportedFormat" {
-  let error : @config.ConfigError = UnsupportedFormat(
-    path="app.ion",
-    extensions=["toml", "yaml"],
-  )
+  let error : @config.ConfigError = UnsupportedFormat(path="app.ion", extensions=[
+    "toml", "yaml",
+  ])
   @expect.expect(error.message()).to_equal(
     "No configuration format reads app.ion; registered extensions: toml, yaml",
   )
-  let none : @config.ConfigError = UnsupportedFormat(
-    path="app.ion",
-    extensions=[],
-  )
+  let none : @config.ConfigError = UnsupportedFormat(path="app.ion", extensions=[])
   @expect.expect(none.message()).to_equal(
     "No configuration format reads app.ion; no format is registered",
   )
@@ -282,10 +273,9 @@ test "message for UnknownProject" {
 
 ///|
 test "message for AmbiguousProject" {
-  let error : @config.ConfigError = AmbiguousProject(
-    selector="orders",
-    matches=["/repo/a", "/repo/b"],
-  )
+  let error : @config.ConfigError = AmbiguousProject(selector="orders", matches=[
+    "/repo/a", "/repo/b",
+  ])
   @expect.expect(error.message()).to_equal(
     "More than one project matches orders: /repo/a, /repo/b; select a member by its path",
   )
@@ -333,10 +323,13 @@ test "message for Validation" {
 
 ///|
 test "blame text names tables, list sources, and origins by kind" {
-  let decode = (blame : @config.Blame) => (Decode(failure={
-    at: [located(at_key("ir"), blame)],
-    detail: "Missing field layout",
-  }) : @config.ConfigError).message()
+  let decode = (blame : @config.Blame) => {
+    (
+      Decode(failure={
+        at: [located(at_key("ir"), blame)],
+        detail: "Missing field layout",
+      }) : @config.ConfigError).message()
+  }
   @expect.expect(
     decode(
       Table([
@@ -355,10 +348,10 @@ test "blame text names tables, list sources, and origins by kind" {
       Set([
         file_origin(Workspace, "C:/repo/morphir.toml"),
         file_origin(Member, "/repo/app/morphir.toml"),
-        { kind: Defaults, source: "defaults", priority: 0, location: None },
-        { kind: InMemory, source: "test", priority: 0, location: None },
-        { kind: Overrides, source: "cli", priority: 700, location: None },
-        { kind: Environment, source: "env", priority: 600, location: None },
+        { kind: Defaults, source: "defaults", priority: 0, location: None, },
+        { kind: InMemory, source: "test", priority: 0, location: None, },
+        { kind: Overrides, source: "cli", priority: 700, location: None, },
+        { kind: Environment, source: "env", priority: 600, location: None, },
         file_origin(Explicit, "/w/conf.toml"),
         file_origin(Legacy, "/w/morphir.json"),
         file_origin(System, "/etc/morphir/morphir.toml"),

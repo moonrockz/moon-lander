@@ -10,11 +10,12 @@ import {
 // Values
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror ConversionError {
   Lossy(ReadOnlyArray[Loss])
   UnsupportedCell(cell~ : Int32, cell_type~ : String)
   InvalidKernelMetadata(path~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ConversionError::equal(Self, Self) -> Bool
 pub fn ConversionError::not_equal(Self, Self) -> Bool
 pub fn ConversionError::to_repr(Self) -> @debug.Repr
@@ -31,6 +32,7 @@ pub fn Converter::to_dib(Self, @nbformat.Notebook) -> Conversion[@dib.Notebook] 
 pub fn Converter::to_jupyter(Self, @dib.Notebook) -> Conversion[@nbformat.Notebook] raise
 pub fn Converter::with_kernel(Self, &@dib.KernelDescriptor) -> Self raise @dib.FormatError
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Loss {
   CellIdentity(cell~ : Int32)
   CellMetadata(cell~ : Int32)
@@ -40,15 +42,16 @@ pub(all) enum Loss {
   CellExtensions(cell~ : Int32)
   NotebookExtensions
   NotebookKernelMetadata
-} derive(Eq, @debug.Debug)
+}
 pub fn Loss::equal(Self, Self) -> Bool
 pub fn Loss::not_equal(Self, Self) -> Bool
 pub fn Loss::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum LossPolicy {
   Reject
   SourceOnly
-} derive(Eq, @debug.Debug)
+}
 pub fn LossPolicy::equal(Self, Self) -> Bool
 pub fn LossPolicy::not_equal(Self, Self) -> Bool
 pub fn LossPolicy::to_repr(Self) -> @debug.Repr

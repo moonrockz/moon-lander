@@ -1,9 +1,10 @@
 ///|
 /// An immutable configuration value over an Ion value. Every format and source
 /// gives values of this one type before the merge.
+#derive(@debug.Debug)
 pub struct ConfigValue {
   priv ion : @ion.Ion
-} derive(@debug.Debug)
+}
 
 ///|
 /// A source tree from an Ion value. The root must be a struct, else this
@@ -14,7 +15,7 @@ pub struct ConfigValue {
 /// does not select list items.
 pub fn ConfigValue::from_ion(
   ion : @ion.Ion,
-  origin? : String = "value",
+  origin~ : String = "value",
 ) -> ConfigValue raise ConfigError {
   let value = { ion, }
   value.check_root(origin)
@@ -27,7 +28,7 @@ pub fn ConfigValue::from_ion(
 /// `ConfigValue::from_ion` apply.
 pub fn ConfigValue::from_json(
   json : Json,
-  origin? : String = "value",
+  origin~ : String = "value",
 ) -> ConfigValue raise ConfigError {
   ConfigValue::from_ion(@ion.Ion::Ion(json), origin~)
 }
@@ -40,7 +41,7 @@ pub fn ConfigValue::to_ion(self : ConfigValue) -> @ion.Ion {
 
 ///|
 /// Equality of the Ion data model. Struct fields compare as an unordered set.
-pub impl Eq for ConfigValue with equal(self, other) {
+pub impl Eq for ConfigValue with fn equal(self, other) {
   self.ion.equals(other.ion)
 }
 
@@ -53,31 +54,31 @@ pub extend ConfigValue with @debug.Debug::{to_repr}
 ///|
 /// A string value.
 pub fn string(text : String) -> ConfigValue {
-  { ion: @ion.Ion::string(text) }
+  { ion: @ion.Ion::string(text), }
 }
 
 ///|
 /// An integer value.
 pub fn int(value : Int64) -> ConfigValue {
-  { ion: @ion.Ion::Ion(value) }
+  { ion: @ion.Ion::Ion(value), }
 }
 
 ///|
 /// A floating-point value.
 pub fn float(value : Double) -> ConfigValue {
-  { ion: @ion.Ion::float(value) }
+  { ion: @ion.Ion::float(value), }
 }
 
 ///|
 /// A Boolean value.
 pub fn bool(value : Bool) -> ConfigValue {
-  { ion: @ion.Ion::bool(value) }
+  { ion: @ion.Ion::bool(value), }
 }
 
 ///|
 /// A list value.
 pub fn list(items : Array[ConfigValue]) -> ConfigValue {
-  { ion: @ion.Ion::list(items.map(item => item.ion)) }
+  { ion: @ion.Ion::list(items.map(item => item.ion)), }
 }
 
 ///|
@@ -124,7 +125,7 @@ fn ConfigValue::field(self : ConfigValue, name : String) -> ConfigValue? {
   guard self.ion.kind() is Struct(fields) else { None }
   for field in fields {
     if field.name().text() == Some(name) {
-      return Some({ ion: field.value() })
+      return Some({ ion: field.value(), })
     }
   }
   None
@@ -173,7 +174,7 @@ fn check_fields(
           let place = if path.is_empty() {
             "the root"
           } else {
-            KeyPath::{ names: path }.to_string()
+            KeyPath::{ names: path, }.to_string()
           }
           raise Parse(
             format="Ion",

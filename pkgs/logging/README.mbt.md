@@ -39,13 +39,13 @@ pure module leaves that I/O to the application or the host:
 struct PrintLogger {}
 
 ///|
-impl @logging.Logger for PrintLogger with log(_self, event) {
+impl @logging.Logger for PrintLogger with fn log(_self, event) {
   println(event.to_line())
 }
 
 ///|
 test "bring your own logger" {
-  let logger : &@logging.Logger = PrintLogger::{  }
+  let logger : &@logging.Logger = PrintLogger::{ }
   logger.info("Build started for {Target}", ["wasm"])
 }
 ```
@@ -202,22 +202,22 @@ that implements `enabled` pays only that one call for a level it does not want:
 ```mbt check
 ///|
 struct WarningsOnly {
-  mut written : Int
+  mut written : Int32
 }
 
 ///|
-impl @logging.Logger for WarningsOnly with enabled(_self, level) {
+impl @logging.Logger for WarningsOnly with fn enabled(_self, level) {
   level >= Warning
 }
 
 ///|
-impl @logging.Logger for WarningsOnly with log(self, _event) {
+impl @logging.Logger for WarningsOnly with fn log(self, _event) {
   self.written += 1
 }
 
 ///|
 test "a disabled level builds no event" {
-  let backend = WarningsOnly::{ written: 0 }
+  let backend = WarningsOnly::{ written: 0, }
   let logger : &@logging.Logger = backend
   logger.debug("Not built", [])
   logger.error("Built", [])

@@ -3,6 +3,7 @@ package "moonrockz/moon-lander-logging/formatting"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
   "moonrockz/moon-lander-logging",
 }
 
@@ -18,17 +19,19 @@ pub fn format_text(LogRecord) -> String
 pub fn utf8_length(String) -> Int64
 
 // Errors
+#derive(@debug.Debug)
 pub suberror TimestampError {
   TimestampOutOfRange(millis~ : Int64)
-} derive(@debug.Debug)
+}
 pub fn TimestampError::message(Self) -> String
 pub fn TimestampError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum JsonProperties {
   OrderedArray
   NamedObject
-} derive(Eq, @debug.Debug)
+}
 pub fn JsonProperties::equal(Self, Self) -> Bool
 pub fn JsonProperties::not_equal(Self, Self) -> Bool
 pub fn JsonProperties::to_repr(Self) -> @debug.Repr
@@ -41,14 +44,15 @@ pub fn LogRecord::category(Self) -> String?
 pub fn LogRecord::error_text(Self) -> String?
 pub fn LogRecord::level(Self) -> @moon-lander-logging.Level
 pub fn LogRecord::message(Self) -> String
-pub fn LogRecord::properties(Self) -> Array[(String, Json)]
+pub fn LogRecord::properties(Self) -> Array[(String, @json.Json)]
 pub fn LogRecord::segments(Self) -> Array[@moon-lander-logging.MessageSegment]
 pub fn LogRecord::template(Self) -> String
 pub fn LogRecord::timestamp(Self) -> LogTimestamp
 
+#derive(Compare, Eq, Hash, @debug.Debug)
 pub struct LogTimestamp {
   // private fields
-} derive(Compare, Eq, Hash, @debug.Debug)
+}
 pub fn LogTimestamp::compact_date(Self) -> String
 pub fn LogTimestamp::compare(Self, Self) -> Int32
 pub fn LogTimestamp::earliest() -> Self
@@ -71,10 +75,11 @@ pub fn LogTimestamp::to_repr(Self) -> @debug.Repr
 pub fn LogTimestamp::to_string(Self) -> String
 pub impl Show for LogTimestamp
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Theme {
   Literate
   Plain
-} derive(Eq, @debug.Debug)
+}
 pub fn Theme::equal(Self, Self) -> Bool
 pub fn Theme::not_equal(Self, Self) -> Bool
 pub fn Theme::to_repr(Self) -> @debug.Repr

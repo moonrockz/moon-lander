@@ -124,16 +124,20 @@ async fn main {
     }
   }
   println("🔍 Checking MoonBit formatting...")
-  let args = ["fmt", "--check", "."]
+  // A path selects only its own package: `moon fmt --check .` checks the workspace root package
+  // and skips the members. So the packages get a call with no path, and the scripts a second call.
+  let scripts = []
   for file in @fs.readdir("scripts", sort=true) {
     if file.has_suffix(".mbtx") {
-      args.push("scripts/\{file}")
+      scripts.push("scripts/\{file}")
     }
   }
-  let fmt = moon(args)
-  if fmt != 0 {
-    println("❌ Formatting issues found. Run 'mise run format' to fix.")
-    @sys.exit(if fmt > 0 { fmt } else { 1 })
+  for args in [["fmt", "--check"], ["fmt", "--check", ..scripts]] {
+    let fmt = moon(args)
+    if fmt != 0 {
+      println("❌ Formatting issues found. Run 'mise run format' to fix.")
+      @sys.exit(if fmt > 0 { fmt } else { 1 })
+    }
   }
   println("🔍 Checking MoonBit code...")
   let check = moon(["check", "--deny-warn", "--target", "all"])
@@ -170,7 +174,7 @@ async test "moon check covers a package outside the preferred target" {
   @fs.mkdir("\{dir}/js_only")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\npreferred_target = \"native\"\n",
+    "name = \"fixture/root\"\n\nprivate = true\n\nversion = \"0.0.1\"\n\npreferred_target = \"native\"\n",
   )
   @fs.write_file("\{dir}/js_only/moon.pkg", "supported_targets = \"js\"\n")
   @fs.write_file(
@@ -206,12 +210,12 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   @fs.mkdir("\{dir}/lib")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\n\nprivate = true\n\nversion = \"0.0.1\"\n",
   )
-  @fs.write_file("\{dir}/lib/moon.pkg", "")
+  @fs.write_file("\{dir}/lib/moon.pkg", "\n")
   @fs.write_file(
     "\{dir}/lib/lib.mbt",
-    "///|\npub fn answer() -> Int {\n  42\n}\n",
+    "///|\npub fn answer() -> Int32 {\n  42\n}\n",
   )
   @fs.write_file("\{dir}/.gitignore", "_build/\n.mooncakes/\n")
   git(["init", "-q"])
@@ -233,7 +237,7 @@ async test "lint fails when a checked-in interface file is missing or stale" {
   // An API change without its interface fails.
   @fs.write_file(
     "\{dir}/lib/lib.mbt",
-    "///|\npub fn answer() -> Int {\n  42\n}\n\n///|\npub fn other() -> Int {\n  7\n}\n",
+    "///|\npub fn answer() -> Int32 {\n  42\n}\n\n///|\npub fn other() -> Int32 {\n  7\n}\n",
   )
   git(["commit", "-q", "-am", "api"])
   let (code, output) = lint()
@@ -272,12 +276,12 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   @fs.mkdir("\{dir}/lib")
   @fs.write_file(
     "\{dir}/moon.mod",
-    "name = \"fixture/root\"\nprivate = true\nversion = \"0.0.1\"\n",
+    "name = \"fixture/root\"\n\nprivate = true\n\nversion = \"0.0.1\"\n",
   )
-  @fs.write_file("\{dir}/lib/moon.pkg", "")
+  @fs.write_file("\{dir}/lib/moon.pkg", "\n")
   @fs.write_file(
     "\{dir}/lib/lib.mbt",
-    "///|\npub fn answer() -> Int {\n  42\n}\n",
+    "///|\npub fn answer() -> Int32 {\n  42\n}\n",
   )
   @fs.write_file("\{dir}/.gitignore", "_build/\n.mooncakes/\n")
   git(["init", "-q"])
@@ -290,12 +294,12 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   // Staged: one hunk. Unstaged: another hunk in the same file.
   @fs.write_file(
     "\{dir}/lib/lib.mbt",
-    "///|\npub fn answer() -> Int {\n  43\n}\n",
+    "///|\npub fn answer() -> Int32 {\n  43\n}\n",
   )
   git(["add", "lib/lib.mbt"])
   @fs.write_file(
     "\{dir}/lib/lib.mbt",
-    "///|\npub fn answer() -> Int {\n  43\n}\n\n///|\npub fn other() -> Int {\n  7\n}\n",
+    "///|\npub fn answer() -> Int32 {\n  43\n}\n\n///|\npub fn other() -> Int32 {\n  7\n}\n",
   )
   let (code, output) = lint(["--staged"])
   assert_true(code != 0, msg=output)
@@ -310,7 +314,10 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   let (code, output) = lint(["--staged"])
   assert_eq(code, 0, msg=output)
   // An untracked MoonBit file would be compiled but not committed.
-  @fs.write_file("\{dir}/lib/extra.mbt", "///|\nfn extra() -> Int {\n  1\n}\n")
+  @fs.write_file(
+    "\{dir}/lib/extra.mbt",
+    "///|\nfn extra() -> Int32 {\n  1\n}\n",
+  )
   let (code, output) = lint(["--staged"])
   assert_true(code != 0, msg=output)
   assert_true(output.contains("lib/extra.mbt"), msg=output)
@@ -318,7 +325,7 @@ async test "staged mode fails when a MoonBit input differs from the index" {
   // An ignored MoonBit file is still compiled, so it blocks too.
   @fs.write_file(
     "\{dir}/lib/helper.mbt",
-    "///|\npub fn helper() -> Int {\n  1\n}\n",
+    "///|\npub fn helper() -> Int32 {\n  1\n}\n",
   )
   @fs.write_file("\{dir}/.git/info/exclude", "lib/helper.mbt\n")
   let (code, output) = lint(["--staged"])

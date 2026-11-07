@@ -294,7 +294,9 @@ test "identifiers apply at referenced locations that were never declared roots" 
 
 ///|
 test "type union element errors name the offending element" {
-  let report = checked_report("{\"properties\":{\"x\":{\"type\":[\"string\",17]}}}")
+  let report = checked_report(
+    "{\"properties\":{\"x\":{\"type\":[\"string\",17]}}}",
+  )
   assert_eq(report.diagnostics().length(), 1)
   assert_eq(report.diagnostics()[0].path(), ["properties", "x", "type", "1"])
   let typed = @schema.Schema::from_json(

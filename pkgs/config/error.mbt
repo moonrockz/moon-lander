@@ -2,6 +2,7 @@
 /// A configuration failure. Each case is one failure class, so a caller can
 /// match it without a string compare. The core, conventions, and binding
 /// capabilities raise these cases and have no error type of their own.
+#derive(Eq, Debug)
 pub(all) suberror ConfigError {
   /// A profile input or provider breaks a typed profile rule.
   Profile(failure~ : ProfileFailure)
@@ -10,11 +11,16 @@ pub(all) suberror ConfigError {
     format~ : String,
     origin~ : String,
     message~ : String,
-    line~ : Int?,
-    column~ : Int?
+    line~ : Int32?,
+    column~ : Int32?
   )
   /// The text uses a YAML feature that the profile does not allow.
-  UnsupportedYaml(origin~ : String, feature~ : String, line~ : Int, column~ : Int)
+  UnsupportedYaml(
+    origin~ : String,
+    feature~ : String,
+    line~ : Int32,
+    column~ : Int32
+  )
   /// The root of a source tree is not a struct.
   InvalidRoot(origin~ : String, found~ : String)
   /// A struct in a source tree holds the same field name twice.
@@ -32,7 +38,7 @@ pub(all) suberror ConfigError {
   /// An environment variable name gives a key path with an empty segment.
   InvalidEnvKey(variable~ : String)
   /// A merge-by-key list item has no key value, or repeats a key value.
-  MergeKey(key~ : KeyPath, index~ : Int, source~ : String)
+  MergeKey(key~ : KeyPath, index~ : Int32, source~ : String)
   /// A secret reference has a payload of the wrong shape.
   InvalidSecret(key~ : KeyPath, origin~ : String, reason~ : String)
   /// No value is at the key path.
@@ -42,9 +48,9 @@ pub(all) suberror ConfigError {
   /// A source has a lower priority than the source before it.
   SourceOrder(
     source~ : String,
-    priority~ : Int,
+    priority~ : Int32,
     previous~ : String,
-    previous_priority~ : Int
+    previous_priority~ : Int32
   )
   /// The start directory of discovery is outside the boundary directory.
   OutsideBoundary(start~ : String, boundary~ : String)
@@ -60,7 +66,7 @@ pub(all) suberror ConfigError {
   Decode(failure~ : BindFailure)
   /// A bound value failed validation.
   Validation(failures~ : Array[BindFailure])
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ConfigError with Eq::{equal, not_equal}

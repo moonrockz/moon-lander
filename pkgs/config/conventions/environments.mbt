@@ -7,7 +7,7 @@ pub fn environments(
   conventions : Conventions,
   default? : String,
 ) -> Conventions {
-  { ..conventions, environments: Some({ default, }) }
+  { ..conventions, environments: Some({ default, }), }
 }
 
 ///|
@@ -18,7 +18,7 @@ pub fn environments(
 /// raises `InvalidEnvironmentName`, which names the source of the name.
 pub fn environment_name(
   conventions : Conventions,
-  options? : DiscoveryOptions = DiscoveryOptions::new(),
+  options~ : DiscoveryOptions = DiscoveryOptions::new(),
   env_vars : Map[String, String],
 ) -> String? raise @config.ConfigError {
   guard conventions.environments is Some(environments) else { return None }
@@ -70,7 +70,9 @@ fn Conventions::environment_file(
   extensions : Array[String],
 ) -> @config.ConfigSource raise @config.ConfigError {
   @config.ConfigSource::candidates(
-    texts(extensions.map(extension => dir.child("\{stem}.\{name}.\{extension}"))),
+    texts(
+      extensions.map(extension => dir.child("\{stem}.\{name}.\{extension}")),
+    ),
     display=self.display,
     role=EnvironmentFile,
     name=self.display,

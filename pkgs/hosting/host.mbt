@@ -1,8 +1,9 @@
 ///|
 /// The exit code of a run, in the range 0 to 255 that every platform keeps.
+#derive(Eq, Debug)
 pub struct ExitCode {
-  priv code : Int
-} derive(Eq, Debug)
+  priv code : Int32
+}
 
 ///|
 pub extend ExitCode with Eq::{equal, not_equal}
@@ -13,7 +14,7 @@ pub extend ExitCode with @debug.Debug::{to_repr}
 ///|
 /// Make an exit code from a number. It raises `InvalidExitCode` when `code` is
 /// not in the range 0 to 255.
-pub fn ExitCode::from_int(code : Int) -> ExitCode raise HostError {
+pub fn ExitCode::from_int(code : Int32) -> ExitCode raise HostError {
   guard code >= 0 && code <= 255 else { raise InvalidExitCode(code~) }
   { code, }
 }
@@ -21,18 +22,18 @@ pub fn ExitCode::from_int(code : Int) -> ExitCode raise HostError {
 ///|
 /// The exit code 0: a clean run.
 pub fn ExitCode::success() -> ExitCode {
-  { code: 0 }
+  { code: 0, }
 }
 
 ///|
 /// The exit code 1: an unhandled failure.
 pub fn ExitCode::failure() -> ExitCode {
-  { code: 1 }
+  { code: 1, }
 }
 
 ///|
 /// The exit code as a number for the process.
-pub fn ExitCode::to_int(self : ExitCode) -> Int {
+pub fn ExitCode::to_int(self : ExitCode) -> Int32 {
   self.code
 }
 
@@ -107,7 +108,9 @@ pub struct HostBuilder[S] {
   priv make_command : ((String) -> @argparse.Command)?
   priv mappings : Array[Mapping]
   priv report : ErrorReport?
-  priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
+  priv configure_sources : Array[
+    (@config.ConfigBuilder) -> @config.ConfigBuilder raise,
+  ]
   priv file_tree : @config.FileTree
   priv timeout_key : @config.KeyPath?
   priv shutdown_timeout : @lander_core.TimeLimit
@@ -129,14 +132,33 @@ pub fn[S] builder(
   working_dir? : @lander_core.AbsolutePath,
   environment? : @conventions.EnvironmentName,
 ) -> HostBuilder[S] {
-  { name, args: args.copy(), prefix: @lander_core.EnvPrefix::from_app_name(name),
-    variables: env_vars.map(vars => snapshot_variables(vars)), directory: working_dir, environment, root: None, reserved: [],
-    skip_variables: false, convention_steps: [], configure_sources: [], file_tree: @config.FileTree::new(), timeout_key: None, make_command: None, mappings: [], services: [], report: None, shutdown_timeout: default_shutdown_timeout() }
+  {
+    name,
+    args: args.copy(),
+    prefix: @lander_core.EnvPrefix::from_app_name(name),
+    variables: env_vars.map(vars => snapshot_variables(vars)),
+    directory: working_dir,
+    environment,
+    root: None,
+    reserved: [],
+    skip_variables: false,
+    convention_steps: [],
+    configure_sources: [],
+    file_tree: @config.FileTree::new(),
+    timeout_key: None,
+    make_command: None,
+    mappings: [],
+    services: [],
+    report: None,
+    shutdown_timeout: default_shutdown_timeout(),
+  }
 }
 
 ///|
 fn default_shutdown_timeout() -> @lander_core.TimeLimit {
-  @lander_core.TimeLimit::seconds(30) catch { _ => abort("30 seconds is a valid time limit") }
+  @lander_core.TimeLimit::seconds(30) catch {
+    _ => abort("30 seconds is a valid time limit")
+  }
 }
 
 ///|
@@ -147,8 +169,11 @@ fn default_shutdown_timeout() -> @lander_core.TimeLimit {
 /// The host cancels the current hook at the limit. A hook that protects itself
 /// from cancellation, or does not yield, runs until it returns, and `run` waits
 /// for it.
-pub fn[S] shutdown_timeout(builder : HostBuilder[S], limit : @lander_core.TimeLimit) -> HostBuilder[S] {
-  { ..builder, shutdown_timeout: limit }
+pub fn[S] shutdown_timeout(
+  builder : HostBuilder[S],
+  limit : @lander_core.TimeLimit,
+) -> HostBuilder[S] {
+  { ..builder, shutdown_timeout: limit, }
 }
 
 ///|
@@ -183,7 +208,7 @@ pub fn[S] service(
     }
   }
   let services = builder.services.copy()
-  services.push({ name, starting, start, started, stopping, stop, stopped })
+  services.push({ name, starting, start, started, stopping, stop, stopped, })
   { ..builder, services, }
 }
 
@@ -208,7 +233,9 @@ pub struct Host[S] {
   priv make_command : ((String) -> @argparse.Command)?
   priv mappings : Array[Mapping]
   priv report : ErrorReport?
-  priv configure_sources : Array[(@config.ConfigBuilder) -> @config.ConfigBuilder raise]
+  priv configure_sources : Array[
+    (@config.ConfigBuilder) -> @config.ConfigBuilder raise,
+  ]
   priv file_tree : @config.FileTree
   priv timeout_key : @config.KeyPath?
   priv shutdown_timeout : @lander_core.TimeLimit
@@ -294,8 +321,11 @@ pub type ErrorReport = async (Error, ExitCode) -> Unit
 /// failure only for code 1 or 2. Reports follow failure order.
 /// If a report raises, the driver ignores its error and reports the next failure.
 /// A report error cannot change the outcome or make `run` raise.
-pub fn[S] error_report(builder : HostBuilder[S], report : ErrorReport) -> HostBuilder[S] {
-  { ..builder, report: Some(report) }
+pub fn[S] error_report(
+  builder : HostBuilder[S],
+  report : ErrorReport,
+) -> HostBuilder[S] {
+  { ..builder, report: Some(report), }
 }
 
 ///|
@@ -310,5 +340,5 @@ pub type ReportWriter = async (String) -> Unit
 /// and reports the next failure. The host logging bridge uses this step to
 /// write the default report through its logger.
 pub fn[S] report_writer(host : Host[S], writer : ReportWriter) -> Host[S] {
-  { ..host, report_writer: Some(writer) }
+  { ..host, report_writer: Some(writer), }
 }

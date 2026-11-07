@@ -26,17 +26,20 @@ import {
 // The pinned build system cannot condition imports by target. Native fs and
 // os_error imports are unused on js; all adapter imports are unused in the
 // empty wasm packages. Remove when target-conditional imports are supported.
+
 warnings = "-29"
 
-options(targets: {
-  "host.mbt": ["native", "js"],
-  "host_wbtest.mbt": ["native", "js"],
-  "conventions_wbtest.mbt": ["native", "js"],
-  "profiles_wbtest.mbt": ["native", "js"],
-  "layered_wbtest.mbt": ["native", "js"],
-  "inspect_wbtest.mbt": ["native", "js"],
-  "fixture.native_wbtest.mbt": ["native"],
-  "files.native_wbtest.mbt": ["native"],
-  "fixture.js_wbtest.mbt": ["js"],
-  "node_fixture.generated.js_wbtest.mbt": ["js"],
-})
+options(
+  targets: {
+    "host.mbt": [ "native", "js" ],
+    "host_wbtest.mbt": [ "native", "js" ],
+    "conventions_wbtest.mbt": [ "native", "js" ],
+    "profiles_wbtest.mbt": [ "native", "js" ],
+    "layered_wbtest.mbt": [ "native", "js" ],
+    "inspect_wbtest.mbt": [ "native", "js" ],
+    "fixture.native_wbtest.mbt": [ "native" ],
+    "files.native_wbtest.mbt": [ "native" ],
+    "fixture.js_wbtest.mbt": [ "js" ],
+    "node_fixture.generated.js_wbtest.mbt": [ "js" ],
+  },
+)

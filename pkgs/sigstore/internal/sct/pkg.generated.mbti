@@ -10,9 +10,10 @@ import {
 pub fn parse_list(BytesView) -> Array[Sct] raise SctError
 
 // Errors
+#derive(@debug.Debug)
 pub suberror SctError {
   BadSct(String)
-} derive(@debug.Debug)
+}
 pub fn SctError::to_repr(Self) -> @debug.Repr
 
 // Types and methods

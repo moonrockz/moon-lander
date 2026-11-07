@@ -79,7 +79,7 @@ fn answer_with(
           "inaccessible" => Inaccessible
           _ => Other
         }
-        entries.push({ name, kind })
+        entries.push({ name, kind, })
       }
       tree.with_listing(path, entries)
     }

@@ -3,4 +3,5 @@ import {
   "moonrockz/moon-lander-logging/formatting",
   "moonbitlang/core/json",
 }
+
 pkgtype(kind: "executable")

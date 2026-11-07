@@ -10,5 +10,8 @@ test "minimal selection returns immutable roots and membership" {
   let off = @profiles.resolve(@profiles.Policy::new(), Disabled)
   assert_true(off.disabled())
   assert_false(off.contains(metrics))
-  assert_eq(@profiles.resolve(@profiles.Policy::new(), Unspecified).active().names(), [])
+  assert_eq(
+    @profiles.resolve(@profiles.Policy::new(), Unspecified).active().names(),
+    [],
+  )
 }

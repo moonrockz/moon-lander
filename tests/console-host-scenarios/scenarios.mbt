@@ -46,11 +46,11 @@ pub fn Scenario::parse(text : String) -> Scenario? {
 
 ///|
 /// The count of lines in the output scenarios: more than one pipe buffer.
-pub let output_lines : Int = 4000
+pub let output_lines : Int32 = 4000
 
 ///|
 /// The text of output line `index`. Each line has 72 characters.
-pub fn output_line(index : Int) -> String {
+pub fn output_line(index : Int32) -> String {
   let number = index.to_string()
   "line=" + "0".repeat(6 - number.length()) + number + " " + "x".repeat(60)
 }
@@ -96,10 +96,9 @@ pub async fn run(
       @lander_core.AppName::parse("console-host"),
       args,
     )
-    |> @hosting_argparse.command(name => @hosting_argparse.Command(
-      name,
-      version="1.2.3",
-    ))
+    |> @hosting_argparse.command(name => {
+      @hosting_argparse.Command(name, version="1.2.3")
+    })
     |> @hosting.service(
       "a",
       starting=_ => emit("hook=a.starting"),
@@ -142,24 +141,29 @@ pub async fn run(
       stopped=_ => emit("hook=b.stopped"),
     )
     |> @hosting.build(_ => ())
-  @hosting_console.run(host, ctx => {
-    match scenario {
-      Clean => emit("command")
-      Help | Version => emit("command must not run")
-      Output => write_output()
-      Wait | SlowStop | OutputAfterSignal | Linger => {
-        emit("ready")
-        @async.sleep(60000)
-        emit("command must be cancelled")
-      }
-      Poll => poll_stop(ctx, () => polled.val = true)
-      Spin => {
-        emit("ready")
-        let count = Ref(0UL)
-        while true {
-          count.val = count.val + 1UL
+  @hosting_console.run(
+    host,
+    ctx => {
+      match scenario {
+        Clean => emit("command")
+        Help | Version => emit("command must not run")
+        Output => write_output()
+        Wait | SlowStop | OutputAfterSignal | Linger => {
+          emit("ready")
+          @async.sleep(60000)
+          emit("command must be cancelled")
+        }
+        Poll => poll_stop(ctx, () => polled.val = true)
+        Spin => {
+          emit("ready")
+          let count = Ref(0UL)
+          while true {
+            count.val = count.val + 1UL
+          }
         }
       }
-    }
-  }, signals?, finalize?)
+    },
+    signals?,
+    finalize?,
+  )
 }

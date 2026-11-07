@@ -42,12 +42,12 @@ async test "EVT: subscribe ends at unsubscribe and scope exit" {
   @actors.scope(events~, scope => {
     let sub = events.subscribe(scope, event_log(log))
     assert_eq(events.subscriber_count(), 1)
-    let actor = scope.start((), (_, _ : Int) => Stop)
+    let actor = scope.start((), (_, _ : Int32) => Stop)
     actor.send(0)
     actor.join()
     sub.unsubscribe()
     assert_eq(events.subscriber_count(), 0)
-    let other = scope.start((), (_, _ : Int) => Stop)
+    let other = scope.start((), (_, _ : Int32) => Stop)
     other.send(0)
     other.join()
   })
@@ -63,7 +63,7 @@ async test "EVT: subscribe ends at unsubscribe and scope exit" {
       ignore(channel.subscribe(inner, event_log(late)))
     })
     assert_eq(channel.subscriber_count(), 1)
-    let actor = outer.start((), (_, _ : Int) => Stop)
+    let actor = outer.start((), (_, _ : Int32) => Stop)
     actor.send(0)
     actor.join()
   })
@@ -105,7 +105,7 @@ async test "EVT: lifecycle order for a normal actor" {
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start(0, (state, message : Int) => {
+    let actor = scope.start(0, (state, message : Int32) => {
       if message == 0 {
         Stop
       } else {
@@ -133,7 +133,7 @@ async test "EVT: failed actor end value matches status" {
   let outcome = try {
     @actors.scope(events~, scope => {
       ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-      let actor = scope.start((), (_, _ : Int) => raise Broken("boom"))
+      let actor = scope.start((), (_, _ : Int32) => raise Broken("boom"))
       match probe.get() {
         Started(_) => ()
         other => fail("expected Started, got \{label_event(other)}")
@@ -165,10 +165,9 @@ async test "EVT: failed initializer publishes neither event" {
     ignore(events.subscribe(scope, event_log(log)))
     let outcome = try {
       ignore(
-        scope.start_with(
-          _ => raise Broken("init"),
-          (state : Int, _ : Int) => Continue(state),
-        ),
+        scope.start_with(_ => raise Broken("init"), (state : Int32, _ : Int32) => {
+          Continue(state)
+        }),
       )
       "started"
     } catch {
@@ -186,8 +185,8 @@ async test "EVT: child actor events use the parent channel" {
   let events = @actors.RuntimeEvents::new()
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let parent = scope.spawn((context : @actors.ActorContext[Int]) => {
-      let child = context.scope().start((), (_, _ : Int) => Stop)
+    let parent = scope.spawn((context : @actors.ActorContext[Int32]) => {
+      let child = context.scope().start((), (_, _ : Int32) => Stop)
       // End the child while the parent is still live so its events are not
       // cancelled by parent teardown. `make` is sync, so use try_send.
       assert_eq(child.try_send(0), Accepted)
@@ -221,11 +220,11 @@ async test "EVT: a separate top-level scope without a channel publishes nothing 
   let events = @actors.RuntimeEvents::new()
   @actors.scope(events~, outer => {
     ignore(events.subscribe(outer, event_log(outer_log)))
-    let parent = outer.start((), (_, _ : Int) => {
+    let parent = outer.start((), (_, _ : Int32) => {
       // A new top-level scope call with no channel: its actor is invisible
       // to the outer channel.
       @actors.scope(inner => {
-        let nested = inner.start((), (_, _ : Int) => Stop)
+        let nested = inner.start((), (_, _ : Int32) => Stop)
         nested.send(0)
         nested.join()
       })
@@ -246,9 +245,9 @@ async test "EVT: one channel for two scopes" {
   let events = @actors.RuntimeEvents::new()
   @actors.scope(events~, first => {
     ignore(events.subscribe(first, @actors.Subject::from_queue(probe)))
-    let a = first.start((), (_, _ : Int) => Stop)
+    let a = first.start((), (_, _ : Int32) => Stop)
     @actors.scope(events~, second => {
-      let b = second.start((), (_, _ : Int) => Stop)
+      let b = second.start((), (_, _ : Int32) => Stop)
       match probe.get() {
         Started(address) => assert_eq(address, a.address())
         other => fail("expected first Started, got \{label_event(other)}")
@@ -272,7 +271,7 @@ async test "EVT: one channel for two scopes" {
 async test "EVT: scope without a channel publishes nothing" {
   let log : Array[String] = []
   @actors.scope(scope => {
-    let actor = scope.start((), (_, _ : Int) => Stop)
+    let actor = scope.start((), (_, _ : Int32) => Stop)
     actor.send(0)
     actor.join()
     assert_true(actor.status() is Ended(Completed))
@@ -291,21 +290,17 @@ async test "EVT: slow subscriber drops and counts; second subscriber gets both" 
     // Observe Starts before the capacity-one actor subscribes, so it does not
     // receive its own Started into the mailbox under test.
     ignore(events.subscribe(scope, @actors.Subject::from_queue(second)))
-    let slow = scope.start(
-      (),
-      mailbox=Bounded(one),
-      (_, _ : @actors.ActorEvent) => {
-        ready.put(())
-        gate.get()
-        Continue(())
-      },
-    )
+    let slow = scope.start((), mailbox=Bounded(one), (_, _ : @actors.ActorEvent) => {
+      ready.put(())
+      gate.get()
+      Continue(())
+    })
     match second.get() {
       Started(address) => assert_eq(address, slow.address())
       other => fail("expected Started(slow), got \{label_event(other)}")
     }
     let sub_slow = events.subscribe(scope, slow.to_ref().to_subject())
-    let a = scope.start((), (_, _ : Int) => Stop)
+    let a = scope.start((), (_, _ : Int32) => Stop)
     match second.get() {
       Started(address) => assert_eq(address, a.address())
       other => fail("expected Started(A), got \{label_event(other)}")
@@ -319,7 +314,7 @@ async test "EVT: slow subscriber drops and counts; second subscriber gets both" 
     }
     assert_eq(slow.queued_count(), 1)
     assert_eq(sub_slow.dropped_count(), 0)
-    let b = scope.start((), (_, _ : Int) => Stop)
+    let b = scope.start((), (_, _ : Int32) => Stop)
     match second.get() {
       Started(address) => assert_eq(address, b.address())
       other => fail("expected Started(B), got \{label_event(other)}")
@@ -349,7 +344,7 @@ async test "EVT: ended subscriber is skipped without failing others" {
     ignore(events.subscribe(scope, closed))
     ignore(events.subscribe(scope, event_log(live_log)))
     assert_eq(events.subscriber_count(), 2)
-    let actor = scope.start((), (_, _ : Int) => Stop)
+    let actor = scope.start((), (_, _ : Int32) => Stop)
     actor.send(0)
     actor.join()
     assert_eq(events.subscriber_count(), 1)
@@ -366,7 +361,7 @@ async test "EVT: an ended subscriber actor is skipped with no event and no failu
     let watcher = scope.start((), (_, _ : @actors.ActorEvent) => Stop)
     ignore(events.subscribe(scope, watcher.to_ref().to_subject()))
     ignore(events.subscribe(scope, event_log(log)))
-    let worker = scope.start((), (_, _ : Int) => Stop)
+    let worker = scope.start((), (_, _ : Int32) => Stop)
     watcher.join()
     // The watcher's own end found its mailbox closed and removed it.
     assert_eq(events.subscriber_count(), 1)
@@ -387,22 +382,18 @@ async test "EVT: dropping an event publishes no feedback event" {
   let hold : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let ready : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
-    let slow = scope.start(
-      (),
-      mailbox=Bounded(one),
-      (_, _ : @actors.ActorEvent) => {
-        ready.put(())
-        hold.get()
-        Continue(())
-      },
-    )
+    let slow = scope.start((), mailbox=Bounded(one), (_, _ : @actors.ActorEvent) => {
+      ready.put(())
+      hold.get()
+      Continue(())
+    })
     let sub = events.subscribe(scope, slow.to_ref().to_subject())
     ignore(events.subscribe(scope, event_log(log)))
-    let a = scope.start((), (_, _ : Int) => Stop)
+    let a = scope.start((), (_, _ : Int32) => Stop)
     ready.get()
     a.send(0)
     a.join()
-    let b = scope.start((), (_, _ : Int) => Stop)
+    let b = scope.start((), (_, _ : Int32) => Stop)
     b.send(0)
     b.join()
     assert_true(sub.dropped_count() >= 1)
@@ -420,7 +411,7 @@ async test "EVT: wait for Ended instead of polling status" {
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let worker = scope.start((), (_, message : Int) => {
+    let worker = scope.start((), (_, message : Int32) => {
       if message == 0 {
         Stop
       } else {

@@ -17,6 +17,7 @@ import {
 
 ///|
 /// The fixed public library set. Names and folders are derived from a case.
+#derive(Eq, Hash)
 priv enum ReleaseLibrary {
   Core
   Logging
@@ -30,9 +31,10 @@ priv enum ReleaseLibrary {
   Notebooks
   OpenRpc
   Sigstore
-} derive(Eq, Hash)
+}
 
 ///|
+#derive(Eq)
 priv enum ReleaseInputRule {
   LibraryLine
   UnknownLibrary
@@ -42,7 +44,7 @@ priv enum ReleaseInputRule {
   VersionLeadingZero
   DigestLength
   DigestCharacter
-} derive(Eq)
+}
 
 ///|
 suberror ReleaseInputError {
@@ -150,9 +152,10 @@ impl Show for ReleaseVersion with fn output(self, logger) {
 extend ReleaseVersion with Show::{to_string}
 
 ///|
+#derive(Eq)
 priv struct ArchiveDigest {
   hex : String
-} derive(Eq)
+}
 
 ///|
 fn ArchiveDigest::parse(

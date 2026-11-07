@@ -1,11 +1,12 @@
 ///|
 /// A point in time, UTC, with nanosecond precision. The caller reads the clock
 /// and gives "now" as an `Instant`; the library never reads a clock.
+#derive(Eq, Compare, Debug)
 pub struct Instant {
   priv seconds : Int64
   /// Nanoseconds after `seconds`, from 0 to 999 999 999.
-  priv nanos : Int
-} derive(Eq, Compare, Debug)
+  priv nanos : Int32
+}
 
 ///|
 pub extend Instant with Eq::{equal, not_equal}
@@ -19,13 +20,13 @@ pub extend Instant with @debug.Debug::{to_repr}
 ///|
 /// The instant `seconds` after 1970-01-01T00:00:00Z. Every `Int64` is valid.
 pub fn Instant::from_unix_seconds(seconds : Int64) -> Instant {
-  { seconds, nanos: 0 }
+  { seconds, nanos: 0, }
 }
 
 ///|
 /// The instant `nanos` nanoseconds (0 to 999 999 999) after `seconds`.
-fn Instant::from_parts(seconds : Int64, nanos : Int) -> Instant {
-  { seconds, nanos }
+fn Instant::from_parts(seconds : Int64, nanos : Int32) -> Instant {
+  { seconds, nanos, }
 }
 
 ///|
@@ -35,9 +36,9 @@ fn Instant::from_unix_millis(millis : Int64) -> Instant {
   let seconds = millis / 1000L
   let rest = (millis % 1000L).to_int()
   if rest < 0 {
-    { seconds: seconds - 1L, nanos: (rest + 1000) * 1_000_000 }
+    { seconds: seconds - 1L, nanos: (rest + 1000) * 1_000_000, }
   } else {
-    { seconds, nanos: rest * 1_000_000 }
+    { seconds, nanos: rest * 1_000_000, }
   }
 }
 
@@ -48,7 +49,7 @@ pub fn Instant::unix_seconds(self : Instant) -> Int64 {
 }
 
 ///|
-pub impl Show for Instant with output(self, logger) {
+pub impl Show for Instant with fn output(self, logger) {
   logger.write_string(self.unix_seconds().to_string())
 }
 
@@ -59,7 +60,7 @@ pub extend Instant with Show::{output, to_string}
 /// Read a protobuf JSON timestamp, for example `2022-12-31T23:59:59.999Z`:
 /// RFC 3339 with up to nine fraction digits and a `Z` or `+hh:mm` offset.
 fn parse_timestamp(text : String) -> Instant? {
-  fn number(start : Int, count : Int) -> Int? {
+  fn number(start : Int32, count : Int32) -> Int32? {
     guard start + count <= text.length() else { return None }
     let mut value = 0
     for i in start..<(start + count) {
@@ -70,7 +71,7 @@ fn parse_timestamp(text : String) -> Instant? {
     Some(value)
   }
 
-  fn char_at(at : Int, expected : Char) -> Bool {
+  fn char_at(at : Int32, expected : Char) -> Bool {
     at < text.length() && text[at].to_int() == expected.to_int()
   }
 
@@ -135,5 +136,5 @@ fn parse_timestamp(text : String) -> Instant? {
   }
   let seconds = @der.unix_seconds(year, month, day, hour, minute, second) -
     offset.to_int64()
-  Some({ seconds, nanos: fraction })
+  Some({ seconds, nanos: fraction, })
 }

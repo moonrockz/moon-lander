@@ -2,14 +2,7 @@
 /// The Morphir key-name fragments that mark a sensitive key.
 pub fn default_redact_fragments() -> Array[String] {
   [
-    "token",
-    "password",
-    "passwd",
-    "secret",
-    "credential",
-    "api_key",
-    "apikey",
-    "private_key",
+    "token", "password", "passwd", "secret", "credential", "api_key", "apikey", "private_key",
     "access_key",
   ]
 }
@@ -39,29 +32,27 @@ fn redact_at(
       let out = []
       for field in fields {
         let name = field.name().text().unwrap_or("")
-        let child = redact_at({ ion: field.value() }, Some(name), fragments)
+        let child = redact_at({ ion: field.value(), }, Some(name), fragments)
         out.push(@ion.Field::from_token(field.name(), child.ion))
       }
       {
-        ion: @ion.Ion::from_fields(out).with_annotations(value.ion.annotations()),
+        ion: @ion.Ion::from_fields(out).with_annotations(
+          value.ion.annotations(),
+        ),
       }
     }
-    List(items) => {
+    List(items) =>
       {
         ion: @ion.Ion::list(
-            items.map(item => redact_at({ ion: item }, None, fragments).ion),
-          )
-          .with_annotations(value.ion.annotations()),
+          items.map(item => redact_at({ ion: item, }, None, fragments).ion),
+        ).with_annotations(value.ion.annotations()),
       }
-    }
-    Sexp(items) => {
+    Sexp(items) =>
       {
         ion: @ion.Ion::sexp(
-            items.map(item => redact_at({ ion: item }, None, fragments).ion),
-          )
-          .with_annotations(value.ion.annotations()),
+          items.map(item => redact_at({ ion: item, }, None, fragments).ion),
+        ).with_annotations(value.ion.annotations()),
       }
-    }
     _ => value
   }
 }

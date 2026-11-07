@@ -9,11 +9,12 @@ priv enum MetadataFormat {
 ///|
 /// DIB output keeps JSON when it preserves the metadata, otherwise uses Ion.
 /// Explicit Json requests reject metadata that cannot round-trip through JSON.
+#derive(Eq, Debug)
 pub(all) enum MetadataOutput {
   Auto
   Json
   Ion
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MetadataOutput with Eq::{equal, not_equal}
@@ -33,12 +34,19 @@ fn metadata_format(line : String) -> MetadataFormat? {
 }
 
 ///|
-fn yaml_metadata_ion(value : @yaml.Yaml, line : Int32) -> @ion.Ion raise FormatError {
+fn yaml_metadata_ion(
+  value : @yaml.Yaml,
+  line : Int32,
+) -> @ion.Ion raise FormatError {
   match value {
-    Map(fields) => @ion.Ion::from_fields(fields.to_array().map(entry => {
-      @ion.field(entry.0, yaml_metadata_ion(entry.1, line))
-    }))
-    Array(items) => @ion.Ion::list(items.map(value => yaml_metadata_ion(value, line)))
+    Map(fields) =>
+      @ion.Ion::from_fields(
+        fields
+        .to_array()
+        .map(entry => @ion.field(entry.0, yaml_metadata_ion(entry.1, line))),
+      )
+    Array(items) =>
+      @ion.Ion::list(items.map(value => yaml_metadata_ion(value, line)))
     String(text) => @ion.Ion::string(text)
     Integer(value) => @ion.Ion::big_int(@bigint.BigInt::from_int64(value))
     Real(value, ..) => @ion.Ion::float(value)
@@ -51,9 +59,12 @@ fn yaml_metadata_ion(value : @yaml.Yaml, line : Int32) -> @ion.Ion raise FormatE
 ///|
 fn toml_metadata_ion(value : @toml.TomlValue) -> @ion.Ion raise @ion.IonError {
   match value {
-    TomlTable(fields) => @ion.Ion::from_fields(fields.to_array().map(entry => {
-      @ion.field(entry.0, toml_metadata_ion(entry.1))
-    }))
+    TomlTable(fields) =>
+      @ion.Ion::from_fields(
+        fields
+        .to_array()
+        .map(entry => @ion.field(entry.0, toml_metadata_ion(entry.1))),
+      )
     TomlArray(items) => @ion.Ion::list(items.map(toml_metadata_ion))
     TomlString(text) => @ion.Ion::string(text)
     TomlInteger(value) => @ion.Ion::big_int(@bigint.BigInt::from_int64(value))
@@ -63,10 +74,14 @@ fn toml_metadata_ion(value : @toml.TomlValue) -> @ion.Ion raise @ion.IonError {
       let (kind, spelling) = value.datetime_info().unwrap()
       if kind == "LocalTime" {
         // Ion has no date-free time. Preserve TOML's type explicitly.
-        @ion.Ion::string(spelling).with_annotation(@ion.symbol("toml_local_time"))
+        @ion.Ion::string(spelling).with_annotation(
+          @ion.symbol("toml_local_time"),
+        )
       } else {
-        let text = spelling.replace_all(old=" ", new="T")
-          .replace_all(old="t", new="T").replace_all(old="z", new="Z")
+        let text = spelling
+          .replace_all(old=" ", new="T")
+          .replace_all(old="t", new="T")
+          .replace_all(old="z", new="Z")
         let text = if kind == "LocalDateTime" { text + "-00:00" } else { text }
         @ion.Ion::timestamp(@ion.Timestamp::parse(text[:]))
       }
@@ -75,24 +90,36 @@ fn toml_metadata_ion(value : @toml.TomlValue) -> @ion.Ion raise @ion.IonError {
 }
 
 ///|
-fn parse_metadata(source : String, format : MetadataFormat, line : Int32) -> Metadata raise FormatError {
+fn parse_metadata(
+  source : String,
+  format : MetadataFormat,
+  line : Int32,
+) -> Metadata raise FormatError {
   let value = match format {
-    Json => @ion_json.read_json(source[:]) catch {
-      error => raise InvalidMetadata(line~, message=error.message())
-    }
-    Ion => @ion_text.read_ion(source[:]) catch {
-      error => raise InvalidMetadata(line~, message=error.message())
-    }
+    Json =>
+      @ion_json.read_json(source[:]) catch {
+        error => raise InvalidMetadata(line~, message=error.message())
+      }
+    Ion =>
+      @ion_text.read_ion(source[:]) catch {
+        error => raise InvalidMetadata(line~, message=error.message())
+      }
     Yaml => {
       let documents = @yaml.Yaml::load_from_string(source[:]) catch {
-        @yaml.YamlError(mark~, info~) => raise InvalidMetadata(
-          line~, message="YAML line \{mark.line}, column \{mark.col + 1}: \{info}",
-        )
+        @yaml.YamlError(mark~, info~) =>
+          raise InvalidMetadata(
+            line~,
+            message="YAML line \{mark.line}, column \{mark.col + 1}: \{info}",
+          )
       }
       match documents[:] {
         [] => @ion.Ion::from_fields([])
         [document] => yaml_metadata_ion(document, line)
-        _ => raise InvalidMetadata(line~, message="expected one YAML mapping document")
+        _ =>
+          raise InvalidMetadata(
+            line~,
+            message="expected one YAML mapping document",
+          )
       }
     }
     Toml => {
@@ -110,19 +137,29 @@ fn parse_metadata(source : String, format : MetadataFormat, line : Int32) -> Met
 }
 
 ///|
-fn registry_metadata_field(metadata : Metadata, key : String) -> Json? raise FormatError {
+fn registry_metadata_field(
+  metadata : Metadata,
+  key : String,
+) -> Json? raise FormatError {
   metadata.get_json(key) catch {
     error => raise InvalidMetadata(line=1, message=error.message())
   }
 }
 
 ///|
-fn write_metadata(metadata : Metadata, output : MetadataOutput) -> String raise FormatError {
+fn write_metadata(
+  metadata : Metadata,
+  output : MetadataOutput,
+) -> String raise FormatError {
   if output != Ion {
     let json = try {
       let text = metadata.to_json().stringify()
       let reread = @ion_json.read_json(text[:])
-      if metadata.to_ion().equals(reread) { Some(text) } else { None }
+      if metadata.to_ion().equals(reread) {
+        Some(text)
+      } else {
+        None
+      }
     } catch {
       _ => None
     }
@@ -130,7 +167,10 @@ fn write_metadata(metadata : Metadata, output : MetadataOutput) -> String raise 
       return "#!meta\n\n" + text + "\n"
     }
     if output == Json {
-      raise InvalidMetadata(line=1, message="metadata cannot round-trip through JSON; use Ion output")
+      raise InvalidMetadata(
+        line=1,
+        message="metadata cannot round-trip through JSON; use Ion output",
+      )
     }
   }
   let text = @ion_text.write_ion(metadata.to_ion()) catch {

@@ -22,7 +22,7 @@ let js_runtimes_var : String = "LANDER_LOGGING_JS_RUNTIMES"
 ///|
 /// Send the stop signal `kind` (1 Interrupt, 2 Terminate, 3 Quit) to the
 /// process `pid` through `send.c`. Gives 0 on success.
-extern "C" fn send_signal(pid : Int, kind : Int) -> Int = "lander_test_send_signal"
+extern "C" fn send_signal(pid : Int32, kind : Int32) -> Int32 = "lander_test_send_signal"
 
 ///|
 /// Index 0 of this file: the body of a native child process.
@@ -54,24 +54,25 @@ fn Child::label(self : Child) -> String {
 ///|
 priv enum Step {
   Await(String)
-  Send(Int)
+  Send(Int32)
 }
 
 ///|
 /// Keep the child phase and streamed output when the timeout cancels a read.
+#derive(Debug)
 priv enum ChildPhase {
   Starting
   Awaiting(String)
-  Signalling(Int)
+  Signalling(Int32)
   ReadingOutput
   WaitingForExit
-} derive(Debug)
+}
 
 ///|
 /// The result of one child: exit code, standard output and standard error,
 /// with `\r\n` as `\n`.
 priv struct Ran {
-  code : Int
+  code : Int32
   out : String
   err : String
 }
@@ -103,7 +104,7 @@ async fn run_child(
   }
   let output = StringBuilder()
   let phase = Ref(ChildPhase::Starting)
-  try @async.with_timeout(30000, () => {
+  @async.with_timeout(30000, () => {
     @async.with_task_group(group => {
       let (reader, writer) = @process.read_from_process()
       let (err_reader, err_writer) = @process.read_from_process()
@@ -135,7 +136,10 @@ async fn run_child(
               match received.get() {
                 Some(actual) if actual.has_suffix(line) => break
                 Some(_) => ()
-                None => fail("\{child.label()} \{scenario}: no line \{line} in\n\{output}")
+                None =>
+                  fail(
+                    "\{child.label()} \{scenario}: no line \{line} in\n\{output}",
+                  )
               }
             }
           }
@@ -153,10 +157,17 @@ async fn run_child(
       phase.val = WaitingForExit
       let code = process.wait()
       let normalize = (text : String) => text.replace_all(old="\r\n", new="\n")
-      { code, out: normalize(output.to_string()), err: normalize(err_task.wait()) }
+      {
+        code,
+        out: normalize(output.to_string()),
+        err: normalize(err_task.wait()),
+      }
     })
   }) catch {
-    @async.TimeoutError => fail("\{child.label()} \{scenario} timed out in \{@debug.to_string(phase.val)}; captured stdout:\n\{output}")
+    @async.TimeoutError =>
+      fail(
+        "\{child.label()} \{scenario} timed out in \{@debug.to_string(phase.val)}; captured stdout:\n\{output}",
+      )
     other => raise other
   }
 }
@@ -180,7 +191,7 @@ fn children() -> Array[Child] {
 /// The kinds that this platform can send to one child process, with the
 /// reason and the exit code. Windows sends only `CTRL_BREAK_EVENT` to one
 /// process group.
-fn sendable_kinds() -> Array[(Int, Int)] {
+fn sendable_kinds() -> Array[(Int32, Int32)] {
   match @async.platform {
     Windows => [(3, 131)]
     _ => [(1, 130), (2, 143), (3, 131)]
@@ -190,7 +201,11 @@ fn sendable_kinds() -> Array[(Int, Int)] {
 ///|
 /// The lines of `text`, without empty lines.
 fn lines(text : String) -> Array[String] {
-  text.split("\n").map(line => line.to_owned()).filter(line => !line.is_empty()).collect()
+  text
+  .split("\n")
+  .map(line => line.to_owned())
+  .filter(line => !line.is_empty())
+  .collect()
 }
 
 ///|
@@ -215,7 +230,11 @@ fn assert_suffixes_in_order(
 
 ///|
 /// Check that no line of `text` ends with `suffix`.
-fn assert_no_suffix(text : String, suffix : String, label : String) -> Unit raise {
+fn assert_no_suffix(
+  text : String,
+  suffix : String,
+  label : String,
+) -> Unit raise {
   for line in lines(text) {
     guard !line.has_suffix(suffix) else {
       fail("\{label}: unexpected line: \{suffix}\n\{text}")
@@ -272,18 +291,33 @@ async test "hosted session close drains before telemetry and remains idempotent"
       let ran = run_child(child, scenario, dir, [])
       let label = child.label() + " " + scenario
       assert_eq(ran.code, code, msg=label + "\n" + ran.out + ran.err)
-      assert_suffixes_in_order(ran.out, [
-        "telemetry=start", "diagnostic=start", "diagnostic=stop",
-        "diagnostic.last", "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop",
-      ], label)
+      assert_suffixes_in_order(
+        ran.out,
+        [
+          "telemetry=start", "diagnostic=start", "diagnostic=stop", "diagnostic.last",
+          "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop",
+        ],
+        label,
+      )
       if code == 143 {
         assert_true(ran.out.contains("reason=Signal(Terminate)"), msg=ran.out)
       }
       let text = read_files(dir, "session-", ".log")
-      assert_suffixes_in_order(text, ["telemetry.start", "diagnostic.start", "command", "diagnostic.last"], label)
-      assert_false(text.contains("late-after-close") || text.contains("late-stopped"), msg=text)
+      assert_suffixes_in_order(
+        text,
+        ["telemetry.start", "diagnostic.start", "command", "diagnostic.last"],
+        label,
+      )
+      assert_false(
+        text.contains("late-after-close") || text.contains("late-stopped"),
+        msg=text,
+      )
       assert_no_marker(names(dir), label)
-      assert_eq(ran.out.split("diagnostic=closed\n").count() - 1, 1, msg=ran.out)
+      assert_eq(
+        ran.out.split("diagnostic=closed\n").count() - 1,
+        1,
+        msg=ran.out,
+      )
     }
   }
 }
@@ -291,7 +325,10 @@ async test "hosted session close drains before telemetry and remains idempotent"
 ///|
 async test "session-aware finalization drains after startup failure and skipped or timed-out stop hooks" {
   for child in children() {
-    for scenario in ["session-start-failure", "session-skipped", "session-timed-stop"] {
+    for
+      scenario in [
+        "session-start-failure", "session-skipped", "session-timed-stop",
+      ] {
       let dir = temp_dir(scenario)
       defer @fs.rmdir(dir, recursive=true)
       let ran = run_child(child, scenario, dir, [])
@@ -320,7 +357,11 @@ async test "the logger-only bridge forwards a consuming probe through its final 
     let ran = run_child(child, "probe-legacy", dir, [])
     assert_eq(ran.code, 130, msg=ran.out + ran.err)
     let text = read_files(dir, "legacy-", ".log")
-    assert_suffixes_in_order(text, ["legacy.accepted", "reason=Signal(Interrupt)"], child.label())
+    assert_suffixes_in_order(
+      text,
+      ["legacy.accepted", "reason=Signal(Interrupt)"],
+      child.label(),
+    )
     assert_no_marker(names(dir), child.label())
   }
 }
@@ -332,7 +373,11 @@ async test "post-close failure reports bypass the logger and signal codes surviv
     defer @fs.rmdir(dir, recursive=true)
     let ran = run_child(child, "session-late-failure", dir, [])
     assert_eq(ran.code, 1, msg=ran.out + ran.err)
-    assert_suffixes_in_order(ran.out, ["diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop"], child.label())
+    assert_suffixes_in_order(
+      ran.out,
+      ["diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop"],
+      child.label(),
+    )
     assert_true(ran.err.contains("telemetry flush failed"), msg=ran.err)
     let text = read_files(dir, "session-", ".log")
     assert_true(text.contains("diagnostic.last"), msg=text)
@@ -341,7 +386,10 @@ async test "post-close failure reports bypass the logger and signal codes surviv
     @fs.write_file(dir + "/blocker", "regular file")
     let signal = run_child(child, "probe-failure", dir, [])
     assert_eq(signal.code, 130, msg=signal.out + signal.err)
-    assert_true(signal.err.contains("logging: create directory failed"), msg=signal.err)
+    assert_true(
+      signal.err.contains("logging: create directory failed"),
+      msg=signal.err,
+    )
     assert_true(signal.out.contains("reason=Signal(Interrupt)"), msg=signal.out)
   }
 }
@@ -349,22 +397,42 @@ async test "post-close failure reports bypass the logger and signal codes surviv
 ///|
 async test "real parent signals stop a non-yielding logging worker and drain before telemetry" {
   guard !(@async.platform is Windows) else { return }
-  guard @env.get_env_var("LANDER_LOGGING_WORKER_LAUNCHER") is Some(launcher) else { return }
-  guard @env.get_env_var("LANDER_LOGGING_WORKER_PROGRAM") is Some(program) else { fail("missing logging worker") }
+  guard @env.get_env_var("LANDER_LOGGING_WORKER_LAUNCHER") is Some(launcher) else {
+    return
+  }
+  guard @env.get_env_var("LANDER_LOGGING_WORKER_PROGRAM") is Some(program) else {
+    fail("missing logging worker")
+  }
   for (kind, name, code) in [(1, "Interrupt", 130), (2, "Terminate", 143)] {
     let dir = temp_dir("logging-worker")
     defer @fs.rmdir(dir, recursive=true)
-    let ran = run_child(Worker(launcher~, program~), "session-poll", dir, [Await("ready"), Send(kind)])
+    let ran = run_child(Worker(launcher~, program~), "session-poll", dir, [
+      Await("ready"),
+      Send(kind),
+    ])
     assert_eq(ran.code, code, msg=ran.out + ran.err)
     // Readiness uses a control channel; buffered worker stdout can arrive later.
     assert_true(ran.out.contains("worker-stdout-pending"), msg=ran.out)
     assert_eq(ran.out.split("ready\n").count() - 1, 1, msg=ran.out)
-    assert_suffixes_in_order(ran.out, [
-      "diagnostic=stop", "reason=Signal(\{name})", "polled=true",
-      "diagnostic=closed", "telemetry=flushed-after-drain", "telemetry=stop", "owner-listeners=intact",
-    ], "logging worker")
+    assert_suffixes_in_order(
+      ran.out,
+      [
+        "diagnostic=stop",
+        "reason=Signal(\{name})",
+        "polled=true",
+        "diagnostic=closed",
+        "telemetry=flushed-after-drain",
+        "telemetry=stop",
+        "owner-listeners=intact",
+      ],
+      "logging worker",
+    )
     let text = read_files(dir, "session-", ".log")
-    assert_suffixes_in_order(text, ["command", "diagnostic.last"], "logging worker")
+    assert_suffixes_in_order(
+      text,
+      ["command", "diagnostic.last"],
+      "logging worker",
+    )
     assert_no_marker(names(dir), "logging worker")
   }
 }
@@ -392,7 +460,12 @@ async test "a standalone session writes the console and both files, then drains 
     let records = lines(jsonl)
     assert_eq(records.length(), 3, msg=label + "\n" + jsonl)
     let decoded = records.map(line => @json.parse(line))
-    guard decoded[1] is { "message": String(message), "properties": [{ "name": "Text", "value": String(value), .. }], .. } else {
+    guard decoded[1]
+      is {
+        "message": String(message),
+        "properties": [{ "name": "Text", "value": String(value), .. }],
+        ..
+      } else {
       fail("\{label}: unexpected record \{records[1]}")
     }
     assert_eq(message, "Unicode é 😀 ✓")
@@ -403,7 +476,15 @@ async test "a standalone session writes the console and both files, then drains 
     assert_eq(
       error, "CompilerError: Unknown identifier calculate_total\n  at app.mbt:42",
     )
-    guard decoded[0] is { "schemaVersion": 1, "properties": [{ "name": "Count", "value": 3, .. }, { "name": "Path", "value": "src", .. }], .. } else {
+    guard decoded[0]
+      is {
+        "schemaVersion": 1,
+        "properties": [
+          { "name": "Count", "value": 3, .. },
+          { "name": "Path", "value": "src", .. },
+        ],
+        ..
+      } else {
       fail("\{label}: unexpected record \{records[0]}")
     }
     assert_no_marker(names(dir), label)
@@ -418,25 +499,50 @@ async test "public rolling files retain approved object properties and the array
     defer @fs.rmdir(dir, recursive=true)
     let ran = run_child(child, "object-properties", dir, [])
     assert_eq(ran.code, 0, msg="\{label}\n\{ran.out}\n\{ran.err}")
-    assert_true(ran.out.contains("closed accepted=4 queue_full=0 failed=false written=4,4,4"), msg=ran.out)
+    assert_true(
+      ran.out.contains(
+        "closed accepted=4 queue_full=0 failed=false written=4,4,4",
+      ),
+      msg=ran.out,
+    )
     assert_no_marker(names(dir), label)
     for prefix in ["array", "named"] {
-      let files = names(dir).filter(name => name.has_prefix(prefix) && name.has_suffix(".jsonl"))
+      let files = names(dir).filter(name => {
+        name.has_prefix(prefix) && name.has_suffix(".jsonl")
+      })
       assert_eq(files.length(), 4, msg=files.join(","))
       for name in files {
         assert_eq(lines(@fs.read_file(dir + "/" + name).text()).length(), 1)
       }
     }
-    let named = lines(read_files(dir, "named", ".jsonl")).map(line => @json.parse(line))
+    let named = lines(read_files(dir, "named", ".jsonl")).map(line => {
+      @json.parse(line)
+    })
     let expected : Array[Json] = [
-      { "path": "/repo/morphir.toml", "array": [1, Json::null(), { "nested": true }], "object": { "items": [false, 2] }, "nothing": Json::null(), "flag": true, "number": 2.5 },
-      { "path": { "nested": [true, 2] }, "level": false, "command": "project.list", "duplicateProperties": "inside", "properties": "safe" },
+      {
+        "path": "/repo/morphir.toml",
+        "array": [1, Json::null(), { "nested": true }],
+        "object": { "items": [false, 2] },
+        "nothing": Json::null(),
+        "flag": true,
+        "number": 2.5,
+      },
+      {
+        "path": { "nested": [true, 2] },
+        "level": false,
+        "command": "project.list",
+        "duplicateProperties": "inside",
+        "properties": "safe",
+      },
       { "value": Json::null(), "text": "é 😀\n\r\u{1b}\"\\" },
       {},
     ]
     let history : Array[Json?] = [
       None,
-      Some({ "path": [Json::null(), [1, Json::null()], { "nested": [true, 2] }], "level": ["event", false] }),
+      Some({
+        "path": [Json::null(), [1, Json::null()], { "nested": [true, 2] }],
+        "level": ["event", false],
+      }),
       Some({ "value": [1, Json::null()] }),
       None,
     ]
@@ -447,21 +553,32 @@ async test "public rolling files retain approved object properties and the array
       assert_eq(fields.get("properties"), Some(expected[index]), msg=label)
       assert_eq(fields.get("duplicateProperties"), history[index], msg=label)
     }
-    let legacy = lines(read_files(dir, "array", ".jsonl")).map(line => @json.parse(line))
+    let legacy = lines(read_files(dir, "array", ".jsonl")).map(line => {
+      @json.parse(line)
+    })
     for index, record in legacy {
       guard record is Object(fields) else { fail("not an object") }
       assert_eq(fields.get("schemaVersion"), Some(1))
       assert_eq(fields.get("duplicateProperties"), None)
-      guard fields.get("properties") is Some(Array(entries)) else { fail("default ceased to be an array") }
+      guard fields.get("properties") is Some(Array(entries)) else {
+        fail("default ceased to be an array")
+      }
       assert_eq(entries.length(), [6, 8, 3, 0][index])
     }
     guard legacy[1] is Object(fields) else { fail("not an object") }
-    assert_eq(fields.get("properties"), Some([
-      { "name": "path", "value": Json::null() }, { "name": "level", "value": "event" },
-      { "name": "path", "value": [1, Json::null()] }, { "name": "command", "value": "project.list" },
-      { "name": "path", "value": { "nested": [true, 2] } }, { "name": "level", "value": false },
-      { "name": "duplicateProperties", "value": "inside" }, { "name": "properties", "value": "safe" },
-    ]))
+    assert_eq(
+      fields.get("properties"),
+      Some([
+        { "name": "path", "value": Json::null() },
+        { "name": "level", "value": "event" },
+        { "name": "path", "value": [1, Json::null()] },
+        { "name": "command", "value": "project.list" },
+        { "name": "path", "value": { "nested": [true, 2] } },
+        { "name": "level", "value": false },
+        { "name": "duplicateProperties", "value": "inside" },
+        { "name": "properties", "value": "safe" },
+      ]),
+    )
     let restarted = run_child(child, "object-properties", dir, [])
     assert_eq(restarted.code, 0, msg=restarted.out + restarted.err)
     assert_no_marker(names(dir), label)
@@ -511,7 +628,9 @@ async test "a session with no file event creates no directory, marker or file" {
     assert_eq(ran.code, 0, msg="\{label}\n\{ran.out}\n\{ran.err}")
     assert_suffixes_in_order(
       ran.out,
-      ["INF] only on the console", "closed accepted=1 queue_full=0 failed=false written=1,0"],
+      [
+        "INF] only on the console", "closed accepted=1 queue_full=0 failed=false written=1,0",
+      ],
       label,
     )
     assert_eq(names(dir), [], msg=label)
@@ -527,7 +646,7 @@ async test "a log directory without write permission is a visible ownership fail
     let dir = temp_dir("denied")
     defer @fs.rmdir(dir, recursive=true)
     @fs.chmod(dir, 0o555)
-    defer @fs.chmod(dir, 0o755)
+    defer @async.protect_from_cancel(() => @fs.chmod(dir, 0o755))
     let ran = run_child(child, "standalone", dir, [])
     assert_eq(ran.code, 0, msg="\{label}\n\{ran.out}\n\{ran.err}")
     assert_suffixes_in_order(
@@ -541,8 +660,9 @@ async test "a log directory without write permission is a visible ownership fail
 
 ///|
 async test "a large volume reaches the pipe and the file completely and in order" {
-  let expected = Array::makei(@scenarios.volume_events, index => "INF] " +
-    @scenarios.volume_line(index))
+  let expected = Array::makei(@scenarios.volume_events, index => {
+    "INF] " + @scenarios.volume_line(index)
+  })
   for child in children() {
     let label = child.label()
     let dir = temp_dir("volume")
@@ -654,7 +774,9 @@ async test "a shutdown timeout skips hooks but not the final drain" {
     defer @fs.rmdir(dir, recursive=true)
     let ran = run_child(child, "host-timeout", dir, [])
     assert_eq(ran.code, 1, msg="\{label}\n\{ran.out}\n\{ran.err}")
-    let expected = ["INF] slow", "ERR] logging-host: Shutdown timed out after 200ms"]
+    let expected = [
+      "INF] slow", "ERR] logging-host: Shutdown timed out after 200ms",
+    ]
     assert_suffixes_in_order(ran.out, expected, label)
     assert_no_suffix(ran.out, "INF] hook=b.stop.end", label)
     assert_suffixes_in_order(read_files(dir, "host-", ".log"), expected, label)
@@ -670,12 +792,23 @@ async test "a first signal stops gracefully and the stop hook logs reach the out
       let (kind, exit_code) = case
       let dir = temp_dir("signal")
       defer @fs.rmdir(dir, recursive=true)
-      let ran = run_child(child, "host-wait", dir, [Await("INF] ready"), Send(kind)])
-      assert_eq(ran.code, exit_code, msg="\{label} \{kind}\n\{ran.out}\n\{ran.err}")
+      let ran = run_child(child, "host-wait", dir, [
+        Await("INF] ready"),
+        Send(kind),
+      ])
+      assert_eq(
+        ran.code,
+        exit_code,
+        msg="\{label} \{kind}\n\{ran.out}\n\{ran.err}",
+      )
       let expected = start_hooks + ["INF] ready"] + stop_hooks
       assert_suffixes_in_order(ran.out, expected, label)
       assert_no_suffix(ran.out, "INF] command must be cancelled", label)
-      assert_suffixes_in_order(read_files(dir, "host-", ".log"), expected, label)
+      assert_suffixes_in_order(
+        read_files(dir, "host-", ".log"),
+        expected,
+        label,
+      )
       assert_no_marker(names(dir), label)
     }
   }
@@ -695,7 +828,11 @@ async test "a second signal still ends the process at once" {
         Await("INF] slow"),
         Send(kind),
       ])
-      assert_eq(ran.code, exit_code, msg="\{label} \{kind}\n\{ran.out}\n\{ran.err}")
+      assert_eq(
+        ran.code,
+        exit_code,
+        msg="\{label} \{kind}\n\{ran.out}\n\{ran.err}",
+      )
       assert_no_suffix(ran.out, "INF] hook=b.stop.end", label)
       assert_no_suffix(ran.out, "INF] hook=a.stopped", label)
     }
@@ -711,7 +848,11 @@ async test "a failed file destination keeps the console and gives exit code 1" {
     @fs.write_file(dir + "/blocker", "a file, not a directory\n")
     let ran = run_child(child, "file-failure", dir, [])
     assert_eq(ran.code, 1, msg="\{label}\n\{ran.out}\n\{ran.err}")
-    assert_suffixes_in_order(ran.out, start_hooks + ["INF] command"] + stop_hooks, label)
+    assert_suffixes_in_order(
+      ran.out,
+      start_hooks + ["INF] command"] + stop_hooks,
+      label,
+    )
     assert_true(
       ran.err.contains("logging: create directory failed for files "),
       msg="\{label}\n\{ran.err}",
@@ -750,7 +891,8 @@ async fn size_rolls(dir : String) -> Array[String] {
       Some(rest) =>
         match rest.strip_suffix(".log") {
           Some(number) =>
-            !number.is_empty() && number.iter().all(char => char >= '0' && char <= '9')
+            !number.is_empty() &&
+            number.iter().all(char => char >= '0' && char <= '9')
           None => false
         }
       None => false
@@ -793,13 +935,18 @@ async test "fan-out, filtering, burst drops, rolling, retention and restart thro
     let summary = "closed accepted=\{accepted} queue_full=\{dropped} failed=false"
     let first = run_child(child, "fanout", dir, [])
     assert_eq(first.code, 0, msg="\{label}\n\{first.out}\n\{first.err}")
-    assert_true(first.out.contains("\u{1b}["), msg="\{label}: no Literate styles")
+    assert_true(
+      first.out.contains("\u{1b}["),
+      msg="\{label}: no Literate styles",
+    )
     let plain = strip_styles(first.out)
     assert_suffixes_in_order(
       plain,
       [
-        "[23:59:58.000Z INF] Loaded 3 files from src", "[00:00:01.000Z INF] Next day 28 with true and null",
-        "[00:00:01.000Z INF] burst 0", "[00:00:01.000Z INF] burst \{@scenarios.burst_limit - 1}",
+        "[23:59:58.000Z INF] Loaded 3 files from src",
+        "[00:00:01.000Z INF] Next day 28 with true and null",
+        "[00:00:01.000Z INF] burst 0",
+        "[00:00:01.000Z INF] burst \{@scenarios.burst_limit - 1}",
       ],
       label,
     )
@@ -822,24 +969,32 @@ async test "fan-out, filtering, burst drops, rolling, retention and restart thro
     // The daily JSON Lines files keep the captured times of both days.
     let day_one = @fs.read_file(dir + "/acme-20261027.jsonl").text()
     assert_eq(lines(day_one).length(), 1, msg=day_one)
-    guard @json.parse(lines(day_one)[0]) is { "timestamp": "2026-10-27T23:59:58.000Z", "message": "Loaded 3 files from src", .. } else {
+    guard @json.parse(lines(day_one)[0])
+      is {
+        "timestamp": "2026-10-27T23:59:58.000Z",
+        "message": "Loaded 3 files from src",
+        ..
+      } else {
       fail("\{label}: \{day_one}")
     }
     let day_two = lines(@fs.read_file(dir + "/acme-20261028.jsonl").text())
     assert_eq(day_two.length(), 1 + @scenarios.burst_limit)
-    guard @json.parse(day_two[0]) is { "properties": [{ "name": "Day", "value": 28, .. }, { "name": "Flag", "value": true, .. }, { "name": "Nothing", "value": Null, .. }], .. } else {
+    guard @json.parse(day_two[0])
+      is {
+        "properties": [
+          { "name": "Day", "value": 28, .. },
+          { "name": "Flag", "value": true, .. },
+          { "name": "Nothing", "value": Null, .. },
+        ],
+        ..
+      } else {
       fail("\{label}: \{day_two[0]}")
     }
     // Size rolls of 400 bytes keep the newest 3 text files.
     let rolls = size_rolls(dir)
     assert_eq(rolls.length(), 3, msg="\{label}: \{entries.join(", ")}")
     let text = read_files(dir, "acme_", ".log")
-    assert_true(
-      text.contains(
-        "\{@scenarios.burst_limit - 1}\n",
-      ),
-      msg=text,
-    )
+    assert_true(text.contains("\{@scenarios.burst_limit - 1}\n"), msg=text)
     for name in rolls {
       let size = @fs.file_size(dir + "/" + name)
       guard size <= 400L else { fail("\{label}: \{name} has \{size} bytes") }
@@ -870,13 +1025,23 @@ async test "fan-out, filtering, burst drops, rolling, retention and restart thro
 async test "completion reports a pending signal before any hook or command" {
   let cases = completion_children()
   for child in cases {
-    for (scenario, code) in [("completion-early-int", 130), ("completion-early-term", 143)] {
+    for
+      (scenario, code) in [
+        ("completion-early-int", 130),
+        ("completion-early-term", 143),
+      ] {
       let dir = temp_dir(scenario)
       defer @fs.rmdir(dir, recursive=true)
       let ran = run_child(child, scenario, dir, [])
       assert_eq(ran.code, code, msg=ran.out + ran.err)
-      assert_eq(ran.out.trim(), "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"closed\":true}", msg=child.label() + " stdout=" + ran.out + " stderr=" + ran.err)
-      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_eq(
+        ran.out.trim(),
+        "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"closed\":true}",
+        msg=child.label() + " stdout=" + ran.out + " stderr=" + ran.err,
+      )
+      assert_true(
+        read_files(dir, "completion-", ".log").contains("factory.accepted"),
+      )
       assert_no_marker(names(dir), child.label())
     }
   }
@@ -889,7 +1054,9 @@ fn completion_children() -> Array[Child] raise {
   if @env.get_env_var("LANDER_LOGGING_NATIVE_PROGRAM") is Some(program) {
     cases.push(NativeProgram(program))
   } else {
-    guard @env.get_env_var(js_program_var) is None else { fail("missing native completion program") }
+    guard @env.get_env_var(js_program_var) is None else {
+      fail("missing native completion program")
+    }
   }
   cases
 }
@@ -897,18 +1064,19 @@ fn completion_children() -> Array[Child] raise {
 ///|
 async test "completion retains real lifecycle outcomes and closes before reporting" {
   for child in completion_children() {
-    for (scenario, exit_code, reason, hooks, commands, selected) in [
-      ("completion-startup", 143, "signal", 1, 0, 143),
-      ("completion-running", 130, "signal", 2, 1, 130),
-      ("completion-clean", 0, "completed", 2, 1, 0),
-      ("completion-failure", 1, "failed", 2, 1, 1),
-      ("completion-config", 2, "start-failed", 0, 0, 2),
-      ("completion-timeout", 1, "completed", 2, 1, 1),
-      ("completion-closed", 0, "completed", 2, 1, 0),
-      ("completion-throws", 1, "completed", 2, 1, 0),
-      ("completion-throws-int", 130, "signal", 0, 0, 130),
-      ("completion-throws-term", 143, "signal", 0, 0, 143),
-    ] {
+    for
+      (scenario, exit_code, reason, hooks, commands, selected) in [
+        ("completion-startup", 143, "signal", 1, 0, 143),
+        ("completion-running", 130, "signal", 2, 1, 130),
+        ("completion-clean", 0, "completed", 2, 1, 0),
+        ("completion-failure", 1, "failed", 2, 1, 1),
+        ("completion-config", 2, "start-failed", 0, 0, 2),
+        ("completion-timeout", 1, "completed", 2, 1, 1),
+        ("completion-closed", 0, "completed", 2, 1, 0),
+        ("completion-throws", 1, "completed", 2, 1, 0),
+        ("completion-throws-int", 130, "signal", 0, 0, 130),
+        ("completion-throws-term", 143, "signal", 0, 0, 143),
+      ] {
       let dir = temp_dir(scenario)
       defer @fs.rmdir(dir, recursive=true)
       let ran = run_child(child, scenario, dir, [])
@@ -923,7 +1091,9 @@ async test "completion retains real lifecycle outcomes and closes before reporti
       assert_eq(ran.out.trim().split("\n").count(), 1, msg=label)
       let files = read_files(dir, "completion-", ".log")
       assert_true(files.contains("factory.accepted"), msg=label)
-      if scenario == "completion-running" { assert_true(files.contains("command.cleanup"), msg=label) }
+      if scenario == "completion-running" {
+        assert_true(files.contains("command.cleanup"), msg=label)
+      }
       assert_no_marker(names(dir), label)
     }
   }
@@ -932,13 +1102,23 @@ async test "completion retains real lifecycle outcomes and closes before reporti
 ///|
 async test "logger-only completion reports an early signal exactly once" {
   for child in completion_children() {
-    for (scenario, code) in [("completion-legacy-int", 130), ("completion-legacy-term", 143)] {
+    for
+      (scenario, code) in [
+        ("completion-legacy-int", 130),
+        ("completion-legacy-term", 143),
+      ] {
       let dir = temp_dir(scenario)
       defer @fs.rmdir(dir, recursive=true)
       let ran = run_child(child, scenario, dir, [])
       assert_eq(ran.code, code, msg=ran.out + ran.err)
-      assert_eq(ran.out.trim(), "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"legacy\":true}", msg=child.label() + ran.out + ran.err)
-      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_eq(
+        ran.out.trim(),
+        "{\"reason\":\"signal\",\"exit_code\":\{code},\"hooks\":0,\"commands\":0,\"legacy\":true}",
+        msg=child.label() + ran.out + ran.err,
+      )
+      assert_true(
+        read_files(dir, "completion-", ".log").contains("factory.accepted"),
+      )
       assert_no_marker(names(dir), child.label())
     }
   }
@@ -947,13 +1127,19 @@ async test "logger-only completion reports an early signal exactly once" {
 ///|
 async test "omitting completion preserves empty stdout and final drain on early signals" {
   for child in completion_children() {
-    for (scenario, code) in [("completion-default-int", 130), ("completion-default-term", 143)] {
+    for
+      (scenario, code) in [
+        ("completion-default-int", 130),
+        ("completion-default-term", 143),
+      ] {
       let dir = temp_dir(scenario)
       defer @fs.rmdir(dir, recursive=true)
       let ran = run_child(child, scenario, dir, [])
       assert_eq(ran.code, code, msg=ran.out + ran.err)
       assert_eq(ran.out, "", msg=child.label())
-      assert_true(read_files(dir, "completion-", ".log").contains("factory.accepted"))
+      assert_true(
+        read_files(dir, "completion-", ".log").contains("factory.accepted"),
+      )
       assert_no_marker(names(dir), child.label())
     }
   }

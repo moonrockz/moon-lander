@@ -55,7 +55,10 @@ test "verify the attestation of a GitHub release" {
       assert_eq(facts.times[0].time.unix_seconds(), 1716998983L)
       assert_eq(facts.claims.source_repository_ref, Some("refs/heads/trunk"))
       guard facts.statement is Some(statement) else { fail("no statement") }
-      assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())
+      assert_eq(
+        statement.predicate_type,
+        @sigstore.PredicateType::slsa_provenance_v1(),
+      )
     }
     Rejected(reason) => fail(reason.message())
   }
@@ -155,7 +158,9 @@ test "verify a release asset of an immutable release" {
     now=@sigstore.Instant::from_unix_seconds(1794000000L),
   )
   guard verdict is Verified(facts) else { fail("not verified") }
-  guard facts.times is [{ source: Authority(uri~), .. }] else { fail("not a timestamp") }
+  guard facts.times is [{ source: Authority(uri~), .. }] else {
+    fail("not a timestamp")
+  }
   assert_eq(uri, "timestamp.githubapp.com")
 }
 ```

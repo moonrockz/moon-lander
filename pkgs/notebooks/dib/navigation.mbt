@@ -6,6 +6,7 @@ pub using @notebooks {type Cursor, type NodePath, type Control, type Metadata}
 /// A concrete DIB traversal node. Notebook children are cells in source
 /// order; cell children are retained directives in source order. Directives
 /// are leaves. Metadata and kernel registrations use their own accessors.
+#derive(Eq, Debug)
 pub(all) enum Node {
   /// A root document whose children are its source cells.
   Notebook(Notebook)
@@ -13,7 +14,7 @@ pub(all) enum Node {
   Cell(Cell)
   /// A retained #! source line with unparsed arguments and a relative line.
   Directive(Directive)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Node with Eq::{equal, not_equal}

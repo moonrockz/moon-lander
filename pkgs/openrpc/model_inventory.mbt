@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum ObjectKind {
   DocumentObject
   InfoObject
@@ -16,7 +17,7 @@ pub(all) enum ObjectKind {
   LinkObject
   ComponentsObject
   ReferenceObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn field_names(kind : ObjectKind) -> Array[String] {

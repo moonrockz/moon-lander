@@ -38,7 +38,7 @@ pub fn node_hash(left : BytesView, right : BytesView) -> Bytes {
 }
 
 ///|
-fn bit_length(value : Int64) -> Int {
+fn bit_length(value : Int64) -> Int32 {
   let mut bits = 0
   let mut rest = value
   while rest > 0L {
@@ -49,7 +49,7 @@ fn bit_length(value : Int64) -> Int {
 }
 
 ///|
-fn popcount(value : Int64) -> Int {
+fn popcount(value : Int64) -> Int32 {
   let mut count = 0
   let mut rest = value
   while rest > 0L {
@@ -92,9 +92,10 @@ pub fn root_from_inclusion_proof(
 
 ///|
 /// A checkpoint text that cannot be read.
+#derive(Debug)
 pub suberror CheckpointError {
   BadCheckpoint(String)
-} derive(Debug)
+}
 
 ///|
 pub extend CheckpointError with @debug.Debug::{to_repr}
@@ -128,7 +129,9 @@ pub fn parse_checkpoint(envelope : String) -> Checkpoint raise CheckpointError {
   let text = envelope[:split + 1].to_owned()
   let lines = text.split("\n").map(line => line.to_owned()).collect()
   // The text ends with a newline, so the last part is empty.
-  guard lines.length() >= 4 else { raise BadCheckpoint("the text has too few lines") }
+  guard lines.length() >= 4 else {
+    raise BadCheckpoint("the text has too few lines")
+  }
   let origin = lines[0]
   guard !origin.is_empty() else { raise BadCheckpoint("the origin is empty") }
   let size = @string.parse_int64(lines[1]) catch {
@@ -140,7 +143,9 @@ pub fn parse_checkpoint(envelope : String) -> Checkpoint raise CheckpointError {
   let root_hash = @encoding.decode_base64(lines[2]) catch {
     _ => raise BadCheckpoint("the root hash is not base64")
   }
-  guard root_hash.length() == 32 else { raise BadCheckpoint("the root hash is not 32 bytes") }
+  guard root_hash.length() == 32 else {
+    raise BadCheckpoint("the root hash is not 32 bytes")
+  }
   let signatures = []
   for line in envelope[split + 2:].split("\n") {
     if line.is_empty() {
@@ -157,21 +162,28 @@ pub fn parse_checkpoint(envelope : String) -> Checkpoint raise CheckpointError {
     let bytes = @encoding.decode_base64(rest[space + 1:]) catch {
       _ => raise BadCheckpoint("a signature is not base64")
     }
-    guard bytes.length() > 4 else { raise BadCheckpoint("a signature is too short") }
+    guard bytes.length() > 4 else {
+      raise BadCheckpoint("a signature is too short")
+    }
     signatures.push({
       name: rest[:space].to_owned(),
       key_hint: bytes[:4].to_owned(),
       signature: bytes[4:].to_owned(),
     })
   }
-  guard !signatures.is_empty() else { raise BadCheckpoint("the note has no signature") }
-  { origin, size, root_hash, text: @encoding.utf8(text), signatures }
+  guard !signatures.is_empty() else {
+    raise BadCheckpoint("the note has no signature")
+  }
+  { origin, size, root_hash, text: @encoding.utf8(text), signatures, }
 }
 
 ///|
 /// True when a signature whose key hint is the first four bytes of SHA-256 of
 /// the key's DER encoding verifies, and no signature with that hint fails.
-pub fn Checkpoint::verify(self : Checkpoint, key : @signature.PublicKey) -> Bool {
+pub fn Checkpoint::verify(
+  self : Checkpoint,
+  key : @signature.PublicKey,
+) -> Bool {
   let hint = @signature.sha256(key.spki)[:4].to_owned()
   let mut verified = false
   for signature in self.signatures {

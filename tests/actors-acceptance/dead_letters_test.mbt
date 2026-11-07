@@ -3,15 +3,15 @@
 /// answers how many undelivered messages it saw for each reason.
 enum DeadLetters {
   Observe(@actors.ActorEvent)
-  Totals(@actors.Reply[(Int, Int, Int)])
+  Totals(@actors.Reply[(Int32, Int32, Int32)])
 }
 
 ///|
 /// Counts of `Full`, `Closed` and `Discarded` events, in that order.
 fn count_dead_letters(
-  totals : (Int, Int, Int),
+  totals : (Int32, Int32, Int32),
   message : DeadLetters,
-) -> @actors.Next[(Int, Int, Int)] {
+) -> @actors.Next[(Int32, Int32, Int32)] {
   let (full, closed, discarded) = totals
   match message {
     Observe(Undelivered(_, Full, ..)) => Continue((full + 1, closed, discarded))
@@ -46,7 +46,7 @@ async test "Dead-letter counter: an actor counts undelivered messages by reason"
     let worker = scope.start(
       (),
       mailbox=Bounded(@actors.MailboxCapacity::from_int(1)),
-      (_, _ : Int) => {
+      (_, _ : Int32) => {
         ready.put(())
         gate.get()
         Continue(())
@@ -73,7 +73,9 @@ async test "Dead-letter counter: an actor counts undelivered messages by reason"
 fn payload_property(payload : @ion.Ion) -> Json {
   @ion_json.to_json(payload) catch {
     _ => {
-      let text = @ion_text.write_fragment(payload) catch { _ => "<unprintable>" }
+      let text = @ion_text.write_fragment(payload) catch {
+        _ => "<unprintable>"
+      }
       Json::string(text)
     }
   }
@@ -130,9 +132,10 @@ enum Bridge {
 }
 
 ///|
+#derive(ToJson)
 enum Order {
-  Place(String, Int)
-} derive(ToJson)
+  Place(String, Int32)
+}
 
 ///|
 async test "Logger bridge: an actor writes runtime events to a logger" {
@@ -166,7 +169,7 @@ async test "Logger bridge: an actor writes runtime events to a logger" {
     // the Ion text form of this payload.
     let symbols = scope.start(
       (),
-      (_, _ : Int) => Continue(()),
+      (_, _ : Int32) => Continue(()),
       payload=@actors.PayloadPolicy::encode(_ => {
         @ion.Ion::symbol_token(@ion.SymbolToken::from_sid(10))
       }),

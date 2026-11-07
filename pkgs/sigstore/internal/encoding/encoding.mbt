@@ -1,21 +1,22 @@
 ///|
 /// A text that is not valid base64 or hex.
+#derive(Debug)
 pub suberror EncodingError {
   /// The text is not base64 in the standard or the URL-safe alphabet.
   BadBase64(String)
   /// The text is not an even number of hex digits.
   BadHex(String)
-} derive(Debug)
+}
 
 ///|
 pub extend EncodingError with @debug.Debug::{to_repr}
 
 ///|
-fn base64_value(char : Char, url : Bool) -> Int {
+fn base64_value(char : Char, url : Bool) -> Int32 {
   match char {
-    'A'..='Z' => char.to_int() - 'A'.to_int()
-    'a'..='z' => char.to_int() - 'a'.to_int() + 26
-    '0'..='9' => char.to_int() - '0'.to_int() + 52
+    'A'..<='Z' => char.to_int() - 'A'.to_int()
+    'a'..<='z' => char.to_int() - 'a'.to_int() + 26
+    '0'..<='9' => char.to_int() - '0'.to_int() + 52
     '+' if !url => 62
     '/' if !url => 63
     '-' if url => 62
@@ -30,7 +31,7 @@ fn base64_value(char : Char, url : Bool) -> Int {
 /// Line breaks are ignored, as Go's decoder does.
 pub fn decode_base64(text : StringView) -> Bytes raise EncodingError {
   let url = text.contains_char('-') || text.contains_char('_')
-  let values : Array[Int] = []
+  let values : Array[Int32] = []
   let mut padding = 0
   for char in text {
     if char == '\r' || char == '\n' {
@@ -43,7 +44,9 @@ pub fn decode_base64(text : StringView) -> Bytes raise EncodingError {
     guard padding == 0 else { raise BadBase64("data after padding") }
     let value = base64_value(char, url)
     guard value >= 0 else {
-      raise BadBase64("the character \{char.to_string().escape()} is not allowed")
+      raise BadBase64(
+        "the character \{char.to_string().escape()} is not allowed",
+      )
     }
     values.push(value)
   }
@@ -54,11 +57,17 @@ pub fn decode_base64(text : StringView) -> Bytes raise EncodingError {
       raise BadBase64("the padding is not valid")
     }
   }
-  let out = FixedArray::make(values.length() / 4 * 3 + (if rest == 0 { 0 } else { rest - 1 }), b'\x00')
+  let out = FixedArray::make(
+    values.length() / 4 * 3 + (if rest == 0 { 0 } else { rest - 1 }),
+    b'\x00',
+  )
   let mut at = 0
   let mut i = 0
   while i + 4 <= values.length() {
-    let n = (values[i] << 18) | (values[i + 1] << 12) | (values[i + 2] << 6) | values[i + 3]
+    let n = (values[i] << 18) |
+      (values[i + 1] << 12) |
+      (values[i + 2] << 6) |
+      values[i + 3]
     out[at] = (n >> 16).to_byte()
     out[at + 1] = ((n >> 8) & 0xff).to_byte()
     out[at + 2] = (n & 0xff).to_byte()
@@ -111,11 +120,11 @@ pub fn encode_base64(bytes : BytesView) -> String {
 }
 
 ///|
-fn hex_value(char : Char) -> Int {
+fn hex_value(char : Char) -> Int32 {
   match char {
-    '0'..='9' => char.to_int() - '0'.to_int()
-    'a'..='f' => char.to_int() - 'a'.to_int() + 10
-    'A'..='F' => char.to_int() - 'A'.to_int() + 10
+    '0'..<='9' => char.to_int() - '0'.to_int()
+    'a'..<='f' => char.to_int() - 'a'.to_int() + 10
+    'A'..<='F' => char.to_int() - 'A'.to_int() + 10
     _ => -1
   }
 }
@@ -128,7 +137,9 @@ pub fn decode_hex(text : StringView) -> Bytes raise EncodingError {
   for i in 0..<out.length() {
     let high = hex_value(text[2 * i].unsafe_to_char())
     let low = hex_value(text[2 * i + 1].unsafe_to_char())
-    guard high >= 0 && low >= 0 else { raise BadHex("a character is not a hex digit") }
+    guard high >= 0 && low >= 0 else {
+      raise BadHex("a character is not a hex digit")
+    }
     out[i] = ((high << 4) | low).to_byte()
   }
   Bytes::from_array(out)

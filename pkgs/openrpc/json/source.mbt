@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum TokenKind {
   Whitespace
   OpenObject
@@ -12,14 +13,15 @@ pub(all) enum TokenKind {
   TrueToken
   FalseToken
   NullToken
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct Token {
   kind : TokenKind
   span : Span
   text : String
-} derive(Debug)
+}
 
 ///|
 pub fn Token::kind(self : Token) -> TokenKind {
@@ -107,10 +109,11 @@ pub fn CstDocument::tokens(self : CstDocument) -> Array[Token] {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct Position {
   line : Int32
   column : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Position::line(self : Position) -> Int32 {
@@ -123,13 +126,14 @@ pub fn Position::column(self : Position) -> Int32 {
 }
 
 ///|
+#derive(Debug)
 pub struct Location {
   source_id : String?
   node_index : Int32
   value_span : Span
   key_span : Span?
   priv node : NodeId
-} derive(Debug)
+}
 
 ///|
 pub fn Location::source_id(self : Location) -> String? {
@@ -159,10 +163,11 @@ pub fn Location::key_span(self : Location) -> Span? {
 }
 
 ///|
+#derive(Debug)
 pub struct SourceMap {
   cst : CstDocument
   line_starts : Array[Int32]
-} derive(Debug)
+}
 
 ///|
 pub fn CstDocument::source_map(self : CstDocument) -> SourceMap {
@@ -230,7 +235,7 @@ pub fn SourceMap::locations(
       node_index: index,
       value_span: node.span,
       key_span: node.key_span,
-      node: { index, source: self.cst.source },
+      node: { index, source: self.cst.source, },
     }
   })
 }

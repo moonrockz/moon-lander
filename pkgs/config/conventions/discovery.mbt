@@ -13,8 +13,14 @@ fn discover(
   let extensions = searched_extensions(context.formats)
   let scan = Scan::new(conventions, context, extensions, notes, options~)
   let machine = scan.machine_sources(options)
-  if !scan.needs.is_empty() { return Need(scan.needs) }
-  let inputs = { options: conventions.primary_options(options), environment, extensions }
+  if !scan.needs.is_empty() {
+    return Need(scan.needs)
+  }
+  let inputs = {
+    options: conventions.primary_options(options),
+    environment,
+    extensions,
+  }
   match conventions.project_sources(inputs, scan, machine) {
     Need(requests) => Need(requests)
     Done(tier) => {
@@ -24,7 +30,12 @@ fn discover(
         []
       }
       let sources = machine.filter_map(machine_source => {
-        if scan.selected is Some(path) && machine_source.candidates.any(candidate => normalize(candidate) == path) { None } else {
+        if scan.selected is Some(path) &&
+          machine_source.candidates.any(candidate => {
+            normalize(candidate) == path
+          }) {
+          None
+        } else {
           Some(filtered(machine_source.source, inherited, warn=false))
         }
       })
@@ -32,32 +43,69 @@ fn discover(
         None => None
         Some(policy) => {
           let variable_name = "\{conventions.prefix}_PROFILES"
-          let variable = context.env_vars.get(variable_name).map(text => (variable_name, text))
+          let variable = context.env_vars
+            .get(variable_name)
+            .map(text => (variable_name, text))
           let input = @profiles.SelectionInput::new(options.profiles, variable?)
           if conventions.prepared_layers() {
-            let layers = @profiles.ControlLayers::new(if input.disabled() { [] } else { tier.controls })
-            Some(scan.overlay_authority(@profiles.resolve_layers(policy, input, layers)))
+            let layers = @profiles.ControlLayers::new(
+              if input.disabled() {
+                []
+              } else {
+                tier.controls
+              },
+            )
+            Some(
+              scan.overlay_authority(
+                @profiles.resolve_layers(policy, input, layers),
+              ),
+            )
           } else {
-          let mut controls : (@config.ConfigValue, @config.Origin)? = None
-          if !input.disabled() && tier.locations.get(0) is Some((path, false)) {
-            let value = match context.tree.file(path) {
-              Found(text) => @config.parse_file(context.formats, path.to_string(), text)
-              Missing => raise @config.FileNotFound(path=path.to_string())
-              Unknown => return Need([ReadFile(path)])
+            let mut controls : (@config.ConfigValue, @config.Origin)? = None
+            if !input.disabled() && tier.locations.get(0) is Some((path, false)) {
+              let value = match context.tree.file(path) {
+                Found(text) =>
+                  @config.parse_file(context.formats, path.to_string(), text)
+                Missing => raise @config.FileNotFound(path=path.to_string())
+                Unknown => return Need([ReadFile(path)])
+              }
+              let kind = tier.sources[0].kind()
+              controls = Some(
+                (
+                  value,
+                  {
+                    kind,
+                    source: conventions.display,
+                    priority: 300,
+                    location: Some(path.to_string()),
+                  },
+                ),
+              )
             }
-            let kind = tier.sources[0].kind()
-            controls = Some((value, { kind, source: conventions.display, priority: 300, location: Some(path.to_string()) }))
-          }
-          Some(@profiles.resolve_input(policy, input, controls?))
+            Some(@profiles.resolve_input(policy, input, controls?))
           }
         }
       }
       let profile_sources = match resolution {
-        Some(resolution) => if conventions.prepared_layers() { scan.ordered_profile_sources(tier, resolution) } else { conventions.profile_sources(tier.locations, resolution, extensions, tier.has_member) }
+        Some(resolution) =>
+          if conventions.prepared_layers() {
+            scan.ordered_profile_sources(tier, resolution)
+          } else {
+            conventions.profile_sources(
+              tier.locations,
+              resolution,
+              extensions,
+              tier.has_member,
+            )
+          }
         None => []
       }
-      if !scan.needs.is_empty() { return Need(scan.needs) }
-      guard scan.with_selected_overlay(tier) is Some(tier) else { return Need(scan.needs) }
+      if !scan.needs.is_empty() {
+        return Need(scan.needs)
+      }
+      guard scan.with_selected_overlay(tier) is Some(tier) else {
+        return Need(scan.needs)
+      }
       let ordered = [..sources]
       let mut inserted = false
       for source in tier.sources {
@@ -67,8 +115,12 @@ fn discover(
         }
         ordered.push(source)
       }
-      if !inserted { ordered.append(profile_sources) }
-      Done(@config.Expansion::new(ordered, warnings=notes, profiles?=resolution))
+      if !inserted {
+        ordered.append(profile_sources)
+      }
+      Done(
+        @config.Expansion::new(ordered, warnings=notes, profiles?=resolution),
+      )
     }
   }
 }
@@ -100,13 +152,33 @@ priv struct Scan {
 }
 
 ///|
-fn Scan::new(conventions : Conventions, context : @config.LoadContext, extensions : Array[String], notes : Array[@config.ConfigWarning], options? : DiscoveryOptions = DiscoveryOptions::new()) -> Scan raise @config.ConfigError {
-  let start = context.working_dir.filter(dir => dir.is_absolute()).map(normalize)
+fn Scan::new(
+  conventions : Conventions,
+  context : @config.LoadContext,
+  extensions : Array[String],
+  notes : Array[@config.ConfigWarning],
+  options~ : DiscoveryOptions = DiscoveryOptions::new(),
+) -> Scan raise @config.ConfigError {
+  let start = context.working_dir
+    .filter(dir => dir.is_absolute())
+    .map(normalize)
   let selected = match (conventions.selected_file, options.config) {
-    (Overlay, Explicit(path)) => Some(conventions.explicit_file(path, context, extensions).path)
+    (Overlay, Explicit(path)) =>
+      Some(conventions.explicit_file(path, context, extensions).path)
     _ => None
   }
-  { conventions, context, extensions, start, selected, member_files: @hashset.HashSet([]), needs: [], notes, parsed: Map([]), documents: Map([]) }
+  {
+    conventions,
+    context,
+    extensions,
+    start,
+    selected,
+    member_files: @hashset.HashSet([]),
+    needs: [],
+    notes,
+    parsed: Map([]),
+    documents: Map([]),
+  }
 }
 
 ///|
@@ -210,7 +282,12 @@ fn Conventions::project_sources(
     None => None
   }
   let alone = (sources : Array[@config.ConfigSource]) => {
-    @config.LoadStep::Done({ sources, has_member: false, locations: [], controls: [] })
+    @config.LoadStep::Done({
+      sources,
+      has_member: false,
+      locations: [],
+      controls: [],
+    })
   }
   let file = match project.options.config {
     Explicit(path) => self.explicit_file(path, context, extensions)
@@ -234,7 +311,10 @@ fn Conventions::project_sources(
         return alone([self.skipped_project()])
       }
       if stop is Some(stop) && !start.is_within(stop) {
-        raise OutsideBoundary(start=start.to_string(), boundary=stop.to_string())
+        raise OutsideBoundary(
+          start=start.to_string(),
+          boundary=stop.to_string(),
+        )
       }
       match scan.walk_up(start, stop) {
         None => return Need(scan.needs)
@@ -248,7 +328,10 @@ fn Conventions::project_sources(
             raise UnknownProject(selector~, workspace=start.to_string())
           }
           if self.layers is Some(_) {
-            guard scan.ordered_layer(start, project, as_member=false) is Some(layer) else { return Need(scan.needs) }
+            guard scan.ordered_layer(start, project, as_member=false)
+              is Some(layer) else {
+              return Need(scan.needs)
+            }
             return Done(self.tier(layer, None))
           }
           return alone([self.primary(self.candidates(start, extensions))])
@@ -274,28 +357,33 @@ fn Conventions::project_sources(
         Unknown => return Need(scan.needs)
       }
   }
-  let selected = if self.member_loading is ExplicitOnly && project.options.project is None { Some(None) } else { match (project.options.project, enclosing) {
-    // The project file is a member of the enclosing workspace.
-    (None, Some(_)) => Some(Some(file.root))
-    (selector, _) => {
-      guard scan.root_value(machine, value) is Some(root_value) else {
-        return Need(scan.needs)
-      }
-      let declaration = self.declaration(root_value)
-      match (selector, declaration) {
-        (Some(selector), _) =>
-          scan.selected_project(
-            workspace.root,
-            declaration,
-            root_value,
-            selector,
-          )
-        (None, Some(declaration)) =>
-          scan.automatic_member(workspace.root, declaration, start)
-        (None, None) => Some(None)
+  let selected = if self.member_loading is ExplicitOnly &&
+    project.options.project is None {
+    Some(None)
+  } else {
+    match (project.options.project, enclosing) {
+      // The project file is a member of the enclosing workspace.
+      (None, Some(_)) => Some(Some(file.root))
+      (selector, _) => {
+        guard scan.root_value(machine, value) is Some(root_value) else {
+          return Need(scan.needs)
+        }
+        let declaration = self.declaration(root_value)
+        match (selector, declaration) {
+          (Some(selector), _) =>
+            scan.selected_project(
+              workspace.root,
+              declaration,
+              root_value,
+              selector,
+            )
+          (None, Some(declaration)) =>
+            scan.automatic_member(workspace.root, declaration, start)
+          (None, None) => Some(None)
+        }
       }
     }
-  } }
+  }
   guard selected is Some(member_dir) else { return Need(scan.needs) }
   guard self.layer(workspace, project, scan, as_member=false) is Some(base) else {
     return Need(scan.needs)
@@ -331,8 +419,9 @@ fn Scan::walk_up(
     match self.config_at(dir) {
       NotKnown => return None
       Several => return Some(Crowded(dir))
-      OneFile(path) => return Some(Root({ path, root: dir, kind: Discovered }))
-      LegacyAt(path) => return Some(Root({ path, root: dir, kind: LegacyFile }))
+      OneFile(path) => return Some(Root({ path, root: dir, kind: Discovered, }))
+      LegacyAt(path) =>
+        return Some(Root({ path, root: dir, kind: LegacyFile, }))
       NoFile => ()
     }
     guard self.conventions.walk_up &&
@@ -365,7 +454,10 @@ fn Scan::config_at(
     return match self.context.tree.is_file(path) {
       Found(true) => LegacyAt(path)
       Found(false) | Missing => NoFile
-      Unknown => { add_need(self.needs, self.context.tree.file_request(path)); NotKnown }
+      Unknown => {
+        add_need(self.needs, self.context.tree.file_request(path))
+        NotKnown
+      }
     }
   }
   let tree = self.context.tree
@@ -418,25 +510,33 @@ fn Scan::value_of(
           let source = self.document_source(document, Workspace)
           if self.conventions.profiles is Some(_) {
             source.exclude([@config.KeyPath::parse("profiles")], warn=false)
-          } else { source }
+          } else {
+            source
+          }
         })
         Found(@config.build(sources).value())
       }
     }
   }
-  if self.conventions.prepared_layers() && file.kind is (ExplicitFile | Discovered) {
+  if self.conventions.prepared_layers() &&
+    file.kind is (ExplicitFile | Discovered) {
     return self.read_document(file.path)
   }
   match self.context.tree.file(file.path) {
     Found(text) => {
-      if self.conventions.selected_file is Overlay && self.parsed.get(file.path) is Some(value) { return Found(value) }
+      if self.conventions.selected_file is Overlay &&
+        self.parsed.get(file.path) is Some(value) {
+        return Found(value)
+      }
       let value = match (file.kind, self.conventions.legacy) {
-          (LegacyFile, Some(legacy)) =>
-            (legacy.decode)((legacy.format.parse)(text, file.path.to_string()))
-          _ =>
-            @config.parse_file(self.context.formats, file.path.to_string(), text)
-        }
-      if self.conventions.selected_file is Overlay { self.parsed[file.path] = value }
+        (LegacyFile, Some(legacy)) =>
+          (legacy.decode)((legacy.format.parse)(text, file.path.to_string()))
+        _ =>
+          @config.parse_file(self.context.formats, file.path.to_string(), text)
+      }
+      if self.conventions.selected_file is Overlay {
+        self.parsed[file.path] = value
+      }
       Found(value)
     }
     Missing => Missing
@@ -474,24 +574,42 @@ fn Conventions::layer(
   }
   let primary = match file.kind {
     Discovered if parsed is Some(value) =>
-      @config.ConfigSource::parsed_file(file.path.to_string(), value,
-        role=if as_member { Member } else { Workspace }, name=self.display)
-    Discovered if self.selected_file is Overlay => match scan.read_document(file.path) {
-      Found(value) => @config.ConfigSource::parsed_file(file.path.to_string(), value, role=if as_member { Member } else { Workspace }, name=self.display)
-      Missing => raise @config.FileNotFound(path=file.path.to_string())
-      Unknown => return None
-    }
+      @config.ConfigSource::parsed_file(
+        file.path.to_string(),
+        value,
+        role=if as_member { Member } else { Workspace },
+        name=self.display,
+      )
+    Discovered if self.selected_file is Overlay =>
+      match scan.read_document(file.path) {
+        Found(value) =>
+          @config.ConfigSource::parsed_file(
+            file.path.to_string(),
+            value,
+            role=if as_member { Member } else { Workspace },
+            name=self.display,
+          )
+        Missing => raise @config.FileNotFound(path=file.path.to_string())
+        Unknown => return None
+      }
     Discovered =>
       @config.ConfigSource::candidates(
         texts(self.candidates(file.root, project.extensions)),
         display=self.display,
         role=if as_member { Member } else { Workspace },
       )
-    ExplicitFile if self.prepared_layers() => match scan.read_document(file.path) {
-      Found(value) => @config.ConfigSource::parsed_file(file.path.to_string(), value, role=if as_member { Member } else { Explicit }, name=self.display)
-      Missing => raise @config.FileNotFound(path=file.path.to_string())
-      Unknown => return None
-    }
+    ExplicitFile if self.prepared_layers() =>
+      match scan.read_document(file.path) {
+        Found(value) =>
+          @config.ConfigSource::parsed_file(
+            file.path.to_string(),
+            value,
+            role=if as_member { Member } else { Explicit },
+            name=self.display,
+          )
+        Missing => raise @config.FileNotFound(path=file.path.to_string())
+        Unknown => return None
+      }
     ExplicitFile =>
       @config.ConfigSource::file(
         file.path.to_string(),
@@ -502,12 +620,15 @@ fn Conventions::layer(
       match scan.value_of(file) {
         Found(value) =>
           return Some({
-            primaries: scan.keep_source(file.path, @config.ConfigSource::parsed_file(
-              file.path.to_string(),
-              value,
-              role=if as_member { Member } else { Legacy },
-              name=self.display,
-            )),
+            primaries: scan.keep_source(
+              file.path,
+              @config.ConfigSource::parsed_file(
+                file.path.to_string(),
+                value,
+                role=if as_member { Member } else { Legacy },
+                name=self.display,
+              ),
+            ),
             adjacent: [],
             paths: [],
             controls: [],
@@ -517,21 +638,63 @@ fn Conventions::layer(
       }
   }
   if self.prepared_layers() {
-    let paths = if self.adjacent(file.path, project.extensions) is Some(_) { [file.path] } else { [] }
-    let adjacent = if paths.is_empty() { [] } else {
-      guard scan.ordered_overrides(self.anchors(paths, project.extensions), project, as_member~) is Some(stages) else { return None }
+    let paths = if self.adjacent(file.path, project.extensions) is Some(_) {
+      [file.path]
+    } else {
+      []
+    }
+    let adjacent = if paths.is_empty() {
+      []
+    } else {
+      guard scan.ordered_overrides(
+          self.anchors(paths, project.extensions),
+          project,
+          as_member~,
+        )
+        is Some(stages) else {
+        return None
+      }
       stages
     }
-    let controls = if as_member || paths.is_empty() || self.profiles is None { [] } else {
+    let controls = if as_member || paths.is_empty() || self.profiles is None {
+      []
+    } else {
       match scan.read_document(file.path) {
-        Found(value) => [scan.control_layer(file.path, value, if file.kind is Discovered { Workspace } else { Explicit })]
+        Found(value) =>
+          [
+            scan.control_layer(
+              file.path,
+              value,
+              if file.kind is Discovered {
+                Workspace
+              } else {
+                Explicit
+              },
+            ),
+          ]
         Missing => raise @config.FileNotFound(path=file.path.to_string())
         Unknown => return None
       }
     }
-    return Some({ primaries: scan.keep_source(file.path, primary), adjacent, paths, controls })
+    return Some({
+      primaries: scan.keep_source(file.path, primary),
+      adjacent,
+      paths,
+      controls,
+    })
   }
-  Some({ primaries: [primary], adjacent: self.overrides(file.path, project).map(source => source.map(value => [value]).unwrap_or([])), paths: if self.adjacent(file.path, project.extensions) is Some(_) { [file.path] } else { [] }, controls: [] })
+  Some({
+    primaries: [primary],
+    adjacent: self
+    .overrides(file.path, project)
+    .map(source => source.map(value => [value]).unwrap_or([])),
+    paths: if self.adjacent(file.path, project.extensions) is Some(_) {
+      [file.path]
+    } else {
+      []
+    },
+    controls: [],
+  })
 }
 
 ///|
@@ -547,23 +710,36 @@ fn Conventions::member_layer(
   match scan.config_at(dir) {
     NotKnown => None
     OneFile(path) =>
-      self.layer({ path, root: dir, kind: Discovered }, project, scan, as_member=true)
+      self.layer(
+        { path, root: dir, kind: Discovered, },
+        project,
+        scan,
+        as_member=true,
+      )
     LegacyAt(path) =>
-      self.layer({ path, root: dir, kind: LegacyFile }, project, scan, as_member=true)
-    NoFile | Several => if self.layers is Some(_) {
-      scan.ordered_layer(dir, project, as_member=true)
-    } else {
-      Some({
-        primaries: [@config.ConfigSource::candidates(
-          texts(self.candidates(dir, project.extensions)),
-          display=self.display,
-          role=Member,
-        )],
-        adjacent: [],
-        paths: [],
-        controls: [],
-      })
-    }
+      self.layer(
+        { path, root: dir, kind: LegacyFile, },
+        project,
+        scan,
+        as_member=true,
+      )
+    NoFile | Several =>
+      if self.layers is Some(_) {
+        scan.ordered_layer(dir, project, as_member=true)
+      } else {
+        Some({
+          primaries: [
+            @config.ConfigSource::candidates(
+              texts(self.candidates(dir, project.extensions)),
+              display=self.display,
+              role=Member,
+            ),
+          ],
+          adjacent: [],
+          paths: [],
+          controls: [],
+        })
+      }
   }
 }
 
@@ -593,7 +769,7 @@ fn Conventions::explicit_file(
     Some((dir, _)) if dir.name() == Some(".\{self.name}") => parent_of(dir)
     _ => parent_of(resolved)
   }
-  { path: resolved, root, kind: ExplicitFile }
+  { path: resolved, root, kind: ExplicitFile, }
 }
 
 ///|
@@ -606,7 +782,7 @@ fn Conventions::overrides(
   path : @config.FileTreePath,
   project : ProjectInputs,
 ) -> Array[@config.ConfigSource?] raise @config.ConfigError {
-  let { options, environment, extensions } = project
+  let { options, environment, extensions, } = project
   guard self.adjacent(path, extensions) is Some((dir, stem)) else { return [] }
   let sources = [
     environment.map(name => self.environment_file(dir, stem, name, extensions)),
@@ -710,7 +886,11 @@ fn unread_options(
 ) -> Array[@config.ConfigWarning] {
   let notes = []
   if options.profiles != Unspecified && conventions.profiles is None {
-    notes.push(note(conventions, "profiles are off, so discovery ignores the profiles option"))
+    notes.push(
+      note(
+        conventions, "profiles are off, so discovery ignores the profiles option",
+      ),
+    )
   }
   if options.environment is Some(_) && conventions.environments is None {
     notes.push(
@@ -765,7 +945,10 @@ fn Conventions::primary(
 }
 
 ///|
-fn add_need(needs : Array[@config.FileRequest], request : @config.FileRequest) -> Unit {
+fn add_need(
+  needs : Array[@config.FileRequest],
+  request : @config.FileRequest,
+) -> Unit {
   if !needs.contains(request) {
     needs.push(request)
   }
@@ -842,12 +1025,26 @@ fn Conventions::profile_sources(
   for name in resolution.active().names() {
     for location in locations {
       let (path, is_member) = location
-      guard self.adjacent(path, extensions) is Some((dir, stem)) else { continue }
+      guard self.adjacent(path, extensions) is Some((dir, stem)) else {
+        continue
+      }
       let source = @config.ConfigSource::candidates(
-        texts(extensions.map(extension => dir.child("\{stem}.profile.\{name}.\{extension}"))),
-        display=self.display, role=ProfileFile(name), name=self.display,
+        texts(
+          extensions.map(extension => {
+            dir.child("\{stem}.profile.\{name}.\{extension}")
+          }),
+        ),
+        display=self.display,
+        role=ProfileFile(name),
+        name=self.display,
       )
-      let filters = if is_member { key_paths(self.member_scope) } else if has_member { key_paths(self.inherited) } else { [] }
+      let filters = if is_member {
+        key_paths(self.member_scope)
+      } else if has_member {
+        key_paths(self.inherited)
+      } else {
+        []
+      }
       sources.push(filtered(source, filters, warn=is_member))
     }
   }

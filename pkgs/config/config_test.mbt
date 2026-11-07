@@ -44,7 +44,9 @@ test "a source root must be a struct" {
     )
   catch {
     error =>
-      @expect.expect(error).to_equal(InvalidRoot(origin="numbers", found="list"))
+      @expect.expect(error).to_equal(
+        InvalidRoot(origin="numbers", found="list"),
+      )
   } noraise {
     _ => fail("expected a list root to raise")
   }
@@ -155,11 +157,7 @@ test "new overlay fields follow base fields" {
   )
   @expect.expect(names(merged)).to_equal(["b", "a", "c"])
   @expect.expect(merged).to_equal(
-    tree([
-      ("b", @config.int(1)),
-      ("a", @config.int(4)),
-      ("c", @config.int(3)),
-    ]),
+    tree([("b", @config.int(1)), ("a", @config.int(4)), ("c", @config.int(3))]),
   )
 }
 
@@ -224,16 +222,21 @@ test "a merged struct keeps the base annotations when the overlay has none" {
     @ion.Ion::from_fields([]).with_annotation(@ion.symbol("app")),
   )
   let merged = @config.merge(base, @config.fields([("a", @config.int(1))]))
-  @expect.expect(merged.to_ion().annotations().map(token => token.text())).to_equal(
-    [Some("app")],
+  @expect.expect(merged.to_ion().annotations().map(token => token.text())).to_equal([
+      Some("app"),
+    ],
   )
 }
 
 ///|
 test "a value tree from Ion must have a struct root" {
-  try @config.ConfigValue::from_ion(@ion.Ion::list([]), origin="numbers") catch {
+  try
+    @config.ConfigValue::from_ion(@ion.Ion::list([]), origin="numbers")
+  catch {
     error =>
-      @expect.expect(error).to_equal(InvalidRoot(origin="numbers", found="list"))
+      @expect.expect(error).to_equal(
+        InvalidRoot(origin="numbers", found="list"),
+      )
   } noraise {
     _ => fail("expected a list root to raise")
   }

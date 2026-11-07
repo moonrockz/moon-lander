@@ -1,10 +1,11 @@
 ///|
 /// The operating system of a run.
+#derive(Eq, Debug)
 pub(all) enum Platform {
   Linux
   MacOs
   Windows
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Platform with Eq::{equal, not_equal}
@@ -36,23 +37,29 @@ pub struct Expansion {
 /// Provider output. Omit `profiles` for an ordinary source provider.
 pub fn Expansion::new(
   sources : Array[ConfigSource],
-  warnings? : Array[ConfigWarning] = [],
+  warnings~ : Array[ConfigWarning] = [],
   profiles? : ProfileResolution,
 ) -> Expansion {
-  { sources: sources.copy(), warnings: warnings.copy(), profiles }
+  { sources: sources.copy(), warnings: warnings.copy(), profiles, }
 }
 
 ///|
 /// A copy of this provider's sources, for a provider decorator.
-pub fn Expansion::sources(self : Expansion) -> Array[ConfigSource] { self.sources.copy() }
+pub fn Expansion::sources(self : Expansion) -> Array[ConfigSource] {
+  self.sources.copy()
+}
 
 ///|
 /// A copy of this provider's warnings, for a provider decorator.
-pub fn Expansion::warnings(self : Expansion) -> Array[ConfigWarning] { self.warnings.copy() }
+pub fn Expansion::warnings(self : Expansion) -> Array[ConfigWarning] {
+  self.warnings.copy()
+}
 
 ///|
 /// The immutable optional resolution, for a provider decorator.
-pub fn Expansion::profiles(self : Expansion) -> ProfileResolution? { self.profiles }
+pub fn Expansion::profiles(self : Expansion) -> ProfileResolution? {
+  self.profiles
+}
 
 ///|
 /// A step of the builder that gives sources during the load. `expand` gives
@@ -105,7 +112,12 @@ pub fn load(
           Done(expansion) => {
             if expansion.profiles is Some(resolution) {
               if profile_provider is Some(previous) {
-                raise Profile(failure=ProfileFailure::new(p.name, CompetingProviders(previous, p.name)))
+                raise Profile(
+                  failure=ProfileFailure::new(
+                    p.name,
+                    CompetingProviders(previous, p.name),
+                  ),
+                )
               }
               profile_provider = Some(p.name)
               profiles = Resolved(resolution)
@@ -141,10 +153,16 @@ pub fn load(
       for piece_index, piece in pieces {
         let key = KeyPath::parse("profiles")
         if piece.0.at(key.names) is Some(_) {
-          let piece_origin = { ..origin, location: piece.1 }
+          let piece_origin = { ..origin, location: piece.1, }
           let authoritative = resolution.permits_controls(piece_origin)
           if !resolution.disabled() && !authoritative {
-            raise Profile(failure=ProfileFailure::new("profiles", ForbiddenLocation, origin=Control(piece_origin, key)))
+            raise Profile(
+              failure=ProfileFailure::new(
+                "profiles",
+                ForbiddenLocation,
+                origin=Control(piece_origin, key),
+              ),
+            )
           }
           if remove_key(piece.0, key.names) is Some(rest) {
             pieces[piece_index] = (rest, piece.1)
@@ -159,7 +177,7 @@ pub fn load(
         if remove_key(piece.0, key.names) is Some(rest) {
           pieces[piece_index] = (rest, piece.1)
           if removed is None {
-            removed = Some({ ..origin, location: piece.1 })
+            removed = Some({ ..origin, location: piece.1, })
           }
         }
       }
@@ -179,16 +197,16 @@ pub fn load(
         policy=source.policy,
         key_policies=source.key_policies,
         source=source.name,
-        secret_syntax=secret_syntax,
+        secret_syntax~,
       )
       record_origins(
         provenance,
         piece.0,
-        { ..origin, location: piece.1 },
+        { ..origin, location: piece.1, },
         source_policy=source.policy,
         key_policies=source.key_policies,
-        secret_syntax=secret_syntax,
-        previous=previous,
+        secret_syntax~,
+        previous~,
       )
     }
     reports.push({
@@ -204,12 +222,19 @@ pub fn load(
   // The configuration holds no null field, and a record only for each leaf.
   root = without_nulls(root)
   let leaf_origins : Map[KeyPath, Array[Origin]] = Map([])
-  for leaf in leaves(root, secret_syntax=secret_syntax) {
+  for leaf in leaves(root, secret_syntax~) {
     if provenance.get(leaf.0) is Some(origins) {
       leaf_origins[leaf.0] = origins
     }
   }
-  Done({ root, reports, notes, provenance: leaf_origins, secret_syntax, profiles })
+  Done({
+    root,
+    reports,
+    notes,
+    provenance: leaf_origins,
+    secret_syntax,
+    profiles,
+  })
 }
 
 ///|
@@ -233,15 +258,27 @@ fn resolve(
 ) -> Resolved? raise ConfigError {
   match source.input {
     Value(value) =>
-      Some({ pieces: [(value, None)], path: None, candidates: [], status: Loaded })
-    NoInput => Some({ pieces: [], path: None, candidates: [], status: Skipped })
+      Some({
+        pieces: [(value, None)],
+        path: None,
+        candidates: [],
+        status: Loaded,
+      })
+    NoInput =>
+      Some({ pieces: [], path: None, candidates: [], status: Skipped, })
     Parsed(given, value) => {
       let path = source_path(context, given).to_string()
-      Some({ pieces: [(value, Some(path))], path: Some(path), candidates: [], status: Loaded })
+      Some({
+        pieces: [(value, Some(path))],
+        path: Some(path),
+        candidates: [],
+        status: Loaded,
+      })
     }
     Env(selection, prefix, reserved) =>
       match selection {
-        Skip => Some({ pieces: [], path: None, candidates: [], status: Skipped })
+        Skip =>
+          Some({ pieces: [], path: None, candidates: [], status: Skipped, })
         Explicit(vars) =>
           Some({
             pieces: env_pieces(vars, prefix, reserved),
@@ -257,7 +294,7 @@ fn resolve(
             status: Loaded,
           })
         Discover =>
-          Some({ pieces: [], path: None, candidates: [], status: NotFound })
+          Some({ pieces: [], path: None, candidates: [], status: NotFound, })
       }
     Path(given) => {
       let file = source_path(context, given)
@@ -312,7 +349,7 @@ fn resolve(
         )
       }
       guard existing is [file] else {
-        return Some({ pieces: [], path: None, candidates, status: NotFound })
+        return Some({ pieces: [], path: None, candidates, status: NotFound, })
       }
       let path = file.to_string()
       let format = select_format(context.formats, path)
@@ -352,7 +389,7 @@ fn parse_with(
 /// lower than the one before it raises `SourceOrder`.
 fn source_priorities(
   sources : Array[ConfigSource],
-) -> Array[Int] raise ConfigError {
+) -> Array[Int32] raise ConfigError {
   let priorities = []
   for index, source in sources {
     let previous = if index > 0 { Some(priorities[index - 1]) } else { None }
@@ -377,7 +414,7 @@ fn source_priorities(
 ///|
 /// The default display priority of a kind and role. An in-memory source has
 /// no default; it follows the source before it.
-fn default_priority(kind : SourceKind) -> Int {
+fn default_priority(kind : SourceKind) -> Int32 {
   match kind {
     Defaults | InMemory => 0
     File(System) => 100

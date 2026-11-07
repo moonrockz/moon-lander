@@ -3,13 +3,13 @@ async test "Fan-out to actors: each actor gets one event without waiting for han
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let got : @aio.Queue[String] = @aio.Queue(kind=Unbounded)
   let events = @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
-    let slow = scope.start((), (_, event : Int) => {
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
+    let slow = scope.start((), (_, event : Int32) => {
       gate.get()
       got.put("slow \{event}")
       Continue(())
     })
-    let fast = scope.start((), (_, event : Int) => {
+    let fast = scope.start((), (_, event : Int32) => {
       got.put("fast \{event}")
       Continue(())
     })

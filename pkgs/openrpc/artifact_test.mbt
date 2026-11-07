@@ -21,10 +21,10 @@ test "minimal documents pass both pinned artifacts" {
 test "closed artifact objects reject unknown members" {
   for version in ["1.3.2", "1.4.0"] {
     let document = @openrpc.read(
-      "{\"openrpc\":\"" +
-      version +
-      "\",\"info\":{\"title\":\"API\",\"version\":\"1\",\"foo\":1,\"x-ok\":2},\"methods\":[]}",
-    )
+        "{\"openrpc\":\"" +
+        version +
+        "\",\"info\":{\"title\":\"API\",\"version\":\"1\",\"foo\":1,\"x-ok\":2},\"methods\":[]}",
+      )
       .document()
       .unwrap()
     let report = @openrpc.validate(document)
@@ -42,8 +42,7 @@ test "closed artifact objects reject unknown members" {
 test "reference siblings fail only the artifact" {
   let report = @openrpc.validate(
     versioned(
-      "1.3.2",
-      "\"methods\":[{\"$ref\":\"#/x-m\",\"summary\":\"s\"}],\"x-m\":{\"name\":\"a\",\"params\":[]}",
+      "1.3.2", "\"methods\":[{\"$ref\":\"#/x-m\",\"summary\":\"s\"}],\"x-m\":{\"name\":\"a\",\"params\":[]}",
     ),
   )
   assert_eq(artifact(report), [
@@ -59,9 +58,11 @@ let external_example : String = "\"methods\":[{\"name\":\"a\",\"params\":[],\"ex
 test "external examples miss the artifact's required inline value" {
   let report = @openrpc.validate(versioned("1.3.2", external_example))
   assert_eq(artifact(report), [
-    (@exact.MissingField, ["methods", "0", "examples", "0", "params", "0"], Some(
-      "value",
-    )),
+    (
+      @exact.MissingField,
+      ["methods", "0", "examples", "0", "params", "0"],
+      Some("value"),
+    ),
   ])
   assert_eq(report.normative(), @openrpc.Passed)
 }
@@ -70,8 +71,7 @@ test "external examples miss the artifact's required inline value" {
 test "example objects may carry a reference sibling under oneOf" {
   let report = @openrpc.validate(
     versioned(
-      "1.4.0",
-      "\"methods\":[{\"name\":\"a\",\"params\":[],\"examples\":[{\"name\":\"p\",\"params\":[{\"name\":\"e\",\"value\":1,\"$ref\":\"#/components/examples/E\"}]}]}],\"components\":{\"examples\":{\"E\":{\"name\":\"e\",\"value\":2}}}",
+      "1.4.0", "\"methods\":[{\"name\":\"a\",\"params\":[],\"examples\":[{\"name\":\"p\",\"params\":[{\"name\":\"e\",\"value\":1,\"$ref\":\"#/components/examples/E\"}]}]}],\"components\":{\"examples\":{\"E\":{\"name\":\"e\",\"value\":2}}}",
     ),
   )
   assert_eq(artifact(report), [])

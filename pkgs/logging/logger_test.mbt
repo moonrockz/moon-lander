@@ -6,7 +6,7 @@ struct AppLogger {
 }
 
 ///|
-impl @logging.Logger for AppLogger with log(self, event) {
+impl @logging.Logger for AppLogger with fn log(self, event) {
   self.received.push(event)
 }
 
@@ -14,16 +14,16 @@ impl @logging.Logger for AppLogger with log(self, event) {
 /// An application logger that enables only `Warning` and higher, and counts the
 /// calls to its `log`.
 struct CountingLogger {
-  mut calls : Int
+  mut calls : Int32
 }
 
 ///|
-impl @logging.Logger for CountingLogger with enabled(_self, level) {
+impl @logging.Logger for CountingLogger with fn enabled(_self, level) {
   level >= Warning
 }
 
 ///|
-impl @logging.Logger for CountingLogger with log(self, _event) {
+impl @logging.Logger for CountingLogger with fn log(self, _event) {
   self.calls += 1
 }
 
@@ -44,10 +44,15 @@ fn write_each_level(logger : &@logging.Logger) -> Unit {
 
 ///|
 test "an application logger with only log gets an event at each level" {
-  let app = AppLogger::{ received: [] }
+  let app = AppLogger::{ received: [], }
   write_each_level(app)
   assert_eq(app.received.map(event => event.level), [
-    Trace, Debug, Information, Warning, Error, Critical,
+    Trace,
+    Debug,
+    Information,
+    Warning,
+    Error,
+    Critical,
   ])
   assert_eq(app.received.map(event => event.template), [
     "t", "d", "i", "w", "e", "c",
@@ -56,7 +61,7 @@ test "an application logger with only log gets an event at each level" {
 
 ///|
 test "warn writes a warning event with the template" {
-  let app = AppLogger::{ received: [] }
+  let app = AppLogger::{ received: [], }
   (app : &@logging.Logger).warn("Disk is low", [])
   assert_eq(app.received.length(), 1)
   let event = app.received[0]
@@ -68,7 +73,7 @@ test "warn writes a warning event with the template" {
 
 ///|
 test "error keeps the error value" {
-  let app = AppLogger::{ received: [] }
+  let app = AppLogger::{ received: [], }
   (app : &@logging.Logger).error(
     "Load failed",
     [],
@@ -85,7 +90,7 @@ test "error keeps the error value" {
 
 ///|
 test "a disabled level builds no event" {
-  let counting = CountingLogger::{ calls: 0 }
+  let counting = CountingLogger::{ calls: 0, }
   let logger : &@logging.Logger = counting
   logger.debug("Not written", [])
   assert_eq(counting.calls, 0)
@@ -101,7 +106,7 @@ fn load_files(logger : &@logging.Logger) -> Unit {
 
 ///|
 test "library code gives the same event to each backend" {
-  let app = AppLogger::{ received: [] }
+  let app = AppLogger::{ received: [], }
   let memory = @logging.MemoryLogger::new()
   load_files(app)
   load_files(memory)

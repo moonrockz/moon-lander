@@ -3,6 +3,7 @@ package "moonrockz/notebooks/nbformat"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
   "moonrockz/notebooks",
 }
 
@@ -14,28 +15,31 @@ pub fn walk(Node, (Node) -> @notebooks.Control, leave? : (Node) -> Unit) -> Unit
 pub fn walk_cursor(Node, (@notebooks.Cursor[Node]) -> @notebooks.Control, leave? : (@notebooks.Cursor[Node]) -> Unit) -> Unit
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror FormatError {
   InvalidJson(String)
   InvalidField(path~ : String, expected~ : String)
   UnsupportedVersion(major~ : Int32, minor~ : Int32)
   DuplicateCellId(String)
   DuplicateCellName(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn FormatError::equal(Self, Self) -> Bool
 pub fn FormatError::not_equal(Self, Self) -> Bool
 pub fn FormatError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-type Attachments derive(Eq, @debug.Debug)
-pub fn Attachments::Attachments(Json) -> Self raise FormatError
+#derive(Eq, @debug.Debug)
+type Attachments
+pub fn Attachments::Attachments(@json.Json) -> Self raise FormatError
 pub fn Attachments::equal(Self, Self) -> Bool
 pub fn Attachments::get(Self, String) -> MimeBundle?
 pub fn Attachments::names(Self) -> ReadOnlyArray[String]
 pub fn Attachments::not_equal(Self, Self) -> Bool
-pub fn Attachments::to_json(Self) -> Json
+pub fn Attachments::to_json(Self) -> @json.Json
 pub fn Attachments::to_repr(Self) -> @debug.Repr
 
-type Cell derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Cell
 pub fn Cell::Cell(CellContent, id? : CellId?, metadata? : @notebooks.Metadata) -> Self raise FormatError
 pub fn Cell::cell_type(Self) -> String
 pub fn Cell::content(Self) -> CellContent
@@ -49,60 +53,66 @@ pub fn Cell::mime_capability(Self) -> &@notebooks.MimeTyped?
 pub fn Cell::not_equal(Self, Self) -> Bool
 pub fn Cell::outputs(Self) -> ReadOnlyArray[Output]
 pub fn Cell::source(Self) -> String?
-pub fn Cell::to_json(Self) -> Json raise FormatError
+pub fn Cell::to_json(Self) -> @json.Json raise FormatError
 pub fn Cell::to_repr(Self) -> @debug.Repr
 pub impl @notebooks.CellView for Cell
 pub impl @notebooks.MimeTyped for Cell
 
+#derive(Eq, @debug.Debug)
 pub(all) enum CellContent {
   Markdown(source~ : String, attachments~ : Attachments?)
   Raw(source~ : String, attachments~ : Attachments?)
   Code(source~ : String, execution_count~ : ExecutionCount?, outputs~ : ReadOnlyArray[Output])
   Unknown(cell_type~ : String, fields~ : JsonObject)
-} derive(Eq, @debug.Debug)
+}
 pub fn CellContent::equal(Self, Self) -> Bool
 pub fn CellContent::not_equal(Self, Self) -> Bool
 pub fn CellContent::to_repr(Self) -> @debug.Repr
 
-type CellId derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type CellId
 pub fn CellId::CellId(String) -> Self raise FormatError
 pub fn CellId::equal(Self, Self) -> Bool
 pub fn CellId::not_equal(Self, Self) -> Bool
 pub fn CellId::to_repr(Self) -> @debug.Repr
 pub fn CellId::to_string(Self) -> String
 
-type ExecutionCount derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type ExecutionCount
 pub fn ExecutionCount::ExecutionCount(Int32) -> Self raise FormatError
 pub fn ExecutionCount::equal(Self, Self) -> Bool
-pub fn ExecutionCount::from_json(Json) -> Self raise FormatError
+pub fn ExecutionCount::from_json(@json.Json) -> Self raise FormatError
 pub fn ExecutionCount::not_equal(Self, Self) -> Bool
-pub fn ExecutionCount::to_json(Self) -> Json
+pub fn ExecutionCount::to_json(Self) -> @json.Json
 pub fn ExecutionCount::to_repr(Self) -> @debug.Repr
 
-type JsonObject derive(Eq, @debug.Debug)
-pub fn JsonObject::JsonObject(Json) -> Self raise FormatError
+#derive(Eq, @debug.Debug)
+type JsonObject
+pub fn JsonObject::JsonObject(@json.Json) -> Self raise FormatError
 pub fn JsonObject::equal(Self, Self) -> Bool
-pub fn JsonObject::get(Self, String) -> Json?
+pub fn JsonObject::get(Self, String) -> @json.Json?
 pub fn JsonObject::keys(Self) -> ReadOnlyArray[String]
 pub fn JsonObject::not_equal(Self, Self) -> Bool
-pub fn JsonObject::to_json(Self) -> Json
+pub fn JsonObject::to_json(Self) -> @json.Json
 pub fn JsonObject::to_repr(Self) -> @debug.Repr
 
-type MimeBundle derive(Eq, @debug.Debug)
-pub fn MimeBundle::MimeBundle(Json) -> Self raise FormatError
+#derive(Eq, @debug.Debug)
+type MimeBundle
+pub fn MimeBundle::MimeBundle(@json.Json) -> Self raise FormatError
 pub fn MimeBundle::equal(Self, Self) -> Bool
-pub fn MimeBundle::get(Self, String) -> Json?
+pub fn MimeBundle::get(Self, String) -> @json.Json?
 pub fn MimeBundle::mime_types(Self) -> ReadOnlyArray[String]
 pub fn MimeBundle::not_equal(Self, Self) -> Bool
-pub fn MimeBundle::to_json(Self) -> Json
+pub fn MimeBundle::to_json(Self) -> @json.Json
 pub fn MimeBundle::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Node {
   Notebook(Notebook)
   Cell(Cell)
   Output(Output)
   Attachment(name~ : String, data~ : MimeBundle)
-} derive(Eq, @debug.Debug)
+}
 pub fn Node::at(Self, @notebooks.NodePath) -> Self?
 pub fn Node::children(Self) -> ReadOnlyArray[Self]
 pub fn Node::cursor(Self) -> @notebooks.Cursor[Self]
@@ -114,7 +124,8 @@ pub fn Node::source(Self) -> String?
 pub fn Node::to_repr(Self) -> @debug.Repr
 pub impl @notebooks.Node for Node
 
-type Notebook derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Notebook
 pub fn Notebook::Notebook(ReadOnlyArray[Cell], minor? : Int32, metadata? : @notebooks.Metadata) -> Self raise FormatError
 pub fn Notebook::cell(Self, Int32) -> Cell?
 pub fn Notebook::cell_by_id(Self, CellId) -> Cell?
@@ -124,33 +135,35 @@ pub fn Notebook::cursor(Self) -> @notebooks.Cursor[Node]
 pub fn Notebook::equal(Self, Self) -> Bool
 pub fn Notebook::extensions(Self) -> JsonObject
 pub fn[A] Notebook::fold(Self, A, (A, @notebooks.Cursor[Node]) -> A) -> A
-pub fn Notebook::from_json(Json) -> Self raise FormatError
+pub fn Notebook::from_json(@json.Json) -> Self raise FormatError
 pub fn Notebook::metadata(Self) -> @notebooks.Metadata
 pub fn Notebook::nbformat(Self) -> Int32
 pub fn Notebook::nbformat_minor(Self) -> Int32
 pub fn Notebook::not_equal(Self, Self) -> Bool
 pub fn Notebook::root(Self) -> Node
-pub fn Notebook::to_json(Self) -> Json raise FormatError
+pub fn Notebook::to_json(Self) -> @json.Json raise FormatError
 pub fn Notebook::to_repr(Self) -> @debug.Repr
 pub fn Notebook::to_string(Self) -> String raise FormatError
 
-type Output derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Output
 pub fn Output::Output(OutputContent) -> Self raise FormatError
 pub fn Output::content(Self) -> OutputContent
 pub fn Output::equal(Self, Self) -> Bool
 pub fn Output::extensions(Self) -> JsonObject
 pub fn Output::not_equal(Self, Self) -> Bool
 pub fn Output::output_type(Self) -> String
-pub fn Output::to_json(Self) -> Json raise FormatError
+pub fn Output::to_json(Self) -> @json.Json raise FormatError
 pub fn Output::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum OutputContent {
   Stream(name~ : String, text~ : String)
   DisplayData(data~ : MimeBundle, metadata~ : @notebooks.Metadata)
   ExecuteResult(data~ : MimeBundle, metadata~ : @notebooks.Metadata, execution_count~ : ExecutionCount?)
   Error(ename~ : String, evalue~ : String, traceback~ : ReadOnlyArray[String])
   Unknown(output_type~ : String, fields~ : JsonObject)
-} derive(Eq, @debug.Debug)
+}
 pub fn OutputContent::equal(Self, Self) -> Bool
 pub fn OutputContent::not_equal(Self, Self) -> Bool
 pub fn OutputContent::to_repr(Self) -> @debug.Repr

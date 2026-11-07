@@ -31,6 +31,8 @@ async fn write_console(stream : @sinks.ConsoleStream, text : String) -> String? 
 /// The pinned `moonbitlang/async` gives no public terminal check, and this
 /// package adds no C stub for it, so `Auto` colors stay off on native. Use
 /// `Always` to force the Literate theme.
-fn console_capability(_stream : @sinks.ConsoleStream) -> @sinks.TerminalCapability {
+fn console_capability(
+  _stream : @sinks.ConsoleStream,
+) -> @sinks.TerminalCapability {
   Unknown
 }

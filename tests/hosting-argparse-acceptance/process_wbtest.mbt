@@ -9,12 +9,21 @@ async test "helper for argparse process exit and standard error" {
     _ => ["--no-such-option"]
   }
   let outcome = @hosting.builder(@lander_core.AppName::parse("acme"), argv)
-    |> @hosting_argparse.command(name => @argparse.Command(name, version="1.2.3"))
+    |> @hosting_argparse.command(name => {
+      @argparse.Command(name, version="1.2.3")
+    })
     |> @hosting.service("a", start=_ => println("unexpected hook"))
     |> @hosting.build(_ => println("unexpected factory"))
     |> @hosting.run(_ => println("unexpected command"))
   // `run` returns in all three modes; only the console driver ends the process.
-  assert_eq(outcome.exit_code().to_int(), if mode == "help" || mode == "version" { 0 } else { 2 })
+  assert_eq(
+    outcome.exit_code().to_int(),
+    if mode == "help" || mode == "version" {
+      0
+    } else {
+      2
+    },
+  )
   println("code=\{outcome.exit_code().to_int()}")
 }
 
@@ -32,9 +41,19 @@ fn test_process() -> (String, Array[String]) raise {
 #cfg(target="native")
 async test "help and version return 0 before services and usage errors write argparse text to stderr" {
   let (exe, args) = test_process()
-  for (mode, text) in [("help", "Usage: acme"), ("version", "1.2.3"), ("unknown", "--no-such-option")] {
-    let (code, out, err) = @async.with_timeout(10000, () => @process.collect_output(exe, args,
-      extra_env=Map::from_array([("LANDER_ARGPARSE_HELPER", mode)])))
+  for
+    (mode, text) in [
+      ("help", "Usage: acme"),
+      ("version", "1.2.3"),
+      ("unknown", "--no-such-option"),
+    ] {
+    let (code, out, err) = @async.with_timeout(10000, () => {
+      @process.collect_output(
+        exe,
+        args,
+        extra_env=Map::from_array([("LANDER_ARGPARSE_HELPER", mode)]),
+      )
+    })
     assert_eq(code, 0, msg=out.text() + err.text())
     let output = if mode == "unknown" { err.text() } else { out.text() }
     assert_true(output.contains(text), msg=output)

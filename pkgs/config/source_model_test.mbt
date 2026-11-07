@@ -15,7 +15,9 @@ fn done(step : @config.LoadStep[@config.Config]) -> @config.Config {
 }
 
 ///|
-fn load_error(run : () -> Unit raise @config.ConfigError) -> @config.ConfigError {
+fn load_error(
+  run : () -> Unit raise @config.ConfigError,
+) -> @config.ConfigError {
   try run() catch {
     error => error
   } noraise {
@@ -29,7 +31,7 @@ fn statuses(config : @config.Config) -> Array[@config.SourceStatus] {
 }
 
 ///|
-fn priorities(config : @config.Config) -> Array[Int] {
+fn priorities(config : @config.Config) -> Array[Int32] {
   config.reports().map(report => report.priority)
 }
 
@@ -72,9 +74,7 @@ test "Defaults from JSON" {
 
 ///|
 test "a defaults root that is not an object raises an invalid-root error" {
-  let error = load_error(() => {
-    @config.ConfigSource::defaults([1, 2]) |> ignore
-  })
+  let error = load_error(() => @config.ConfigSource::defaults([1, 2]) |> ignore)
   @expect.expect(error).to_equal(InvalidRoot(origin="defaults", found="list"))
 }
 
@@ -96,8 +96,9 @@ test "Default priorities" {
 test "default priorities of the other file roles" {
   let config = @config.build(
     ([System, Global, Legacy, Workspace, Member] : Array[@config.FileRole]).map(role => {
-      @config.ConfigSource::skipped(File(role))
-    }),
+        @config.ConfigSource::skipped(File(role))
+      },
+    ),
   )
   @expect.expect(priorities(config)).to_equal([100, 200, 300, 300, 350])
 }
@@ -106,8 +107,9 @@ test "default priorities of the other file roles" {
 test "Override file priorities" {
   let config = @config.build(
     ([EnvironmentFile, LocalOverride, UserOverride] : Array[@config.FileRole]).map(role => {
-      @config.ConfigSource::skipped(File(role))
-    }),
+        @config.ConfigSource::skipped(File(role))
+      },
+    ),
   )
   @expect.expect(priorities(config)).to_equal([375, 390, 400])
 }
@@ -127,9 +129,7 @@ test "Decreasing priority" {
   let builder = @config.builder()
     |> @config.add(@config.ConfigSource::skipped(Environment))
     |> @config.file("/w/app.toml", priority=300)
-  let error = load_error(() => {
-    @config.load(builder, complete()) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, complete()) |> ignore)
   @expect.expect(error).to_equal(
     SourceOrder(
       source="/w/app.toml",
@@ -176,9 +176,7 @@ test "Absence record answers a request" {
     |> @config.format(@toml.format())
     |> @config.file("/w/app.toml")
   let tree = @config.FileTree::new().with_missing(p("/w/app.toml"))
-  let error = load_error(() => {
-    @config.load(builder, tree) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, tree) |> ignore)
   @expect.expect(error).to_equal(FileNotFound(path="/w/app.toml"))
 }
 
@@ -228,10 +226,12 @@ fn file_provider(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
       match context.tree.listing(p("/w")) {
         Unknown => Need([ListDir(p("/w"))])
         _ =>
-          Done(@config.Expansion::new(
-            [@config.ConfigSource::file("/w/app.toml", priority=300)],
-            warnings=[Note(source="files", message="one file")],
-          ))
+          Done(
+            @config.Expansion::new(
+              [@config.ConfigSource::file("/w/app.toml", priority=300)],
+              warnings=[Note(source="files", message="one file")],
+            ),
+          )
       }
     },
   }
@@ -241,7 +241,7 @@ fn file_provider(seen : Ref[@config.LoadContext?]) -> @config.SourceProvider {
 test "Provider sources take its position" {
   let seen = Ref(None)
   let tree = complete()
-    .with_listing(p("/w"), [{ name: "app.toml", kind: File }])
+    .with_listing(p("/w"), [{ name: "app.toml", kind: File, }])
     .with_file(p("/w/app.toml"), "a = 1")
   let config = @config.builder()
     |> @config.format(@toml.format())
@@ -299,9 +299,9 @@ test "a provider gets an empty variable set and no platform by default" {
   |> @config.load(@config.FileTree::new())
   |> ignore
   guard seen.val is Some(context) else { fail("the provider did not run") }
-  @expect.expect((context.platform, context.env_vars.length())).to_equal((
-    None, 0,
-  ))
+  @expect.expect((context.platform, context.env_vars.length())).to_equal(
+    (None, 0),
+  )
 }
 
 ///|
@@ -341,9 +341,7 @@ test "Missing explicit file" {
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("conf/app.toml")
-  let error = load_error(() => {
-    @config.load(builder, complete()) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, complete()) |> ignore)
   @expect.expect(error).to_equal(FileNotFound(path="conf/app.toml"))
 }
 
@@ -352,9 +350,7 @@ test "Unregistered extension" {
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("app.ion")
-  let error = load_error(() => {
-    @config.load(builder, complete()) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, complete()) |> ignore)
   @expect.expect(error).to_equal(
     UnsupportedFormat(path="app.ion", extensions=["toml"]),
   )
@@ -401,7 +397,7 @@ test "Relative path joins the working directory" {
 
 ///|
 fn listing(names : Array[String]) -> Array[@config.DirEntry] {
-  names.map(name => { name, kind: File })
+  names.map(name => { name, kind: File, })
 }
 
 ///|
@@ -416,16 +412,13 @@ test "Two candidates exist" {
       ),
     )
   let tree = complete().with_listing(p("/w"), listing(["app.toml", "app.yaml"]))
-  let error = load_error(() => {
-    @config.load(builder, tree) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, tree) |> ignore)
   guard error is Ambiguous(location~, candidates~, ..) else {
     fail("expected an ambiguity error")
   }
-  @expect.expect((location, candidates)).to_equal((
-    "/w",
-    ["/w/app.toml", "/w/app.yaml"],
-  ))
+  @expect.expect((location, candidates)).to_equal(
+    ("/w", ["/w/app.toml", "/w/app.yaml"]),
+  )
   @expect.expect(error.message()).to_start_with(
     "Ambiguous App configuration; found:",
   )
@@ -447,11 +440,9 @@ test "One candidate exists" {
     )
     |> done
   let report = config.reports()[0]
-  @expect.expect((report.path, report.candidates, report.status)).to_equal((
-    Some("/w/app.yaml"),
-    ["/w/app.toml", "/w/app.yaml"],
-    Loaded,
-  ))
+  @expect.expect((report.path, report.candidates, report.status)).to_equal(
+    (Some("/w/app.yaml"), ["/w/app.toml", "/w/app.yaml"], Loaded),
+  )
   @expect.expect(@config.get_text(config, "format")).to_equal("yaml")
 }
 
@@ -483,7 +474,7 @@ test "Name match is exact" {
 ///|
 test "a directory with a candidate name does not exist as a file" {
   let tree = complete().with_listing(p("/w"), [
-    { name: "app.toml", kind: Directory },
+    { name: "app.toml", kind: Directory, },
   ])
   @expect.expect(tree.is_file(p("/w/app.toml"))).to_equal(Found(false))
 }
@@ -501,15 +492,11 @@ test "ambiguity names the common directory of the candidates" {
   let tree = @config.FileTree::new()
     .with_listing(p("/w"), listing(["app.toml"]))
     .with_listing(p("/w/.config"), listing(["app.toml"]))
-  let error = load_error(() => {
-    @config.load(builder, tree) |> ignore
-  })
+  let error = load_error(() => @config.load(builder, tree) |> ignore)
   @expect.expect(error).to_equal(
-    Ambiguous(
-      display="App",
-      location="/w",
-      candidates=["/w/app.toml", "/w/.config/app.toml"],
-    ),
+    Ambiguous(display="App", location="/w", candidates=[
+      "/w/app.toml", "/w/.config/app.toml",
+    ]),
   )
 }
 
@@ -524,7 +511,8 @@ test "Inherited layer drops project identity" {
       ),
     )
     |> @config.load(
-      complete().with_file(p("/w/app.toml"),
+      complete().with_file(
+        p("/w/app.toml"),
         (
           #|ir.layout = "tree"
           #|project.name = "A"
@@ -541,7 +529,9 @@ test "Inherited layer drops project identity" {
 test "Member layer removal warns" {
   let config = @config.builder()
     |> @config.format(@toml.format())
-    |> @config.add(@config.in_memory_pairs([("workspace.out_dir", @config.string("base"))]))
+    |> @config.add(
+      @config.in_memory_pairs([("workspace.out_dir", @config.string("base"))]),
+    )
     |> @config.add(
       @config.ConfigSource::file("/w/m/app.toml", role=Member).exclude(
         [key("workspace.out_dir")],
@@ -549,7 +539,8 @@ test "Member layer removal warns" {
       ),
     )
     |> @config.load(
-      complete().with_file(p("/w/m/app.toml"),
+      complete().with_file(
+        p("/w/m/app.toml"),
         (
           #|workspace.out_dir = "out"
           #|workspace.name = "m"
@@ -623,30 +614,29 @@ test "a candidate named twice is one candidate" {
     )
     |> done
   let report = config.reports()[0]
-  @expect.expect((report.status, report.candidates)).to_equal((
-    Loaded,
-    ["/w/app.toml"],
-  ))
+  @expect.expect((report.status, report.candidates)).to_equal(
+    (Loaded, ["/w/app.toml"]),
+  )
 }
 
 ///|
 test "an inaccessible entry is a file only when the host answers for it" {
   let listed = @config.FileTree::new().with_listing(p("/w"), [
-    { name: "app.toml", kind: Inaccessible },
+    { name: "app.toml", kind: Inaccessible, },
   ])
   @expect.expect(listed.is_file(p("/w/app.toml"))).to_equal(Unknown)
   @expect.expect(listed.file_request(p("/w/app.toml"))).to_equal(
     ReadFile(p("/w/app.toml")),
   )
-  @expect.expect(listed.with_file(p("/w/app.toml"), "a = 1").is_file(p("/w/app.toml"))).to_equal(
-    Found(true),
-  )
-  @expect.expect(listed.with_missing(p("/w/app.toml")).is_file(p("/w/app.toml"))).to_equal(
-    Found(false),
-  )
+  @expect.expect(
+    listed.with_file(p("/w/app.toml"), "a = 1").is_file(p("/w/app.toml")),
+  ).to_equal(Found(true))
+  @expect.expect(
+    listed.with_missing(p("/w/app.toml")).is_file(p("/w/app.toml")),
+  ).to_equal(Found(false))
   // A complete tree has no host to ask, so the read reports file-not-found.
   let complete = complete().with_listing(p("/w"), [
-    { name: "app.toml", kind: Inaccessible },
+    { name: "app.toml", kind: Inaccessible, },
   ])
   @expect.expect(complete.is_file(p("/w/app.toml"))).to_equal(Found(true))
   // Without the listing, the request is the listing.
@@ -663,7 +653,7 @@ test "Inaccessible candidate file" {
       @config.ConfigSource::candidates(["/w/app.toml"], display="App"),
     )
   let tree = @config.FileTree::new().with_listing(p("/w"), [
-    { name: "app.toml", kind: Inaccessible },
+    { name: "app.toml", kind: Inaccessible, },
   ])
   @expect.expect(needs(@config.load(builder, tree))).to_equal([
     ReadFile(p("/w/app.toml")),
@@ -673,7 +663,7 @@ test "Inaccessible candidate file" {
 ///|
 test "a file directly below a drive root is in the listing of the drive root" {
   let tree = @config.FileTree::new().with_listing(p("C:/"), [
-    { name: "app.toml", kind: File },
+    { name: "app.toml", kind: File, },
   ])
   @expect.expect(tree.is_file(p("C:/app.toml"))).to_equal(Found(true))
   @expect.expect(@config.FileTree::new().file_request(p("C:/app.toml"))).to_equal(
@@ -714,11 +704,11 @@ test "the core reads an inaccessible candidate before it reports ambiguity" {
     )
   let tree = @config.FileTree::new()
     .with_listing(p("/w"), [
-      { name: "app.toml", kind: File },
-      { name: ".app", kind: Directory },
+      { name: "app.toml", kind: File, },
+      { name: ".app", kind: Directory, },
     ])
-    .with_listing(p("/w/.app"), [{ name: "app.toml", kind: File }])
-    .with_listing(p("/w/.config"), [{ name: "app.toml", kind: Inaccessible }])
+    .with_listing(p("/w/.app"), [{ name: "app.toml", kind: File, }])
+    .with_listing(p("/w/.config"), [{ name: "app.toml", kind: Inaccessible, }])
   @expect.expect(needs(@config.load(builder, tree))).to_equal([
     ReadFile(p("/w/.config/app.toml")),
   ])

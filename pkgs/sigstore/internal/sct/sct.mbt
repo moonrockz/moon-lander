@@ -1,8 +1,9 @@
 ///|
 /// An SCT list that cannot be read.
+#derive(Debug)
 pub suberror SctError {
   BadSct(String)
-} derive(Debug)
+}
 
 ///|
 pub extend SctError with @debug.Debug::{to_repr}
@@ -15,19 +16,19 @@ pub struct Sct {
   timestamp : Int64
   extensions : Bytes
   /// The TLS hash and signature algorithm codes.
-  hash_algorithm : Int
-  signature_algorithm : Int
+  hash_algorithm : Int32
+  signature_algorithm : Int32
   signature : Bytes
 }
 
 ///|
 priv struct Cursor {
   bytes : BytesView
-  mut at : Int
+  mut at : Int32
 }
 
 ///|
-fn Cursor::take(self : Cursor, count : Int) -> BytesView raise SctError {
+fn Cursor::take(self : Cursor, count : Int32) -> BytesView raise SctError {
   guard count >= 0 && self.at + count <= self.bytes.length() else {
     raise BadSct("truncated")
   }
@@ -37,7 +38,7 @@ fn Cursor::take(self : Cursor, count : Int) -> BytesView raise SctError {
 }
 
 ///|
-fn Cursor::number(self : Cursor, size : Int) -> Int64 raise SctError {
+fn Cursor::number(self : Cursor, size : Int32) -> Int64 raise SctError {
   let mut value = 0L
   for byte in self.take(size) {
     value = (value << 8) | byte.to_int64()
@@ -46,7 +47,7 @@ fn Cursor::number(self : Cursor, size : Int) -> Int64 raise SctError {
 }
 
 ///|
-fn Cursor::vector(self : Cursor, size : Int) -> BytesView raise SctError {
+fn Cursor::vector(self : Cursor, size : Int32) -> BytesView raise SctError {
   let length = self.number(size).to_int()
   self.take(length)
 }
@@ -58,8 +59,8 @@ pub fn parse_list(extension_value : BytesView) -> Array[Sct] raise SctError {
   let list = @der.parse_tag(extension_value, @der.OCTET_STRING) catch {
     _ => raise BadSct("the extension is not an OCTET STRING")
   }
-  let outer = { bytes: list.content, at: 0 }
-  let entries = { bytes: outer.vector(2), at: 0 }
+  let outer = { bytes: list.content, at: 0, }
+  let entries = { bytes: outer.vector(2), at: 0, }
   guard outer.at == outer.bytes.length() else { raise BadSct("trailing bytes") }
   guard entries.bytes.length() > 0 else {
     // RFC 6962, section 3.3: the list has at least one SCT.
@@ -67,7 +68,7 @@ pub fn parse_list(extension_value : BytesView) -> Array[Sct] raise SctError {
   }
   let scts = []
   while entries.at < entries.bytes.length() {
-    let item = { bytes: entries.vector(2), at: 0 }
+    let item = { bytes: entries.vector(2), at: 0, }
     guard item.number(1) == 0L else { raise BadSct("not a v1 SCT") }
     let log_id = item.take(32).to_owned()
     let timestamp = item.number(8)
@@ -75,7 +76,9 @@ pub fn parse_list(extension_value : BytesView) -> Array[Sct] raise SctError {
     let hash_algorithm = item.number(1).to_int()
     let signature_algorithm = item.number(1).to_int()
     let signature = item.vector(2).to_owned()
-    guard item.at == item.bytes.length() else { raise BadSct("trailing bytes in an SCT") }
+    guard item.at == item.bytes.length() else {
+      raise BadSct("trailing bytes in an SCT")
+    }
     scts.push({
       log_id,
       timestamp,
@@ -89,7 +92,7 @@ pub fn parse_list(extension_value : BytesView) -> Array[Sct] raise SctError {
 }
 
 ///|
-fn push_number(out : Array[Byte], value : Int64, size : Int) -> Unit {
+fn push_number(out : Array[Byte], value : Int64, size : Int32) -> Unit {
   for i in 0..<size {
     out.push(((value >> ((size - 1 - i) * 8)) & 0xffL).to_byte())
   }
@@ -131,7 +134,9 @@ pub fn Sct::verify(
   precertificate_tbs : BytesView,
 ) -> Bool {
   // TLS codes: hash sha256 = 4, signature ecdsa = 3.
-  guard self.hash_algorithm == 4 && self.signature_algorithm == 3 else { return false }
+  guard self.hash_algorithm == 4 && self.signature_algorithm == 3 else {
+    return false
+  }
   key.verify(
     self.signed_data(issuer_spki, precertificate_tbs),
     self.signature,

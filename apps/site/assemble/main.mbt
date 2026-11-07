@@ -29,28 +29,31 @@ async fn read_releases(root : String) -> String {
       @model.problem("gh api", "cannot read the releases: \{detail}"),
     ])
   }
-  stdout.text() catch { _ => "" }
+  stdout.text() catch {
+    _ => ""
+  }
 }
 
 ///|
 /// Unpack the site asset `archive` of `release` into `to`. A file that does not unpack fails with the
 /// release tag.
-async fn unpack(
-  release : String,
-  archive : String,
-  to : String,
-) -> Unit {
+async fn unpack(release : String, archive : String, to : String) -> Unit {
   @fs.mkdir(to, recursive=true, allow_exist=true)
   let (code, _, stderr) = @process.collect_output("tar", [
     "-xzf", archive, "-C", to,
   ]) catch {
     error =>
-      raise @model.Invalid([@model.problem(release, "tar does not run: \{error}")])
+      raise @model.Invalid([
+        @model.problem(release, "tar does not run: \{error}"),
+      ])
   }
   if code != 0 {
     let detail = stderr.text() catch { _ => "" }
     raise @model.Invalid([
-      @model.problem(release, "the site asset does not unpack: \{detail.trim()}"),
+      @model.problem(
+        release,
+        "the site asset does not unpack: \{detail.trim()}",
+      ),
     ])
   }
   if !@fs.exists("\{to}/index.html") {
@@ -62,22 +65,27 @@ async fn unpack(
 
 ///|
 /// Download the site asset of `release` into `dir` with `gh release download`.
-async fn download(
-  root : String,
-  release : Release,
-  dir : String,
-) -> String {
+async fn download(root : String, release : Release, dir : String) -> String {
   let name = asset_name(minor_of(release.version))
   @fs.mkdir(dir, recursive=true, allow_exist=true)
   let (code, _, stderr) = @process.collect_output(
     "gh",
     [
-      "release", "download", release.tag, "--pattern", name, "--dir", dir, "--clobber",
+      "release",
+      "download",
+      release.tag,
+      "--pattern",
+      name,
+      "--dir",
+      dir,
+      "--clobber",
     ],
     cwd=root,
   ) catch {
     error =>
-      raise @model.Invalid([@model.problem(release.tag, "gh does not run: \{error}")])
+      raise @model.Invalid([
+        @model.problem(release.tag, "gh does not run: \{error}"),
+      ])
   }
   if code != 0 {
     let detail = stderr.text() catch { _ => "" }
@@ -136,8 +144,7 @@ async fn run(
   if !@fs.exists("\{site}/next/index.html") {
     raise @model.Invalid([
       @model.problem(
-        site,
-        "has no `next` tree; run `mise run build:site -- --main --tree next`",
+        site, "has no `next` tree; run `mise run build:site -- --main --tree next`",
       ),
     ])
   }

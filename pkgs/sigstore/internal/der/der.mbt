@@ -1,9 +1,10 @@
 ///|
 /// Bytes that are not strict DER.
+#derive(Debug)
 pub(all) suberror DerError {
   /// The bytes break the rule that the text names.
   Malformed(String)
-} derive(Debug)
+}
 
 ///|
 pub extend DerError with @debug.Debug::{to_repr}
@@ -15,60 +16,60 @@ pub fn DerError::message(self : DerError) -> String {
 }
 
 ///|
-pub const BOOLEAN : Int = 0x01
+pub const BOOLEAN : Int32 = 0x01
 
 ///|
-pub const INTEGER : Int = 0x02
+pub const INTEGER : Int32 = 0x02
 
 ///|
-pub const BIT_STRING : Int = 0x03
+pub const BIT_STRING : Int32 = 0x03
 
 ///|
-pub const OCTET_STRING : Int = 0x04
+pub const OCTET_STRING : Int32 = 0x04
 
 ///|
-pub const NULL : Int = 0x05
+pub const NULL : Int32 = 0x05
 
 ///|
-pub const OID : Int = 0x06
+pub const OID : Int32 = 0x06
 
 ///|
-pub const UTF8_STRING : Int = 0x0c
+pub const UTF8_STRING : Int32 = 0x0c
 
 ///|
-pub const PRINTABLE_STRING : Int = 0x13
+pub const PRINTABLE_STRING : Int32 = 0x13
 
 ///|
-pub const IA5_STRING : Int = 0x16
+pub const IA5_STRING : Int32 = 0x16
 
 ///|
-pub const UTC_TIME : Int = 0x17
+pub const UTC_TIME : Int32 = 0x17
 
 ///|
-pub const GENERALIZED_TIME : Int = 0x18
+pub const GENERALIZED_TIME : Int32 = 0x18
 
 ///|
-pub const SEQUENCE : Int = 0x30
+pub const SEQUENCE : Int32 = 0x30
 
 ///|
-pub const SET : Int = 0x31
+pub const SET : Int32 = 0x31
 
 ///|
 /// The identifier of a context-specific constructed tag `[n]`.
-pub fn context(n : Int) -> Int {
+pub fn context(n : Int32) -> Int32 {
   0xa0 | n
 }
 
 ///|
 /// The identifier of a context-specific primitive tag `[n]`.
-pub fn context_primitive(n : Int) -> Int {
+pub fn context_primitive(n : Int32) -> Int32 {
   0x80 | n
 }
 
 ///|
 /// One DER element: its identifier byte, its content and all of its bytes.
 pub struct Element {
-  tag : Int
+  tag : Int32
   content : BytesView
   raw : BytesView
 }
@@ -77,12 +78,12 @@ pub struct Element {
 /// A cursor over consecutive DER elements.
 pub struct Reader {
   priv bytes : BytesView
-  priv mut at : Int
+  priv mut at : Int32
 }
 
 ///|
 pub fn Reader::new(bytes : BytesView) -> Reader {
-  { bytes, at: 0 }
+  { bytes, at: 0, }
 }
 
 ///|
@@ -92,7 +93,7 @@ pub fn Reader::is_empty(self : Reader) -> Bool {
 
 ///|
 /// The identifier byte of the next element, without reading it.
-pub fn Reader::peek_tag(self : Reader) -> Int? {
+pub fn Reader::peek_tag(self : Reader) -> Int32? {
   if self.is_empty() {
     None
   } else {
@@ -120,7 +121,9 @@ pub fn Reader::next(self : Reader) -> Element raise DerError {
     guard start + 2 + count <= bytes.length() else {
       raise Malformed("truncated length")
     }
-    guard bytes[start + 2] != b'\x00' else { raise Malformed("length has a leading zero") }
+    guard bytes[start + 2] != b'\x00' else {
+      raise Malformed("length has a leading zero")
+    }
     for i in 0..<count {
       length = (length << 8) | bytes[start + 2 + i].to_int()
     }
@@ -130,12 +133,12 @@ pub fn Reader::next(self : Reader) -> Element raise DerError {
   let end = start + header + length
   guard end <= bytes.length() else { raise Malformed("content is truncated") }
   self.at = end
-  { tag, content: bytes[start + header:end], raw: bytes[start:end] }
+  { tag, content: bytes[start + header:end], raw: bytes[start:end], }
 }
 
 ///|
 /// Read the next element and require the identifier `tag`.
-pub fn Reader::expect(self : Reader, tag : Int) -> Element raise DerError {
+pub fn Reader::expect(self : Reader, tag : Int32) -> Element raise DerError {
   let element = self.next()
   guard element.tag == tag else {
     raise Malformed("expected tag \{tag}, found \{element.tag}")
@@ -145,7 +148,7 @@ pub fn Reader::expect(self : Reader, tag : Int) -> Element raise DerError {
 
 ///|
 /// Read the next element when it has the identifier `tag`.
-pub fn Reader::optional(self : Reader, tag : Int) -> Element? raise DerError {
+pub fn Reader::optional(self : Reader, tag : Int32) -> Element? raise DerError {
   if self.peek_tag() == Some(tag) {
     Some(self.next())
   } else {
@@ -170,7 +173,7 @@ pub fn parse(bytes : BytesView) -> Element raise DerError {
 
 ///|
 /// Read exactly one element with the identifier `tag` that fills `bytes`.
-pub fn parse_tag(bytes : BytesView, tag : Int) -> Element raise DerError {
+pub fn parse_tag(bytes : BytesView, tag : Int32) -> Element raise DerError {
   let element = parse(bytes)
   guard element.tag == tag else {
     raise Malformed("expected tag \{tag}, found \{element.tag}")
@@ -181,7 +184,9 @@ pub fn parse_tag(bytes : BytesView, tag : Int) -> Element raise DerError {
 ///|
 /// A reader over the children of a constructed element.
 pub fn Element::children(self : Element) -> Reader raise DerError {
-  guard (self.tag & 0x20) != 0 else { raise Malformed("element is not constructed") }
+  guard (self.tag & 0x20) != 0 else {
+    raise Malformed("element is not constructed")
+  }
   Reader::new(self.content)
 }
 
@@ -193,7 +198,9 @@ pub fn Element::unsigned(self : Element) -> BytesView raise DerError {
   guard content.length() > 0 else { raise Malformed("empty INTEGER") }
   guard content[0].to_int() < 0x80 else { raise Malformed("negative INTEGER") }
   if content.length() > 1 && content[0] == b'\x00' {
-    guard content[1].to_int() >= 0x80 else { raise Malformed("INTEGER is not minimal") }
+    guard content[1].to_int() >= 0x80 else {
+      raise Malformed("INTEGER is not minimal")
+    }
     content[1:]
   } else {
     content
@@ -202,7 +209,7 @@ pub fn Element::unsigned(self : Element) -> BytesView raise DerError {
 
 ///|
 /// A small non-negative INTEGER.
-pub fn Element::small_int(self : Element) -> Int raise DerError {
+pub fn Element::small_int(self : Element) -> Int32 raise DerError {
   let magnitude = self.unsigned()
   guard magnitude.length() <= 3 else { raise Malformed("INTEGER is too large") }
   let mut value = 0
@@ -231,21 +238,27 @@ pub fn Element::bit_string_bytes(self : Element) -> BytesView raise DerError {
   guard self.tag == BIT_STRING && self.content.length() >= 1 else {
     raise Malformed("expected BIT STRING")
   }
-  guard self.content[0] == b'\x00' else { raise Malformed("BIT STRING has unused bits") }
+  guard self.content[0] == b'\x00' else {
+    raise Malformed("BIT STRING has unused bits")
+  }
   self.content[1:]
 }
 
 ///|
 /// The bits of a BIT STRING as an integer with bit 0 first, as X.509 key usage
 /// names them. At most 16 bits.
-pub fn Element::named_bits(self : Element) -> Int raise DerError {
+pub fn Element::named_bits(self : Element) -> Int32 raise DerError {
   guard self.tag == BIT_STRING && self.content.length() >= 1 else {
     raise Malformed("expected BIT STRING")
   }
   let unused = self.content[0].to_int()
   let data = self.content[1:]
-  guard unused <= 7 && data.length() <= 2 else { raise Malformed("BIT STRING is too long") }
-  guard data.length() > 0 || unused == 0 else { raise Malformed("BIT STRING unused bits") }
+  guard unused <= 7 && data.length() <= 2 else {
+    raise Malformed("BIT STRING is too long")
+  }
+  guard data.length() > 0 || unused == 0 else {
+    raise Malformed("BIT STRING unused bits")
+  }
   // DER sets the unused bits to zero (X.690, section 11.2.1).
   guard data.length() == 0 ||
     (data[data.length() - 1].to_int() & ((1 << unused) - 1)) == 0 else {
@@ -266,14 +279,18 @@ pub fn Element::named_bits(self : Element) -> Int raise DerError {
 ///|
 /// The dotted text of an OBJECT IDENTIFIER.
 pub fn Element::oid(self : Element) -> String raise DerError {
-  guard self.tag == OID && self.content.length() > 0 else { raise Malformed("expected OID") }
+  guard self.tag == OID && self.content.length() > 0 else {
+    raise Malformed("expected OID")
+  }
   let parts : Array[UInt64] = []
   let mut value : UInt64 = 0
   let mut fresh = true
   for byte in self.content {
     let b = byte.to_int()
-    guard !(fresh && b == 0x80) else { raise Malformed("OID arc is not minimal") }
-    guard value < (1UL << 56) else { raise Malformed("OID arc is too large") }
+    guard !(fresh && b == 0x80) else {
+      raise Malformed("OID arc is not minimal")
+    }
+    guard value < 1UL << 56 else { raise Malformed("OID arc is too large") }
     value = (value << 7) | (b & 0x7f).to_uint64()
     if (b & 0x80) == 0 {
       parts.push(value)
@@ -315,7 +332,9 @@ pub fn Element::text(self : Element) -> String raise DerError {
     }
   } else if self.tag == IA5_STRING {
     for byte in self.content {
-      guard byte < b'\x80' else { raise Malformed("IA5String has a byte above 0x7f") }
+      guard byte < b'\x80' else {
+        raise Malformed("IA5String has a byte above 0x7f")
+      }
     }
   }
   @utf8.decode(self.content) catch {
@@ -330,7 +349,9 @@ fn is_printable(byte : Byte) -> Bool {
   (byte >= b'A' && byte <= b'Z') ||
   (byte >= b'a' && byte <= b'z') ||
   (byte >= b'0' && byte <= b'9') ||
-  [b' ', b'\'', b'(', b')', b'+', b',', b'-', b'.', b'/', b':', b'=', b'?'].contains(byte)
+  [b' ', b'\'', b'(', b')', b'+', b',', b'-', b'.', b'/', b':', b'=', b'?'].contains(
+    byte,
+  )
 }
 
 ///|
@@ -352,7 +373,9 @@ pub fn Element::time(self : Element) -> Int64 raise DerError {
     }
     _ => raise Malformed("expected a time")
   }
-  guard text[text.length() - 1] == 'Z'.to_int().to_uint16() else { raise Malformed("time is not UTC") }
+  guard text[text.length() - 1] == 'Z'.to_int().to_uint16() else {
+    raise Malformed("time is not UTC")
+  }
   let month = digits(text, rest, 2)
   let day = digits(text, rest + 2, 2)
   let hour = digits(text, rest + 4, 2)
@@ -371,7 +394,7 @@ pub fn Element::time(self : Element) -> Int64 raise DerError {
 }
 
 ///|
-fn digits(text : String, start : Int, count : Int) -> Int raise DerError {
+fn digits(text : String, start : Int32, count : Int32) -> Int32 raise DerError {
   let mut value = 0
   for i in start..<(start + count) {
     let code = text[i].to_int()
@@ -384,13 +407,13 @@ fn digits(text : String, start : Int, count : Int) -> Int raise DerError {
 }
 
 ///|
-fn is_leap(year : Int) -> Bool {
+fn is_leap(year : Int32) -> Bool {
   (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
 ///|
 /// The number of days in a month of a year.
-pub fn days_in_month(year : Int, month : Int) -> Int {
+pub fn days_in_month(year : Int32, month : Int32) -> Int32 {
   match month {
     2 => if is_leap(year) { 29 } else { 28 }
     4 | 6 | 9 | 11 => 30
@@ -401,12 +424,12 @@ pub fn days_in_month(year : Int, month : Int) -> Int {
 ///|
 /// Seconds since 1970-01-01T00:00:00Z for a valid civil date and time.
 pub fn unix_seconds(
-  year : Int,
-  month : Int,
-  day : Int,
-  hour : Int,
-  minute : Int,
-  second : Int,
+  year : Int32,
+  month : Int32,
+  day : Int32,
+  hour : Int32,
+  minute : Int32,
+  second : Int32,
 ) -> Int64 {
   // Days from civil, H. Hinnant.
   let y = if month <= 2 { year - 1 } else { year }
@@ -424,7 +447,7 @@ pub fn unix_seconds(
 
 ///|
 /// The DER bytes of an element with the identifier `tag` and `content`.
-pub fn encode(tag : Int, content : BytesView) -> Bytes {
+pub fn encode(tag : Int32, content : BytesView) -> Bytes {
   let out : Array[Byte] = [tag.to_byte()]
   let length = content.length()
   if length < 0x80 {
@@ -452,18 +475,25 @@ pub fn encode(tag : Int, content : BytesView) -> Bytes {
 /// The time of a GeneralizedTime with an optional fraction of a second, as
 /// seconds since 1970 and nanoseconds. DER requires the `Z` form and a fraction
 /// with no trailing zero (X.690, section 11.7), of at most nine digits here.
-pub fn Element::generalized_time(self : Element) -> (Int64, Int) raise DerError {
-  guard self.tag == GENERALIZED_TIME else { raise Malformed("expected GeneralizedTime") }
+pub fn Element::generalized_time(
+  self : Element,
+) -> (Int64, Int32) raise DerError {
+  guard self.tag == GENERALIZED_TIME else {
+    raise Malformed("expected GeneralizedTime")
+  }
   let text = @utf8.decode(self.content) catch {
     _ => raise Malformed("time is not ASCII")
   }
-  guard text.length() >= 15 && text[text.length() - 1] == 'Z'.to_int().to_uint16() else {
+  guard text.length() >= 15 &&
+    text[text.length() - 1] == 'Z'.to_int().to_uint16() else {
     raise Malformed("GeneralizedTime form")
   }
   let whole = text[:14].to_owned() + "Z"
   let mut nanos = 0
   if text.length() > 15 {
-    guard text[14] == '.'.to_int().to_uint16() else { raise Malformed("GeneralizedTime form") }
+    guard text[14] == '.'.to_int().to_uint16() else {
+      raise Malformed("GeneralizedTime form")
+    }
     let fraction = text[15:text.length() - 1].to_owned()
     guard fraction.length() >= 1 && fraction.length() <= 9 else {
       raise Malformed("GeneralizedTime fraction length")
@@ -472,13 +502,19 @@ pub fn Element::generalized_time(self : Element) -> (Int64, Int) raise DerError 
       raise Malformed("GeneralizedTime fraction has a trailing zero")
     }
     for char in fraction {
-      guard char >= '0' && char <= '9' else { raise Malformed("time has a non-digit") }
+      guard char >= '0' && char <= '9' else {
+        raise Malformed("time has a non-digit")
+      }
       nanos = nanos * 10 + (char.to_int() - '0'.to_int())
     }
     for _ in fraction.length()..<9 {
       nanos = nanos * 10
     }
   }
-  let seconds = { tag: GENERALIZED_TIME, content: @utf8.encode(whole)[:], raw: self.raw }.time()
+  let seconds = {
+    tag: GENERALIZED_TIME,
+    content: @utf8.encode(whole)[:],
+    raw: self.raw,
+  }.time()
   (seconds, nanos)
 }

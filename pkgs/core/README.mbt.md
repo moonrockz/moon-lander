@@ -57,7 +57,7 @@ with `TimeLimit::parse(text)`:
 ///|
 /// A function that takes a timeout as milliseconds, such as
 /// `@async.with_timeout`.
-fn wait_up_to(millis : Int) -> String {
+fn wait_up_to(millis : Int32) -> String {
   "waits up to \{millis} ms"
 }
 

@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 suberror Crash {
   Crash
-} derive(Debug)
+}
 
 ///|
 async test "Close with work in flight: close gives B and C, A replies, join waits for cleanup" {
@@ -45,7 +46,7 @@ async test "Close with work in flight: close gives B and C, A replies, join wait
 async test "Repeated close: one snapshot and one cleanup" {
   let cleanups = Ref(0)
   @actors.scope(scope => {
-    let actor = scope.start((), (_, _ : Int) => Continue(()), on_stop=() => {
+    let actor = scope.start((), (_, _ : Int32) => Continue(()), on_stop=() => {
       cleanups.val += 1
     })
     let first = actor.close()
@@ -80,7 +81,7 @@ async test "Cancel during a wait: queued work does not run and pending asks wake
   let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let log = []
   @actors.scope(scope => {
-    let actor = scope.start((), (_, message : (String, @actors.Reply[Int]?)) => {
+    let actor = scope.start((), (_, message : (String, @actors.Reply[Int32]?)) => {
       log.push(message.0)
       started.put(())
       never.get()
@@ -115,7 +116,7 @@ async test "Idle actor on normal scope exit: the scope returns after its cleanup
   let log = []
   @actors.scope(scope => {
     ignore(
-      scope.start((), (_, _ : Int) => Continue(()), on_stop=() => {
+      scope.start((), (_, _ : Int32) => Continue(()), on_stop=() => {
         log.push("cleanup")
       }),
     )
@@ -128,11 +129,11 @@ async test "Idle actor on normal scope exit: the scope returns after its cleanup
 async test "Parent completes normally: its child ends before the parent join" {
   let log = []
   @actors.scope(scope => {
-    let parent = scope.spawn((context : @actors.ActorContext[Int]) => {
+    let parent = scope.spawn((context : @actors.ActorContext[Int32]) => {
       ignore(
         context
         .scope()
-        .start((), (_, _ : Int) => Continue(()), on_stop=() => {
+        .start((), (_, _ : Int32) => Continue(()), on_stop=() => {
           log.push("child cleanup")
         }),
       )
@@ -150,11 +151,11 @@ async test "Failure cancels siblings: the scope reports the error after cleanup"
   let outcome = try {
     @actors.scope(scope => {
       ignore(
-        scope.start((), (_, _ : Int) => Continue(()), on_stop=() => {
+        scope.start((), (_, _ : Int32) => Continue(()), on_stop=() => {
           log.push("sibling cleanup")
         }),
       )
-      let failing = scope.start((), (_, _ : Int) => raise Crash)
+      let failing = scope.start((), (_, _ : Int32) => raise Crash)
       failing.send(1)
       failing.join()
     })
@@ -170,7 +171,7 @@ async test "Failure cancels siblings: the scope reports the error after cleanup"
 async test "Recovered receive: the scope stays live and another message is processed" {
   let result = @actors.scope(scope => {
     let actor = scope.spawn(_ => {
-      let failing : @actors.Receive[Int, Int] = @actors.receive().bind(_ => {
+      let failing : @actors.Receive[Int32, Int32] = @actors.receive().bind(_ => {
         raise Crash
       })
       failing.recover(_ => @actors.receive())
@@ -186,7 +187,7 @@ async test "Recovered receive: the scope stays live and another message is proce
 async test "Escaped scope handle: a later start gets a typed closed-scope error" {
   let saved = @actors.scope(scope => scope)
   let outcome = try {
-    ignore(saved.start((), (_, _ : Int) => Continue(())))
+    ignore(saved.start((), (_, _ : Int32) => Continue(())))
     "started"
   } catch {
     @actors.ScopeClosed => "scope closed"
@@ -200,12 +201,12 @@ async test "Initialization failure: the cause is reported and the resource is re
   let released = Ref(0)
   @actors.scope(scope => {
     let outcome = try {
-      let _ : @actors.Actor[Int, Unit] = scope.start_with(
+      let _ : @actors.Actor[Int32, Unit] = scope.start_with(
         setup => {
           setup.on_stop(() => released.val += 1)
           raise Crash
         },
-        (state : Int, _) => Continue(state),
+        (state : Int32, _) => Continue(state),
       )
       "started"
     } catch {
@@ -225,7 +226,7 @@ async test "Cleanup exceeds its budget: the scope reports a typed cleanup timeou
       ignore(
         scope.start(
           (),
-          (_, _ : Int) => Continue(()),
+          (_, _ : Int32) => Continue(()),
           on_stop=() => @aio.sleep(10000),
           cleanup_limit=limit,
         ),

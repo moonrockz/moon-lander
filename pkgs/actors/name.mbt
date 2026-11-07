@@ -1,5 +1,6 @@
 ///|
 /// The rule of an actor name that an input breaks.
+#derive(Eq, Debug)
 pub enum NameRule {
   /// The text is empty.
   Empty
@@ -9,7 +10,7 @@ pub enum NameRule {
   FirstNotLetter(Char)
   /// A later character is not an ASCII letter, digit, `_`, `-` or `.`.
   InvalidCharacter(Char)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend NameRule with Eq::{equal, not_equal}
@@ -19,10 +20,11 @@ pub extend NameRule with @debug.Debug::{to_repr}
 
 ///|
 /// An input that is not a valid actor name. Only `ActorName::parse` makes it.
+#derive(Debug)
 pub suberror NameError {
   /// `input` is not a valid actor name because of `rule`.
   InvalidName(input~ : String, rule~ : NameRule)
-} derive(Debug)
+}
 
 ///|
 pub extend NameError with @debug.Debug::{to_repr}
@@ -31,9 +33,10 @@ pub extend NameError with @debug.Debug::{to_repr}
 /// A label that an actor scope can reserve for one actor at a time: 1 to 128
 /// ASCII characters, a letter first, then letters, digits, `_`, `-` or `.`.
 /// Names are case sensitive and are not trimmed or normalized.
+#derive(Eq, Hash, Debug)
 pub struct ActorName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend ActorName with Eq::{equal, not_equal}
@@ -46,7 +49,7 @@ pub extend ActorName with @debug.Debug::{to_repr}
 
 ///|
 /// The longest name in characters.
-const MAX_NAME_LENGTH : Int = 128
+const MAX_NAME_LENGTH : Int32 = 128
 
 ///|
 /// Parse `text` as an actor name.

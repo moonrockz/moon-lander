@@ -6,7 +6,7 @@ priv type NodeAdapter
 let node : NodeAdapter = node_adapter()
 
 ///|
-fn stream_fd(stream : @sinks.ConsoleStream) -> Int {
+fn stream_fd(stream : @sinks.ConsoleStream) -> Int32 {
   match stream {
     StandardOutput => 1
     StandardError => 2
@@ -16,13 +16,16 @@ fn stream_fd(stream : @sinks.ConsoleStream) -> Int {
 ///|
 extern "js" fn NodeAdapter::write_stream(
   self : NodeAdapter,
-  fd : Int,
+  fd : Int32,
   text : String,
 ) -> @js_async.Promise[String] =
   #|(adapter, fd, text) => adapter.writeStream(fd, text)
 
 ///|
-extern "js" fn NodeAdapter::stream_kind(self : NodeAdapter, fd : Int) -> String =
+extern "js" fn NodeAdapter::stream_kind(
+  self : NodeAdapter,
+  fd : Int32,
+) -> String =
   #|(adapter, fd) => adapter.streamKind(fd)
 
 ///|
@@ -30,8 +33,8 @@ extern "js" fn NodeAdapter::stream_kind(self : NodeAdapter, fd : Int) -> String 
 /// gives the error text when the write fails, else `None`.
 async fn write_console(stream : @sinks.ConsoleStream, text : String) -> String? {
   let error = node.write_stream(stream_fd(stream), text).wait() catch {
-    error => return Some(failure_text(error))
-  }
+      error => return Some(failure_text(error))
+    }
   if error.is_empty() {
     None
   } else {
@@ -42,7 +45,9 @@ async fn write_console(stream : @sinks.ConsoleStream, text : String) -> String? 
 ///|
 /// The terminal kind of the stream from Node.js or Bun: `isTTY` and
 /// `hasColors()`. `hasColors()` also reads `NO_COLOR`, `FORCE_COLOR` and `TERM`.
-fn console_capability(stream : @sinks.ConsoleStream) -> @sinks.TerminalCapability {
+fn console_capability(
+  stream : @sinks.ConsoleStream,
+) -> @sinks.TerminalCapability {
   match node.stream_kind(stream_fd(stream)) {
     "color" => ColorTerminal
     "plain" => PlainTerminal

@@ -4,7 +4,7 @@ async test "Wait for Ended: a test observes the end event instead of polling sta
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let worker = scope.start((), (_, message : Int) => {
+    let worker = scope.start((), (_, message : Int32) => {
       if message == 0 {
         Stop
       } else {
@@ -30,9 +30,9 @@ async test "Opt-in channel: two scopes share one RuntimeEvents value" {
   let events = @actors.RuntimeEvents::new()
   @actors.scope(events~, first => {
     ignore(events.subscribe(first, @actors.Subject::from_queue(probe)))
-    let a = first.start((), (_, _ : Int) => Stop)
+    let a = first.start((), (_, _ : Int32) => Stop)
     @actors.scope(events~, second => {
-      let b = second.start((), (_, _ : Int) => Stop)
+      let b = second.start((), (_, _ : Int32) => Stop)
       match probe.get() {
         Started(address) => assert_eq(address, a.address())
         other => fail("expected first Started, got \{other.to_string()}")

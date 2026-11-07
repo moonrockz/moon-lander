@@ -21,7 +21,7 @@ struct Topic[C, Ev] {
 ///|
 /// Build an async topic from its first event handler.
 pub fn[C, Ev] topic(handle : async (C, Ev) -> Unit) -> Topic[C, Ev] {
-  { handlers: Own([handle]), middleware: [] }
+  { handlers: Own([handle]), middleware: [], }
 }
 
 ///|
@@ -31,7 +31,7 @@ pub fn[C, Ev] topic(handle : async (C, Ev) -> Unit) -> Topic[C, Ev] {
 /// handler count of the core topic. After `add`, the core publish counts as
 /// one handler at position 1, and its error is the failure at that position.
 pub fn[C, Ev] Topic::from_sync(core : @mediator.Topic[C, Ev]) -> Topic[C, Ev] {
-  { handlers: Core(core), middleware: [] }
+  { handlers: Core(core), middleware: [], }
 }
 
 ///|
@@ -46,7 +46,7 @@ pub fn[C, Ev] Topic::add(
     Own(handlers) => handlers.copy()
   }
   handlers.push(handle)
-  { handlers: Own(handlers), middleware: self.middleware }
+  { handlers: Own(handlers), middleware: self.middleware, }
 }
 
 ///|
@@ -60,7 +60,7 @@ pub fn[C, Ev] Topic::use_(
 ) -> Topic[C, Ev] {
   let steps = self.middleware.copy()
   steps.push(middleware)
-  { handlers: self.handlers, middleware: steps }
+  { handlers: self.handlers, middleware: steps, }
 }
 
 ///|
@@ -77,7 +77,8 @@ pub async fn[C, Ev] Topic::publish(
   ev : Ev,
 ) -> Unit {
   let handlers = match self.handlers {
-    Core(core) => return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
+    Core(core) =>
+      return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
     Own(handlers) => handlers
   }
   run(
@@ -113,7 +114,8 @@ pub async fn[C, Ev] Topic::publish_concurrent(
   ev : Ev,
 ) -> Unit {
   let handlers = match self.handlers {
-    Core(core) => return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
+    Core(core) =>
+      return run(self.middleware, 0, (c, e) => core.publish(c, e), ctx, ev)
     Own(handlers) => handlers
   }
   run(

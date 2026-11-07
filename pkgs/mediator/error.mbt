@@ -2,7 +2,7 @@
 /// One handler failure in a publish. Only mediator constructs this record.
 pub struct PublishFailure {
   /// The 1-based position of the handler in the topic, in add order.
-  position : Int
+  position : Int32
   /// The error that the handler raised, unchanged.
   error : Error
 }
@@ -15,20 +15,25 @@ struct PublishFailures {
 
 ///|
 /// Give the number of failed handlers.
-pub fn PublishFailures::length(self : PublishFailures) -> Int {
+pub fn PublishFailures::length(self : PublishFailures) -> Int32 {
   self.items.length()
 }
 
 ///|
 /// Give the failure at a zero-based index, or None when the index is outside
 /// the collection.
-pub fn PublishFailures::get(self : PublishFailures, index : Int) -> PublishFailure? {
+pub fn PublishFailures::get(
+  self : PublishFailures,
+  index : Int32,
+) -> PublishFailure? {
   self.items.get(index)
 }
 
 ///|
 /// Give an array copy. Changes to this array do not change the collection.
-pub fn PublishFailures::to_array(self : PublishFailures) -> Array[PublishFailure] {
+pub fn PublishFailures::to_array(
+  self : PublishFailures,
+) -> Array[PublishFailure] {
   self.items.copy()
 }
 
@@ -41,7 +46,7 @@ pub suberror MediatorError {
   Rejected(reason~ : String)
   /// One or more handlers failed. The count and positions come from the
   /// handler outcomes; the failure collection cannot change.
-  PublishFailed(handlers~ : Int, failures~ : PublishFailures)
+  PublishFailed(handlers~ : Int32, failures~ : PublishFailures)
   /// A step did not end within the shared core time limit.
   TimedOut(after~ : @lander_core.TimeLimit)
 }
@@ -54,7 +59,9 @@ pub fn MediatorError::rejected(reason : String) -> MediatorError {
 
 ///|
 /// Describe a timeout with a valid shared core time limit.
-pub fn MediatorError::timed_out(after : @lander_core.TimeLimit) -> MediatorError {
+pub fn MediatorError::timed_out(
+  after : @lander_core.TimeLimit,
+) -> MediatorError {
   TimedOut(after~)
 }
 
@@ -69,13 +76,13 @@ pub fn MediatorError::from_publish_errors(
   let failures = []
   for index, error in errors {
     if error is Some(error) {
-      failures.push({ position: index + 1, error })
+      failures.push({ position: index + 1, error, })
     }
   }
   if failures.is_empty() {
     None
   } else {
-    Some(PublishFailed(handlers=errors.length(), failures={ items: failures }))
+    Some(PublishFailed(handlers=errors.length(), failures={ items: failures, }))
   }
 }
 

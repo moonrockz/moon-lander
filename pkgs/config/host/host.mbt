@@ -20,7 +20,7 @@
 ///   another process locks, is `Inaccessible` in the listing. It stops the load
 ///   only when the load reads it as a candidate.
 #warnings("-67")
-pub async fn load(builder : @config.ConfigBuilder) -> @config.Config raise {
+pub async fn load(builder : @config.ConfigBuilder) -> @config.Config {
   // On js `answer` is synchronous; the wrapper fits it to the async type.
   load_by(builder, async fn(tree, request, platform) {
     answer(tree, request, platform)
@@ -32,8 +32,8 @@ pub async fn load(builder : @config.ConfigBuilder) -> @config.Config raise {
 /// inspection fails as a locked file does.
 async fn load_by(
   builder : @config.ConfigBuilder,
-  answer : async (@config.FileTree, @config.FileRequest, @config.Platform) -> @config.FileTree raise,
-) -> @config.Config raise {
+  answer : async (@config.FileTree, @config.FileRequest, @config.Platform) -> @config.FileTree,
+) -> @config.Config {
   let platform = builder.given_platform().unwrap_or(running_platform())
   let mut builder = builder |> @config.platform(platform)
   if builder.given_env_vars() is None {

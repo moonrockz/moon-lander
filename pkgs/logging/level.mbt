@@ -1,6 +1,7 @@
 ///|
 /// The severity of a log event, from the lowest to the highest, with the names of
 /// `Microsoft.Extensions.Logging`. Levels compare in this order.
+#derive(Eq, Compare, Debug)
 pub(all) enum Level {
   /// The most detailed steps, for a trace of one run.
   Trace
@@ -14,7 +15,7 @@ pub(all) enum Level {
   Error
   /// A fault that stops the application, or that needs action now.
   Critical
-} derive(Eq, Compare, Debug)
+}
 
 ///|
 pub extend Level with Eq::{equal, not_equal}
@@ -27,7 +28,7 @@ pub extend Level with @debug.Debug::{to_repr}
 
 ///|
 /// The level name, for example `Information`.
-pub impl Show for Level with output(self, logger) {
+pub impl Show for Level with fn output(self, logger) {
   logger.write_string(
     match self {
       Trace => "Trace"

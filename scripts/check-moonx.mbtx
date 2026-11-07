@@ -21,8 +21,7 @@ let fixtures = "tests/assets/moonx-launcher"
 
 ///|
 priv enum StockVersion {
-  Stock16
-  Stock17
+  Stock20
 }
 
 ///|
@@ -31,10 +30,11 @@ priv struct ApprovedArchiveDigest {
 }
 
 ///|
+#derive(Eq, Debug)
 priv enum DigestRule {
   Sha256Length
   LowercaseHex
-} derive(Eq, Debug)
+}
 
 ///|
 suberror DigestError {
@@ -113,16 +113,14 @@ async fn download_public_resource(url : String) -> Bytes {
 ///|
 fn StockVersion::text(self : StockVersion) -> String {
   match self {
-    Stock16 => "0.10.16+b1a0e846e"
-    Stock17 => "0.10.17+d971670cd"
+    Stock20 => "0.10.20+65efd5b93"
   }
 }
 
 ///|
 fn StockVersion::commit(self : StockVersion) -> String {
   match self {
-    Stock16 => "2284bd2"
-    Stock17 => "3778465"
+    Stock20 => "940aa18"
   }
 }
 
@@ -137,10 +135,8 @@ fn StockVersion::parse_description(
   guard compilers.length() == 1 && moons.length() == 1 && runners.length() == 1 else {
     raise InvalidConfiguration(input~, rule=UnsupportedStock)
   }
-  let version = if compilers[0].has_prefix("moonc v" + Stock16.text() + " ") {
-    Stock16
-  } else if compilers[0].has_prefix("moonc v" + Stock17.text() + " ") {
-    Stock17
+  let version = if compilers[0].has_prefix("moonc v" + Stock20.text() + " ") {
+    Stock20
   } else {
     raise InvalidConfiguration(input~, rule=UnsupportedStock)
   }
@@ -453,8 +449,7 @@ async fn prepare(
   )
   @fs.mkdir(stage + "/host")
   // The existing released host proves API and runtime identity compatibility.
-  // Keep async 0.22.5, the release of hosting 0.8.0: async 0.22.6 and later
-  // import moonbitlang/core/async, which the stock 0.10.16 and 0.10.17 cores lack.
+  // Keep async 0.22.5, the release of hosting 0.8.0, which the host pins.
   @fs.write_file(stage + "/host/moon.work", "members = [\".\"]\n")
   @fs.write_file(
     stage + "/host/moon.mod",
@@ -2005,17 +2000,17 @@ test "public asset checksum accepts stock SHA256SUM output" {
 
 ///|
 test "stock identity requires matching compiler frontend and Moonrun" {
-  let stock16 = "moon 0.1.20261020 (2284bd2 2026-10-20) /stock/bin/moon\nmoonc v0.10.16+b1a0e846e (2026-10-16) /stock/bin/moonc\nmoonrun 0.1.20261020 (2284bd2 2026-10-20) /stock/bin/moonrun\n"
+  let stock20 = "moon 0.1.20261104 (940aa18 2026-11-04) /stock/bin/moon\nmoonc v0.10.20+65efd5b93 (2026-11-05) /stock/bin/moonc\nmoonrun 0.1.20261104 (940aa18 2026-11-04) /stock/bin/moonrun\n"
   let stock17 = "moon 0.1.20261023 (3778465 2026-10-23) /stock/bin/moon\nmoonc v0.10.17+d971670cd (2026-10-23) /stock/bin/moonc\nmoonrun 0.1.20261023 (3778465 2026-10-23) /stock/bin/moonrun\n"
-  assert_true(StockVersion::parse_description(stock16) is Stock16)
-  assert_true(StockVersion::parse_description(stock17) is Stock17)
+  assert_true(StockVersion::parse_description(stock20) is Stock20)
   for
     input in [
       "",
-      stock16.replace_all(old="2284bd2", new="3778465"),
-      stock16.replace_all(old=Stock16.text(), new=Stock17.text()),
-      stock17 + stock16,
-      "moonc v0.10.17+d971670cd\n",
+      stock17,
+      stock20.replace_all(old="940aa18", new="3778465"),
+      stock20.replace_all(old=Stock20.text(), new="0.10.17+d971670cd"),
+      stock20 + stock17,
+      "moonc v0.10.20+65efd5b93\n",
     ] {
     try StockVersion::parse_description(input) catch {
       InvalidConfiguration(input=actual, rule=UnsupportedStock) =>

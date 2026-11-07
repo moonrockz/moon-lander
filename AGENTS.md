@@ -68,12 +68,12 @@ application framework with no UI package. Moonbase owns its UI and desktop shell
   and applications use the `@hosting_argparse` type re-exports, so the return changes
   only the `moon.pkg` imports.
 - Consult `zig-cross` doctor before you change the zig-cross pin, `ZIG_CROSS_RUNTIME`,
-  `sync_programs` in `scripts/cross-build.mbtx` or a cross-build CI job:
+  `programs` in `scripts/cross-build.mbtx` or a cross-build CI job:
   `mise run doctor:zig-cross` (add `-- --json` for the `schema_version: 1` report), on
   each host OS that the change affects. Use the finding codes and `next_steps`, check
-  them against the real programs, and record them in the pull request. The sync runtime
-  excludes `moonbitlang/async`, so hosting and the config host keep their native macOS
-  and Windows CI legs. A cross-built Windows program is not proof of runtime behavior.
+  them against the real programs, and record them in the pull request. `moonbitlang/async`
+  does not cross-build to macOS or Windows, so hosting and the config host keep their
+  native macOS and Windows CI legs. A cross-built Windows program is not proof of runtime behavior.
   See "Cross-builds with zig-cross" in `README.md`.
 - Browser Web API calls may use TypeScript in `pkgs/config/adapters/browser/`,
   bundled with the pinned Bun browser target through moonx. The unpublished
@@ -191,9 +191,9 @@ from a workstation.
 
 Use the shared `html-design` schema for new changes. Read `openspec/README.md`
 and `openspec/config.yaml`; repository-local tracking and approval rules still apply.
-The files under `openspec/schemas/html-design/` and `scripts/openspec-ext.mbtx`
-are managed by Mission Control's openspec-ext bundle. Change the shared source
-and reinstall instead of editing these snapshots. Run `mise run openspec:check`
-and `mise exec -- openspec validate --all --strict` after configuration changes.
+The files under `openspec/schemas/html-design/` are managed by Mission Control's
+tools CLI (`mission-control-tools`, pinned in `.config/mise/config.toml`). Change the
+shared source and reinstall with `mission-control-tools openspec install` instead of
+editing these snapshots. Run `mise run openspec:verify` after configuration changes.
 OpenSpec artifacts are committed project documentation; existing scratch-document
 rules continue to apply to local notes. Existing changes retain their own schema.

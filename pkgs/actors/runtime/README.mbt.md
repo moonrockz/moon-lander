@@ -34,13 +34,13 @@ state and one message, and gives `Continue(next_state)` or `Stop`.
 ///|
 enum Tally {
   Bump
-  Total(@actors.Reply[Int])
+  Total(@actors.Reply[Int32])
 }
 
 ///|
 async test "a counter replies one after one increment" {
   let count = @actors.scope <| scope => {
-    let counter = scope.start(0) <| (state, message) => {
+    let counter = scope.start(0) <| ((state, message) => {
       match message {
         Bump => @actors.Continue(state + 1)
         Total(reply) => {
@@ -48,7 +48,7 @@ async test "a counter replies one after one increment" {
           @actors.Continue(state)
         }
       }
-    }
+    })
     counter.send(Bump)
     counter.ask(reply => Total(reply))
   }
@@ -121,10 +121,10 @@ async test "a full mailbox gives Full, and an unbounded mailbox never does" {
   @actors.scope <| scope => {
     let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
     let one = @actors.MailboxCapacity::from_int(1)
-    let slow = scope.start((), mailbox=Bounded(one)) <| (_, _ : Int) => {
+    let slow = scope.start((), mailbox=Bounded(one)) <| ((_, _ : Int32) => {
       gate.get()
       @actors.Continue(())
-    }
+    })
     slow.send(1) // in progress: it does not count
     while slow.queued_count() > 0 {
       @aio.pause()
@@ -133,9 +133,9 @@ async test "a full mailbox gives Full, and an unbounded mailbox never does" {
     assert_eq(slow.try_send(3), Full)
     gate.put(())
     gate.put(())
-    let open = scope.start((), mailbox=Unbounded) <| (_, _ : Int) => {
+    let open = scope.start((), mailbox=Unbounded) <| ((_, _ : Int32) => {
       @actors.Continue(())
-    }
+    })
     for message in 0..<500 {
       assert_eq(open.try_send(message), Accepted)
     }
@@ -195,11 +195,12 @@ also goes in `bind`.
 
 ```mbt check
 ///|
+#derive(Eq, Debug)
 enum SignIn {
   Hello(String)
-  Pin(Int)
+  Pin(Int32)
   Chatter(String)
-} derive(Eq, Debug)
+}
 
 ///|
 fn hello_name(message : SignIn) -> String? {
@@ -210,7 +211,7 @@ fn hello_name(message : SignIn) -> String? {
 }
 
 ///|
-fn pin_value(message : SignIn) -> Int? {
+fn pin_value(message : SignIn) -> Int32? {
   match message {
     Pin(pin) => Some(pin)
     _ => None
@@ -245,12 +246,12 @@ result is the last state:
 ```mbt check
 ///|
 async test "a state loop adds values until a stop message" {
-  let sum = @actors.receive_loop(0) <| (total, message : Int?) => {
+  let sum = @actors.receive_loop(0) <| ((total, message : Int32?) => {
     match message {
       Some(value) => @actors.Continue(total + value)
       None => @actors.Stop
     }
-  }
+  })
   let total = @actors.scope <| scope => {
     let actor = scope.spawn(_ => sum)
     actor.send(Some(40))
@@ -362,14 +363,14 @@ lookup.
 ///|
 enum Shelf {
   Put(String)
-  Size(@actors.Reply[Int])
+  Size(@actors.Reply[Int32])
   Names(@actors.Reply[Array[String]])
 }
 
 ///|
 async test "one protocol answers with an Int and an Array" {
   @actors.scope <| scope => {
-    let shelf = scope.start([]) <| (items : Array[String], message) => {
+    let shelf = scope.start([]) <| ((items : Array[String], message) => {
       match message {
         Put(item) => @actors.Continue([..items, item])
         Size(reply) => {
@@ -381,10 +382,10 @@ async test "one protocol answers with an Int and an Array" {
           @actors.Continue(items)
         }
       }
-    }
+    })
     shelf.send(Put("tea"))
     shelf.send(Put("rice"))
-    let size : Int = shelf.ask(reply => Size(reply))
+    let size : Int32 = shelf.ask(reply => Size(reply))
     let names : Array[String] = shelf.ask(reply => Names(reply))
     assert_eq(size, 2)
     assert_eq(names, ["tea", "rice"])
@@ -420,14 +421,14 @@ kinds of target adapt to it:
 ```mbt check
 ///|
 enum Feed {
-  Temperature(Int)
-  Total(@actors.Reply[Int])
+  Temperature(Int32)
+  Total(@actors.Reply[Int32])
 }
 
 ///|
 async test "a mapped destination puts events in the same mailbox" {
   @actors.scope <| scope => {
-    let feed = scope.start(0) <| (sum, message) => {
+    let feed = scope.start(0) <| ((sum, message) => {
       match message {
         Temperature(value) => @actors.Continue(sum + value)
         Total(reply) => {
@@ -435,8 +436,8 @@ async test "a mapped destination puts events in the same mailbox" {
           @actors.Continue(sum)
         }
       }
-    }
-    let readings : @actors.Subject[Int] = feed
+    })
+    let readings : @actors.Subject[Int32] = feed
       .to_ref()
       .to_subject()
       .contramap(value => Temperature(value))
@@ -471,13 +472,13 @@ async test "close gives the queued messages, and join waits for the one in progr
   @actors.scope <| scope => {
     let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
     let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
-    let printer = scope.start(0) <| (count, job : String) => {
+    let printer = scope.start(0) <| ((count, job : String) => {
       if job == "slow" {
         started.put(())
         gate.get()
       }
       @actors.Continue(count + 1)
-    }
+    })
     printer.send("slow")
     started.get()
     printer.send("b")
@@ -515,9 +516,10 @@ the caller is cancelled first, the actor is cancelled too.
 
 ```mbt check
 ///|
+#derive(Debug)
 suberror NoDisk {
   NoDisk
-} derive(Debug)
+}
 
 ///|
 async test "a failed initializer releases what it acquired" {
@@ -529,7 +531,7 @@ async test "a failed initializer releases what it acquired" {
           setup.on_stop(() => released.push("connection"))
           raise NoDisk
         },
-        (state : Int, _) => @actors.Continue(state),
+        (state : Int32, _) => @actors.Continue(state),
       )
       "started"
     } catch {
@@ -563,15 +565,15 @@ result, so each call can have its own result type with no message enum.
 ```mbt check
 ///|
 struct Wallet {
-  mut coins : Int
+  mut coins : Int32
 }
 
 ///|
 async test "a service runs typed calls one at a time" {
   @actors.scope <| scope => {
-    let wallet = scope.create({ coins: 3 })
+    let wallet = scope.create({ coins: 3, })
     wallet.tell(w => w.coins += 2)
-    let coins : Int = wallet.ask(w => w.coins)
+    let coins : Int32 = wallet.ask(w => w.coins)
     let label : String = wallet.ask(w => "\{w.coins} coins")
     assert_eq(coins, 5)
     assert_eq(label, "5 coins")
@@ -643,12 +645,12 @@ a global table, and it does not check if an actor is live.
 ```mbt check
 ///|
 enum Gauge {
-  Add(Int)
-  Total(@actors.Reply[Int])
+  Add(Int32)
+  Total(@actors.Reply[Int32])
 }
 
 ///|
-fn gauge_handler(total : Int, message : Gauge) -> @actors.Next[Int] {
+fn gauge_handler(total : Int32, message : Gauge) -> @actors.Next[Int32] {
   match message {
     Add(value) => @actors.Continue(total + value)
     Total(reply) => {
@@ -662,12 +664,20 @@ fn gauge_handler(total : Int, message : Gauge) -> @actors.Next[Int] {
 async test "find a named actor in a directory" {
   @actors.scope <| scope => {
     let name = @actors.ActorName::parse("gauge")
-    let gauge = scope.start(0, (total, message) => gauge_handler(total, message), name~)
+    let gauge = scope.start(
+      0,
+      (total, message) => gauge_handler(total, message),
+      name~,
+    )
     let spare = scope.start(0, (total, message) => gauge_handler(total, message))
-    let gauges = @actors.Directory::of(gauge.to_ref()) + @actors.Directory::of(spare.to_ref())
+    let gauges = @actors.Directory::of(gauge.to_ref()) +
+      @actors.Directory::of(spare.to_ref())
     guard gauges.lookup(name) is Found(found) else { fail("no gauge") }
     found.send(Add(5))
-    assert_eq(gauges.resolve(gauge.address()).unwrap().ask(reply => Total(reply)), 5)
+    assert_eq(
+      gauges.resolve(gauge.address()).unwrap().ask(reply => Total(reply)),
+      5,
+    )
     // Removal gives a new value; the actor keeps running.
     let fewer = gauges - @actors.Directory::of(spare.to_ref())
     assert_eq((gauges.size(), fewer.size()), (2, 1))
@@ -723,16 +733,16 @@ async test "a worker pool with direct send for work and a topic for observations
   let seen = []
   @actors.scope <| scope => {
     let observations : @actors.Topic[String] = @actors.Topic::new()
-    let observer = scope.start(0) <| (count, note : String) => {
+    let observer = scope.start(0) <| ((count, note : String) => {
       seen.push(note)
       @actors.Continue(count + 1)
-    }
+    })
     ignore(scope.subscribe(observations, observer.to_ref().to_subject()))
     let workers = Array::makei(2, index => {
-      scope.start(index) <| (id, job : Int) => {
+      scope.start(index) <| ((id, job : Int32) => {
         observations.publish("worker \{id} did job \{job}")
         @actors.Continue(id)
-      }
+      })
     })
     for job in 0..<4 {
       workers[job % 2].send(job)
@@ -775,7 +785,7 @@ async test "wait for Ended instead of polling status" {
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~) <| scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let worker = scope.start((), (_, message : Int) => {
+    let worker = scope.start((), (_, message : Int32) => {
       if message == 0 {
         @actors.Stop
       } else {
@@ -828,7 +838,7 @@ async test "count dead letters with a payload" {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
     let counter = scope.start(
       0,
-      (count, by : Int) => @actors.Continue(count + by),
+      (count, by : Int32) => @actors.Continue(count + by),
       payload=@actors.PayloadPolicy::json(),
     )
     ignore(counter.close())

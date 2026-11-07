@@ -47,8 +47,8 @@ fn to_ion(value : Json) -> @ion.Ion {
 /// An integral number within ±2^53 becomes an Ion integer; otherwise a float.
 fn number_ion(number : Double) -> @ion.Ion {
   if number == number.trunc() &&
-      !number.is_nan() &&
-      number.abs() <= max_safe_integer {
+    !number.is_nan() &&
+    number.abs() <= max_safe_integer {
     @ion.Ion::big_int(@bigint.BigInt::from_int64(number.to_int64()))
   } else {
     @ion.Ion::float(number)
@@ -72,11 +72,5 @@ fn parse_error(
       (Some(line), Some(column + 1))
     @json5_lib.ParseError(@json5_lib.InvalidEof) => (None, None)
   }
-  Parse(
-    format="JSON5",
-    origin~,
-    message=error.to_string(),
-    line~,
-    column~,
-  )
+  Parse(format="JSON5", origin~, message=error.to_string(), line~, column~)
 }

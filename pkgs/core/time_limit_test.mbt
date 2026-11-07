@@ -1,6 +1,6 @@
 ///|
 /// The milliseconds of the parsed `text`.
-fn parsed_millis(text : String) -> Int raise {
+fn parsed_millis(text : String) -> Int32 raise {
   @lander_core.TimeLimit::parse(text).to_millis()
 }
 
@@ -36,10 +36,7 @@ fn constructor_failure(
 ///|
 test "the smallest and the largest limits" {
   assert_eq(@lander_core.TimeLimit::millis(1).to_millis(), 1)
-  assert_eq(
-    @lander_core.TimeLimit::millis(2147483647).to_millis(),
-    2147483647,
-  )
+  assert_eq(@lander_core.TimeLimit::millis(2147483647).to_millis(), 2147483647)
 }
 
 ///|
@@ -54,13 +51,8 @@ test "zero and negative counts are not positive" {
 
 ///|
 test "seconds are checked against the largest limit without overflow" {
-  assert_eq(
-    @lander_core.TimeLimit::seconds(2147483).to_millis(),
-    2147483000,
-  )
-  let above = constructor_failure(() => {
-    @lander_core.TimeLimit::seconds(2147484)
-  })
+  assert_eq(@lander_core.TimeLimit::seconds(2147483).to_millis(), 2147483000)
+  let above = constructor_failure(() => @lander_core.TimeLimit::seconds(2147484))
   assert_true(above is Some(("2147484s", AboveLargest)))
   let largest = constructor_failure(() => {
     @lander_core.TimeLimit::seconds(2147483647)
@@ -88,8 +80,8 @@ test "short units" {
 test "long units" {
   assert_eq(
     [
-      "1 millisecond", "2 milliseconds", "10 seconds", "1 second", "2 minutes",
-      "1 minute", "1 hour", "3 hours",
+      "1 millisecond", "2 milliseconds", "10 seconds", "1 second", "2 minutes", "1 minute",
+      "1 hour", "3 hours",
     ].map(parsed_millis),
     [1, 2, 10000, 1000, 120000, 60000, 3600000, 10800000],
   )
@@ -118,12 +110,13 @@ test "a number without a unit" {
 
 ///|
 test "an unknown unit names the unit text" {
-  for (text, unit) in [
-    ("30d", "d"),
-    ("10 secs", "secs"),
-    ("10 Seconds", "Seconds"),
-    ("1MS", "MS"),
-  ] {
+  for
+    (text, unit) in [
+      ("30d", "d"),
+      ("10 secs", "secs"),
+      ("10 Seconds", "Seconds"),
+      ("1MS", "MS"),
+    ] {
     assert_true(parse_rule(text) is Some(UnknownUnit(found)) && found == unit)
   }
 }
@@ -199,7 +192,7 @@ test "the canonical text" {
 
 ///|
 test "law: the canonical text parses to an equal limit" {
-  @quickcheck.check((pair : (UInt, UInt)) => {
+  @quickcheck.check((pair : (UInt32, UInt32)) => {
     let (high, low) = pair
     let millis = ((high.to_uint64() * 65536UL + low.to_uint64()) % 2147483647UL +
     1UL).to_int()
@@ -210,15 +203,16 @@ test "law: the canonical text parses to an equal limit" {
 
 ///|
 test "the error message names the input and the rule" {
-  let messages = ["", "30d", "0s"].map(text => try {
-    ignore(@lander_core.TimeLimit::parse(text))
-    "ok"
-  } catch {
-    err => err.message()
+  let messages = ["", "30d", "0s"].map(text => {
+    try {
+      ignore(@lander_core.TimeLimit::parse(text))
+      "ok"
+    } catch {
+      err => err.message()
+    }
   })
   assert_eq(messages, [
-    "Invalid time limit \"\": the text is empty",
-    "Invalid time limit \"30d\": the unit \"d\" is not known; use ms, s, m or h, or millisecond(s), second(s), minute(s) or hour(s)",
+    "Invalid time limit \"\": the text is empty", "Invalid time limit \"30d\": the unit \"d\" is not known; use ms, s, m or h, or millisecond(s), second(s), minute(s) or hour(s)",
     "Invalid time limit \"0s\": the value must be greater than zero",
   ])
 }
@@ -257,7 +251,9 @@ test "whole numbers next to the 10-digit limit" {
 ///|
 test "each part must be a whole number of milliseconds" {
   assert_true(parse_rule("1.0005s 0.5ms") is Some(NotWholeMilliseconds))
-  assert_true(parse_rule("1\{String::make(20, '0')}h 0.5ms") is Some(NotWholeMilliseconds))
+  assert_true(
+    parse_rule("1\{String::make(20, '0')}h 0.5ms") is Some(NotWholeMilliseconds),
+  )
 }
 
 ///|
@@ -269,12 +265,13 @@ test "whitespace that is not a space is unexpected" {
 
 ///|
 test "an unknown unit holds the full text that follows the number" {
-  for (text, unit) in [
-    ("10µs", "µs"),
-    ("10 séconds", "séconds"),
-    ("10%", "%"),
-    ("1m,30s", "m,"),
-  ] {
+  for
+    (text, unit) in [
+      ("10µs", "µs"),
+      ("10 séconds", "séconds"),
+      ("10%", "%"),
+      ("1m,30s", "m,"),
+    ] {
     assert_true(parse_rule(text) is Some(UnknownUnit(found)) && found == unit)
   }
 }

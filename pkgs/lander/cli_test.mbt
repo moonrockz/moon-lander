@@ -9,13 +9,28 @@ async test "the acme host runs the command between start and stop" {
 ///|
 async test "cli starting environment is a typed default below the run variable" {
   let production = @lander.EnvironmentName::parse("Production")
-  for (vars, expected) in [({ "ACME_ENVIRONMENT": "Staging" }, "Staging"), ({}, "Production")] {
+  for
+    (vars, expected) in [
+      ({ "ACME_ENVIRONMENT": "Staging" }, "Staging"),
+      ({}, "Production"),
+    ] {
     let names = []
-    let result = @lander.cli(@lander.AppName::parse("acme"), [], env_vars=vars,
-      working_dir=@lander_core.AbsolutePath::root(), environment=production)
-      |> @hosting.build(b => { names.push(b.environment.environment_name.unwrap().to_string()); () })
+    let result = @lander.cli(
+        @lander.AppName::parse("acme"),
+        [],
+        env_vars=vars,
+        working_dir=@lander_core.AbsolutePath::root(),
+        environment=production,
+      )
+      |> @hosting.build(b => {
+        names.push(b.environment.environment_name.unwrap().to_string())
+        ()
+      })
       |> @hosting.run(ctx => {
-        assert_eq(ctx.environment.environment_name.unwrap().to_string(), expected)
+        assert_eq(
+          ctx.environment.environment_name.unwrap().to_string(),
+          expected,
+        )
         assert_eq(names, [expected])
       })
     assert_eq(result.exit_code().to_int(), 0)

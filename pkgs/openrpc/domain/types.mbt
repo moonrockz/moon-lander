@@ -1,8 +1,9 @@
 ///|
 /// Shared checked values for OpenRPC documents and embedded schemas.
+#derive(Eq, Debug)
 pub struct ComponentKey {
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ComponentKey::parse(
@@ -50,9 +51,10 @@ pub fn ComponentKey::to_string(self : ComponentKey) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct ExtensionName {
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ExtensionName::parse(
@@ -76,9 +78,10 @@ pub fn ExtensionName::to_string(self : ExtensionName) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct ErrorCode {
   number : @exact.Number
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ErrorCode::from_number(
@@ -110,9 +113,10 @@ pub fn ErrorCode::number(self : ErrorCode) -> @exact.Number {
 }
 
 ///|
+#derive(Debug)
 pub struct Extensions {
   entries : Array[(ExtensionName, @exact.Value)]
-} derive(Debug)
+}
 
 ///|
 pub fn Extensions::from_json(

@@ -1,22 +1,24 @@
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct ServiceOptions {
   url : String
   token : String
-} derive(FromJson, ToJson, Debug, Eq)
+}
 
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct ApiOptions {
   api_token : String
-} derive(FromJson, ToJson, Debug, Eq)
+}
 
 ///|
 /// A resolver that counts its calls. Binding must never call it.
 struct CountingResolver {
-  calls : Ref[Int]
+  calls : Ref[Int32]
 }
 
 ///|
-impl @config.SecretResolver for CountingResolver with resolve(
+impl @config.SecretResolver for CountingResolver with fn resolve(
   self,
   _reference,
   _origin,
@@ -41,7 +43,7 @@ fn service_config() -> @config.Config raise @config.ConfigError {
 
 ///|
 test "Secret reference into a text field" {
-  let resolver : CountingResolver = { calls: { val: 0 } }
+  let resolver : CountingResolver = { calls: { val: 0, }, }
   let config = service_config()
   let (failure, text) = decode_failure(() => {
     let _ : ServiceOptions = config |> @config.bind("service")
@@ -64,7 +66,7 @@ test "Secret reference into a text field" {
 test "a secret reference fails bind_or before the merge and bind_root" {
   let config = service_config()
   let (failure, _) = decode_failure(() => {
-    let default : ServiceOptions = { url: "http://localhost", token: "" }
+    let default : ServiceOptions = { url: "http://localhost", token: "", }
     config |> @config.bind_or("service", default) |> ignore
   })
   @expect.expect(failure.at.map(at => at.path.to_string())).to_equal([
@@ -119,7 +121,9 @@ test "with secret syntax off, a reference shape is an ordinary table" {
     |> @config.format(@toml.format())
     |> @config.secret_syntax(@config.SecretSyntax::none())
     |> @config.file("/repo/acme.toml")
-  let tree = @config.FileTree::new(complete=true).with_file(p("/repo/acme.toml"), "service.token = { env = \"SERVICE_TOKEN\" }",
+  let tree = @config.FileTree::new(complete=true).with_file(
+    p("/repo/acme.toml"),
+    "service.token = { env = \"SERVICE_TOKEN\" }",
   )
   guard @config.load(builder, tree) is Done(config) else {
     abort("a complete tree never asks for files")
@@ -152,11 +156,11 @@ test "the text of each binding error does not show the configured value" {
   })
   keep(() => {
     config
-    |> @config.bind_or("service", ({ api_token: "none" } : ApiOptions))
+    |> @config.bind_or("service", ({ api_token: "none", } : ApiOptions))
     |> ignore
   })
   keep(() => {
-    let value : ApiOptions = { api_token: "x" }
+    let value : ApiOptions = { api_token: "x", }
     value |> @config.validated(config, "service") |> ignore
   })
   @expect.expect(texts.length()).to_equal(5)
@@ -169,6 +173,6 @@ test "the text of each binding error does not show the configured value" {
 
 ///|
 /// A rule that always breaks, so the safe-text test gets a validation error.
-impl @config.Validate for ApiOptions with validate(_) {
+impl @config.Validate for ApiOptions with fn validate(_) {
   [@config.violation(["api_token"], "must be text")]
 }

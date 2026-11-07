@@ -28,8 +28,7 @@ test "compatibility cannot excuse unrelated semantic errors" {
       "\"methods\":[{\"name\":\"a\",\"params\":[]},{\"name\":\"a\",\"params\":[]}]",
       "\"methods\":[{\"name\":\"a\",\"params\":[],\"errors\":[{\"code\":1,\"message\":\"x\"},{\"code\":1,\"message\":\"y\"}]}]",
     ] {
-    for
-      profile in [@openrpc.Specification, @openrpc.MetaschemaCompatibility] {
+    for profile in [@openrpc.Specification, @openrpc.MetaschemaCompatibility] {
       let result = closed(versioned("1.4.0", body), profile)
       assert_eq(result.report().normative(), @openrpc.Failed, msg=body)
       assert_true(result.document() is None, msg=body)
@@ -40,8 +39,7 @@ test "compatibility cannot excuse unrelated semantic errors" {
 ///|
 test "open resource coverage is not a closed validation proof" {
   let document = versioned(
-    "1.4.0",
-    "\"methods\":[{\"$ref\":\"https://ext.test/m.json#/m\"}]",
+    "1.4.0", "\"methods\":[{\"$ref\":\"https://ext.test/m.json#/m\"}]",
   )
   for profile in [@openrpc.Specification, @openrpc.MetaschemaCompatibility] {
     let result = closed(document, profile)
@@ -54,17 +52,15 @@ test "open resource coverage is not a closed validation proof" {
   ).unwrap()
   let resources = @reference.ResourceSet::new([resource]).unwrap()
   let result = closed(document, @openrpc.Specification, resources~)
-  assert_eq(
-    result.document().unwrap().resources().map(u => u.text()),
-    ["https://ext.test/m.json"],
-  )
+  assert_eq(result.document().unwrap().resources().map(u => u.text()), [
+    "https://ext.test/m.json",
+  ])
 }
 
 ///|
 test "interior optional parameters have explicit profile results" {
   let document = versioned(
-    "1.3.2",
-    "\"methods\":[{\"name\":\"a\",\"params\":[{\"name\":\"o\",\"required\":false,\"schema\":true},{\"name\":\"r\",\"required\":true,\"schema\":true}]}]",
+    "1.3.2", "\"methods\":[{\"name\":\"a\",\"params\":[{\"name\":\"o\",\"required\":false,\"schema\":true},{\"name\":\"r\",\"required\":true,\"schema\":true}]}]",
   )
   let strict = closed(document, @openrpc.Specification)
   assert_eq(strict.report().normative(), @openrpc.Failed)
@@ -94,8 +90,7 @@ test "interior optional parameters have explicit profile results" {
 ///|
 test "truncated findings never produce a wrapper" {
   let document = versioned(
-    "1.4.0",
-    "\"methods\":[{\"name\":\"a\",\"params\":[],\"foo\":1,\"bar\":2}]",
+    "1.4.0", "\"methods\":[{\"name\":\"a\",\"params\":[],\"foo\":1,\"bar\":2}]",
   )
   let limits = @exact.Limits::new(max_findings=1)
   for profile in [@openrpc.Specification, @openrpc.MetaschemaCompatibility] {

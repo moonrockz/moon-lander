@@ -1,7 +1,11 @@
 ///|
 /// The Ion text format for `.ion` files.
 pub fn format() -> @config.Format {
-  { name: "Ion", extensions: ["ion"], parse: (text, origin) => parse(text, origin~) }
+  {
+    name: "Ion",
+    extensions: ["ion"],
+    parse: (text, origin) => parse(text, origin~),
+  }
 }
 
 ///|
@@ -27,11 +31,5 @@ fn parse_error(
   origin : String,
   error : @ion_lib.IonError,
 ) -> @config.ConfigError {
-  Parse(
-    format="Ion",
-    origin~,
-    message=error.message(),
-    line=None,
-    column=None,
-  )
+  Parse(format="Ion", origin~, message=error.message(), line=None, column=None)
 }

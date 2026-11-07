@@ -23,9 +23,9 @@ fn console_destination(console : @sinks.ConsoleSink) -> Sink {
     record => @formatting.format_console(record, theme),
     {
       write: async fn(text) {
-        write_console(stream, text).map(detail => @sinks.SinkFailure::new(
-          Write, target, detail,
-        ))
+        write_console(stream, text).map(detail => {
+          @sinks.SinkFailure::new(Write, target, detail)
+        })
       },
       close: fn() { [] },
     },
@@ -183,7 +183,8 @@ async fn FileOutput::open(
 ) -> @sinks.SinkFailure? {
   let path = self.sink.directory().file(name)
   match (self.io.open_append)(path) {
-    Err(detail) => Some(self.failure(OpenFile, subject=name.to_string(), detail))
+    Err(detail) =>
+      Some(self.failure(OpenFile, subject=name.to_string(), detail))
     Ok((handle, size)) => {
       self.handle = Some(handle)
       self.state = self.state.opened(name, size)
@@ -277,15 +278,16 @@ fn file_destination(
   file : @sinks.FileSink,
   clock : () -> @formatting.LogTimestamp,
   warn : (@sinks.SinkFailure) -> Unit,
-  io? : FileIo = system_io(),
+  io~ : FileIo = system_io(),
 ) -> Sink {
   let output = FileOutput::new(file, clock, warn, io)
   let render : (@formatting.LogRecord) -> String = match file.files().format() {
     Text => @formatting.format_text
-    JsonLines => match file.json_properties() {
-      OrderedArray => @formatting.format_json_line
-      NamedObject => @formatting.format_json_object_line
-    }
+    JsonLines =>
+      match file.json_properties() {
+        OrderedArray => @formatting.format_json_line
+        NamedObject => @formatting.format_json_object_line
+      }
   }
   Sink::new(output.target, file.minimum(), render, {
     write: async fn(text) { output.write(text) },
@@ -298,7 +300,7 @@ fn file_destination(
 fn production_sinks(
   settings : @sinks.SessionSettings,
   clock : () -> @formatting.LogTimestamp,
-  warn : (Int, @sinks.SinkFailure) -> Unit,
+  warn : (Int32, @sinks.SinkFailure) -> Unit,
 ) -> Array[Sink] {
   let sinks = []
   if settings.console() is Some(console) {

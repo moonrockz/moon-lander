@@ -9,6 +9,7 @@ priv enum StopRequest {
 }
 
 ///|
+#derive(Eq, Debug)
 priv enum Phase {
   Starting
   Start
@@ -16,31 +17,34 @@ priv enum Phase {
   Stopping
   Stop
   Stopped
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 priv enum Event {
   Started
   Stopping
   Stopped
-} derive(Eq, Debug)
+}
 
 ///|
 /// Only Engine::start makes a reference, from a service's registration index.
+#derive(Eq, Debug)
 priv struct ServiceRef {
-  index : Int
-} derive(Eq, Debug)
+  index : Int32
+}
 
 ///|
 // Debug supports white-box tests only, and only `run` (native, js) compares
 // actions with Eq, so wasm and wasm-gc do not use it. Remove when the build
 // system can limit derived methods to tests and targets.
+#derive(Eq, Debug)
 #warnings("-1")
 priv enum Action {
   Hook(ServiceRef, Phase)
   RunCommand
   Raise(Event)
-} derive(Eq, Debug)
+}
 
 ///|
 priv enum Step {
@@ -66,11 +70,11 @@ priv enum EnginePhase {
 ///|
 priv struct Engine {
   instructions : Array[Instruction]
-  stop_at : Int
-  stopped_at : Int
+  stop_at : Int32
+  stopped_at : Int32
   started : Array[Bool]
   failures : Array[Error]
-  mut position : Int
+  mut position : Int32
   mut phase : EnginePhase
   mut reason : StopReason?
   mut requested_code : ExitCode?
@@ -104,7 +108,7 @@ fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   let instructions = []
   for phase in [Phase::Starting, Start, Started] {
     for index, service in services {
-      let reference = ServiceRef::{ index }
+      let reference = ServiceRef::{ index, }
       if service.hook(phase) is Some(_) {
         instructions.push(Emit(Hook(reference, phase)))
       }
@@ -123,15 +127,25 @@ fn[S] Engine::start(services : Array[HostedService[S]]) -> Step {
   for phase in [Phase::Stopping, Stop, Stopped] {
     for index = services.length() - 1; index >= 0; index = index - 1 {
       if services[index].hook(phase) is Some(_) {
-        instructions.push(Emit(Hook(ServiceRef::{ index }, phase)))
+        instructions.push(Emit(Hook(ServiceRef::{ index, }, phase)))
       }
     }
   }
   let stopped_at = instructions.length()
   instructions.push(Emit(Raise(Stopped)))
   let engine : Engine = {
-    instructions, stop_at, stopped_at, started: Array::make(services.length(), false), failures: [], position: 0,
-    phase: Starting, reason: None, requested_code: None, signal: None, stop_requested: false, timed_out: false,
+    instructions,
+    stop_at,
+    stopped_at,
+    started: Array::make(services.length(), false),
+    failures: [],
+    position: 0,
+    phase: Starting,
+    reason: None,
+    requested_code: None,
+    signal: None,
+    stop_requested: false,
+    timed_out: false,
   }
   engine.next()
 }
@@ -149,20 +163,29 @@ fn Engine::next(self : Engine) -> Step {
       Emit(action) => {
         match action {
           Hook(reference, Stopping | Stop | Stopped) =>
-            if !self.started[reference.index] { continue }
+            if !self.started[reference.index] {
+              continue
+            }
           Raise(Stopping) => {
             self.phase = Stopping
-            if self.reason is None { self.reason = Some(Completed) }
+            if self.reason is None {
+              self.reason = Some(Completed)
+            }
           }
           RunCommand => self.phase = Command
           _ => ()
         }
-        return Run({ engine: self, action, reply: None }, action)
+        return Run({ engine: self, action, reply: None, }, action)
       }
     }
   }
   let outcome : RunOutcome = {
-    exit_code: select_exit_code(self.signal, self.failures, self.timed_out, self.requested_code),
+    exit_code: select_exit_code(
+      self.signal,
+      self.failures,
+      self.timed_out,
+      self.requested_code,
+    ),
     timed_out: self.timed_out,
     failures: self.failures.copy(),
     reason: self.reason.unwrap_or(Completed),
@@ -190,41 +213,64 @@ priv enum Reply {
 
 ///|
 fn Pending::respond(self : Pending, reply : Reply) -> Step {
-  if self.reply is Some(step) { return step }
+  if self.reply is Some(step) {
+    return step
+  }
   let engine = self.engine
   match reply {
     Done => ()
     Failed(error) => {
-      if self.action is Raise(_) { abort("failed reply to a Raise step") }
+      if self.action is Raise(_) {
+        abort("failed reply to a Raise step")
+      }
       engine.failures.push(error)
       match engine.phase {
         Starting => {
-          if engine.reason is None { engine.reason = Some(StartFailed(error)) }
+          if engine.reason is None {
+            engine.reason = Some(StartFailed(error))
+          }
           engine.position = engine.stop_at
         }
-        Command => {
-          if engine.reason is None { engine.reason = Some(Failed(error)) }
-        }
+        Command =>
+          if engine.reason is None {
+            engine.reason = Some(Failed(error))
+          }
         _ => ()
       }
     }
     StopRequested(request, code, result, observed_signal) => {
-      if result is Failed(_) && self.action is Raise(_) { abort("failed reply to a Raise step") }
-      if request is Signal(signal) { engine.signal = Some(signal) }
-      if observed_signal is Some(signal) { engine.signal = Some(signal) }
+      if result is Failed(_) && self.action is Raise(_) {
+        abort("failed reply to a Raise step")
+      }
+      if request is Signal(signal) {
+        engine.signal = Some(signal)
+      }
+      if observed_signal is Some(signal) {
+        engine.signal = Some(signal)
+      }
       if !engine.stop_requested {
         engine.stop_requested = true
         if engine.reason is None {
-          engine.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind); Embedder => Embedder })
+          engine.reason = Some(
+            match request {
+              Requested => Requested
+              Signal(kind) => Signal(kind)
+              Embedder => Embedder
+            },
+          )
         }
         engine.requested_code = code
       }
-      if result is Failed(error) { engine.failures.push(error) }
+      if result is Failed(error) {
+        engine.failures.push(error)
+      }
       if engine.phase is Starting {
         // The current hook succeeded. Consume its mark before skipping startup.
-        if result is Returned && engine.position < engine.instructions.length() &&
+        if result is Returned &&
+          engine.position < engine.instructions.length() &&
           engine.instructions[engine.position] is MarkStarted(reference) &&
-          self.action is Hook(current, Starting | Start) && current == reference {
+          self.action is Hook(current, Starting | Start) &&
+          current == reference {
           engine.started[reference.index] = true
         }
         engine.position = engine.stop_at
@@ -237,12 +283,20 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
         Finished(_) => abort("timed_out outside the stop phase: Finished")
         Stopping => ()
       }
-      if observed_signal is Some(signal) { engine.signal = Some(signal) }
-      if result is Failed(error) { engine.failures.push(error) }
+      if observed_signal is Some(signal) {
+        engine.signal = Some(signal)
+      }
+      if result is Failed(error) {
+        engine.failures.push(error)
+      }
       engine.timed_out = true
       engine.failures.push(ShutdownTimedOut(limit))
       // A timeout while raising Stopped must not raise the event twice.
-      engine.position = if engine.position > engine.stopped_at { engine.position } else { engine.stopped_at }
+      engine.position = if engine.position > engine.stopped_at {
+        engine.position
+      } else {
+        engine.stopped_at
+      }
     }
   }
   let next = engine.next()
@@ -251,13 +305,23 @@ fn Pending::respond(self : Pending, reply : Reply) -> Step {
 }
 
 ///|
-fn Pending::done(self : Pending) -> Step { self.respond(Done) }
+fn Pending::done(self : Pending) -> Step {
+  self.respond(Done)
+}
 
 ///|
-fn Pending::failed(self : Pending, error : Error) -> Step { self.respond(Failed(error)) }
+fn Pending::failed(self : Pending, error : Error) -> Step {
+  self.respond(Failed(error))
+}
 
 ///|
-fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCode?, result~ : ActionResult = Returned, observed_signal? : SignalKind) -> Step {
+fn Pending::stop_requested(
+  self : Pending,
+  request : StopRequest,
+  code : ExitCode?,
+  result~ : ActionResult = Returned,
+  observed_signal? : SignalKind,
+) -> Step {
   self.respond(StopRequested(request, code, result, observed_signal))
 }
 
@@ -265,4 +329,11 @@ fn Pending::stop_requested(self : Pending, request : StopRequest, code : ExitCod
 // Only `run` (native, js) calls this. wasm and wasm-gc have no timer, so it is
 // unused there. Remove when the build system can limit a function to targets.
 #warnings("-1")
-fn Pending::timed_out(self : Pending, limit~ : @lander_core.TimeLimit, observed_signal? : SignalKind, result~ : ActionResult = Interrupted) -> Step { self.respond(TimedOut(limit, observed_signal, result)) }
+fn Pending::timed_out(
+  self : Pending,
+  limit~ : @lander_core.TimeLimit,
+  observed_signal? : SignalKind,
+  result~ : ActionResult = Interrupted,
+) -> Step {
+  self.respond(TimedOut(limit, observed_signal, result))
+}

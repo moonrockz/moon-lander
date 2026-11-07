@@ -1,9 +1,10 @@
 ///|
 /// A consumer-defined format uses the shared engine without editing it.
+#derive(Eq)
 priv enum OtherNode {
   Document(ReadOnlyArray[OtherNode])
   Snippet(String)
-} derive(Eq)
+}
 
 ///|
 impl @notebooks.Node for OtherNode with fn children(self) {

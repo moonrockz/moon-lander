@@ -80,10 +80,13 @@ test "example: preserve empty Markdown and source boundary lines" {
     [@dib.KernelInfo(@dib.KernelName("scheme"))],
     default_kernel=@dib.KernelName("scheme"),
   )
-  let book = @dib.Notebook::Notebook([
-    @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
-    @dib.Cell::Cell("\n42\n", kernel=@dib.KernelName("scheme"), source_mode~),
-  ], registry~)
+  let book = @dib.Notebook::Notebook(
+    [
+      @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
+      @dib.Cell::Cell("\n42\n", kernel=@dib.KernelName("scheme"), source_mode~),
+    ],
+    registry~,
+  )
   let exported = book.to_string(source_mode~)
   let restored = @dib.parse(exported, registry=book.registry(), source_mode~)
   @expect.expect(restored).to_equal(book)
@@ -158,7 +161,9 @@ test "example: self-describing custom kernel metadata" {
   values.clear()
   @expect.expect_all(s => {
     s.expect(book.cells()[0].kernel().to_string()).to_equal("custom")
-    s.expect(book.metadata().get_json("vendor")).to_equal(Some({ "values": [1, 2] }))
+    s
+    .expect(book.metadata().get_json("vendor"))
+    .to_equal(Some({ "values": [1, 2] }))
     s.expect(@dib.parse(book.to_string())).to_equal(book)
   })
 }
@@ -215,17 +220,27 @@ value and Ion otherwise. YAML/TOML comments and source formatting are not saved.
 ```mbt check
 ///|
 test "example: DIB metadata format extensions" {
-  let yaml = @dib.parse("#!meta yaml\ntitle: Example\ntags: [demo, notebook]\n#!markdown\n# Heading")
-  let toml = @dib.parse("#!meta toml\ntitle = \"Example\"\ncreated = 2026-10-19T12:30:00Z")
+  let yaml = @dib.parse(
+    "#!meta yaml\ntitle: Example\ntags: [demo, notebook]\n#!markdown\n# Heading",
+  )
+  let toml = @dib.parse(
+    "#!meta toml\ntitle = \"Example\"\ncreated = 2026-10-19T12:30:00Z",
+  )
   let ion = @dib.parse("#!meta ion\n{title: \"Example\", amount: 1234.500}")
-  guard toml.metadata().get("created") is Some(created) else { fail("missing timestamp") }
+  guard toml.metadata().get("created") is Some(created) else {
+    fail("missing timestamp")
+  }
   @expect.expect_all(s => {
-    s.expect(yaml.metadata().get_json("tags")).to_equal(Some(["demo", "notebook"]))
+    s
+    .expect(yaml.metadata().get_json("tags"))
+    .to_equal(Some(["demo", "notebook"]))
     s.expect(yaml.to_string().has_prefix("#!meta\n")).to_be_true()
     s.expect(created.ion_type().to_text()).to_equal("timestamp")
     s.expect(toml.to_string().has_prefix("#!meta ion\n")).to_be_true()
     s.expect(@dib.parse(toml.to_string())).to_equal(toml)
-    s.expect(@dib.parse(ion.to_string(metadata_output=@dib.MetadataOutput::Ion))).to_equal(ion)
+    s
+    .expect(@dib.parse(ion.to_string(metadata_output=@dib.MetadataOutput::Ion)))
+    .to_equal(ion)
   })
 }
 ```
@@ -336,9 +351,9 @@ test "example: DIB empty cells and whitespace" {
 test "example: configured lossless codec" {
   let codec = @dib.Codec::lossless(
     default=@dib.KernelInfo(@dib.KernelName("moonbit")),
-  ).with_kernel(@dib.KernelInfo(
-    @dib.KernelName("python"), aliases=[@dib.KernelName("py")],
-  ))
+  ).with_kernel(
+    @dib.KernelInfo(@dib.KernelName("python"), aliases=[@dib.KernelName("py")]),
+  )
   let book = codec.notebook([
     codec.cell(""),
     codec.cell("\nprint(42)\n", kernel=@dib.KernelName("py")),

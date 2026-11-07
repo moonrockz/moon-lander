@@ -69,13 +69,11 @@ test "Core schema scalars" {
 
 ///|
 test "the event builder matches Yaml::load_from_string on library examples" {
-  for text in [
-    "a: 1\nb: 'q'\n",
-    "a: true\nb: false\nc: null\nd: ~\n",
-    "a: 0x2A\nb: 0o52\nc: +7\n",
-    "list:\n  - 1\n  - two\n  - true\n",
-    "nested:\n  x: 1\n  y: [a, b]\n",
-  ] {
+  for
+    text in [
+      "a: 1\nb: 'q'\n", "a: true\nb: false\nc: null\nd: ~\n", "a: 0x2A\nb: 0o52\nc: +7\n",
+      "list:\n  - 1\n  - two\n  - true\n", "nested:\n  x: 1\n  y: [a, b]\n",
+    ] {
     let built = @yaml.parse(text, origin="app.yaml").to_ion()
     let library = library_ion(text)
     @expect.expect(built.equals(library)).to_equal(true)
@@ -86,16 +84,18 @@ test "the event builder matches Yaml::load_from_string on library examples" {
 test "YAML integers above Int64 stay exact" {
   let text = "big: 9223372036854775808\n"
   let value = @yaml.parse(text, origin="app.yaml")
-  guard value.to_ion().kind() is Struct(fields) else { fail("expected a mapping") }
+  guard value.to_ion().kind() is Struct(fields) else {
+    fail("expected a mapping")
+  }
   guard fields[0].value().kind() is Int(number) else { fail("expected an int") }
   @expect.expect(number.to_string()).to_equal("9223372036854775808")
 }
 
 ///|
 test "More than one document" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("a: 1\n---\nb: 2\n", origin="/w/app.yaml")
-  )
+  })
   guard error is Parse(origin~, line~, ..) else { fail("expected Parse") }
   @expect.expect(origin).to_equal("/w/app.yaml")
   @expect.expect(line).to_equal(Some(2))
@@ -103,9 +103,9 @@ test "More than one document" {
 
 ///|
 test "Duplicate key" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("name: a\nname: b\n", origin="/w/app.yaml")
-  )
+  })
   guard error is Parse(origin~, message~, line~, column~, ..) else {
     fail("expected Parse")
   }
@@ -158,9 +158,9 @@ test "Strict profile rejects an alias" {
   let text =
     #|a: &x 1
     #|b: *x
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse(text, origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(origin~, feature~, line~, column~) else {
     fail("expected UnsupportedYaml")
   }
@@ -171,9 +171,9 @@ test "Strict profile rejects an alias" {
 
 ///|
 test "Strict profile rejects null" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("a: ~\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(origin~, feature~, ..) else {
     fail("expected UnsupportedYaml")
   }
@@ -182,9 +182,9 @@ test "Strict profile rejects null" {
 
 ///|
 test "Strict profile rejects an anchor" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("a: &x 1\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(feature~, ..) else {
     fail("expected UnsupportedYaml")
   }
@@ -193,9 +193,9 @@ test "Strict profile rejects an anchor" {
 
 ///|
 test "Strict profile rejects a custom tag" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("a: !foo bar\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(feature~, ..) else {
     fail("expected UnsupportedYaml")
   }
@@ -204,9 +204,9 @@ test "Strict profile rejects a custom tag" {
 
 ///|
 test "Strict profile rejects a merge key" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("<<: a\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(feature~, ..) else {
     fail("expected UnsupportedYaml")
   }
@@ -215,27 +215,27 @@ test "Strict profile rejects a merge key" {
 
 ///|
 test "Strict profile rejects a duplicate key" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("name: a\nname: b\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is Parse(message~, ..) else { fail("expected Parse") }
   @expect.expect(message).to_equal("duplicate key name")
 }
 
 ///|
 test "Strict profile rejects more than one document" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("a: 1\n---\nb: 2\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is Parse(message~, ..) else { fail("expected Parse") }
   @expect.expect(message).to_equal("expected exactly one YAML document")
 }
 
 ///|
 test "Strict profile rejects a non-mapping root" {
-  let error = expect_error(() =>
+  let error = expect_error(() => {
     @yaml.parse("- 1\n- 2\n", origin="/w/app.yaml", profile=Strict)
-  )
+  })
   guard error is UnsupportedYaml(origin~, feature~, line~, column~) else {
     fail("expected UnsupportedYaml with a source mark")
   }
@@ -255,9 +255,7 @@ test "Default profile rejects a non-mapping root" {
 ///|
 test "empty string mapping keys are kept" {
   let value = @yaml.parse("\"\": kept\n", origin="app.yaml")
-  @expect.expect(value).to_equal(
-    @config.fields([("", @config.string("kept"))]),
-  )
+  @expect.expect(value).to_equal(@config.fields([("", @config.string("kept"))]))
 }
 
 ///|
@@ -281,10 +279,7 @@ test "signed radix forms stay strings" {
 
 ///|
 test "explicit !!int keeps radix forms" {
-  let value = @yaml.parse(
-    "a: !!int 0x2A\nb: !!int -0o52\n",
-    origin="app.yaml",
-  )
+  let value = @yaml.parse("a: !!int 0x2A\nb: !!int -0o52\n", origin="app.yaml")
   @expect.expect(value).to_equal(
     @config.fields([("a", @config.int(42)), ("b", @config.int(-42))]),
   )

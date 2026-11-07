@@ -5,7 +5,7 @@ import {
 
 import {
   "moonrockz/moon-lander-logging" @logging,
-  "moonrockz/moon-lander-logging/formatting" @formatting,
+  "moonrockz/moon-lander-logging/formatting",
   "moonbitlang/core/json",
   "moonbitlang/core/double",
 } for "test"

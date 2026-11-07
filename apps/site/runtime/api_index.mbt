@@ -14,7 +14,9 @@ fn resolve_api_index(
     if url == api_index_marker {
       base.text() + "api/"
     } else if url.has_prefix("moon-lander-route://") {
-      problems.push(@model.problem(file, "unknown site compatibility route: \{url}"))
+      problems.push(
+        @model.problem(file, "unknown site compatibility route: \{url}"),
+      )
       url
     } else {
       url
@@ -42,7 +44,11 @@ async fn finish_api_links(
         if html.contains(api_index_marker) {
           guard @fs.exists(out + "/api/index.html") &&
             @fs.kind(out + "/api/index.html", follow_symlink=false) is Regular else {
-            raise @model.Invalid([@model.problem(rel, "API index compatibility link requires generated api/index.html")])
+            raise @model.Invalid([
+              @model.problem(
+                rel, "API index compatibility link requires generated api/index.html",
+              ),
+            ])
           }
         }
         let result = resolve_api_index(rel, html, base)

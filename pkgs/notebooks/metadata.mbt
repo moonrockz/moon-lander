@@ -1,10 +1,11 @@
 ///|
 /// A metadata shape or format-conversion failure.
+#derive(Eq, Debug)
 pub(all) suberror MetadataError {
   ExpectedObject
   InvalidKey(String)
   NotJson(path~ : String, reason~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MetadataError with Eq::{equal, not_equal}
@@ -24,9 +25,10 @@ pub fn MetadataError::message(self : MetadataError) -> String {
 ///|
 /// Immutable Ion metadata with unique, textual top-level field names.
 /// Import and export copy nested containers and annotations defensively.
+#derive(Debug)
 struct Metadata {
   value : @ion.Ion
-} derive(Debug)
+}
 
 ///|
 pub impl Eq for Metadata with fn equal(self, other) {
@@ -44,9 +46,12 @@ fn copy_metadata_ion(value : @ion.Ion) -> @ion.Ion {
   let kind = match value.kind() {
     List(items) => @ion.IonValueKind::List(items.map(copy_metadata_ion))
     Sexp(items) => @ion.IonValueKind::Sexp(items.map(copy_metadata_ion))
-    Struct(fields) => @ion.IonValueKind::Struct(fields.map(field => {
-      @ion.Field::from_token(field.name(), copy_metadata_ion(field.value()))
-    }))
+    Struct(fields) =>
+      @ion.IonValueKind::Struct(
+        fields.map(field => {
+          @ion.Field::from_token(field.name(), copy_metadata_ion(field.value()))
+        }),
+      )
     scalar => scalar
   }
   @ion.Ion(kind).with_annotations(value.annotations().copy())
@@ -99,16 +104,20 @@ pub fn Metadata::get(self : Metadata, key : String) -> @ion.Ion? {
 ///|
 /// Explicit JSON lookup. Raise NotJson if the selected value needs Ion's
 /// richer types; None still means the key is absent.
-pub fn Metadata::get_json(self : Metadata, key : String) -> Json? raise MetadataError {
+pub fn Metadata::get_json(
+  self : Metadata,
+  key : String,
+) -> Json? raise MetadataError {
   self.get(key).map(value => metadata_json(value, "$." + key))
 }
 
 ///|
 pub fn Metadata::keys(self : Metadata) -> ReadOnlyArray[String] {
   match self.value.kind() {
-    Struct(fields) => ReadOnlyArray::from_iter(fields.iter().map(field => {
-      field.name().text().unwrap()
-    }))
+    Struct(fields) =>
+      ReadOnlyArray::from_iter(
+        fields.iter().map(field => field.name().text().unwrap()),
+      )
     _ => []
   }
 }
@@ -154,9 +163,8 @@ fn metadata_json(value : @ion.Ion, path : String) -> Json raise MetadataError {
       }
       Json::object(result)
     }
-    List(items) => Json::array(items.mapi((i, item) => {
-      metadata_json(item, "\{path}[\{i}]")
-    }))
+    List(items) =>
+      Json::array(items.mapi((i, item) => metadata_json(item, "\{path}[\{i}]")))
     Decimal(decimal) => {
       // Keep exponent notation compact rather than expanding large powers
       // into millions of zeroes during automatic DIB format selection.

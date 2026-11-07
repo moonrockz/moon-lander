@@ -163,10 +163,16 @@ test "containment is name by name and needs the same root" {
 ///|
 test "the common directory of paths" {
   @expect.expect(
-    @config.FileTreePath::common_dir([path("/w/a.toml"), path("/w/.config/a.toml")]),
+    @config.FileTreePath::common_dir([
+      path("/w/a.toml"),
+      path("/w/.config/a.toml"),
+    ]),
   ).to_equal(Some(path("/w")))
   @expect.expect(
-    @config.FileTreePath::common_dir([path("C:/a.toml"), path("C:/.config/a.toml")]),
+    @config.FileTreePath::common_dir([
+      path("C:/a.toml"),
+      path("C:/.config/a.toml"),
+    ]),
   ).to_equal(Some(path("C:/")))
   @expect.expect(
     @config.FileTreePath::common_dir([path("C:/a.toml"), path("D:/a.toml")]),
@@ -179,9 +185,9 @@ test "Native Windows source path" {
   @expect.expect(
     @config.FileTreePath::from_native("C:\\cfg\\app.toml", Windows).to_string(),
   ).to_equal("C:/cfg/app.toml")
-  @expect.expect(
-    @config.FileTreePath::from_native("C:/cfg/app.toml", Windows),
-  ).to_equal(path("C:/cfg/app.toml"))
+  @expect.expect(@config.FileTreePath::from_native("C:/cfg/app.toml", Windows)).to_equal(
+    path("C:/cfg/app.toml"),
+  )
   // A Linux file name can hold `\`, so only Windows converts it.
   try @config.FileTreePath::from_native("/w/a\\b", Linux) catch {
     InvalidFilePath(rule~, ..) => @expect.expect(rule).to_equal(Backslash)
@@ -229,7 +235,7 @@ test "native text for a file call" {
 
 ///|
 test "paths are map keys and sort by their text" {
-  let map : Map[@config.FileTreePath, Int] = Map([])
+  let map : Map[@config.FileTreePath, Int32] = Map([])
   map[path("/w/a")] = 1
   @expect.expect(map.get(path("/w//a/"))).to_equal(Some(1))
   let sorted = [path("/w/b"), path("/w/a")]
@@ -356,8 +362,9 @@ test "a native UNC source keeps its share root through the load" {
     |> @config.file("\\\\server\\share\\acme.toml")
   let file = p("//server/share/acme.toml")
   @expect.expect(needs(@config.load(builder, @config.FileTree::new()))).to_equal([
-    ReadFile(file),
-  ])
+      ReadFile(file),
+    ],
+  )
   @expect.expect(file.root().to_string()).to_equal("//server/share")
 }
 

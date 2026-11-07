@@ -15,10 +15,10 @@ async fn main {
     is { "moonrockz/moon-lander-moonx": String(checksum), .. } else {
     fail("Missing approved Moonx release archive checksum")
   }
-  for task in ["check:moonx", "check:moonx-stock16"] {
-    assert_eq(
-      @process.run("mise", ["run", task, "--", "--published-checksum", checksum]),
-      0,
-    )
-  }
+  assert_eq(
+    @process.run("mise", [
+      "run", "check:moonx", "--", "--published-checksum", checksum,
+    ]),
+    0,
+  )
 }

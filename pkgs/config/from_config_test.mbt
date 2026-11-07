@@ -29,7 +29,7 @@ struct Billing {
 }
 
 ///|
-impl @config.FromConfig for Billing with from_config(node) {
+impl @config.FromConfig for Billing with fn from_config(node) {
   {
     rate: node.get("rate"),
     starts: node.get("starts"),
@@ -75,7 +75,10 @@ test "bind a hand-written FromConfig record" {
   @expect.expect(billing.lock.value).to_equal("deps.lock")
   guard billing.lock.blame is Set([origin]) else { fail("expected one origin") }
   @expect.expect(origin.location).to_equal(Some("/repo/morphir.ion"))
-  @expect.expect(billing.layout).to_equal({ layout: "split", strict_mode: true })
+  @expect.expect(billing.layout).to_equal({
+    layout: "split",
+    strict_mode: true,
+  })
 }
 
 ///|
@@ -114,7 +117,7 @@ test "Int rejects a fraction and Int64 keeps a large integer" {
     ),
   ])
   let (path, text) = exact_failure(() => {
-    let _ : Int = config |> @config.bind_with("server.port")
+    let _ : Int32 = config |> @config.bind_with("server.port")
   })
   @expect.expect(path).to_equal("server.port")
   @expect.expect(text).to_equal(
@@ -123,7 +126,7 @@ test "Int rejects a fraction and Int64 keeps a large integer" {
   let max : Int64 = config |> @config.bind_with("limits.max")
   @expect.expect(max).to_equal(9007199254740993L)
   let (_, text) = exact_failure(() => {
-    let _ : Int = config |> @config.bind_with("limits.big")
+    let _ : Int32 = config |> @config.bind_with("limits.big")
   })
   @expect.expect(text).to_equal(
     "limits.big: the integer is out of range for Int (set in project /repo/morphir.toml)",
@@ -194,25 +197,25 @@ test "options, lists and maps decode their parts" {
       ),
     ),
   ])
-  let missing : Int? = config |> @config.bind_with("timeout")
+  let missing : Int32? = config |> @config.bind_with("timeout")
   @expect.expect(missing).to_equal(None)
-  let labels : Map[String, Int] = config |> @config.bind_with("labels")
+  let labels : Map[String, Int32] = config |> @config.bind_with("labels")
   @expect.expect(labels).to_equal({ "team": 1, "eu.west": 2 })
   let (path, text) = exact_failure(() => {
-    let _ : Array[Int] = config |> @config.bind_with("ports")
+    let _ : Array[Int32] = config |> @config.bind_with("ports")
   })
   @expect.expect(path).to_equal("ports[2]")
   @expect.expect(text).to_equal(
     "ports[2]: expected int, found string (set in workspace-member /repo/app/morphir.toml)",
   )
   let (_, text) = exact_failure(() => {
-    let _ : Array[Int] = config |> @config.bind_with("labels")
+    let _ : Array[Int32] = config |> @config.bind_with("labels")
   })
   @expect.expect(text).to_equal(
     "labels: expected list, found struct (table set in workspace-member /repo/app/morphir.toml)",
   )
   let (_, text) = exact_failure(() => {
-    let _ : Int = config |> @config.bind_with("server.port")
+    let _ : Int32 = config |> @config.bind_with("server.port")
   })
   @expect.expect(text).to_equal("server.port: no value (not set by any source)")
 }
@@ -224,7 +227,7 @@ struct Probe {
 }
 
 ///|
-impl @config.FromConfig for Probe with from_config(node) {
+impl @config.FromConfig for Probe with fn from_config(node) {
   let lines = []
   for item in node.items() {
     let name : String = item.get("name")
@@ -263,8 +266,8 @@ struct Service {
 }
 
 ///|
-impl @config.FromConfig for Service with from_config(node) {
-  { url: node.get("url"), token: node.get("token") }
+impl @config.FromConfig for Service with fn from_config(node) {
+  { url: node.get("url"), token: node.get("token"), }
 }
 
 ///|
@@ -303,8 +306,8 @@ struct JsonPart {
 }
 
 ///|
-impl @config.FromConfig for JsonPart with from_config(node) {
-  { part: node.json() }
+impl @config.FromConfig for JsonPart with fn from_config(node) {
+  { part: node.json(), }
 }
 
 ///|

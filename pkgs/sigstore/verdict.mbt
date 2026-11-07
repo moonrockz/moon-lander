@@ -1,5 +1,6 @@
 ///|
 /// A valid bundle feature that this verifier does not support yet.
+#derive(Eq, Debug)
 pub enum Feature {
   /// The content is signed by a key that the bundle names by a hint, not by a
   /// certificate (managed keys).
@@ -16,7 +17,7 @@ pub enum Feature {
   KeyType(String)
   /// A message digest algorithm other than SHA-256.
   DigestAlgorithm(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Feature with Eq::{equal, not_equal}
@@ -27,6 +28,7 @@ pub extend Feature with @debug.Debug::{to_repr}
 ///|
 /// A check of the verification pipeline that failed, with the detail that a
 /// user needs.
+#derive(Eq, Debug)
 pub enum Failure {
   /// The bundle is well-formed JSON but has a shape that verification refuses.
   BundleShape(String)
@@ -51,7 +53,11 @@ pub enum Failure {
   /// The leaf certificate cannot be read or used.
   Certificate(CertificateProblem)
   /// The leaf certificate was not valid at the integrated time.
-  CertificateValidity(not_before~ : Instant, not_after~ : Instant, time~ : Instant)
+  CertificateValidity(
+    not_before~ : Instant,
+    not_after~ : Instant,
+    time~ : Instant
+  )
   /// No trusted certificate authority issued the leaf at the integrated time.
   CertificateChain(String)
   /// No embedded signed certificate timestamp verifies.
@@ -66,7 +72,7 @@ pub enum Failure {
   ArtifactDigestMismatch(ArtifactDigest)
   /// The certificate matches no policy; one reason for each policy.
   Policy(Array[PolicyMismatch])
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Failure with Eq::{equal, not_equal}
@@ -76,6 +82,7 @@ pub extend Failure with @debug.Debug::{to_repr}
 
 ///|
 /// Why the leaf certificate cannot be used.
+#derive(Eq, Debug)
 pub enum CertificateProblem {
   /// The certificate, its key or a Fulcio extension cannot be read; the text
   /// gives the rule.
@@ -89,7 +96,7 @@ pub enum CertificateProblem {
   UnknownCriticalExtension(String)
   /// The leaf is a certificate authority.
   LeafIsAuthority
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CertificateProblem with Eq::{equal, not_equal}
@@ -104,7 +111,8 @@ pub fn CertificateProblem::message(self : CertificateProblem) -> String {
     Unreadable(rule) => rule
     NotForCodeSigning => "the leaf is not for code signing"
     NoDigitalSignature => "the leaf key usage does not allow digital signatures"
-    UnknownCriticalExtension(oid) => "the leaf has the unknown critical extension \{oid}"
+    UnknownCriticalExtension(oid) =>
+      "the leaf has the unknown critical extension \{oid}"
     LeafIsAuthority => "the leaf is a certificate authority"
   }
 }
@@ -112,10 +120,11 @@ pub fn CertificateProblem::message(self : CertificateProblem) -> String {
 ///|
 /// Why a bundle was not verified: a valid feature that is not supported, or
 /// a check that failed.
+#derive(Eq, Debug)
 pub enum Rejection {
   Unsupported(Feature)
   Invalid(Failure)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Rejection with Eq::{equal, not_equal}
@@ -149,7 +158,8 @@ pub fn Rejection::message(self : Rejection) -> String {
         Checkpoint(text) => "checkpoint: \{text}"
         Timestamp(text) => "timestamp: \{text}"
         TimestampAuthority(text) => "timestamp authority: \{text}"
-        TimestampTime(time~, now~) => "the timestamp time \{time} is after now (\{now})"
+        TimestampTime(time~, now~) =>
+          "the timestamp time \{time} is after now (\{now})"
         Certificate(problem) => "certificate: \{problem.message()}"
         CertificateValidity(not_before~, not_after~, time~) =>
           "the certificate is valid from \{not_before} to \{not_after}, not at \{time}"
@@ -169,11 +179,12 @@ pub fn Rejection::message(self : Rejection) -> String {
 
 ///|
 /// One subject of an in-toto statement.
+#derive(Eq, Debug)
 pub struct Subject {
   name : String
   /// The SHA-256 digest, when the subject has one.
   sha256 : ArtifactDigest?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Subject with Eq::{equal, not_equal}
@@ -183,13 +194,14 @@ pub extend Subject with @debug.Debug::{to_repr}
 
 ///|
 /// The in-toto statement of a verified DSSE bundle.
+#derive(Eq, Debug)
 pub struct Statement {
   predicate_type : PredicateType
   priv predicate : Json
   subjects : Array[Subject]
   /// The exact payload bytes that the signature covers.
   payload : Bytes
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Statement with Eq::{equal, not_equal}
@@ -208,12 +220,13 @@ pub extend Statement with @debug.Debug::{to_repr}
 
 ///|
 /// What gave a verified time.
+#derive(Eq, Debug)
 pub enum TimeSource {
   /// The signed entry timestamp of a transparency log entry.
   Log(log_id~ : Bytes, log_index~ : Int64)
   /// An RFC 3161 timestamp of the authority with this URI.
   Authority(uri~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TimeSource with Eq::{equal, not_equal}
@@ -223,10 +236,11 @@ pub extend TimeSource with @debug.Debug::{to_repr}
 
 ///|
 /// A time at which the bundle was signed, and what gave it.
+#derive(Eq, Debug)
 pub struct VerifiedTime {
   time : Instant
   source : TimeSource
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VerifiedTime with Eq::{equal, not_equal}
@@ -236,17 +250,18 @@ pub extend VerifiedTime with @debug.Debug::{to_repr}
 
 ///|
 /// The facts of a verified bundle.
+#derive(Eq, Debug)
 pub struct VerifiedBundle {
   /// The statement of a DSSE bundle; `None` for a message signature.
   statement : Statement?
   /// The index of the policy that matched: 0 for the first policy, then the
   /// alternatives in order.
-  policy_index : Int
+  policy_index : Int32
   claims : CertificateClaims
   /// Each verified time, in the order: log entries, then timestamps. The
   /// leaf certificate was valid at each one.
   times : Array[VerifiedTime]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VerifiedBundle with Eq::{equal, not_equal}
@@ -256,10 +271,11 @@ pub extend VerifiedBundle with @debug.Debug::{to_repr}
 
 ///|
 /// The result of a verification.
+#derive(Eq, Debug)
 pub enum Verdict {
   Verified(VerifiedBundle)
   Rejected(Rejection)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Verdict with Eq::{equal, not_equal}

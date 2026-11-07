@@ -21,12 +21,18 @@ priv suberror DisplayRequested {
 /// The driver supplies the resolved variable snapshot, shared by all readers.
 /// A parse error raises `UsageError`. A help or version request raises
 /// `DisplayRequested`. The parse never ends the process.
-fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, String]) -> ParsedArguments raise {
+fn[S] parse_arguments(
+  host : Host[S],
+  env~ : @sorted_map.SortedMap[String, String],
+) -> ParsedArguments raise {
   let command = match host.make_command {
     Some(make) => make(host.name.to_string())
     None => @argparse.Command(host.name.to_string())
   }
-  let parsed = command.try_parse(argv=host.args[:], env=Map::from_iter(env.iter())) catch {
+  let parsed = command.try_parse(
+    argv=host.args[:],
+    env=Map::from_iter(env.iter()),
+  ) catch {
     error => raise UsageError(error.to_string())
   }
   let matches = match parsed {
@@ -41,22 +47,42 @@ fn[S] parse_arguments(host : Host[S], env~ : @sorted_map.SortedMap[String, Strin
   let project = standard_option(matches, "project")
   let isolated = matches.flags.get("isolated").unwrap_or(false)
   let profiles = profile_options(matches)
-  let overrides = if host.mappings.is_empty() { None } else { Some(to_overrides(matches, host.mappings)) }
-  { matches, discovery_options: @conventions.DiscoveryOptions::new(environment?, config~, isolated~, project?, profiles~), overrides }
+  let overrides = if host.mappings.is_empty() {
+    None
+  } else {
+    Some(to_overrides(matches, host.mappings))
+  }
+  {
+    matches,
+    discovery_options: @conventions.DiscoveryOptions::new(
+      environment?,
+      config~,
+      isolated~,
+      project?,
+      profiles~,
+    ),
+    overrides,
+  }
 }
 
 ///|
 /// Standard profile lists are parsed at the argument boundary, including
 /// when no profile policy is enabled. The global argparse result preserves
 /// repeated option order across subcommands.
-fn profile_options(matches : @argparse.Matches) -> @config.ProfileSelection raise UsageError {
+fn profile_options(
+  matches : @argparse.Matches,
+) -> @config.ProfileSelection raise UsageError {
   let values = matches.values.get("profiles").unwrap_or([])
   let disabled = matches.flags.get("no-profiles").unwrap_or(false)
   if disabled && !values.is_empty() {
     raise UsageError("--no-profiles conflicts with --profiles")
   }
-  if disabled { return Disabled }
-  if values.is_empty() { return Unspecified }
+  if disabled {
+    return Disabled
+  }
+  if values.is_empty() {
+    return Unspecified
+  }
   let names = []
   for value in values {
     let parsed = @config.ProfileNames::parse_csv(value, origin=Discovery) catch {
@@ -71,15 +97,24 @@ fn profile_options(matches : @argparse.Matches) -> @config.ProfileSelection rais
 /// Empty standard values fail at the argument boundary. The host resolves and
 /// parses the environment name next. Config and project selectors keep
 /// conventions text.
-fn standard_option(matches : @argparse.Matches, id : String) -> String? raise UsageError {
+fn standard_option(
+  matches : @argparse.Matches,
+  id : String,
+) -> String? raise UsageError {
   guard matches.values.get(id) is Some([.., value]) else { return None }
-  if value.is_empty() { raise UsageError("--\{id} requires a non-empty value") }
+  if value.is_empty() {
+    raise UsageError("--\{id} requires a non-empty value")
+  }
   Some(value)
 }
 
 ///|
 /// Set the command factory. The run gives it the application name and parses
 /// its command once, before configuration and hooks.
-pub fn[S] command(builder : HostBuilder[S], make : (String) -> @argparse.Command, mappings? : Array[Mapping] = []) -> HostBuilder[S] {
-  { ..builder, make_command: Some(make), mappings: mappings.copy() }
+pub fn[S] command(
+  builder : HostBuilder[S],
+  make : (String) -> @argparse.Command,
+  mappings~ : Array[Mapping] = [],
+) -> HostBuilder[S] {
+  { ..builder, make_command: Some(make), mappings: mappings.copy(), }
 }

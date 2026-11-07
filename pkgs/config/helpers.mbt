@@ -1,10 +1,11 @@
 ///|
 /// The text form of a show helper.
+#derive(Eq, Debug)
 pub(all) enum ShowFormat {
   Toml
   Json
   Ion
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ShowFormat with Eq::{equal, not_equal}
@@ -47,13 +48,13 @@ pub fn get_json(config : Config, key : String) -> Json raise ConfigError {
 pub fn show(config : Config, format : ShowFormat) -> String raise ConfigError {
   let redacted = redact(config.root)
   match format {
-    Json => show_json_value(redacted, { names: ["(root)"] }).stringify()
+    Json => show_json_value(redacted, { names: ["(root)"], }).stringify()
     Ion =>
       @ion_text.write_ion(redacted.ion) catch {
         err =>
           raise Render(
             format="Ion",
-            key={ names: ["(root)"] },
+            key={ names: ["(root)"], },
             reason=err.message(),
           )
       }
@@ -121,7 +122,7 @@ pub fn explain(
   if value.ion.kind() is Struct(_) &&
     !is_secret_reference(value, config.secret_syntax) {
     return leaves(value, secret_syntax=config.secret_syntax).map(leaf => {
-      let full = { names: [..path.names, ..leaf.0.names] }
+      let full = { names: [..path.names, ..leaf.0.names], }
       (full, config.origins(full))
     })
   }
@@ -129,7 +130,10 @@ pub fn explain(
 }
 
 ///|
-fn redacted_at(config : Config, path : KeyPath) -> ConfigValue raise ConfigError {
+fn redacted_at(
+  config : Config,
+  path : KeyPath,
+) -> ConfigValue raise ConfigError {
   let redacted = redact(config.root)
   guard redacted.at(path.names) is Some(value) else {
     raise KeyNotFound(key=path)
@@ -149,14 +153,16 @@ fn status_text(status : SourceStatus) -> String {
 ///|
 fn warning_text(warning : ConfigWarning) -> String {
   match warning {
-    KeyRemoved(key, origin) =>
-      "removed key \{key} from \{origin_text(origin)}"
+    KeyRemoved(key, origin) => "removed key \{key} from \{origin_text(origin)}"
     Note(source~, message~) => "\{source}: \{message}"
   }
 }
 
 ///|
-fn show_json_value(value : ConfigValue, path : KeyPath) -> Json raise ConfigError {
+fn show_json_value(
+  value : ConfigValue,
+  path : KeyPath,
+) -> Json raise ConfigError {
   match value.ion.kind() {
     Null(_) => Json::null()
     Bool(flag) => Json::boolean(flag)
@@ -175,18 +181,16 @@ fn show_json_value(value : ConfigValue, path : KeyPath) -> Json raise ConfigErro
     Timestamp(stamp) => Json::string(stamp.to_ion_string())
     Symbol(token) => Json::string(token.text().unwrap_or(""))
     String(text) => Json::string(text)
-    Blob(bytes) | Clob(bytes) =>
-      Json::string(@base64.encode(bytes[:]))
+    Blob(bytes) | Clob(bytes) => Json::string(@base64.encode(bytes[:]))
     List(items) | Sexp(items) =>
-      Json::array(items.map(item => show_json_value({ ion: item }, path)))
+      Json::array(items.map(item => show_json_value({ ion: item, }, path)))
     Struct(fields) => {
       let object : Map[String, Json] = Map([])
       for field in fields {
         let name = field.name().text().unwrap_or("")
-        object[name] = show_json_value(
-          { ion: field.value() },
-          { names: [..path.names, name] },
-        )
+        object[name] = show_json_value({ ion: field.value(), }, {
+          names: [..path.names, name],
+        })
       }
       Json::object(object)
     }
@@ -240,9 +244,9 @@ fn to_toml_value(
   path : Array[String],
 ) -> @toml_lib.TomlValue raise ConfigError {
   let key : KeyPath = if path.is_empty() {
-    { names: ["(root)"] }
+    { names: ["(root)"], }
   } else {
-    { names: path.copy() }
+    { names: path.copy(), }
   }
   match value.ion.kind() {
     Null(_) => raise Render(format="TOML", key~, reason="TOML cannot hold null")
@@ -264,7 +268,7 @@ fn to_toml_value(
             reason="TOML cannot hold null in a list",
           )
         }
-        out.push(to_toml_value({ ion: item }, path))
+        out.push(to_toml_value({ ion: item, }, path))
       }
       @toml_lib.TomlArray(out)
     }
@@ -272,7 +276,7 @@ fn to_toml_value(
       let table : Map[String, @toml_lib.TomlValue] = Map([])
       for field in fields {
         let name = field.name().text().unwrap_or("")
-        table[name] = to_toml_value({ ion: field.value() }, [..path, name])
+        table[name] = to_toml_value({ ion: field.value(), }, [..path, name])
       }
       @toml_lib.TomlTable(table)
     }

@@ -42,7 +42,9 @@ fn project() -> (Mount, Map[String, String]) raise {
     "https://example.org/project/",
     {
       "version": 1,
-      "files": ["acme.toml", "acme.local.toml", "acme.user.toml", "src/main.mbt"],
+      "files": [
+        "acme.toml", "acme.local.toml", "acme.user.toml", "src/main.mbt",
+      ],
     },
     root="/workspace",
   )
@@ -125,10 +127,11 @@ test "a narrower caller boundary stops discovery below the mount root" {
 
 ///|
 test "browser rules check the source spelling before the load parses it" {
-  for text in [
-    "/workspace/./acme.toml", "/workspace//acme.toml", "/workspace\\acme.toml",
-    "/workspace/../acme.toml", "./acme.toml", "C:/acme.toml", "conf//app.toml",
-  ] {
+  for
+    text in [
+      "/workspace/./acme.toml", "/workspace//acme.toml", "/workspace\\acme.toml",
+      "/workspace/../acme.toml", "./acme.toml", "C:/acme.toml", "conf//app.toml",
+    ] {
     let builder = @config.builder()
       |> @config.platform(Windows)
       |> @config.file(text)

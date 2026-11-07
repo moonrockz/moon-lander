@@ -1,6 +1,6 @@
 import {
   "moonrockz/moon-lander-core" @lander_core,
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
   "moonrockz/ion/json" @ion_json,
   "moonrockz/ion/text" @ion_text,
   "moonbit-community/toml" @toml_lib,
@@ -10,7 +10,7 @@ import {
   "moonbitlang/core/int64",
   "moonbitlang/core/uint64",
   "moonbitlang/core/bigint",
-  "moonbitlang/core/encoding/base64" @base64,
+  "moonbitlang/core/encoding/base64",
 }
 
 import {
@@ -21,7 +21,7 @@ import {
   "moonrockz/moon-lander-config/parsers/ion" @ion_format,
   "moonbitlang/core/bigint",
   "moonbitlang/core/json",
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/quickcheck/shrink",
 } for "test"

@@ -1,11 +1,15 @@
 ///|
 /// A malformed tree declaration or unsupported export kernel. Declaration
 /// coordinates use a zero-based cell index and one-based normalized source line.
+#derive(Eq, Debug)
 pub(all) suberror DeclarationError {
-  InvalidDeclaration(cell~ : Int, line~ : Int, text~ : String)
+  InvalidDeclaration(cell~ : Int32, line~ : Int32, text~ : String)
   ReservedKernel(@source_dib.KernelName)
-  NonCanonicalKernel(name~ : @source_dib.KernelName, canonical~ : @source_dib.KernelName)
-} derive(Eq, Debug)
+  NonCanonicalKernel(
+    name~ : @source_dib.KernelName,
+    canonical~ : @source_dib.KernelName
+  )
+}
 
 ///|
 pub extend DeclarationError with Eq::{equal, not_equal}
@@ -22,10 +26,14 @@ struct Format {
 
 ///|
 /// Configure the default kernel and lossless tree transport once.
-pub fn Format::new(default? : &@source_dib.KernelDescriptor) -> Format raise @source_dib.FormatError {
-  let codec = @source_dib.Codec::lossless(default?)
-    .with_kernel(@source_dib.KernelInfo(@source_dib.KernelName("tree")))
-  let codec = if codec.registry().resolve("text") == Some(@source_dib.KernelName("text")) {
+pub fn Format::new(
+  default? : &@source_dib.KernelDescriptor,
+) -> Format raise @source_dib.FormatError {
+  let codec = @source_dib.Codec::lossless(default?).with_kernel(
+    @source_dib.KernelInfo(@source_dib.KernelName("tree")),
+  )
+  let codec = if codec.registry().resolve("text") ==
+    Some(@source_dib.KernelName("text")) {
     codec
   } else {
     codec.with_kernel(@source_dib.KernelInfo(@source_dib.KernelName("text")))
@@ -66,8 +74,8 @@ pub fn Format::file(
 fn declaration_path(
   text : String,
   command : String,
-  cell : Int,
-  line : Int,
+  cell : Int32,
+  line : Int32,
 ) -> @files.TreePath raise {
   guard text.has_prefix(command + " ") || text.has_prefix(command + "\t") else {
     raise InvalidDeclaration(cell~, line~, text~)
@@ -77,7 +85,9 @@ fn declaration_path(
     let json = @json.parse(argument) catch {
       _ => raise InvalidDeclaration(cell~, line~, text~)
     }
-    guard json is String(value) else { raise InvalidDeclaration(cell~, line~, text~) }
+    guard json is String(value) else {
+      raise InvalidDeclaration(cell~, line~, text~)
+    }
     value
   } else {
     argument
@@ -100,15 +110,31 @@ pub fn Format::from_notebook(
     let lines = source.split("\n").to_array()
     if cell.kernel().to_string() == "tree" {
       for index, line in lines {
-        if line.is_empty() { continue }
-        directories.push(declaration_path(line.to_owned(), "#!directory", cell_index, index + 1))
+        if line.is_empty() {
+          continue
+        }
+        directories.push(
+          declaration_path(
+            line.to_owned(),
+            "#!directory",
+            cell_index,
+            index + 1,
+          ),
+        )
       }
-    } else if lines[0] == "#!file" || lines[0].has_prefix("#!file ") || lines[0].has_prefix("#!file\t") {
+    } else if lines[0] == "#!file" ||
+      lines[0].has_prefix("#!file ") ||
+      lines[0].has_prefix("#!file\t") {
       let path = declaration_path(lines[0].to_owned(), "#!file", cell_index, 1)
-      files.push(@files.TextFile::new(path, lines[1:].join("\n"), kernel=cell.kernel()))
+      files.push(
+        @files.TextFile::new(path, lines[1:].join("\n"), kernel=cell.kernel()),
+      )
     }
   }
-  @files.FileTree::new(ReadOnlyArray::from_array(files[:]), directories=ReadOnlyArray::from_array(directories[:]))
+  @files.FileTree::new(
+    ReadOnlyArray::from_array(files[:]),
+    directories=ReadOnlyArray::from_array(directories[:]),
+  )
 }
 
 ///|
@@ -126,22 +152,30 @@ pub fn Format::to_notebook(
 ) -> @source_dib.Notebook raise {
   let cells = []
   if !tree.explicit_directories().is_empty() {
-    let manifest = tree.explicit_directories().map(path => {
-      "#!directory " + Json(path.to_string()).stringify()
-    }).join("\n")
+    let manifest = tree
+      .explicit_directories()
+      .map(path => "#!directory " + Json(path.to_string()).stringify())
+      .join("\n")
     cells.push(self.codec.cell(manifest, kernel=@source_dib.KernelName("tree")))
   }
   for file in tree.files() {
     if file.kernel().to_string() == "tree" {
       raise ReservedKernel(file.kernel())
     }
-    if self.codec.registry().resolve(file.kernel().to_string()) is Some(canonical) && canonical != file.kernel() {
+    if self.codec.registry().resolve(file.kernel().to_string())
+      is Some(canonical) &&
+      canonical != file.kernel() {
       raise NonCanonicalKernel(name=file.kernel(), canonical~)
     }
-    cells.push(self.codec.cell(
-      "#!file " + Json(file.path().to_string()).stringify() + "\n" + file.source(),
-      kernel=file.kernel(),
-    ))
+    cells.push(
+      self.codec.cell(
+        "#!file " +
+        Json(file.path().to_string()).stringify() +
+        "\n" +
+        file.source(),
+        kernel=file.kernel(),
+      ),
+    )
   }
   self.codec.notebook(ReadOnlyArray::from_array(cells[:]))
 }
@@ -154,7 +188,11 @@ pub fn Format::write(self : Format, tree : @files.FileTree) -> String raise {
 }
 
 ///|
-pub impl @files.TreeFormat for Format with fn read(self, text) { self.read(text) }
+pub impl @files.TreeFormat for Format with fn read(self, text) {
+  self.read(text)
+}
 
 ///|
-pub impl @files.TreeFormat for Format with fn write(self, tree) { self.write(tree) }
+pub impl @files.TreeFormat for Format with fn write(self, tree) {
+  self.write(tree)
+}

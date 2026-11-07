@@ -26,17 +26,21 @@ raise `MappingError`; invalid paths or conflicts retain typed tree errors.
 ///|
 test "example: Jupyter file metadata has clean cell source" {
   let format = @tree_ipynb.Format::new()
-  let tree = @files.FileTree::new([
-    @files.TextFile::new(
-      @files.TreePath::parse("src/main.mbt"), "let answer = 42\n",
-      kernel=@source_dib.KernelName("moonbit"),
-    ),
-  ], directories=[@files.TreePath::parse("fixtures/empty")])
+  let tree = @files.FileTree::new(
+    [
+      @files.TextFile::new(
+        @files.TreePath::parse("src/main.mbt"),
+        "let answer = 42\n",
+        kernel=@source_dib.KernelName("moonbit"),
+      ),
+    ],
+    directories=[@files.TreePath::parse("fixtures/empty")],
+  )
   let notebook = format.to_notebook(tree)
   assert_eq(notebook.cells()[0].source(), Some("let answer = 42\n"))
   assert_eq(
     notebook.cells()[0].metadata().get_json("vfs"),
-    Some({ "path": "src/main.mbt", "kernel": "moonbit", }),
+    Some({ "path": "src/main.mbt", "kernel": "moonbit" }),
   )
   assert_eq(format.read(format.write(tree)), tree)
 }

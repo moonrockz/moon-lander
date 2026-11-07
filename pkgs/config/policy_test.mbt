@@ -2,12 +2,13 @@
 test "Append lists" {
   let config = @config.build([
     named({ "plugins": ["a"] }, "base"),
-    named({ "plugins": ["b"] }, "overlay").with_key_policy(key("plugins"), Append),
+    named({ "plugins": ["b"] }, "overlay").with_key_policy(
+      key("plugins"),
+      Append,
+    ),
   ])
   @expect.expect(config.value()).to_equal(
-    tree([
-      ("plugins", @config.list([@config.string("a"), @config.string("b")])),
-    ]),
+    tree([("plugins", @config.list([@config.string("a"), @config.string("b")]))]),
   )
 }
 
@@ -31,21 +32,11 @@ test "Key path policy beats source policy" {
 test "Merge by key" {
   let config = @config.build([
     named(
-      {
-        "servers": [
-          { "name": "a", "port": 1 },
-          { "name": "b", "port": 2 },
-        ],
-      },
+      { "servers": [{ "name": "a", "port": 1 }, { "name": "b", "port": 2 }] },
       "base",
     ),
     named(
-      {
-        "servers": [
-          { "name": "b", "port": 3 },
-          { "name": "c", "port": 4 },
-        ],
-      },
+      { "servers": [{ "name": "b", "port": 3 }, { "name": "c", "port": 4 }] },
       "overlay",
     ).with_key_policy(key("servers"), MergeByKey("name")),
   ])
@@ -93,9 +84,10 @@ test "Appended list has all contributors" {
     named({ "plugins": ["a"] }, "a"),
     named({ "plugins": ["b"] }, "b").with_key_policy(key("plugins"), Append),
   ])
-  @expect.expect(
-    config.origins(key("plugins")).map(origin => origin.source),
-  ).to_equal(["a", "b"])
+  @expect.expect(config.origins(key("plugins")).map(origin => origin.source)).to_equal([
+      "a", "b",
+    ],
+  )
 }
 
 ///|
@@ -120,7 +112,10 @@ test "law: provenance entries are never empty" {
 }
 
 ///|
-fn named_value(value : @config.ConfigValue, name : String) -> @config.ConfigSource {
+fn named_value(
+  value : @config.ConfigValue,
+  name : String,
+) -> @config.ConfigSource {
   @config.in_memory(value, name~) catch {
     error => abort(error.message())
   }
@@ -132,12 +127,7 @@ test "Merge-by-key rejects a repeated key in one overlay list" {
     @config.build([
       named({ "servers": [{ "name": "a", "port": 1 }] }, "base"),
       named(
-        {
-          "servers": [
-            { "name": "b", "port": 2 },
-            { "name": "b", "port": 3 },
-          ],
-        },
+        { "servers": [{ "name": "b", "port": 2 }, { "name": "b", "port": 3 }] },
         "overlay",
       ).with_key_policy(key("servers"), MergeByKey("name")),
     ])
@@ -159,9 +149,13 @@ test "Merge-by-key rejects a repeated key in one overlay list" {
 test "a list policy replacing a scalar keeps one origin" {
   let config = @config.build([
     named({ "plugins": "alone" }, "base"),
-    named({ "plugins": ["b"] }, "overlay").with_key_policy(key("plugins"), Append),
+    named({ "plugins": ["b"] }, "overlay").with_key_policy(
+      key("plugins"),
+      Append,
+    ),
   ])
-  @expect.expect(
-    config.origins(key("plugins")).map(origin => origin.source),
-  ).to_equal(["overlay"])
+  @expect.expect(config.origins(key("plugins")).map(origin => origin.source)).to_equal([
+      "overlay",
+    ],
+  )
 }

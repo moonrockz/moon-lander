@@ -7,15 +7,15 @@ import {
   // Vendored moonbitlang/core/argparse until a pinned MoonBit has
   // Command::try_parse (lander-4us.5.18). The alias stays, so the return changes
   // only this line.
-  "moonrockz/moon-lander-hosting/vendor/argparse" @argparse,
+  "moonrockz/moon-lander-hosting/vendor/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/immut/sorted_map",
   "moonbitlang/core/debug",
   "moonbitlang/async",
   "moonbitlang/async/stdio",
   "moonbitlang/async/js_async",
-  "moonbit-community/unicode-data/xid" @xid,
-  "moonbit-community/unicode-data/case_mapping" @case_mapping,
+  "moonbit-community/unicode-data/xid",
+  "moonbit-community/unicode-data/case_mapping",
 }
 
 import {
@@ -42,25 +42,29 @@ import {
 // The pinned build system cannot condition imports by target, so the async and
 // config/host imports are unused on wasm and wasm-gc (29). Remove the override
 // when the imports can be conditional.
+
 warnings = "-29"
 
 // `run` needs the `moonbitlang/async` event loop, which wasm and wasm-gc do not
 // have. Its tests are async tests, which wasm-gc cannot run. `run_embedded`
 // replaces it on wasm and wasm-gc.
-options(targets: {
-  "settings.process.mbt": ["native", "js"],
-  "settings.embedded.mbt": ["wasm", "wasm-gc"],
-  "settings.process_wbtest.mbt": ["native", "js"],
-  "settings.embedded_wbtest.mbt": ["wasm", "wasm-gc"],
-  "run.mbt": ["native", "js"],
-  "run.embedded.mbt": ["wasm", "wasm-gc"],
-  "run.embedded_wbtest.mbt": ["wasm", "wasm-gc"],
-  "report.js_wbtest.mbt": ["js"],
-  "foreign_probe.js_wbtest.mbt": ["js"],
-  "node_fixture.generated.js_wbtest.mbt": ["js"],
-  "run_test.mbt": ["native", "js"],
-  "enclosing_test.mbt": ["native", "js"],
-  "run_wbtest.mbt": ["native", "js"],
-  "shutdown_timeout_wbtest.mbt": ["native", "js"],
-  "signals_wbtest.mbt": ["native", "js"],
-})
+
+options(
+  targets: {
+    "settings.process.mbt": [ "native", "js" ],
+    "settings.embedded.mbt": [ "wasm", "wasm-gc" ],
+    "settings.process_wbtest.mbt": [ "native", "js" ],
+    "settings.embedded_wbtest.mbt": [ "wasm", "wasm-gc" ],
+    "run.mbt": [ "native", "js" ],
+    "run.embedded.mbt": [ "wasm", "wasm-gc" ],
+    "run.embedded_wbtest.mbt": [ "wasm", "wasm-gc" ],
+    "report.js_wbtest.mbt": [ "js" ],
+    "foreign_probe.js_wbtest.mbt": [ "js" ],
+    "node_fixture.generated.js_wbtest.mbt": [ "js" ],
+    "run_test.mbt": [ "native", "js" ],
+    "enclosing_test.mbt": [ "native", "js" ],
+    "run_wbtest.mbt": [ "native", "js" ],
+    "shutdown_timeout_wbtest.mbt": [ "native", "js" ],
+    "signals_wbtest.mbt": [ "native", "js" ],
+  },
+)

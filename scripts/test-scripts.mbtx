@@ -31,20 +31,12 @@ fn feature_name(file : String) -> String? {
 }
 
 ///|
-fn test_arguments(file : String, path : String) -> Array[String] {
-  let args = ["test", "--deny-warn", "--target", "wasm"]
-  // The shared snapshot also supports Moon 0.10.15, which cannot parse
-  // frontmatter imports. Permit only that deprecation on this managed file.
-  if file == "openspec-ext.mbtx" {
-    args.push("--warn-list")
-    args.push("-96")
-  }
-  args.push(path)
-  args
+fn test_arguments(path : String) -> Array[String] {
+  ["test", "--deny-warn", "--target", "wasm", path]
 }
 
 ///|
-async test "legacy import compatibility stays limited to the shared snapshot" {
+async test "a script with legacy imports fails its tests" {
   let dir = @fs.tmpdir(prefix="lander-script-warnings")
   defer @fs.rmdir(dir, recursive=true)
   let path = "\{dir}/legacy.mbtx"
@@ -56,14 +48,9 @@ async test "legacy import compatibility stays limited to the shared snapshot" {
       #|test "works" { assert_eq(1, 1) }
     ),
   )
-  let (accepted, out, err) = @process.collect_output(
-    "moon",
-    test_arguments("openspec-ext.mbtx", path),
-  )
-  assert_eq(accepted, 0, msg=out.text() + err.text())
   let (rejected, out, err) = @process.collect_output(
     "moon",
-    test_arguments("other.mbtx", path),
+    test_arguments(path),
   )
   assert_true(rejected != 0)
   assert_true((out.text() + err.text()).contains("unfenced_import"))
@@ -93,7 +80,7 @@ async fn main {
     println("🧪 Testing \{scripts_dir}/\{file}")
     let code = @process.run(
       "moon",
-      test_arguments(file, "\{scripts_dir}/\{file}"),
+      test_arguments("\{scripts_dir}/\{file}"),
       stdout=@stdio.stdout,
       stderr=@stdio.stderr,
     )

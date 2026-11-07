@@ -1,11 +1,12 @@
 ///|
 /// A syntax error offset refers to UTF-16 units in the decoded pattern string.
 /// It is not a span in the JSON source containing that string.
+#derive(Debug)
 pub struct PatternError {
   code : @json.Code
   message : String
   offset : Int32
-} derive(Debug)
+}
 
 ///|
 pub extend PatternError with @debug.Debug::{to_repr}
@@ -26,9 +27,10 @@ pub fn PatternError::offset(self : PatternError) -> Int32 {
 }
 
 ///|
+#derive(Debug)
 priv suberror PatternRead {
   PatternRead(PatternError)
-} derive(Debug)
+}
 
 ///|
 priv struct PatternReader {

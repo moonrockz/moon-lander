@@ -1,4 +1,4 @@
 import {
   "moonrockz/moon-lander-config" @config,
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
 }

@@ -4,6 +4,7 @@ package "moonrockz/moon-lander-hosting"
 import {
   "moonbitlang/core/debug",
   "moonbitlang/core/immut/sorted_map",
+  "moonbitlang/core/json",
   "moonrockz/moon-lander-config",
   "moonrockz/moon-lander-config/conventions",
   "moonrockz/moon-lander-config/profiles",
@@ -64,17 +65,19 @@ pub suberror FileTreeError {
 }
 pub fn FileTreeError::message(Self) -> String
 
+#derive(@debug.Debug)
 pub(all) suberror HostError {
   InvalidServiceName(text~ : String, reason~ : String)
   DuplicateService(name~ : ServiceName, existing~ : ServiceName)
   InvalidExitCode(code~ : Int32)
-} derive(@debug.Debug)
+}
 pub fn HostError::message(Self) -> String
 pub fn HostError::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub suberror MappingError {
   InvalidOverrideOption(input~ : String, reason~ : String)
-} derive(@debug.Debug)
+}
 pub fn MappingError::to_repr(Self) -> @debug.Repr
 
 pub suberror ShutdownTimedOut {
@@ -95,10 +98,11 @@ pub(all) suberror UsageError {
 }
 pub fn UsageError::message(Self) -> String
 
+#derive(@debug.Debug)
 pub suberror WorkingDirectoryError {
   MissingWorkingDirectory
   InvalidWorkingDirectory(@moon-lander-core.AbsolutePathError)
-} derive(@debug.Debug)
+}
 pub fn WorkingDirectoryError::message(Self) -> String
 pub fn WorkingDirectoryError::to_repr(Self) -> @debug.Repr
 
@@ -124,9 +128,10 @@ pub fn[S] Context::cancelled(Self[S]) -> Bool
 pub fn[S] Context::check_cancelled(Self[S]) -> Unit raise StopRequested
 pub fn[S] Context::stop_requested(Self[S]) -> Bool
 
+#derive(Eq, @debug.Debug)
 pub struct ExitCode {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ExitCode::equal(Self, Self) -> Bool
 pub fn ExitCode::failure() -> Self
 pub fn ExitCode::from_int(Int32) -> Self raise HostError
@@ -135,6 +140,7 @@ pub fn ExitCode::success() -> Self
 pub fn ExitCode::to_int(Self) -> Int32
 pub fn ExitCode::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum HookPhase {
   Starting
   Start
@@ -142,7 +148,7 @@ pub(all) enum HookPhase {
   Stopping
   Stop
   Stopped
-} derive(Eq, @debug.Debug)
+}
 pub fn HookPhase::equal(Self, Self) -> Bool
 pub fn HookPhase::not_equal(Self, Self) -> Bool
 pub fn HookPhase::output(Self, &Logger) -> Unit
@@ -192,9 +198,10 @@ pub(all) enum MappingAction {
   Append
 }
 
+#derive(Eq, @debug.Debug)
 pub struct OverrideOption {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn OverrideOption::equal(Self, Self) -> Bool
 pub fn OverrideOption::not_equal(Self, Self) -> Bool
 pub fn OverrideOption::parse(String) -> Self raise MappingError
@@ -208,9 +215,10 @@ pub fn RunOutcome::exit_code(Self) -> ExitCode
 pub fn RunOutcome::failures(Self) -> Array[Error]
 pub fn RunOutcome::stop_reason(Self) -> StopReason
 
+#derive(Eq, Hash, @debug.Debug)
 pub struct ServiceName {
   // private fields
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn ServiceName::equal(Self, Self) -> Bool
 pub fn ServiceName::hash(Self) -> Int32
 pub fn ServiceName::hash_combine(Self, Hasher) -> Unit
@@ -223,11 +231,12 @@ pub fn ServiceName::to_string(Self) -> String
 pub impl Show for ServiceName
 pub impl IntoServiceName for ServiceName
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SignalKind {
   Interrupt
   Terminate
   Quit
-} derive(Eq, @debug.Debug)
+}
 pub fn SignalKind::equal(Self, Self) -> Bool
 pub fn SignalKind::exit_code(Self) -> ExitCode
 pub fn SignalKind::not_equal(Self, Self) -> Bool
@@ -266,8 +275,8 @@ pub type ReportWriter = async (String) -> Unit
 pub trait IntoEnvVars {
   fn into_env_vars(Self) -> Map[String, String] raise UsageError
 }
-pub impl IntoEnvVars for Json
 pub impl IntoEnvVars for Map[String, String]
+pub impl IntoEnvVars for @json.Json
 
 pub trait IntoServiceName {
   fn into_service_name(Self) -> ServiceName raise HostError

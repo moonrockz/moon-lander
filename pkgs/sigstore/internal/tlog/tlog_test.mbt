@@ -75,7 +75,9 @@ test "set_payload is the canonical JSON of the entry" {
   )
   // Base64 padding and characters past 62 are kept as they are.
   assert_eq(
-    text_of(@tlog.set_payload(b"\xfb\xff", 1792133282L, b"\x00\xff", 3275146211L)),
+    text_of(
+      @tlog.set_payload(b"\xfb\xff", 1792133282L, b"\x00\xff", 3275146211L),
+    ),
     "{\"body\":\"+/8=\",\"integratedTime\":1792133282,\"logID\":\"00ff\",\"logIndex\":3275146211}",
   )
 }
@@ -84,9 +86,14 @@ test "set_payload is the canonical JSON of the entry" {
 test "the real signed entry timestamp signs set_payload" {
   let entry = morphir_entry()
   let body = base64(member_text(entry, "canonicalizedBody"))
-  let log_id = base64(member_text(object_at(Json::object(entry), ["logId"]), "keyId"))
+  let log_id = base64(
+    member_text(object_at(Json::object(entry), ["logId"]), "keyId"),
+  )
   let set = base64(
-    member_text(object_at(Json::object(entry), ["inclusionPromise"]), "signedEntryTimestamp"),
+    member_text(
+      object_at(Json::object(entry), ["inclusionPromise"]),
+      "signedEntryTimestamp",
+    ),
   )
   let key = @signature.PublicKey::from_spki(base64(rekor_key))
   assert_eq(log_id, @signature.sha256(key.spki))
@@ -114,7 +121,7 @@ test "leaf and node hashes have the RFC 6962 prefixes" {
 
 ///|
 /// The largest power of two that is less than `n` (n > 1).
-fn split_point(n : Int) -> Int {
+fn split_point(n : Int32) -> Int32 {
   let mut k = 1
   while k * 2 < n {
     k = k * 2
@@ -134,7 +141,7 @@ fn tree_hash(leaves : ArrayView[Bytes]) -> Bytes {
 
 ///|
 /// The RFC 6962 audit path of the leaf at `index`.
-fn audit_path(index : Int, leaves : ArrayView[Bytes]) -> Array[Bytes] {
+fn audit_path(index : Int32, leaves : ArrayView[Bytes]) -> Array[Bytes] {
   if leaves.length() == 1 {
     return []
   }
@@ -151,13 +158,13 @@ fn audit_path(index : Int, leaves : ArrayView[Bytes]) -> Array[Bytes] {
 }
 
 ///|
-fn small_tree(size : Int) -> Array[Bytes] {
+fn small_tree(size : Int32) -> Array[Bytes] {
   Array::makei(size, i => @tlog.leaf_hash(Bytes::make(i + 1, i.to_byte())))
 }
 
 ///|
 test "inclusion proofs of every leaf of trees of 1 to 8 leaves" {
-  for size in 1..=8 {
+  for size in 1..<=8 {
     let leaves = small_tree(size)
     let root = tree_hash(leaves[:])
     for index in 0..<size {
@@ -310,10 +317,7 @@ test "the real morphir-rust inclusion proof gives the root hash" {
   )
   // A neighbour index gives another root.
   let neighbour = @tlog.root_from_inclusion_proof(
-    3153241948L,
-    3153242266L,
-    leaf,
-    hashes,
+    3153241948L, 3153242266L, leaf, hashes,
   )
   assert_true(neighbour != Some(root))
 }
@@ -348,9 +352,7 @@ let fake_signature : String = "\u{2014} name AAAAAAA=\n"
 ///|
 test "the real checkpoint is read" {
   assert_eq(@encoding.encode_base64(Bytes::make(5, b'\x00')), "AAAAAAA=")
-  let checkpoint = @tlog.parse_checkpoint(
-    fixture_checkpoint(morphir_entry()),
-  )
+  let checkpoint = @tlog.parse_checkpoint(fixture_checkpoint(morphir_entry()))
   assert_eq(checkpoint.origin, "rekor.sigstore.dev - 1193050959916656506")
   assert_eq(checkpoint.size, 3153242266L)
   assert_eq(checkpoint.root_hash, base64(root_text))
@@ -368,7 +370,10 @@ test "the real checkpoint is read" {
 
 ///|
 fn fixture_checkpoint(entry : Map[String, Json]) -> String raise {
-  member_text(object_at(Json::object(entry), ["inclusionProof", "checkpoint"]), "envelope")
+  member_text(
+    object_at(Json::object(entry), ["inclusionProof", "checkpoint"]),
+    "envelope",
+  )
 }
 
 ///|
@@ -392,9 +397,14 @@ test "checkpoint text rules" {
     checkpoint_outcome(note("\n5\n\{root_text}\n", fake_signature)),
     "the origin is empty",
   )
-  for size in ["", "x", "-1", "+5", " 5", "5 ", "0x5", "1_0", "99999999999999999999"] {
+  for
+    size in [
+      "", "x", "-1", "+5", " 5", "5 ", "0x5", "1_0", "99999999999999999999",
+    ] {
     assert_eq(
-      checkpoint_outcome(note("origin\n\{size}\n\{root_text}\n", fake_signature)),
+      checkpoint_outcome(
+        note("origin\n\{size}\n\{root_text}\n", fake_signature),
+      ),
       "the tree size is not a number",
       msg=size,
     )
@@ -452,11 +462,11 @@ test "checkpoint signature line rules" {
     checkpoint_outcome(note(header, "\u{2014} name AAAAAA==\n")),
     "a signature is too short",
   )
-  assert_eq(checkpoint_outcome(note(header, "\u{2014} name AAAAAAA=\n")), "ok 5 1")
   assert_eq(
-    checkpoint_outcome(note(header, "")),
-    "the note has no signature",
+    checkpoint_outcome(note(header, "\u{2014} name AAAAAAA=\n")),
+    "ok 5 1",
   )
+  assert_eq(checkpoint_outcome(note(header, "")), "the note has no signature")
   assert_eq(
     checkpoint_outcome(note(header, fake_signature + fake_signature)),
     "ok 5 2",
@@ -484,7 +494,10 @@ test "the real checkpoint verifies with the Rekor key only" {
   // A changed origin fails.
   assert_false(
     @tlog.parse_checkpoint(
-      morphir_checkpoint.replace(old="rekor.sigstore.dev - ", new="rekor.sigstore.dev  - "),
+      morphir_checkpoint.replace(
+        old="rekor.sigstore.dev - ",
+        new="rekor.sigstore.dev  - ",
+      ),
     ).verify(rekor),
   )
 }
@@ -500,8 +513,12 @@ test "a checkpoint with the Rekor hint must have only good signatures" {
   let text = "rekor.sigstore.dev - 1193050959916656506\n3153242266\n\{root_text}\n\n"
   assert_true(@tlog.parse_checkpoint(text + good_line).verify(rekor))
   assert_false(@tlog.parse_checkpoint(text + bad_line).verify(rekor))
-  assert_false(@tlog.parse_checkpoint(text + good_line + bad_line).verify(rekor))
-  assert_false(@tlog.parse_checkpoint(text + bad_line + good_line).verify(rekor))
+  assert_false(
+    @tlog.parse_checkpoint(text + good_line + bad_line).verify(rekor),
+  )
+  assert_false(
+    @tlog.parse_checkpoint(text + bad_line + good_line).verify(rekor),
+  )
   assert_true(
     @tlog.parse_checkpoint(text + foreign_line + good_line).verify(rekor),
   )

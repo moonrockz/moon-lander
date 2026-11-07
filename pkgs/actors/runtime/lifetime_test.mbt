@@ -1,8 +1,8 @@
 ///|
 /// A protocol whose request never gets a reply from the handler.
 enum Job {
-  Wait(@actors.Reply[Int])
-  Fail(@actors.Reply[Int])
+  Wait(@actors.Reply[Int32])
+  Fail(@actors.Reply[Int32])
 }
 
 ///|
@@ -22,7 +22,7 @@ async fn[M, R] joined(actor : @actors.Actor[M, R]) -> String {
 async test "LIFE-1: scope exit cancels idle actors instead of waiting for a message" {
   let log = []
   let (idle, receiver) = @actors.scope(scope => {
-    let idle = scope.start(0, (state, _ : Int) => Continue(state))
+    let idle = scope.start(0, (state, _ : Int32) => Continue(state))
     let receiver : @actors.Actor[String, String] = scope.spawn(_ => {
       @actors.receive()
     })
@@ -42,7 +42,7 @@ async test "LIFE-1: a parent that completes cancels and joins its child first" {
   let log = []
   let result = @actors.scope(scope => {
     let parent = scope.spawn(context => {
-      let first : @actors.Receive[Int, Unit] = @actors.done(())
+      let first : @actors.Receive[Int32, Unit] = @actors.done(())
       first.bind(_ => {
         let child = context.scope().start((), (_, _ : String) => Continue(()))
         child_cell.val = Some(child)
@@ -53,7 +53,13 @@ async test "LIFE-1: a parent that completes cancels and joins its child first" {
     let result = parent.join()
     // The child has ended before the parent's join returned.
     let child = child_cell.val.unwrap()
-    log.push(if child.try_send("late") is Closed { "child closed" } else { "child open" })
+    log.push(
+      if child.try_send("late") is Closed {
+        "child closed"
+      } else {
+        "child open"
+      },
+    )
     log.push(joined(child))
     result
   })
@@ -105,25 +111,28 @@ async test "LIFE-1: a stop without a reply wakes the in-flight and queued asks" 
 async test "LIFE-1: an actor failure wakes an ask with the original cause" {
   let ready : @aio.Queue[@actors.ActorRef[Job]] = @aio.Queue(kind=Unbounded)
   let outcome = @aio.with_task_group(group => {
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let worker = scope.start((), (_, job : Job) => {
-        match job {
-          Fail(reply) => {
-            ignore(reply)
-            raise Boom
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let worker = scope.start((), (_, job : Job) => {
+          match job {
+            Fail(reply) => {
+              ignore(reply)
+              raise Boom
+            }
+            Wait(_) => Continue(())
           }
-          Wait(_) => Continue(())
-        }
+        })
+        ready.put(worker.to_ref())
+        worker.join()
       })
-      ready.put(worker.to_ref())
-      worker.join()
-    }))
+    })
     let worker = ready.get()
     try {
       ignore(worker.ask(reply => Fail(reply)))
       "reply"
     } catch {
-      @actors.ActorFailed(address, Boom) if address == worker.address() => "failed: Boom"
+      @actors.ActorFailed(address, Boom) if address == worker.address() =>
+        "failed: Boom"
       _ => "other"
     }
   })
@@ -144,7 +153,7 @@ async test "LIFE-1: scope exit with an actor that asks a blocked sibling returns
         gate.get()
         Continue(())
       })
-      let asker = scope.start((), (_, _ : Int) => {
+      let asker = scope.start((), (_, _ : Int32) => {
         ignore(blocked.ask(reply => Wait(reply)))
         Continue(())
       })
@@ -159,7 +168,7 @@ async test "LIFE-1: scope exit with an actor that asks a blocked sibling returns
 enum Load {
   Block
   Filler
-  Request(@actors.Reply[Int])
+  Request(@actors.Reply[Int32])
 }
 
 ///|
@@ -170,25 +179,27 @@ async test "ASK-1: an ask blocked on a full mailbox gets the actor's failure" {
   let log = []
   let outcome = @aio.with_task_group(group => {
     // The failing scope runs in its own task, outside the caller.
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let one = @actors.MailboxCapacity::from_int(1)
-      let worker = scope.start((), mailbox=Bounded(one), (_, load : Load) => {
-        match load {
-          Block => {
-            started.put(())
-            gate.get()
-            raise Boom
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let one = @actors.MailboxCapacity::from_int(1)
+        let worker = scope.start((), mailbox=Bounded(one), (_, load : Load) => {
+          match load {
+            Block => {
+              started.put(())
+              gate.get()
+              raise Boom
+            }
+            Filler => Continue(())
+            Request(reply) => {
+              ignore(reply.send(1))
+              Continue(())
+            }
           }
-          Filler => Continue(())
-          Request(reply) => {
-            ignore(reply.send(1))
-            Continue(())
-          }
-        }
+        })
+        ready.put(worker.to_ref())
+        worker.join()
       })
-      ready.put(worker.to_ref())
-      worker.join()
-    }))
+    })
     let worker = ready.get()
     assert_eq(worker.try_send(Block), Accepted)
     started.get()
@@ -227,16 +238,18 @@ async test "ASK-1: an ask blocked on a full mailbox gets the actor's failure" {
 async test "ASK-1: an ask to an actor that already failed gets the failure" {
   let ready : @aio.Queue[@actors.ActorRef[Load]] = @aio.Queue(kind=Unbounded)
   let outcome = @aio.with_task_group(group => {
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let worker = scope.start((), (_, load : Load) => {
-        match load {
-          Block => raise Boom
-          Filler | Request(_) => Continue(())
-        }
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let worker = scope.start((), (_, load : Load) => {
+          match load {
+            Block => raise Boom
+            Filler | Request(_) => Continue(())
+          }
+        })
+        ready.put(worker.to_ref())
+        worker.join()
       })
-      ready.put(worker.to_ref())
-      worker.join()
-    }))
+    })
     let worker = ready.get()
     worker.send(Block)
     while worker.try_send(Filler) != Closed {

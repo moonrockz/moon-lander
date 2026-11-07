@@ -1,16 +1,17 @@
 ///|
 /// The version of the JSON Lines schema of `format_json_line`.
-const SCHEMA_VERSION : Int = 1
+const SCHEMA_VERSION : Int32 = 1
 
 ///|
 /// The JSON property layout of a file sink. OrderedArray keeps schema version
 /// 1. NamedObject selects schema version 2 with last-wins values and history.
+#derive(Eq, Debug)
 pub(all) enum JsonProperties {
   /// Schema version 1, with every occurrence in an ordered array.
   OrderedArray
   /// Schema version 2, with last-wins named values and complete history.
   NamedObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend JsonProperties with Eq::{equal, not_equal}

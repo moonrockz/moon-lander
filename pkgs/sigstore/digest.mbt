@@ -1,5 +1,6 @@
 ///|
 /// The rule of an artifact digest that a text breaks.
+#derive(Eq, Debug)
 pub enum DigestRule {
   /// The text has no `algorithm:` prefix.
   MissingAlgorithm
@@ -8,8 +9,8 @@ pub enum DigestRule {
   /// The value is not hex.
   NotHex
   /// The value does not have 32 bytes.
-  WrongLength(Int)
-} derive(Eq, Debug)
+  WrongLength(Int32)
+}
 
 ///|
 pub extend DigestRule with Eq::{equal, not_equal}
@@ -19,9 +20,10 @@ pub extend DigestRule with @debug.Debug::{to_repr}
 
 ///|
 /// A text that is not a valid artifact digest.
+#derive(Debug)
 pub suberror DigestError {
   InvalidDigest(text~ : String, rule~ : DigestRule)
-} derive(Debug)
+}
 
 ///|
 pub extend DigestError with @debug.Debug::{to_repr}
@@ -32,7 +34,8 @@ pub fn DigestError::message(self : DigestError) -> String {
   let InvalidDigest(text~, rule~) = self
   let reason = match rule {
     MissingAlgorithm => "use the form sha256:<hex>"
-    UnsupportedAlgorithm(name) => "the algorithm \{name.escape()} is not supported; use sha256"
+    UnsupportedAlgorithm(name) =>
+      "the algorithm \{name.escape()} is not supported; use sha256"
     NotHex => "the value is not hex"
     WrongLength(size) => "a SHA-256 digest has 32 bytes, not \{size}"
   }
@@ -41,9 +44,10 @@ pub fn DigestError::message(self : DigestError) -> String {
 
 ///|
 /// The SHA-256 digest of an artifact.
+#derive(Eq, Debug)
 pub struct ArtifactDigest {
   priv bytes : Bytes
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ArtifactDigest with Eq::{equal, not_equal}
@@ -73,7 +77,7 @@ pub fn ArtifactDigest::parse(text : String) -> ArtifactDigest raise DigestError 
 ///|
 /// The digest of the artifact bytes.
 pub fn ArtifactDigest::of_bytes(artifact : BytesView) -> ArtifactDigest {
-  { bytes: @signature.sha256(artifact) }
+  { bytes: @signature.sha256(artifact), }
 }
 
 ///|
@@ -84,7 +88,7 @@ pub fn ArtifactDigest::to_bytes(self : ArtifactDigest) -> Bytes {
 
 ///|
 /// The digest as `sha256:<lowercase hex>`, which `ArtifactDigest::parse` reads back.
-pub impl Show for ArtifactDigest with output(self, logger) {
+pub impl Show for ArtifactDigest with fn output(self, logger) {
   logger.write_string("sha256:")
   logger.write_string(@encoding.encode_hex(self.bytes))
 }

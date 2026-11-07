@@ -1,11 +1,12 @@
 ///|
 /// A time that is not in the range of `LogTimestamp`. Callers can match the
 /// case, but only `LogTimestamp::from_epoch_millis` makes it.
+#derive(Debug)
 pub suberror TimestampError {
   /// The input `millis` is before 1970-01-01T00:00:00.000Z or after
   /// 9999-12-31T23:59:59.999Z.
   TimestampOutOfRange(millis~ : Int64)
-} derive(Debug)
+}
 
 ///|
 pub extend TimestampError with @debug.Debug::{to_repr}
@@ -22,9 +23,10 @@ pub fn TimestampError::message(self : TimestampError) -> String {
 /// 1970-01-01T00:00:00.000Z to 9999-12-31T23:59:59.999Z. In this range each
 /// time has a four-digit year, so the text forms all have one length and sort
 /// in time order.
+#derive(Eq, Compare, Debug, Hash)
 pub struct LogTimestamp {
   priv millis : Int64
-} derive(Eq, Compare, Debug, Hash)
+}
 
 ///|
 pub extend LogTimestamp with Eq::{equal, not_equal}
@@ -66,13 +68,13 @@ pub fn LogTimestamp::from_epoch_millis(
 ///|
 /// The earliest timestamp: 1970-01-01T00:00:00.000Z.
 pub fn LogTimestamp::earliest() -> LogTimestamp {
-  { millis: EARLIEST_MILLIS }
+  { millis: EARLIEST_MILLIS, }
 }
 
 ///|
 /// The latest timestamp: 9999-12-31T23:59:59.999Z.
 pub fn LogTimestamp::latest() -> LogTimestamp {
-  { millis: LATEST_MILLIS }
+  { millis: LATEST_MILLIS, }
 }
 
 ///|
@@ -95,10 +97,12 @@ fn LogTimestamp::date(self : LogTimestamp) -> (Int64, Int64, Int64) {
   let shifted = self.epoch_day() + 719468L
   let era = shifted / 146097L
   let day_of_era = shifted - era * 146097L
-  let year_of_era = (day_of_era -
-    day_of_era / 1460L +
-    day_of_era / 36524L -
-    day_of_era / 146096L) /
+  let year_of_era = (
+      day_of_era -
+      day_of_era / 1460L +
+      day_of_era / 36524L -
+      day_of_era / 146096L
+    ) /
     365L
   let day_of_year = day_of_era -
     (365L * year_of_era + year_of_era / 4L - year_of_era / 100L)
@@ -115,7 +119,7 @@ fn LogTimestamp::date(self : LogTimestamp) -> (Int64, Int64, Int64) {
 
 ///|
 /// `value` as decimal text with zeros at the start to `width` digits.
-fn padded(value : Int64, width : Int) -> String {
+fn padded(value : Int64, width : Int32) -> String {
   let text = value.to_string()
   if text.length() >= width {
     text
@@ -153,7 +157,7 @@ pub fn LogTimestamp::to_iso8601(self : LogTimestamp) -> String {
 
 ///|
 /// The ISO 8601 text, as `to_iso8601` gives it.
-pub impl Show for LogTimestamp with output(self, logger) {
+pub impl Show for LogTimestamp with fn output(self, logger) {
   logger.write_string(self.to_iso8601())
 }
 

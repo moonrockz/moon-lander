@@ -1,5 +1,6 @@
 ///|
 /// The operation of a destination that failed.
+#derive(Eq, Debug)
 pub(all) enum SinkOperation {
   /// Create the log directory.
   CreateDirectory
@@ -21,7 +22,7 @@ pub(all) enum SinkOperation {
   DeleteOldFile
   /// Wait for the accepted records in a final drain.
   Drain
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SinkOperation with Eq::{equal, not_equal}
@@ -31,7 +32,7 @@ pub extend SinkOperation with @debug.Debug::{to_repr}
 
 ///|
 /// The operation name for people, for example `write`.
-pub impl Show for SinkOperation with output(self, logger) {
+pub impl Show for SinkOperation with fn output(self, logger) {
   logger.write_string(
     match self {
       CreateDirectory => "create directory"
@@ -53,12 +54,13 @@ pub extend SinkOperation with Show::{output, to_string}
 
 ///|
 /// The destination of a failure or a count.
+#derive(Eq, Debug)
 pub(all) enum SinkTarget {
   /// A console stream.
   Console(ConsoleStream)
   /// A file set in a directory.
   Files(LogDirectory, @rolling.FileSet)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SinkTarget with Eq::{equal, not_equal}
@@ -68,7 +70,7 @@ pub extend SinkTarget with @debug.Debug::{to_repr}
 
 ///|
 /// The target for people, for example `stderr` or `files /var/log/acme.log.lock`.
-pub impl Show for SinkTarget with output(self, logger) {
+pub impl Show for SinkTarget with fn output(self, logger) {
   match self {
     Console(stream) => logger.write_string(stream.to_string())
     Files(directory, files) =>
@@ -81,13 +83,14 @@ pub extend SinkTarget with Show::{output, to_string}
 
 ///|
 /// A report value that breaks a rule.
+#derive(Debug)
 pub suberror ReportError {
   /// A count is less than 0.
   NegativeCount(count~ : Int64)
   /// A report says that a drain timed out, but the session is not closed. Only
   /// close has a drain time limit.
   TimeoutBeforeClose
-} derive(Debug)
+}
 
 ///|
 pub extend ReportError with @debug.Debug::{to_repr}
@@ -111,12 +114,13 @@ fn check_counts(counts : Array[Int64]) -> Unit raise ReportError {
 ///|
 /// One failure of a destination: the operation, the target, the path or name
 /// that the operation used, if any, and the text of the error.
+#derive(Eq, Debug)
 pub struct SinkFailure {
   priv operation : SinkOperation
   priv target : SinkTarget
   priv subject : String?
   priv detail : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SinkFailure with Eq::{equal, not_equal}
@@ -132,7 +136,7 @@ pub fn SinkFailure::new(
   subject? : String,
   detail : String,
 ) -> SinkFailure {
-  { operation, target, subject, detail }
+  { operation, target, subject, detail, }
 }
 
 ///|
@@ -172,13 +176,14 @@ pub fn SinkFailure::message(self : SinkFailure) -> String {
 
 ///|
 /// The counts and the latest failures of one destination.
+#derive(Eq, Debug)
 pub struct DestinationReport {
   priv target : SinkTarget
   priv written : Int64
   priv undelivered : Int64
   priv failure : SinkFailure?
   priv retention_failure : SinkFailure?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DestinationReport with Eq::{equal, not_equal}
@@ -197,7 +202,7 @@ pub fn DestinationReport::new(
   retention_failure? : SinkFailure,
 ) -> DestinationReport raise ReportError {
   check_counts([written, undelivered])
-  { target, written, undelivered, failure, retention_failure }
+  { target, written, undelivered, failure, retention_failure, }
 }
 
 ///|
@@ -237,12 +242,13 @@ pub fn DestinationReport::retention_failure(
 
 ///|
 /// The counts of records that the session did not accept, one for each reason.
+#derive(Eq, Debug)
 pub struct DropCounts {
   priv queue_full : Int64
   priv oversized : Int64
   priv closed : Int64
   priv reentrant : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DropCounts with Eq::{equal, not_equal}
@@ -260,7 +266,7 @@ pub fn DropCounts::new(
   reentrant~ : Int64,
 ) -> DropCounts raise ReportError {
   check_counts([queue_full, oversized, closed, reentrant])
-  { queue_full, oversized, closed, reentrant }
+  { queue_full, oversized, closed, reentrant, }
 }
 
 ///|
@@ -297,13 +303,14 @@ pub fn DropCounts::total(self : DropCounts) -> Int64 {
 ///|
 /// An immutable snapshot of a session: accepted records, drops, the result of
 /// each destination, and whether a drain used its full time limit.
+#derive(Eq, Debug)
 pub struct SessionReport {
   priv accepted : Int64
   priv dropped : DropCounts
   priv destinations : Array[DestinationReport]
   priv drain_timed_out : Bool
   priv closed : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SessionReport with Eq::{equal, not_equal}
@@ -372,7 +379,9 @@ pub fn SessionReport::closed(self : SessionReport) -> Bool {
 /// or a drain timed out. Drops at admission and retention failures do not count.
 pub fn SessionReport::delivery_failed(self : SessionReport) -> Bool {
   self.drain_timed_out ||
-  self.destinations.iter().any(destination => {
+  self.destinations
+  .iter()
+  .any(destination => {
     destination.failure is Some(_) || destination.undelivered > 0L
   })
 }

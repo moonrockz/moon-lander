@@ -114,7 +114,7 @@ pub async fn open_store(
   guard reply.kind() == "store" else {
     raise storage_failure(reply.kind(), operation, root)
   }
-  { name, root, handle: reply.handle() }
+  { name, root, handle: reply.handle(), }
 }
 
 ///|
@@ -133,11 +133,9 @@ pub async fn write_text(
   let operation = "write_text"
   validate_path(path, absolute=false, operation~)
   let mounted = join(store.root, path)
-  let reply = @js_async.run_promise(_ => adapter.write_text(
-    store.handle,
-    path,
-    text,
-  )) catch {
+  let reply = @js_async.run_promise(_ => {
+    adapter.write_text(store.handle, path, text)
+  }) catch {
     _ => raise Io(operation~, path=mounted)
   }
   guard reply.kind() == "written" else {

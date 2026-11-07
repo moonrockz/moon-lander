@@ -1,5 +1,5 @@
 import {
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
   "moonrockz/ion/json" @ion_json,
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
@@ -10,6 +10,6 @@ import {
   "moonrockz/notebooks/nbformat",
   "moonrockz/notebooks/dib",
   "moonrockz/expect",
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
   "moonrockz/ion/text" @ion_text,
 } for "test"

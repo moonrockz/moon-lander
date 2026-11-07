@@ -66,9 +66,11 @@ pub fn LogRecord::message(self : LogRecord) -> String {
 /// A copy of the message segments. A change to the result, or to a JSON value
 /// in it, does not change the record.
 pub fn LogRecord::segments(self : LogRecord) -> Array[@logging.MessageSegment] {
-  self.segments.map(segment => match segment {
-    Text(_) => segment
-    Value(name~, value~) => Value(name~, value=copy_json(value))
+  self.segments.map(segment => {
+    match segment {
+      Text(_) => segment
+      Value(name~, value~) => Value(name~, value=copy_json(value))
+    }
   })
 }
 

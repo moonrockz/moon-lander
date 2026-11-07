@@ -1,8 +1,9 @@
 ///|
 /// A nonempty file extension, without a dot or path separator.
+#derive(Eq, Hash, Debug)
 pub struct Extension {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend Extension with Eq::{equal, not_equal}
@@ -20,7 +21,11 @@ pub fn Extension::parse(text : String) -> Extension raise @config.ConfigError {
   guard !text.is_empty() else {
     raise @config.ConventionPolicy(input=text, rule=EmptyExtension)
   }
-  guard text.iter().all(char => char.is_ascii_alphabetic() || char.is_ascii_digit() || char is ('_' | '-')) else {
+  guard text
+    .iter()
+    .all(char => {
+      char.is_ascii_alphabetic() || char.is_ascii_digit() || char is ('_' | '-')
+    }) else {
     raise @config.ConventionPolicy(input=text, rule=ExtensionCharacters)
   }
   { text, }
@@ -28,7 +33,9 @@ pub fn Extension::parse(text : String) -> Extension raise @config.ConfigError {
 
 ///|
 /// The extension without a dot.
-pub fn Extension::to_string(self : Extension) -> String { self.text }
+pub fn Extension::to_string(self : Extension) -> String {
+  self.text
+}
 
 ///|
 /// One application-owned source below the ordinary primary of its format
@@ -41,25 +48,37 @@ pub struct SupplementalFile {
 }
 
 ///|
+/// The default transform of a supplemental file: the value does not change.
+let keep_value : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError = fn(
+  value,
+) {
+  value
+}
+
+///|
 /// Parse one file name with a declared extension. Paths, . and .. are refused.
 pub fn SupplementalFile::new(
   name : String,
   extension : Extension,
-  transform? : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError = value => value,
+  transform~ : (@config.ConfigValue) -> @config.ConfigValue raise @config.ConfigError = keep_value,
 ) -> SupplementalFile raise @config.ConfigError {
-  guard !name.is_empty() && name != "." && name != ".." &&
+  guard !name.is_empty() &&
+    name != "." &&
+    name != ".." &&
     !name.iter().any(char => char is ('/' | '\\' | '\u{0}')) else {
     raise @config.ConventionPolicy(input=name, rule=SupplementalName)
   }
   guard name.has_suffix("." + extension.text) else {
     raise @config.ConventionPolicy(input=name, rule=SupplementalExtension)
   }
-  { name, extension, transform }
+  { name, extension, transform, }
 }
 
 ///|
 /// The validated file name.
-pub fn SupplementalFile::name(self : SupplementalFile) -> String { self.name }
+pub fn SupplementalFile::name(self : SupplementalFile) -> String {
+  self.name
+}
 
 ///|
 /// Alternatives at one precedence step. At most one ordinary candidate may
@@ -82,14 +101,20 @@ pub fn FormatGroup::new(
   let seen : @hashset.HashSet[Extension] = @hashset.HashSet([])
   for extension in extensions {
     if seen.contains(extension) {
-      raise @config.ConventionPolicy(input=extension.text, rule=DuplicateExtension)
+      raise @config.ConventionPolicy(
+        input=extension.text,
+        rule=DuplicateExtension,
+      )
     }
     seen.add(extension)
   }
   if supplemental is Some(file) && !seen.contains(file.extension) {
-    raise @config.ConventionPolicy(input=file.name, rule=SupplementalOutsideGroup)
+    raise @config.ConventionPolicy(
+      input=file.name,
+      rule=SupplementalOutsideGroup,
+    )
   }
-  { extensions: extensions.copy(), supplemental }
+  { extensions: extensions.copy(), supplemental, }
 }
 
 ///|
@@ -107,7 +132,9 @@ pub struct FormatLayers {
 
 ///|
 /// Make a nonempty order. Repeated extensions, also across groups, are refused.
-pub fn FormatLayers::new(groups : Array[FormatGroup]) -> FormatLayers raise @config.ConfigError {
+pub fn FormatLayers::new(
+  groups : Array[FormatGroup],
+) -> FormatLayers raise @config.ConfigError {
   guard !groups.is_empty() else {
     raise @config.ConventionPolicy(input="format order", rule=EmptyFormatOrder)
   }
@@ -115,35 +142,55 @@ pub fn FormatLayers::new(groups : Array[FormatGroup]) -> FormatLayers raise @con
   for group in groups {
     for extension in group.extensions {
       if seen.contains(extension) {
-        raise @config.ConventionPolicy(input=extension.text, rule=DuplicateExtension)
+        raise @config.ConventionPolicy(
+          input=extension.text,
+          rule=DuplicateExtension,
+        )
       }
       seen.add(extension)
     }
   }
-  { groups: groups.copy() }
+  { groups: groups.copy(), }
 }
 
 ///|
 /// Select ordered format layers. Omitting this step keeps the existing
 /// cross-format ambiguity rule. Every extension must have a registered parser.
-pub fn format_layers(conventions : Conventions, layers : FormatLayers) -> Conventions {
-  { ..conventions, layers: Some(layers) }
+pub fn format_layers(
+  conventions : Conventions,
+  layers : FormatLayers,
+) -> Conventions {
+  { ..conventions, layers: Some(layers), }
 }
 
 ///|
 /// Check final parser availability before the discovery pass requests data.
-fn Conventions::check_formats(self : Conventions, formats : Array[@config.Format]) -> Unit raise @config.ConfigError {
+fn Conventions::check_formats(
+  self : Conventions,
+  formats : Array[@config.Format],
+) -> Unit raise @config.ConfigError {
   guard self.layers is Some(layers) else { return }
   let registered = searched_extensions(formats)
   for group in layers.groups {
     if group.supplemental is Some(file) &&
-      (self.has(Layouts) || self.has(SystemDir) || self.has(UserConfigDir) || self.has(AppHome)) &&
+      (
+        self.has(Layouts) ||
+        self.has(SystemDir) ||
+        self.has(UserConfigDir) ||
+        self.has(AppHome)
+      ) &&
       file.name == "\{self.name}.\{file.extension.text}" {
-      raise @config.ConventionPolicy(input=file.name, rule=SupplementalPrimaryCollision)
+      raise @config.ConventionPolicy(
+        input=file.name,
+        rule=SupplementalPrimaryCollision,
+      )
     }
     for extension in group.extensions {
       if !registered.contains(extension.text) {
-        raise @config.ConventionPolicy(input=extension.text, rule=UnregisteredExtension)
+        raise @config.ConventionPolicy(
+          input=extension.text,
+          rule=UnregisteredExtension,
+        )
       }
     }
   }

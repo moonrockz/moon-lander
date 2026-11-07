@@ -20,12 +20,12 @@ struct ErrorsOnly {
 }
 
 ///|
-impl @logging.Logger for ErrorsOnly with enabled(_self, level) {
+impl @logging.Logger for ErrorsOnly with fn enabled(_self, level) {
   level >= Error
 }
 
 ///|
-impl @logging.Logger for ErrorsOnly with log(self, event) {
+impl @logging.Logger for ErrorsOnly with fn log(self, event) {
   self.received.push(event)
 }
 
@@ -55,7 +55,7 @@ test "min_level drops the lower levels" {
 
 ///|
 test "min_level keeps the filter of the wrapped logger" {
-  let app = ErrorsOnly::{ received: [] }
+  let app = ErrorsOnly::{ received: [], }
   let logger = @logging.min_level(app, Debug)
   assert_false(logger.enabled(Warning))
   logger.warn("Not passed", [])

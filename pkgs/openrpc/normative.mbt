@@ -1,11 +1,12 @@
 ///|
 /// A recorded disagreement between pinned prose and the pinned metaschema.
 /// Only these normative errors become warnings under MetaschemaCompatibility.
+#derive(Eq, Debug)
 pub(all) enum Discrepancy {
   OptionalParameterBeforeRequired
   ServerNameOmitted
   LicenseNameOmitted
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Discrepancy with Eq::{equal, not_equal}
@@ -29,7 +30,10 @@ fn legacy(version : DocumentVersion) -> Bool {
 ///|
 /// Fields defined by the version's pinned field tables. The model keeps the
 /// union so that no present field is lost.
-fn version_fields(version : DocumentVersion, kind : ObjectKind) -> Array[String] {
+fn version_fields(
+  version : DocumentVersion,
+  kind : ObjectKind,
+) -> Array[String] {
   let excluded = if legacy(version) {
     match kind {
       DocumentObject => ["$schema"]
@@ -126,7 +130,7 @@ fn Check::named(
     self.normative(
       @exact.MissingField,
       object_name + " name is required by OpenRPC 1.3.2",
-      { resource: owner, path },
+      { resource: owner, path, },
       chain~,
       expected=Some("name"),
       discrepancy~,
@@ -212,7 +216,13 @@ fn Check::link(
     self.server(server, owner, child(path, "server"), chain~)
   }
   if link.target_method() is Some(target) {
-    self.links.push((target.to_string(), { resource: owner, path: child(path, "method") }, chain))
+    self.links.push(
+      (
+        target.to_string(),
+        { resource: owner, path: child(path, "method"), },
+        chain,
+      ),
+    )
   }
 }
 
@@ -258,7 +268,10 @@ fn Check::uniqueness(
   for method_errors in errors {
     let seen : Map[String, Array[Site]] = Map([])
     for error in method_errors {
-      let site = Site::{ resource: error.owner, path: child(error.path, "code") }
+      let site = Site::{
+        resource: error.owner,
+        path: child(error.path, "code"),
+      }
       let key = error.value.code().number().numeric_key()
       match seen.get(key) {
         Some(first) =>
@@ -331,7 +344,7 @@ fn Check::component_keys(
         self.normative(
           @exact.InvalidValue,
           "Component keys must match ^[a-zA-Z0-9.\\-_]+$",
-          { resource: owner, path: ["components", table.0, key.to_string()] },
+          { resource: owner, path: ["components", table.0, key.to_string()], },
         )
       }
     }
@@ -359,7 +372,7 @@ fn Check::example(
       self.normative(
         @exact.MissingField,
         "Example " + field + " is required by OpenRPC 1.4",
-        { resource: owner, path },
+        { resource: owner, path, },
         chain~,
         expected=Some(field),
       )

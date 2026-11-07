@@ -1,42 +1,47 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum Coverage {
   Passed
   Failed
   Incomplete
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ValidationProfile {
   Specification
   MetaschemaCompatibility
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Severity {
   Error
   Warning
   Information
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Phase {
   Model
   SchemaDocument
   References
   Normative
   Artifact
-} derive(Eq, Debug)
+}
 
 ///|
 /// Where a finding applies. `resource` is None for the unnamed input document.
 /// Spans exist only for the input document, and only when its source map was
 /// supplied.
+#derive(Debug)
 pub struct FindingLocation {
   priv resource : @reference.UriReference?
   priv path : Array[String]
   priv span : @exact.Span?
   priv source_id : String?
-} derive(Debug)
+}
 
 ///|
 pub fn FindingLocation::resource(
@@ -61,6 +66,7 @@ pub fn FindingLocation::source_id(self : FindingLocation) -> String? {
 }
 
 ///|
+#derive(Debug)
 pub struct Finding {
   diagnostic : @exact.Diagnostic
   severity : Severity
@@ -72,7 +78,7 @@ pub struct Finding {
   priv discrepancy : Discrepancy?
   priv version : DocumentVersion
   priv profile : ValidationProfile
-} derive(Debug)
+}
 
 ///|
 pub fn Finding::diagnostic(self : Finding) -> @exact.Diagnostic {
@@ -129,6 +135,7 @@ pub fn Finding::profile(self : Finding) -> ValidationProfile {
 }
 
 ///|
+#derive(Debug)
 pub struct ValidationReport {
   profile : ValidationProfile
   version : DocumentVersion
@@ -138,7 +145,7 @@ pub struct ValidationReport {
   references : Coverage
   normative : Coverage
   artifact : Coverage
-} derive(Debug)
+}
 
 ///|
 pub fn ValidationReport::profile(self : ValidationReport) -> ValidationProfile {
@@ -185,11 +192,12 @@ pub fn ValidationReport::artifact(self : ValidationReport) -> Coverage {
 ///|
 /// A document whose required facets all passed for one profile and one
 /// explicit resource snapshot.
+#derive(Debug)
 pub struct ValidatedDocument {
   document : Document
   report : ValidationReport
   priv resources : Array[@reference.UriReference]
-} derive(Debug)
+}
 
 ///|
 pub fn ValidatedDocument::document(self : ValidatedDocument) -> Document {
@@ -222,10 +230,11 @@ pub fn ValidatedDocument::resources(
 }
 
 ///|
+#derive(Debug)
 pub struct ClosedValidation {
   report : ValidationReport
   document : ValidatedDocument?
-} derive(Debug)
+}
 
 ///|
 pub fn ClosedValidation::report(self : ClosedValidation) -> ValidationReport {
@@ -277,7 +286,7 @@ fn add(
     diagnostic: @exact.Diagnostic::new(code, message, path~),
     phase,
     severity,
-    site: { resource, path },
+    site: { resource, path, },
     related,
     chain,
     expected,
@@ -354,7 +363,7 @@ fn Check::follow(
   let seen : Set[String] = Set([])
   for _ in 0..<self.limits.max_depth() {
     guard current.get("$ref") is Some(raw) else {
-      return Some({ value: current, owner, path: at, chain })
+      return Some({ value: current, owner, path: at, chain, })
     }
     let site = child(at, "$ref")
     let fail = (code, message, severity) => {
@@ -395,7 +404,7 @@ fn Check::follow(
       )
       return None
     }
-    chain.push({ resource: owner, path: site })
+    chain.push({ resource: owner, path: site, })
     current = target.target()
     owner = target.resource()
     at = target.pointer().tokens()
@@ -556,7 +565,9 @@ fn Check::pairing(
     is Some(pairing) else {
     return
   }
-  if !self.checked.add_and_check("pairing " + site_key(pairing.owner, pairing.path)) {
+  if !self.checked.add_and_check(
+      "pairing " + site_key(pairing.owner, pairing.path),
+    ) {
     return
   }
   self.fields(
@@ -824,7 +835,7 @@ fn array_index(token : String) -> Bool {
 ///|
 /// Pointer tokens in document order: array indices numerically, other tokens
 /// by UTF-16 code units, and a prefix before its extensions.
-fn compare_paths(a : Array[String], b : Array[String]) -> Int {
+fn compare_paths(a : Array[String], b : Array[String]) -> Int32 {
   for i in 0..<(if a.length() < b.length() { a.length() } else { b.length() }) {
     let x = a[i]
     let y = b[i]
@@ -841,7 +852,7 @@ fn compare_paths(a : Array[String], b : Array[String]) -> Int {
 }
 
 ///|
-fn compare_findings(a : Finding, b : Finding) -> Int {
+fn compare_findings(a : Finding, b : Finding) -> Int32 {
   let order = resource_key(a.location.resource).lexical_compare(
     resource_key(b.location.resource),
   )
@@ -895,7 +906,12 @@ fn finish(
         source_id = first.source_id()
       }
     }
-    FindingLocation::{ resource: site.resource, path: site.path, span, source_id }
+    FindingLocation::{
+      resource: site.resource,
+      path: site.path,
+      span,
+      source_id,
+    }
   }
   let version = document.version
   let unique : Array[Finding] = []
@@ -939,7 +955,7 @@ fn finish(
     diagnostic: @exact.Diagnostic::new(@exact.LimitExceeded, message),
     severity: Information,
     phase,
-    location: { resource: None, path: [], span: None, source_id: None },
+    location: { resource: None, path: [], span: None, source_id: None, },
     related: [],
     chain: [],
     expected: None,
@@ -981,10 +997,12 @@ fn finish(
     findings.push(marker(References, "Reference index is incomplete"))
   }
   findings.sort_by(compare_findings)
-  let facet = phase => if failed.contains(phase) {
-    Failed
-  } else {
-    coverage(findings, phase)
+  let facet = phase => {
+    if failed.contains(phase) {
+      Failed
+    } else {
+      coverage(findings, phase)
+    }
   }
   {
     profile,
@@ -1192,7 +1210,7 @@ pub fn validate(
         check.normative(
           @exact.ParameterOrder,
           "Optional parameters precede a required parameter",
-          { resource: method_.owner, path: param_path },
+          { resource: method_.owner, path: param_path, },
           chain~,
           discrepancy=Some(OptionalParameterBeforeRequired),
         )
@@ -1235,9 +1253,10 @@ pub fn validate(
       )
     }
     errors.push(method_errors)
-    for link in check.items(method_, "links", "link", (v, p) => {
-      link_(v, p, limits)
-    }) {
+    for
+      link in check.items(method_, "links", "link", (v, p) => {
+        link_(v, p, limits)
+      }) {
       check.link(link.value, link.owner, link.path, chain=link.chain)
     }
     for tag in check.items(method_, "tags", "tag", (v, p) => tag_(v, p, limits)) {
@@ -1305,7 +1324,12 @@ pub fn validate(
             check.link(entry.1, owner, at("links", entry.0))
           }
           for entry in typed.errors().unwrap_or([]) {
-            check.fields(ErrorObjectKind, entry.1.value, owner, at("errors", entry.0))
+            check.fields(
+              ErrorObjectKind,
+              entry.1.value,
+              owner,
+              at("errors", entry.0),
+            )
           }
           for entry in typed.tags().unwrap_or([]) {
             check.tag(entry.1, owner, at("tags", entry.0))

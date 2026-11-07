@@ -20,10 +20,14 @@ test "outcome of a failure before the start phase has StartFailed reason" {
 async test "request then hook failure retains Requested and does not start the service" {
   let log = []
   let result = builder(@lander_core.AppName::parse("test"), [])
-    |> service("a", start=ctx => {
-      ctx.lifetime.stop_application()
-      raise HookFailed(0)
-    }, stop=_ => log.push("must not stop"))
+    |> service(
+      "a",
+      start=ctx => {
+        ctx.lifetime.stop_application()
+        raise HookFailed(0)
+      },
+      stop=_ => log.push("must not stop"),
+    )
     |> build(_ => ())
     |> run(_ => log.push("must not run"))
   @expect.expect(result.reason is Requested).to_be_true()
@@ -47,7 +51,13 @@ async test "registered stop probe reaches engine through command check" {
   let result = builder(@lander_core.AppName::parse("probe"), [])
     |> build(_ => ())
     |> run(ctx => {
-      ctx.lifetime.register_stop_probe(() => if flag.val { Some(Requested) } else { None })
+      ctx.lifetime.register_stop_probe(() => {
+        if flag.val {
+          Some(Requested)
+        } else {
+          None
+        }
+      })
       @expect.expect(ctx.cancelled()).to_be_false()
       flag.val = true
       ctx.check_cancelled()
@@ -62,11 +72,21 @@ async test "a probe stop during start skips later start hooks and the command bo
   let flag = Ref(false)
   let log = []
   let result = builder(@lander_core.AppName::parse("probe-start"), [])
-    |> service("a", start=ctx => {
-      ctx.lifetime.register_stop_probe(() => if flag.val { Some(Requested) } else { None })
-      log.push("a.start")
-      flag.val = true
-    }, stop=_ => log.push("a.stop"))
+    |> service(
+      "a",
+      start=ctx => {
+        ctx.lifetime.register_stop_probe(() => {
+          if flag.val {
+            Some(Requested)
+          } else {
+            None
+          }
+        })
+        log.push("a.start")
+        flag.val = true
+      },
+      stop=_ => log.push("a.stop"),
+    )
     |> service("b", start=_ => log.push("b.start"), stop=_ => log.push("b.stop"))
     |> build(_ => ())
     |> run(_ => log.push("command"))
@@ -80,18 +100,35 @@ async test "a probe stop during started skips later started hooks and the comman
   let flag = Ref(false)
   let log = []
   let result = builder(@lander_core.AppName::parse("probe-started"), [])
-    |> service("a", start=ctx => {
-      ctx.lifetime.register_stop_probe(() => if flag.val { Some(Requested) } else { None })
-      log.push("a.start")
-    }, started=_ => {
-      log.push("a.started")
-      flag.val = true
-    }, stop=_ => log.push("a.stop"))
-    |> service("b", start=_ => log.push("b.start"), started=_ => log.push("b.started"),
-      stop=_ => log.push("b.stop"))
+    |> service(
+      "a",
+      start=ctx => {
+        ctx.lifetime.register_stop_probe(() => {
+          if flag.val {
+            Some(Requested)
+          } else {
+            None
+          }
+        })
+        log.push("a.start")
+      },
+      started=_ => {
+        log.push("a.started")
+        flag.val = true
+      },
+      stop=_ => log.push("a.stop"),
+    )
+    |> service(
+      "b",
+      start=_ => log.push("b.start"),
+      started=_ => log.push("b.started"),
+      stop=_ => log.push("b.stop"),
+    )
     |> build(_ => ())
     |> run(_ => log.push("command"))
-  @expect.expect(log).to_equal(["a.start", "b.start", "a.started", "b.stop", "a.stop"])
+  @expect.expect(log).to_equal([
+    "a.start", "b.start", "a.started", "b.stop", "a.stop",
+  ])
   @expect.expect(result.reason is Requested).to_be_true()
   @expect.expect(result.failures().length()).to_equal(0)
 }
@@ -99,27 +136,31 @@ async test "a probe stop during started skips later started hooks and the comman
 ///|
 async test "absorbed cancellation before a start failure stays visible during protected shutdown" {
   let log = []
-  ignore(@async.with_timeout_opt(10, () => {
-    let result = builder(@lander_core.AppName::parse("absorbed"), [])
-      |> service("a", stopping=ctx => {
-        @expect.expect(@async.is_being_cancelled()).to_be_false()
-        @expect.expect(ctx.cancelled()).to_be_true()
-        @expect.expect(ctx.lifetime.stop_reason() is Some(StartFailed(HookFailed(1)))).to_be_true()
-        @async.sleep(1)
-        log.push("a.stopping")
-      })
-      |> service("b", start=_ => {
-        ignore(@async.handle_cancellation(() => @async.sleep(60000)))
-        @expect.expect(@async.is_being_cancelled()).to_be_true()
-        log.push("b absorbed")
-        raise HookFailed(1)
-      })
-      |> build(_ => ())
-      |> run(_ => fail("command must not run"))
-    @expect.expect(result.reason is StartFailed(HookFailed(1))).to_be_true()
-    @expect.expect(result.failures().length()).to_equal(1)
-    @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
-  }))
+  ignore(
+    @async.with_timeout_opt(10, () => {
+      let result = builder(@lander_core.AppName::parse("absorbed"), [])
+        |> service("a", stopping=ctx => {
+          @expect.expect(@async.is_being_cancelled()).to_be_false()
+          @expect.expect(ctx.cancelled()).to_be_true()
+          @expect.expect(
+            ctx.lifetime.stop_reason() is Some(StartFailed(HookFailed(1))),
+          ).to_be_true()
+          @async.sleep(1)
+          log.push("a.stopping")
+        })
+        |> service("b", start=_ => {
+          ignore(@async.handle_cancellation(() => @async.sleep(60000)))
+          @expect.expect(@async.is_being_cancelled()).to_be_true()
+          log.push("b absorbed")
+          raise HookFailed(1)
+        })
+        |> build(_ => ())
+        |> run(_ => fail("command must not run"))
+      @expect.expect(result.reason is StartFailed(HookFailed(1))).to_be_true()
+      @expect.expect(result.failures().length()).to_equal(1)
+      @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
+    }),
+  )
   @expect.expect(log).to_equal(["b absorbed", "a.stopping"])
 }
 
@@ -137,7 +178,9 @@ async test "outside cancellation runs command defers then protected shutdown" {
     |> build(_ => ())
     |> run(ctx => {
       defer {
-        @expect.expect(ctx.cancelled()).to_be_true() catch { _ => abort("cancel probe") }
+        @expect.expect(ctx.cancelled()).to_be_true() catch {
+          _ => abort("cancel probe")
+        }
         log.push("defer")
       }
       @async.sleep(60000)
@@ -151,18 +194,28 @@ async test "outside cancellation runs command defers then protected shutdown" {
 async test "StopRequested in a start hook is a stop without marking that service" {
   for phase in [Phase::Starting, Start, Started] {
     for has_start in [false, true] {
-      if phase == Start && !has_start { continue }
+      if phase == Start && !has_start {
+        continue
+      }
       let log = []
       let interrupt : Hook[Unit] = ctx => {
         ctx.lifetime.stop_application()
         ctx.check_cancelled()
       }
       let result = builder(@lander_core.AppName::parse("start-stop"), [])
-        |> service("a",
+        |> service(
+          "a",
           starting?=if phase == Starting { Some(interrupt) } else { None },
-          start?=if phase == Start { Some(interrupt) } else if has_start { Some(_ => ()) } else { None },
+          start?=if phase == Start {
+            Some(interrupt)
+          } else if has_start {
+            Some(_ => ())
+          } else {
+            None
+          },
           started?=if phase == Started { Some(interrupt) } else { None },
-          stop=_ => log.push("stop"))
+          stop=_ => log.push("stop"),
+        )
         |> build(_ => ())
         |> run(_ => fail("command must not run"))
       @expect.expect(result.reason is Requested).to_be_true()
@@ -178,24 +231,41 @@ async test "StopRequested in every stop phase does not skip later cleanup" {
   for phase in [Phase::Stopping, Stop, Stopped] {
     let log = []
     let result = builder(@lander_core.AppName::parse("stop-check"), [])
-      |> service("a", stopping=_ => log.push("a.stopping"),
-        stop=_ => log.push("a.stop"), stopped=_ => log.push("a.stopped"))
-      |> service("b", stopping=ctx => {
-        log.push("b.stopping")
-        if phase == Stopping { ctx.check_cancelled() }
-      }, stop=ctx => {
-        log.push("b.stop")
-        if phase == Stop { ctx.check_cancelled() }
-      }, stopped=ctx => {
-        log.push("b.stopped")
-        if phase == Stopped { ctx.check_cancelled() }
-      })
+      |> service(
+        "a",
+        stopping=_ => log.push("a.stopping"),
+        stop=_ => log.push("a.stop"),
+        stopped=_ => log.push("a.stopped"),
+      )
+      |> service(
+        "b",
+        stopping=ctx => {
+          log.push("b.stopping")
+          if phase == Stopping {
+            ctx.check_cancelled()
+          }
+        },
+        stop=ctx => {
+          log.push("b.stop")
+          if phase == Stop {
+            ctx.check_cancelled()
+          }
+        },
+        stopped=ctx => {
+          log.push("b.stopped")
+          if phase == Stopped {
+            ctx.check_cancelled()
+          }
+        },
+      )
       |> build(_ => ())
       |> run(ctx => ctx.lifetime.stop_application())
     @expect.expect(result.reason is Requested).to_be_true()
     @expect.expect(result.failures().length()).to_equal(0)
     @expect.expect(result.exit_code()).to_equal(ExitCode::success())
-    @expect.expect(log).to_equal(["b.stopping", "a.stopping", "b.stop", "a.stop", "b.stopped", "a.stopped"])
+    @expect.expect(log).to_equal([
+      "b.stopping", "a.stopping", "b.stop", "a.stop", "b.stopped", "a.stopped",
+    ])
   }
 }
 
@@ -225,7 +295,10 @@ async test "a signal before the command reply does not replace its first request
 ///|
 async test "configuration factory failure gives 2 and runs no hook or command" {
   let log = []
-  let host : HostBuilder[Unit] = builder(@lander_core.AppName::parse("config"), [])
+  let host : HostBuilder[Unit] = builder(
+    @lander_core.AppName::parse("config"),
+    [],
+  )
   let result = host
     |> service("a", start=_ => log.push("start"), stop=_ => log.push("stop"))
     |> build(_ => raise @config.FileNotFound(path="config.toml"))
@@ -243,8 +316,12 @@ async test "command binding and usage errors give 2 and still stop" {
       |> service("a", stop=_ => log.push("stop"))
       |> build(_ => ())
       |> run(ctx => {
-        if binding { let value : String = @config.bind(ctx.config, "missing"); ignore(value) }
-        else { raise UsageError("bad argument") }
+        if binding {
+          let value : String = @config.bind(ctx.config, "missing")
+          ignore(value)
+        } else {
+          raise UsageError("bad argument")
+        }
       })
     @expect.expect(result.exit_code().to_int()).to_equal(2)
     @expect.expect(result.failures().length()).to_equal(1)
@@ -261,16 +338,39 @@ async test "custom async report replaces the default and receives failures in or
       |> error_report((_, _) => replaced += 1)
       |> error_report((error, code) => {
         @async.sleep(1)
-        seen.push((report_text(@lander_core.AppName::parse("custom"), error), code.to_int()))
+        seen.push(
+          (
+            report_text(@lander_core.AppName::parse("custom"), error),
+            code.to_int(),
+          ),
+        )
       })
-      |> service("a", stop=_ => raise HookFailed(1), stopped=_ => raise HookFailed(2))
+      |> service("a", stop=_ => raise HookFailed(1), stopped=_ => {
+        raise HookFailed(2)
+      })
       |> build(_ => ())
-      |> run(_ => { if usage { raise UsageError("bad option") } else { raise HookFailed(0) } })
+      |> run(_ => {
+        if usage {
+          raise UsageError("bad option")
+        } else {
+          raise HookFailed(0)
+        }
+      })
     let expected_code = if usage { 2 } else { 1 }
     @expect.expect(result.exit_code().to_int()).to_equal(expected_code)
     @expect.expect(replaced).to_equal(0)
-    @expect.expect(seen).to_equal(result.failures().map(error =>
-      (report_text(@lander_core.AppName::parse("custom"), error) catch { _ => abort("valid name") }, expected_code)))
+    @expect.expect(seen).to_equal(
+      result
+      .failures()
+      .map(error => {
+        (
+          report_text(@lander_core.AppName::parse("custom"), error) catch {
+            _ => abort("valid name")
+          },
+          expected_code,
+        )
+      }),
+    )
   }
 }
 
@@ -289,9 +389,14 @@ async test "no report for clean application or signal outcomes including suppres
     let mut calls = 0
     let result = builder(@lander_core.AppName::parse("signal"), [])
       |> error_report((_, _) => calls += 1)
-      |> service("a", stop=ctx => ctx.lifetime.request_stop(Signal(signal), None))
+      |> service("a", stop=ctx => {
+        ctx.lifetime.request_stop(Signal(signal), None)
+      })
       |> build(_ => ())
-      |> run(ctx => { ctx.lifetime.set_exit_code(ExitCode::from_int(3)); raise UsageError("hidden") })
+      |> run(ctx => {
+        ctx.lifetime.set_exit_code(ExitCode::from_int(3))
+        raise UsageError("hidden")
+      })
     @expect.expect(result.exit_code()).to_equal(signal.exit_code())
     @expect.expect(calls).to_equal(0)
     @expect.expect(result.failures().length()).to_equal(1)
@@ -303,7 +408,9 @@ async test "application code uses chronological order across the first request a
   for set_after in [false, true] {
     let result = builder(@lander_core.AppName::parse("order"), [])
       |> service("a", stop=ctx => {
-        if set_after { ctx.lifetime.set_exit_code(ExitCode::from_int(5)) }
+        if set_after {
+          ctx.lifetime.set_exit_code(ExitCode::from_int(5))
+        }
         ctx.lifetime.stop_application(exit_code=ExitCode::from_int(9))
       })
       |> build(_ => ())
@@ -311,7 +418,13 @@ async test "application code uses chronological order across the first request a
         ctx.lifetime.set_exit_code(ExitCode::from_int(3))
         ctx.lifetime.stop_application(exit_code=ExitCode::from_int(4))
       })
-    @expect.expect(result.exit_code().to_int()).to_equal(if set_after { 5 } else { 4 })
+    @expect.expect(result.exit_code().to_int()).to_equal(
+      if set_after {
+        5
+      } else {
+        4
+      },
+    )
   }
 }
 
@@ -341,8 +454,13 @@ async test "concurrent failing runs can both write their default reports" {
 ///|
 async test "custom report also receives a failure before start" {
   let seen = []
-  let host : Host[Unit] = builder(@lander_core.AppName::parse("factory-report"), [])
-    |> error_report((error, code) => seen.push((error is UsageError("factory"), code)))
+  let host : Host[Unit] = builder(
+      @lander_core.AppName::parse("factory-report"),
+      [],
+    )
+    |> error_report((error, code) => {
+      seen.push((error is UsageError("factory"), code))
+    })
     |> build(_ => raise UsageError("factory"))
   let result = run(host, _ => fail("command must not run"))
   @expect.expect(result.exit_code().to_int()).to_equal(2)
@@ -355,21 +473,41 @@ async test "a report error preserves the outcome and reports the next failure" {
     let seen = []
     let result = builder(@lander_core.AppName::parse("report-error"), [])
       |> error_report((error, code) => {
-        seen.push((report_text(@lander_core.AppName::parse("custom"), error), code.to_int()))
-        if seen.length() == 1 { fail("report broke") }
+        seen.push(
+          (
+            report_text(@lander_core.AppName::parse("custom"), error),
+            code.to_int(),
+          ),
+        )
+        if seen.length() == 1 {
+          fail("report broke")
+        }
       })
       |> service("a", stop=_ => raise HookFailed(1))
       |> build(_ => ())
       |> run(_ => {
-        if usage { raise UsageError("bad option") }
-        else { raise HookFailed(0) }
+        if usage {
+          raise UsageError("bad option")
+        } else {
+          raise HookFailed(0)
+        }
       })
     let expected_code = if usage { 2 } else { 1 }
     @expect.expect(result.exit_code().to_int()).to_equal(expected_code)
     @expect.expect(result.failures().length()).to_equal(2)
     @expect.expect(result.reason is Failed(_)).to_be_true()
-    @expect.expect(seen).to_equal(result.failures().map(error =>
-      (report_text(@lander_core.AppName::parse("custom"), error) catch { _ => abort("valid name") }, expected_code)))
+    @expect.expect(seen).to_equal(
+      result
+      .failures()
+      .map(error => {
+        (
+          report_text(@lander_core.AppName::parse("custom"), error) catch {
+            _ => abort("valid name")
+          },
+          expected_code,
+        )
+      }),
+    )
   }
 }
 
@@ -378,9 +516,15 @@ async test "factory StopRequested gives a clean requested stop without hooks or 
   let log = []
   let host : Host[Unit] = builder(@lander_core.AppName::parse("factory-stop"), [])
     |> error_report((_, _) => log.push("report"))
-    |> service("a", starting=_ => log.push("starting"), start=_ => log.push("start"),
-      started=_ => log.push("started"), stopping=_ => log.push("stopping"),
-      stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
+    |> service(
+      "a",
+      starting=_ => log.push("starting"),
+      start=_ => log.push("start"),
+      started=_ => log.push("started"),
+      stopping=_ => log.push("stopping"),
+      stop=_ => log.push("stop"),
+      stopped=_ => log.push("stopped"),
+    )
     |> build(_ => raise StopRequested::StopRequested)
   let result = run(host, _ => log.push("command"))
   @expect.expect(result.reason is Requested).to_be_true()
@@ -393,29 +537,49 @@ async test "factory StopRequested gives a clean requested stop without hooks or 
 
 ///|
 async test "default report preserves the message of fail" {
-  let host : Host[Unit] = builder(@lander_core.AppName::parse("build"), []) |> build(_ => ())
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("build"), [])
+    |> build(_ => ())
   let result = run(host, _ => fail("build.invalid_timeout"))
   @expect.expect(result.exit_code()).to_equal(ExitCode::failure())
   @expect.expect(result.failures().length()).to_equal(1)
-  @expect.expect(report_text(host.name, result.failures()[0]).contains("build.invalid_timeout")).to_be_true()
+  @expect.expect(
+    report_text(host.name, result.failures()[0]).contains(
+      "build.invalid_timeout",
+    ),
+  ).to_be_true()
 }
 
 ///|
 async test "run shares resolved variables and directory with argparse factory hooks and command" {
   let seen = []
-  let variables = { "ACME_B": "2", "ACME_ENVIRONMENT": "Staging", "HOME": "/home/test" }
-  let outcome = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_A": "1" },
-    working_dir=@lander_core.AbsolutePath::parse("/a"))
-    |> env_vars(variables) |> working_dir(@lander_core.AbsolutePath::parse("/b"))
-    |> command(name => @argparse.Command(name, options=[@argparse.OptionArg("b", env="ACME_B")]))
-    |> service("observer", start=ctx => {
-      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
-      assert_eq(ctx.working_dir.to_string(), "/b")
-      seen.push("start")
-    }, stop=ctx => {
-      assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
-      seen.push("stop")
+  let variables = {
+    "ACME_B": "2",
+    "ACME_ENVIRONMENT": "Staging",
+    "HOME": "/home/test",
+  }
+  let outcome = builder(
+      @lander_core.AppName::parse("acme"),
+      [],
+      env_vars={ "ACME_A": "1" },
+      working_dir=@lander_core.AbsolutePath::parse("/a"),
+    )
+    |> env_vars(variables)
+    |> working_dir(@lander_core.AbsolutePath::parse("/b"))
+    |> command(name => {
+      @argparse.Command(name, options=[@argparse.OptionArg("b", env="ACME_B")])
     })
+    |> service(
+      "observer",
+      start=ctx => {
+        assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+        assert_eq(ctx.working_dir.to_string(), "/b")
+        seen.push("start")
+      },
+      stop=ctx => {
+        assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
+        seen.push("stop")
+      },
+    )
     |> build(ctx => {
       assert_eq(Map::from_iter(ctx.env_vars.iter()), variables)
       assert_eq(ctx.working_dir.to_string(), "/b")
@@ -441,12 +605,18 @@ async test "run shares resolved variables and directory with argparse factory ho
 ///|
 async test "bad JSON variables and argv stop before factory or hooks" {
   let mut ran = false
-  for (vars, argv) in [((["ACME_PORT"] : Json), []), (({} : Json), ["--unknown"])] {
-    let outcome = builder(@lander_core.AppName::parse("acme"), argv, env_vars=vars,
-      working_dir=@lander_core.AbsolutePath::root())
+  for
+    (vars, argv) in [((["ACME_PORT"] : Json), []), (({} : Json), ["--unknown"])] {
+    let outcome = builder(
+        @lander_core.AppName::parse("acme"),
+        argv,
+        env_vars=vars,
+        working_dir=@lander_core.AbsolutePath::root(),
+      )
       |> error_report((_, _) => ())
-      |> service("must-not-start", start=_ => { ran = true })
-      |> build(_ => { ran = true }) |> run(_ => { ran = true })
+      |> service("must-not-start", start=_ => ran = true)
+      |> build(_ => ran = true)
+      |> run(_ => ran = true)
     assert_eq(outcome.exit_code().to_int(), 2)
     assert_true(outcome.failures()[0] is UsageError(_))
     assert_true(!ran)
@@ -457,13 +627,25 @@ async test "bad JSON variables and argv stop before factory or hooks" {
 async test "a missing process directory reports code 1 before argparse factory hooks or command" {
   let seen = []
   let reports = []
-  let host = builder(@lander_core.AppName::parse("acme"), [], env_vars={ "ACME_A": "1" })
-    |> command(name => { seen.push("parse"); @argparse.Command(name) })
-    |> error_report((error, code) => { reports.push((report_text(@lander_core.AppName::parse("acme"), error), code.to_int())) })
-    |> service("observer", start=_ => seen.push("start"), stop=_ => seen.push("stop"))
+  let host = builder(@lander_core.AppName::parse("acme"), [], env_vars={
+      "ACME_A": "1",
+    })
+    |> command(name => {
+      seen.push("parse")
+      @argparse.Command(name)
+    })
+    |> error_report((error, code) => {
+      reports.push(
+        (report_text(@lander_core.AppName::parse("acme"), error), code.to_int()),
+      )
+    })
+    |> service("observer", start=_ => seen.push("start"), stop=_ => {
+      seen.push("stop")
+    })
     |> build(_ => seen.push("factory"))
-  let result = run_with_directory_reader(host, _ => seen.push("command"),
-    read_directory=() => process_directory_from(() => None))
+  let result = run_with_directory_reader(host, _ => seen.push("command"), read_directory=() => {
+    process_directory_from(() => None)
+  })
   assert_eq(result.exit_code().to_int(), 1)
   assert_true(result.failures()[0] is MissingWorkingDirectory)
   assert_eq(seen, [])
@@ -473,21 +655,27 @@ async test "a missing process directory reports code 1 before argparse factory h
 ///|
 async test "runs keep the builder and env_vars snapshots after caller map mutation" {
   let vars = { "ACME_A": "1" }
-  let first = builder(@lander_core.AppName::parse("acme"), [], env_vars=vars,
-    working_dir=@lander_core.AbsolutePath::root())
+  let first = builder(
+    @lander_core.AppName::parse("acme"),
+    [],
+    env_vars=vars,
+    working_dir=@lander_core.AbsolutePath::root(),
+  )
   vars["ACME_A"] = "2"
   let second = first |> env_vars(vars)
   vars["ACME_A"] = "3"
   for (builder, expected) in [(first, "1"), (second, "2")] {
-    let host = builder |> build(ctx => {
-      assert_eq(ctx.env_vars.get("ACME_A"), Some(expected))
-      assert_eq(@config.get_text(ctx.config, "a"), expected)
-    })
-    for _ in 0..<2 {
-      let result = host |> run(ctx => {
+    let host = builder
+      |> build(ctx => {
         assert_eq(ctx.env_vars.get("ACME_A"), Some(expected))
         assert_eq(@config.get_text(ctx.config, "a"), expected)
       })
+    for _ in 0..<2 {
+      let result = host
+        |> run(ctx => {
+          assert_eq(ctx.env_vars.get("ACME_A"), Some(expected))
+          assert_eq(@config.get_text(ctx.config, "a"), expected)
+        })
       assert_eq(result.exit_code().to_int(), 0)
     }
   }
@@ -495,17 +683,28 @@ async test "runs keep the builder and env_vars snapshots after caller map mutati
 
 ///|
 async test "invalid environment names stop before factory hooks and command" {
-  for (args, vars) in [
-    (["--environment", "../x"], {}),
-    ([], { "ACME_ENVIRONMENT": "local" }),
-  ] {
+  for
+    (args, vars) in [
+      (["--environment", "../x"], {}),
+      ([], { "ACME_ENVIRONMENT": "local" }),
+    ] {
     let log = []
     let mut reports = 0
     let result = environment_builder(args~, vars~)
       |> error_report((_, _) => reports = reports + 1)
-      |> service("observer", starting=_ => log.push("starting"), start=_ => log.push("start"),
-        started=_ => log.push("started"), stopping=_ => log.push("stopping"), stop=_ => log.push("stop"), stopped=_ => log.push("stopped"))
-      |> build(_ => { log.push("factory"); () })
+      |> service(
+        "observer",
+        starting=_ => log.push("starting"),
+        start=_ => log.push("start"),
+        started=_ => log.push("started"),
+        stopping=_ => log.push("stopping"),
+        stop=_ => log.push("stop"),
+        stopped=_ => log.push("stopped"),
+      )
+      |> build(_ => {
+        log.push("factory")
+        ()
+      })
       |> run(_ => log.push("command"))
     assert_eq(result.exit_code().to_int(), 2)
     assert_eq(log, [])
@@ -524,10 +723,25 @@ async test "factory all six hooks and command see the same typed host environmen
     assert_eq(ctx.environment.content_root, ctx.services.content_root)
     environments.push(ctx.environment.environment_name.unwrap().to_string())
   }
-  let result = builder(@lander_core.AppName::parse("acme"), ["--environment", "Staging"], env_vars={ "ACME_ENVIRONMENT": "Production" }, working_dir=@lander_core.AbsolutePath::parse("/work/repo"))
-    |> command(name => @argparse.Command(name, options=[@hosting_argparse.environment_option()]))
+  let result = builder(
+      @lander_core.AppName::parse("acme"),
+      ["--environment", "Staging"],
+      env_vars={ "ACME_ENVIRONMENT": "Production" },
+      working_dir=@lander_core.AbsolutePath::parse("/work/repo"),
+    )
+    |> command(name => {
+      @argparse.Command(name, options=[@hosting_argparse.environment_option()])
+    })
     |> content_root(@lander_core.AbsolutePath::parse("/content"))
-    |> service("observer", starting=record, start=record, started=record, stopping=record, stop=record, stopped=record)
+    |> service(
+      "observer",
+      starting=record,
+      start=record,
+      started=record,
+      stopping=record,
+      stop=record,
+      stopped=record,
+    )
     |> build(b => {
       assert_eq(b.environment.application_name.to_string(), "acme")
       assert_true(b.environment.is_staging())
@@ -537,5 +751,7 @@ async test "factory all six hooks and command see the same typed host environmen
     })
     |> run(record)
   assert_eq(result.exit_code(), ExitCode::success())
-  assert_eq(environments, ["Staging", "Staging", "Staging", "Staging", "Staging", "Staging", "Staging"])
+  assert_eq(environments, [
+    "Staging", "Staging", "Staging", "Staging", "Staging", "Staging", "Staging",
+  ])
 }

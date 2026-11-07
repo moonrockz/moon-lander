@@ -1,5 +1,6 @@
 ///|
 /// The rule of a time limit that an input breaks.
+#derive(Eq, Debug)
 pub enum TimeLimitRule {
   /// The text is empty.
   Empty
@@ -22,7 +23,7 @@ pub enum TimeLimitRule {
   NotPositive
   /// The value is more than the largest time limit.
   AboveLargest
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TimeLimitRule with Eq::{equal, not_equal}
@@ -33,11 +34,12 @@ pub extend TimeLimitRule with @debug.Debug::{to_repr}
 ///|
 /// An input that is not a valid time limit. Callers can match the cases, but
 /// only the constructors of `TimeLimit` make them.
+#derive(Debug)
 pub suberror TimeLimitError {
   /// The input `input` breaks the rule `rule`. For a constructor that takes a
   /// count, `input` is the count with its unit, for example `-1ms`.
   InvalidTimeLimit(input~ : String, rule~ : TimeLimitRule)
-} derive(Debug)
+}
 
 ///|
 pub extend TimeLimitError with @debug.Debug::{to_repr}
@@ -68,9 +70,10 @@ pub fn TimeLimitError::message(self : TimeLimitError) -> String {
 /// A positive amount of time, from 1 millisecond to 2 147 483 647 milliseconds
 /// (the largest `Int`, about 24.8 days). This is the range of the timeouts of
 /// `moonbitlang/async`, so `to_millis` can give the value to it.
+#derive(Eq, Compare, Hash, Debug)
 pub struct TimeLimit {
-  priv millis : Int
-} derive(Eq, Compare, Hash, Debug)
+  priv millis : Int32
+}
 
 ///|
 pub extend TimeLimit with Eq::{equal, not_equal}
@@ -94,19 +97,19 @@ const LARGEST_TEXT : String = "596h31m23s647ms"
 
 ///|
 /// Make a time limit of `count` milliseconds.
-pub fn TimeLimit::millis(count : Int) -> TimeLimit raise TimeLimitError {
+pub fn TimeLimit::millis(count : Int32) -> TimeLimit raise TimeLimitError {
   from_total("\{count}ms", count.to_int64())
 }
 
 ///|
 /// Make a time limit of `count` seconds.
-pub fn TimeLimit::seconds(count : Int) -> TimeLimit raise TimeLimitError {
+pub fn TimeLimit::seconds(count : Int32) -> TimeLimit raise TimeLimitError {
   from_total("\{count}s", count.to_int64() * 1000L)
 }
 
 ///|
 /// The time limit in milliseconds, from 1 to the largest `Int`.
-pub fn TimeLimit::to_millis(self : TimeLimit) -> Int {
+pub fn TimeLimit::to_millis(self : TimeLimit) -> Int32 {
   self.millis
 }
 
@@ -116,7 +119,7 @@ fn from_total(input : String, total : Int64) -> TimeLimit raise TimeLimitError {
   guard total <= MAX_MILLIS else {
     raise InvalidTimeLimit(input~, rule=AboveLargest)
   }
-  { millis: total.to_int() }
+  { millis: total.to_int(), }
 }
 
 ///|
@@ -138,7 +141,7 @@ priv enum Unit_ {
 }
 
 ///|
-fn Unit_::rank(self : Unit_) -> Int {
+fn Unit_::rank(self : Unit_) -> Int32 {
   match self {
     Millisecond => 0
     Second => 1
@@ -203,15 +206,19 @@ pub fn TimeLimit::parse(text : String) -> TimeLimit raise TimeLimitError {
     guard index >= chars.length() || chars[index] != '.' else {
       raise invalid(NotANumber)
     }
-    index = skip_one_space(chars, index) catch { _ => raise invalid(UnexpectedSpace) }
+    index = skip_one_space(chars, index) catch {
+      _ => raise invalid(UnexpectedSpace)
+    }
     let unit_text = take_while(chars, index, is_unit_char)
     guard unit_text.length() > 0 else { raise invalid(MissingUnit) }
     guard unit_of(unit_text) is Some(unit) else {
       raise invalid(UnknownUnit(unit_text))
     }
     index += unit_text.length()
-    parts.push({ whole, fraction, unit })
-    index = skip_one_space(chars, index) catch { _ => raise invalid(UnexpectedSpace) }
+    parts.push({ whole, fraction, unit, })
+    index = skip_one_space(chars, index) catch {
+      _ => raise invalid(UnexpectedSpace)
+    }
   }
   // The order: each unit is smaller than the unit before it.
   for i in 1..<parts.length() {
@@ -249,7 +256,7 @@ pub fn TimeLimit::parse(text : String) -> TimeLimit raise TimeLimitError {
   }
   guard above || total > 0L else { raise invalid(NotPositive) }
   guard !above && total <= MAX_MILLIS else { raise invalid(AboveLargest) }
-  { millis: total.to_int() }
+  { millis: total.to_int(), }
 }
 
 ///|
@@ -282,7 +289,7 @@ fn digits_value(digits : String) -> Int64 {
 
 ///|
 /// 10 to the power `exponent`, for an exponent from 0 to 7.
-fn power_of_ten(exponent : Int) -> Int64 {
+fn power_of_ten(exponent : Int32) -> Int64 {
   let mut value = 1L
   for _ in 0..<exponent {
     value *= 10L
@@ -292,7 +299,11 @@ fn power_of_ten(exponent : Int) -> Int64 {
 
 ///|
 /// The characters from `start` for which `accept` is true, as text.
-fn take_while(chars : Array[Char], start : Int, accept : (Char) -> Bool) -> String {
+fn take_while(
+  chars : Array[Char],
+  start : Int32,
+  accept : (Char) -> Bool,
+) -> String {
   let builder = StringBuilder()
   let mut index = start
   while index < chars.length() && accept(chars[index]) {
@@ -304,7 +315,7 @@ fn take_while(chars : Array[Char], start : Int, accept : (Char) -> Bool) -> Stri
 
 ///|
 /// The index after one optional space at `index`. Two spaces raise.
-fn skip_one_space(chars : Array[Char], index : Int) -> Int raise {
+fn skip_one_space(chars : Array[Char], index : Int32) -> Int32 raise {
   guard index < chars.length() && chars[index] == ' ' else { return index }
   guard index + 1 < chars.length() && chars[index + 1] != ' ' else {
     fail("two spaces")
@@ -329,7 +340,7 @@ fn is_unit_char(char : Char) -> Bool {
 /// The canonical text: the parts from hours to milliseconds with short units
 /// and no spaces, without the zero parts, for example `2m30s` or `1s500ms`.
 /// `TimeLimit::parse` reads it back to an equal limit.
-pub impl Show for TimeLimit with output(self, logger) {
+pub impl Show for TimeLimit with fn output(self, logger) {
   let mut rest = self.millis
   for unit in [Hour, Minute, Second, Millisecond] {
     let size = unit.millis().to_int()

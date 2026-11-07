@@ -54,10 +54,11 @@ test "a stem does not end with _ or - and digits" {
 
 ///|
 test "a stem is not a Windows device name in any letter case" {
-  for name in [
-    "CON", "con", "Con", "PRN", "aux", "NUL", "COM1", "com9", "COM0", "lpt1", "LPT9",
-    "Lpt0",
-  ] {
+  for
+    name in [
+      "CON", "con", "Con", "PRN", "aux", "NUL", "COM1", "com9", "COM0", "lpt1", "LPT9",
+      "Lpt0",
+    ] {
     assert_true(stem_rule(name) is Some(ReservedDeviceName))
   }
   for name in ["CONX", "cons", "COM10", "COMA", "LPT", "nulls", "AUXI"] {
@@ -73,9 +74,12 @@ test "a stem error names the input and the rule" {
   } catch {
     error => error.message()
   }
-  inspect(message, content=(
-    #|Invalid log file stem "a.b": the character "." is not an ASCII letter, an ASCII digit, _ or -
-  ))
+  inspect(
+    message,
+    content=(
+      #|Invalid log file stem "a.b": the character "." is not an ASCII letter, an ASCII digit, _ or -
+    ),
+  )
 }
 
 ///|

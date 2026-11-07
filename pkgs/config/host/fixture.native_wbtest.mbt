@@ -25,12 +25,12 @@ async fn remove_dir(path : String) -> Unit {
 }
 
 ///|
-async fn mkdir(path : String, permission~ : Int) -> Unit {
+async fn mkdir(path : String, permission~ : Int32) -> Unit {
   @fs.mkdir(path, permission~)
 }
 
 ///|
-async fn chmod(path : String, permission : Int) -> Unit {
+async fn chmod(path : String, permission : Int32) -> Unit {
   @fs.chmod(path, permission)
 }
 
@@ -54,7 +54,7 @@ fn faulty_inspect(
   locked : Array[String],
   vanished : Array[String],
   broken : Array[String],
-) -> async (String) -> @fs.FileKind raise {
+) -> async (String) -> @fs.FileKind {
   async fn(native) {
     let path = to_slash(native, running_platform())
     if locked.contains(path) {
@@ -63,7 +63,11 @@ fn faulty_inspect(
     if broken.contains(path) {
       raise InjectedFault(path)
     }
-    let target = if vanished.contains(path) { native + ".vanished" } else { native }
+    let target = if vanished.contains(path) {
+      native + ".vanished"
+    } else {
+      native
+    }
     @fs.kind(target, follow_symlink=true)
   }
 }
@@ -74,9 +78,9 @@ async fn faulty_answer(
   tree : @config.FileTree,
   request : @config.FileRequest,
   locked~ : Array[String],
-  vanished? : Array[String] = [],
-  broken? : Array[String] = [],
-) -> @config.FileTree raise {
+  vanished~ : Array[String] = [],
+  broken~ : Array[String] = [],
+) -> @config.FileTree {
   answer_with(
     tree,
     request,
@@ -90,8 +94,8 @@ async fn faulty_answer(
 async fn faulty_load(
   builder : @config.ConfigBuilder,
   locked~ : Array[String],
-  vanished? : Array[String] = [],
-) -> @config.Config raise {
+  vanished~ : Array[String] = [],
+) -> @config.Config {
   let inspect = faulty_inspect(locked, vanished, [])
   load_by(builder, async fn(tree, request, platform) {
     answer_with(tree, request, platform, inspect)

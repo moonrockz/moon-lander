@@ -5,4 +5,5 @@ import {
 }
 
 // The diagram renderer uses native Markdown support; published framework code stays portable.
+
 supported_targets = "native"

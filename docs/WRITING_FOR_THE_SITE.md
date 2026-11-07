@@ -22,7 +22,7 @@ prose with tables, code and diagrams. Do not write long walls of text.
 The build reads only these sources. A file below `docs/` is a page. A link from a
 page to a file that is not a page goes to the file on GitHub.
 
-The shared site engine is `moonrockz/telescope@0.5.1`. Moon-Lander supplies its
+The shared site engine is `moonrockz/telescope@0.6.0`. Moon-Lander supplies its
 landing content, scoped landing styles, Mermaid/layers adapters and source rules.
 The shared shell supplies the Smithy palette, navigation, search and theme controls.
 

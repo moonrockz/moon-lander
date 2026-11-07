@@ -1,5 +1,6 @@
 ///|
 /// Checked generic RFC3986 URI-reference components, with original spelling.
+#derive(Debug)
 pub struct UriReference {
   raw : String
   scheme : String?
@@ -7,29 +8,31 @@ pub struct UriReference {
   path : String
   query : String?
   fragment : String?
-} derive(Debug)
+}
 
 ///|
 pub extend UriReference with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct Authority {
   raw : String
   userinfo : String?
   host : Host
   port : String?
-} derive(Debug)
+}
 
 ///|
 pub extend Authority with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub enum Host {
   RegisteredName(String)
   Ipv4(String)
   Ipv6(String)
   IpvFuture(String)
-} derive(Debug)
+}
 
 ///|
 pub extend Host with @debug.Debug::{to_repr}
@@ -92,9 +95,10 @@ pub fn Authority::port(self : Authority) -> String? {
 }
 
 ///|
+#derive(Debug)
 priv suberror UriRead {
   UriRead(@json.Diagnostic)
-} derive(Debug)
+}
 
 ///|
 fn[T] uri_invalid(message : String) -> T raise UriRead {

@@ -9,7 +9,7 @@ import {
   // Vendored moonbitlang/core/argparse until a pinned MoonBit has
   // Command::try_parse (lander-4us.5.18). The alias stays, so the return changes
   // only this line.
-  "moonrockz/moon-lander-hosting/vendor/argparse" @argparse,
+  "moonrockz/moon-lander-hosting/vendor/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/debug",
   "moonbitlang/async",
@@ -17,4 +17,5 @@ import {
 
 // The disk driver needs the async runtime; injected-tree tests in hosting
 // cover wasm and wasm-gc through the same configuration/factory boundary.
+
 supported_targets = "native+js"

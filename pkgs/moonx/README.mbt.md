@@ -24,9 +24,10 @@ provenance](RUNTIME.md) records the frozen source, test inputs and removal path.
 ///|
 test "construct an immutable Node payload plan" {
   let entry = @moonx.RelativeFilePath::parse("app/entry.js")
-  let payload = @moonx.Payload::new([
-    @moonx.PayloadFile::new(entry, b"process.exitCode = 23;"),
-  ], entry)
+  let payload = @moonx.Payload::new(
+    [@moonx.PayloadFile::new(entry, b"process.exitCode = 23;")],
+    entry,
+  )
   let arguments = @moonx.Arguments::parse(["", "--", "a b", "é🙂"])
   let plan = @moonx.NodeLaunch::new(payload, arguments)
   assert_eq(plan.payload().entry().to_string(), "app/entry.js")

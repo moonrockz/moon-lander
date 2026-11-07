@@ -31,6 +31,7 @@ pub async fn[X] scope(events? : RuntimeEvents, async (Scope) -> X) -> X
 pub fn[M, T] select((M) -> T? raise?) -> Receive[M, T]
 
 // Errors
+#derive(@debug.Debug)
 pub suberror ActorError {
   ScopeClosed
   NameInUse(@moon-lander-actors.ActorName)
@@ -42,7 +43,7 @@ pub suberror ActorError {
   DestinationClosed
   CleanupFailed(primary~ : Error?, cleanup~ : Error)
   CleanupTimedOut(primary~ : Error?, limit~ : @moon-lander-core.TimeLimit)
-} derive(@debug.Debug)
+}
 pub fn ActorError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
@@ -84,19 +85,21 @@ pub fn[M] ActorContext::reenqueue(Self[M], M) -> @moon-lander-actors.Admission
 pub fn[M] ActorContext::scope(Self[M]) -> Scope
 pub fn[M] ActorContext::self_ref(Self[M]) -> ActorRef[M]
 
+#derive(@debug.Debug)
 pub enum ActorEnd {
   Completed
   MailboxClosed
   Failed(Error)
   Cancelled
-} derive(@debug.Debug)
+}
 pub fn ActorEnd::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub enum ActorEvent {
   Started(ActorAddress)
   Ended(ActorAddress, ActorEnd)
   Undelivered(ActorAddress, Undelivered, payload~ : @ion.Ion?)
-} derive(@debug.Debug)
+}
 pub fn ActorEvent::to_repr(Self) -> @debug.Repr
 pub fn ActorEvent::to_string(Self) -> String
 
@@ -111,11 +114,12 @@ pub fn[M] ActorRef::to_subject(Self[M]) -> Subject[M]
 pub async fn[M, R] ActorRef::try_ask(Self[M], (Reply[R]) -> M, timeout? : WaitPolicy) -> R?
 pub fn[M] ActorRef::try_send(Self[M], M) -> @moon-lander-actors.Admission
 
+#derive(@debug.Debug)
 pub enum ActorStatus {
   Running
   Closing
   Ended(ActorEnd)
-} derive(@debug.Debug)
+}
 pub fn ActorStatus::to_repr(Self) -> @debug.Repr
 
 pub struct Directory[M] {
@@ -185,10 +189,11 @@ pub struct Reply[R] {
 }
 pub fn[R] Reply::send(Self[R], R) -> ReplyOutcome
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ReplyOutcome {
   Delivered
   Expired
-} derive(Eq, @debug.Debug)
+}
 pub fn ReplyOutcome::equal(Self, Self) -> Bool
 pub fn ReplyOutcome::not_equal(Self, Self) -> Bool
 pub fn ReplyOutcome::to_repr(Self) -> @debug.Repr
@@ -223,10 +228,11 @@ pub fn[S, M] Scope::start(Self, S, async (S, M) -> Next[S], mailbox? : @moon-lan
 pub async fn[S, M] Scope::start_with(Self, async (Setup) -> S, async (S, M) -> Next[S], mailbox? : @moon-lander-actors.MailboxPolicy, cleanup_limit? : @moon-lander-core.TimeLimit, name? : @moon-lander-actors.ActorName, payload? : @moon-lander-actors.PayloadPolicy[M]) -> Actor[M, Unit]
 pub fn[M] Scope::subscribe(Self, Topic[M], Subject[M]) -> Subscription raise ActorError
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SendOutcome {
   Admitted
   Rejected
-} derive(Eq, @debug.Debug)
+}
 pub fn SendOutcome::equal(Self, Self) -> Bool
 pub fn SendOutcome::not_equal(Self, Self) -> Bool
 pub fn SendOutcome::to_repr(Self) -> @debug.Repr
@@ -292,19 +298,21 @@ pub fn[M] Topic::new() -> Self[M]
 pub async fn[M] Topic::publish(Self[M], M) -> Unit
 pub fn[M] Topic::subscriber_count(Self[M]) -> Int32
 
+#derive(Eq, @debug.Debug)
 pub enum Undelivered {
   Full
   Closed
   Discarded
-} derive(Eq, @debug.Debug)
+}
 pub fn Undelivered::equal(Self, Self) -> Bool
 pub fn Undelivered::not_equal(Self, Self) -> Bool
 pub fn Undelivered::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum WaitPolicy {
   Within(@moon-lander-core.TimeLimit)
   UntilStopped
-} derive(Eq, @debug.Debug)
+}
 pub fn WaitPolicy::default() -> Self
 pub fn WaitPolicy::equal(Self, Self) -> Bool
 pub fn WaitPolicy::not_equal(Self, Self) -> Bool

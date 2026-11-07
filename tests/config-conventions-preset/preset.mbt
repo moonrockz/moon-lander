@@ -16,7 +16,11 @@ pub let root : String = "/case"
 pub fn morphir() -> @conventions.Conventions {
   @conventions.app_dirs("morphir", prefix="MORPHIR", display="Morphir")
   |> @conventions.without(LocalOverrides)
-  |> @conventions.legacy("morphir.json", format=@json5.format(), decode=value => value)
+  |> @conventions.legacy("morphir.json", format=@json5.format(), decode=fn(
+    value,
+  ) {
+    value
+  })
   |> @conventions.workspace
   |> @conventions.member_scope_keys(["workspace.out_dir"])
   |> @conventions.inherited_filter(["project", "workspace"])
@@ -26,7 +30,7 @@ pub fn morphir() -> @conventions.Conventions {
 /// The registered formats of the preset: TOML, and YAML limited to `.yaml`.
 /// The JSON5 format is only the format of the legacy part.
 pub fn formats() -> Array[@config.Format] {
-  [@toml.format(), { ..@yaml.format(), extensions: ["yaml"] }]
+  [@toml.format(), { ..@yaml.format(), extensions: ["yaml"], }]
 }
 
 ///|
@@ -57,14 +61,14 @@ pub(all) struct Case {
 pub fn Case::new(
   name : String,
   files : Array[(String, String)],
-  start? : String = "",
+  start~ : String = "",
   config? : String,
-  isolated? : Bool = false,
+  isolated~ : Bool = false,
   project? : String,
-  platform? : @config.Platform = Linux,
-  env_vars? : Array[(String, String)] = [("HOME", "/home/user")],
+  platform~ : @config.Platform = Linux,
+  env_vars~ : Array[(String, String)] = [("HOME", "/home/user")],
 ) -> Case {
-  { name, files, start, config, isolated, project, platform, env_vars }
+  { name, files, start, config, isolated, project, platform, env_vars, }
 }
 
 ///|
@@ -127,7 +131,11 @@ pub fn tree(files : Array[(String, String)]) -> @config.FileTree {
     for index, name in names {
       let entry : @config.DirEntry = {
         name,
-        kind: if index == names.length() - 1 { File } else { Directory },
+        kind: if index == names.length() - 1 {
+          File
+        } else {
+          Directory
+        },
       }
       let entries = listings.get(dir).unwrap_or([])
       if !entries.contains(entry) {
@@ -157,9 +165,7 @@ pub fn load(case : Case) -> @config.Config raise @config.ConfigError {
 /// name, priority, status, path, candidates and warnings, the effective value
 /// as JSON, and the load warnings. A failed load gives its error message.
 pub fn observe(case : Case) -> String {
-  let config = try load(case) catch {
-    error => return "error: \{error.message()}"
-  }
+  let config = load(case) catch { error => return "error: \{error.message()}" }
   let lines = []
   for report in config.reports() {
     let status = match report.status {
@@ -177,7 +183,7 @@ pub fn observe(case : Case) -> String {
       lines.push("  warning \{describe(warning)}")
     }
   }
-  let value = try @config.show(config, Json) catch {
+  let value = @config.show(config, Json) catch {
     error => "error: \{error.message()}"
   }
   lines.push("value \{value}")

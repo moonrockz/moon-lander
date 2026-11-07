@@ -8,7 +8,7 @@ pub struct Directory[M] {
 ///|
 /// The directory with no members.
 pub fn[M] Directory::empty() -> Directory[M] {
-  { members: @sorted_map.SortedMap::new() }
+  { members: @sorted_map.SortedMap::new(), }
 }
 
 ///|
@@ -19,7 +19,10 @@ pub fn[M] Directory::of(entry : ActorRef[M]) -> Directory[M] {
 
 ///|
 /// All members of both directories, one for each address.
-pub fn[M] Directory::union(self : Directory[M], other : Directory[M]) -> Directory[M] {
+pub fn[M] Directory::union(
+  self : Directory[M],
+  other : Directory[M],
+) -> Directory[M] {
   let mut members = self.members
   for address, entry in other.members {
     members = members.add(address, entry)
@@ -29,8 +32,11 @@ pub fn[M] Directory::union(self : Directory[M], other : Directory[M]) -> Directo
 
 ///|
 /// This directory with `member` as a entry.
-pub fn[M] Directory::add(self : Directory[M], entry : ActorRef[M]) -> Directory[M] {
-  { members: self.members.add(entry.address(), entry) }
+pub fn[M] Directory::add(
+  self : Directory[M],
+  entry : ActorRef[M],
+) -> Directory[M] {
+  { members: self.members.add(entry.address(), entry), }
 }
 
 ///|
@@ -40,7 +46,7 @@ pub fn[M] Directory::remove(
   self : Directory[M],
   entry : ActorRef[M],
 ) -> Directory[M] {
-  { members: self.members.remove(entry.address()) }
+  { members: self.members.remove(entry.address()), }
 }
 
 ///|
@@ -57,12 +63,12 @@ pub fn[M] Directory::difference(
 }
 
 ///|
-pub impl[M] Add for Directory[M] with add(self, other) {
+pub impl[M] Add for Directory[M] with fn add(self, other) {
   self.union(other)
 }
 
 ///|
-pub impl[M] Sub for Directory[M] with sub(self, other) {
+pub impl[M] Sub for Directory[M] with fn sub(self, other) {
   self.difference(other)
 }
 
@@ -73,7 +79,7 @@ pub extend Directory with Sub::{sub}
 
 ///|
 /// Equal when both have the same entry addresses.
-pub impl[M] Eq for Directory[M] with equal(self, other) {
+pub impl[M] Eq for Directory[M] with fn equal(self, other) {
   self.members.length() == other.members.length() &&
   self.members.keys_as_iter().all(address => other.members.contains(address))
 }
@@ -83,7 +89,7 @@ pub extend Directory with Eq::{equal, not_equal}
 
 ///|
 /// The number of members.
-pub fn[M] Directory::size(self : Directory[M]) -> Int {
+pub fn[M] Directory::size(self : Directory[M]) -> Int32 {
   self.members.length()
 }
 
@@ -146,6 +152,6 @@ pub fn[M] Directory::lookup(
   match refs {
     [] => Missing
     [entry] => Found(entry)
-    _ => Ambiguous({ name, refs })
+    _ => Ambiguous({ name, refs, })
   }
 }

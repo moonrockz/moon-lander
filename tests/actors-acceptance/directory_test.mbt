@@ -1,7 +1,7 @@
 ///|
 enum Tick {
   Bump
-  Value(@actors.Reply[Int])
+  Value(@actors.Reply[Int32])
 }
 
 ///|
@@ -49,7 +49,15 @@ async test "Valid names and boundaries, and invalid names with their rule" {
   for text in ["a", "worker-17", "counter.total", "a".repeat(128)] {
     assert_eq(@actors.ActorName::parse(text).to_string(), text)
   }
-  for text in ["", "9counter", "counter/total", "zähler", "two words", "a".repeat(129)] {
+  for
+    text in [
+      "",
+      "9counter",
+      "counter/total",
+      "zähler",
+      "two words",
+      "a".repeat(129),
+    ] {
     let failed = try {
       ignore(@actors.ActorName::parse(text))
       false

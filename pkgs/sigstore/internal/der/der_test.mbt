@@ -16,7 +16,10 @@ fn malformed(bytes : Bytes) -> Bool {
 ///|
 test "lengths must be definite and minimal" {
   assert_eq(@der.parse(hex("0400")).content.length(), 0)
-  assert_eq(@der.parse(hex("04 7f".replace_all(old=" ", new="") + "00".repeat(127))).content.length(), 127)
+  assert_eq(
+    @der.parse(hex("04 7f".replace_all(old=" ", new="") + "00".repeat(127))).content.length(),
+    127,
+  )
   assert_eq(@der.parse(hex("048180" + "00".repeat(128))).content.length(), 128)
   // 127 bytes in the long form is not minimal.
   assert_true(malformed(hex("04817f" + "00".repeat(127))))
@@ -50,8 +53,14 @@ test "integers must be minimal and non-negative" {
 
 ///|
 test "object identifiers" {
-  assert_eq(@der.parse(hex("06092a864886f70d01010b")).oid(), "1.2.840.113549.1.1.11")
-  assert_eq(@der.parse(hex("060a2b0601040183bf300101")).oid(), "1.3.6.1.4.1.57264.1.1")
+  assert_eq(
+    @der.parse(hex("06092a864886f70d01010b")).oid(),
+    "1.2.840.113549.1.1.11",
+  )
+  assert_eq(
+    @der.parse(hex("060a2b0601040183bf300101")).oid(),
+    "1.3.6.1.4.1.57264.1.1",
+  )
   assert_eq(@der.parse(hex("0603551d11")).oid(), "2.5.29.17")
   for bad in ["0600", "06022b80", "06028001", "06012b86"] {
     let failed = try {
@@ -71,7 +80,10 @@ test "times are UTC with seconds" {
   let general = @der.parse(@encoding.utf8("\u{18}\u{0f}20261016064801Z"))
   assert_eq(general.time(), 1792133281L)
   assert_eq(@der.parse(@encoding.utf8("\u{17}\u{0d}700101000000Z")).time(), 0L)
-  assert_eq(@der.parse(@encoding.utf8("\u{17}\u{0d}491231235959Z")).time(), 2524607999L)
+  assert_eq(
+    @der.parse(@encoding.utf8("\u{17}\u{0d}491231235959Z")).time(),
+    2524607999L,
+  )
   for
     bad in [
       "\u{17}\u{0d}261016064801+", "\u{17}\u{0b}2610160648Z", "\u{17}\u{0d}261316064801Z",
@@ -132,7 +144,10 @@ fn refused(body : () -> Unit raise) -> Bool {
 test "length forms at each limit" {
   // One to three length bytes are read; four are not.
   assert_eq(@der.parse(hex("0481ff" + "00".repeat(255))).content.length(), 255)
-  assert_eq(@der.parse(hex("04820100" + "00".repeat(256))).content.length(), 256)
+  assert_eq(
+    @der.parse(hex("04820100" + "00".repeat(256))).content.length(),
+    256,
+  )
   assert_true(malformed(hex("048200ff" + "00".repeat(255))))
   assert_true(malformed(hex("0484000000010000")))
   // A length longer than the input, in the short and long forms.
@@ -174,7 +189,9 @@ test "reader cursor operations" {
 test "small integers up to three bytes" {
   assert_eq(@der.parse(hex("02037fffff")).small_int(), 0x7fffff)
   assert_eq(@der.parse(hex("020400ffffff")).small_int(), 0xffffff)
-  assert_true(refused(() => ignore(@der.parse(hex("020401000000")).small_int())))
+  assert_true(
+    refused(() => ignore(@der.parse(hex("020401000000")).small_int())),
+  )
   // Not an INTEGER.
   assert_true(refused(() => ignore(@der.parse(hex("0a0101")).small_int())))
 }
@@ -191,13 +208,19 @@ test "bit strings at each limit" {
   // bit_string_bytes needs no unused bits.
   assert_eq(@der.parse(hex("030100")).bit_string_bytes().length(), 0)
   assert_true(refused(() => ignore(@der.parse(hex("0300")).bit_string_bytes())))
-  assert_true(refused(() => ignore(@der.parse(hex("030201ff")).bit_string_bytes())))
-  assert_true(refused(() => ignore(@der.parse(hex("0401ff")).bit_string_bytes())))
+  assert_true(
+    refused(() => ignore(@der.parse(hex("030201ff")).bit_string_bytes())),
+  )
+  assert_true(
+    refused(() => ignore(@der.parse(hex("0401ff")).bit_string_bytes())),
+  )
   // named_bits: no bits, 16 bits, and the limits of the unused count.
   assert_eq(@der.parse(hex("030100")).named_bits(), 0)
   assert_eq(@der.parse(hex("030300ffff")).named_bits(), 0xffff)
   assert_eq(@der.parse(hex("03020080")).named_bits(), 1)
-  assert_true(refused(() => ignore(@der.parse(hex("03040000ffff")).named_bits())))
+  assert_true(
+    refused(() => ignore(@der.parse(hex("03040000ffff")).named_bits())),
+  )
   assert_true(refused(() => ignore(@der.parse(hex("03020880")).named_bits())))
   assert_true(refused(() => ignore(@der.parse(hex("030101")).named_bits())))
   assert_true(refused(() => ignore(@der.parse(hex("0300")).named_bits())))
@@ -225,7 +248,9 @@ test "object identifier arcs at each limit" {
     "1.2.\{(1UL << 63) - 1UL}",
   )
   assert_true(
-    refused(() => ignore(@der.parse(hex("060b2a" + "ff".repeat(9) + "7f")).oid())),
+    refused(() => {
+      ignore(@der.parse(hex("060b2a" + "ff".repeat(9) + "7f")).oid())
+    }),
   )
   // Not an OID.
   assert_true(refused(() => ignore(@der.parse(hex("04012a")).oid())))
@@ -244,9 +269,9 @@ test "strings" {
 ///|
 test "time limits" {
   // UTCTime years 50 and 49 are 1950 and 2049.
-  let utc = (text : String) => @der.parse(
-    @der.encode(@der.UTC_TIME, @encoding.utf8(text)),
-  )
+  let utc = (text : String) => {
+    @der.parse(@der.encode(@der.UTC_TIME, @encoding.utf8(text)))
+  }
   assert_eq(utc("500101000000Z").time(), -631152000L)
   assert_eq(utc("491231235959Z").time(), 2524607999L)
   // Leap days.
@@ -254,13 +279,14 @@ test "time limits" {
   assert_true(refused(() => ignore(utc("010229000000Z").time())))
   assert_true(refused(() => ignore(utc("000230000000Z").time())))
   // Day 0, month 0, minute 60 and second 60.
-  for bad in ["260100000000Z", "260001000000Z", "260101006000Z", "260101000060Z"] {
+  for
+    bad in ["260100000000Z", "260001000000Z", "260101006000Z", "260101000060Z"] {
     assert_true(refused(() => ignore(utc(bad).time())), msg=bad)
   }
   // A fraction or an offset is not DER.
-  let general = (text : String) => @der.parse(
-    @der.encode(@der.GENERALIZED_TIME, @encoding.utf8(text)),
-  )
+  let general = (text : String) => {
+    @der.parse(@der.encode(@der.GENERALIZED_TIME, @encoding.utf8(text)))
+  }
   assert_eq(general("21000301000000Z").time(), 4107542400L)
   assert_true(refused(() => ignore(general("20261016064801.5Z").time())))
   assert_true(refused(() => ignore(general("20261016064801+0000").time())))
@@ -286,7 +312,7 @@ test "days_in_month and unix_seconds" {
 }
 
 ///|
-fn generalized(text : String) -> (Int64, Int) raise {
+fn generalized(text : String) -> (Int64, Int32) raise {
   let content = @encoding.utf8(text)
   let header = Bytes::from_array([b'\x18', content.length().to_byte()])
   @der.parse(Bytes::from_array([..header.to_array(), ..content.to_array()])).generalized_time()
@@ -296,7 +322,10 @@ fn generalized(text : String) -> (Int64, Int) raise {
 test "GeneralizedTime reads canonical fractions" {
   assert_eq(generalized("20261026192009Z"), (1793042409L, 0))
   assert_eq(generalized("20261026192009.5Z"), (1793042409L, 500_000_000))
-  assert_eq(generalized("20261026192009.123456789Z"), (1793042409L, 123_456_789))
+  assert_eq(
+    generalized("20261026192009.123456789Z"),
+    (1793042409L, 123_456_789),
+  )
   assert_eq(generalized("20261026192009.001Z"), (1793042409L, 1_000_000))
   for
     bad in [
@@ -314,13 +343,20 @@ test "GeneralizedTime reads canonical fractions" {
 }
 
 ///|
-fn string_element(tag : Int, text : Bytes) -> @der.Element raise {
-  @der.parse(Bytes::from_array([tag.to_byte(), text.length().to_byte(), ..text.to_array()]))
+fn string_element(tag : Int32, text : Bytes) -> @der.Element raise {
+  @der.parse(
+    Bytes::from_array(
+      [tag.to_byte(), text.length().to_byte(), ..text.to_array()],
+    ),
+  )
 }
 
 ///|
 test "PrintableString and IA5String keep to their character sets" {
-  assert_eq(string_element(@der.PRINTABLE_STRING, b"Az09 '()+,-./:=?").text(), "Az09 '()+,-./:=?")
+  assert_eq(
+    string_element(@der.PRINTABLE_STRING, b"Az09 '()+,-./:=?").text(),
+    "Az09 '()+,-./:=?",
+  )
   for bad in [b"a@b", b"a*b", b"a_b", b"a\x00b", b"\xc3\xa9"] {
     let failed = try {
       ignore(string_element(@der.PRINTABLE_STRING, bad).text())

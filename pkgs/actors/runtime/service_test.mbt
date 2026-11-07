@@ -1,20 +1,21 @@
 ///|
 /// A private service with mutable state.
 struct Account {
-  mut balance : Int
+  mut balance : Int32
   log : Array[String]
 }
 
 ///|
+#derive(Debug)
 suberror Refused {
   Refused(String)
-} derive(Debug)
+}
 
 ///|
 async test "SVC-1: a service gives typed results of different types with no message enum" {
   @actors.scope(scope => {
-    let account = scope.create({ balance: 10, log: [] })
-    let balance : Int = account.ask(service => service.balance)
+    let account = scope.create({ balance: 10, log: [], })
+    let balance : Int32 = account.ask(service => service.balance)
     let text : String = account.ask(service => {
       @aio.pause()
       "balance \{service.balance}"
@@ -27,7 +28,7 @@ async test "SVC-1: a service gives typed results of different types with no mess
 ///|
 async test "SVC-1: an ask error goes to its caller, and the next call sees the earlier change" {
   @actors.scope(scope => {
-    let account = scope.create({ balance: 10, log: [] })
+    let account = scope.create({ balance: 10, log: [], })
     let outcome = try {
       account.ask(service => {
         service.balance -= 30
@@ -53,7 +54,7 @@ async test "SVC-1: calls run one at a time on the service task" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let log = @actors.scope(scope => {
-    let account = scope.create({ balance: 0, log: [] })
+    let account = scope.create({ balance: 0, log: [], })
     @aio.with_task_group(group => {
       group.spawn_bg(() => {
         account.ask(service => {
@@ -79,7 +80,7 @@ async test "SVC-1: a tell failure ends the service, runs its cleanup and fails t
   let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let outcome = try {
     @actors.scope(scope => {
-      let account = scope.create({ balance: 0, log: [] }, on_stop=() => {
+      let account = scope.create({ balance: 0, log: [], }, on_stop=() => {
         log.push("cleanup")
       })
       account.tell(_ => raise Refused("tell"))
@@ -100,7 +101,7 @@ async test "SVC-1: closing a service lets the running call finish and wakes a qu
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let outcomes = []
   @actors.scope(scope => {
-    let account = scope.create({ balance: 0, log: [] })
+    let account = scope.create({ balance: 0, log: [], })
     @aio.with_task_group(group => {
       let running = group.spawn(() => {
         account.ask(service => {
@@ -135,7 +136,7 @@ async test "SVC-1: closing a service lets the running call finish and wakes a qu
 ///|
 async test "SVC-1: a service drains its queued calls and can be cancelled" {
   @actors.scope(scope => {
-    let account = scope.create({ balance: 0, log: [] })
+    let account = scope.create({ balance: 0, log: [], })
     account.tell(service => service.balance += 5)
     account.drain()
     let late = try {
@@ -152,7 +153,8 @@ async test "SVC-1: a service drains its queued calls and can be cancelled" {
       other.join()
       "result"
     } catch {
-      @actors.ActorCancelled(address) if address == other.address() => "cancelled"
+      @actors.ActorCancelled(address) if address == other.address() =>
+        "cancelled"
       _ => "other"
     }
     assert_eq(joined, "cancelled")
@@ -174,7 +176,7 @@ async test "SVC-1: a responder answers with the handler result and no reply plum
 ///|
 async test "SVC-1: a rejection in the reply type does not end the responder" {
   @actors.scope(scope => {
-    let checker = scope.respond((value : Int) => {
+    let checker = scope.respond((value : Int32) => {
       if value < 0 {
         Err("negative")
       } else {
@@ -191,22 +193,24 @@ async test "SVC-1: a rejection in the reply type does not end the responder" {
 async test "SVC-1: a responder handler error ends it and wakes every pending caller with the cause" {
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
-  let ready : @aio.Queue[@actors.RequestActor[Int, Int]] = @aio.Queue(
+  let ready : @aio.Queue[@actors.RequestActor[Int32, Int32]] = @aio.Queue(
     kind=Unbounded,
   )
   let outcomes = @aio.with_task_group(group => {
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let failing = scope.respond((value : Int) => {
-        started.put(())
-        gate.get()
-        if value == 0 {
-          raise Refused("zero")
-        }
-        value
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let failing = scope.respond((value : Int32) => {
+          started.put(())
+          gate.get()
+          if value == 0 {
+            raise Refused("zero")
+          }
+          value
+        })
+        ready.put(failing)
+        failing.join()
       })
-      ready.put(failing)
-      failing.join()
-    }))
+    })
     let failing = ready.get()
     let first = group.spawn(() => {
       try {
@@ -240,7 +244,7 @@ async test "SVC-1: service and responder share the admission rules of actors" {
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let one = @actors.MailboxCapacity::from_int(1)
   @actors.scope(scope => {
-    let account = scope.create({ balance: 0, log: [] }, mailbox=Bounded(one))
+    let account = scope.create({ balance: 0, log: [], }, mailbox=Bounded(one))
     account.tell(_ => {
       started.put(())
       gate.get()
@@ -256,7 +260,10 @@ async test "SVC-1: service and responder share the admission rules of actors" {
     assert_eq(asked, -1)
     gate.put(())
     assert_eq(account.ask(service => service.balance), 1)
-    let responder = scope.respond((value : Int) => value, mailbox=Bounded(one))
+    let responder = scope.respond(
+      (value : Int32) => value,
+      mailbox=Bounded(one),
+    )
     responder.close()
     let closed = try {
       ignore(responder.ask(1))

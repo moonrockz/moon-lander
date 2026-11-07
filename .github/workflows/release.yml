@@ -134,7 +134,7 @@ jobs:
         run: mise run release:publish
       - name: Verify all published libraries and archive checksums
         run: mise run check:framework-published
-      - name: Verify cold public Moonx consumers on both stock compilers
+      - name: Verify cold public Moonx consumers on the stock primary pin
         run: mise run check:moonx-published
       - name: Retain public Moonx qualification
         if: always()

@@ -76,7 +76,7 @@ suberror BuildError {
 }
 
 ///|
-impl Show for BuildError with output(self, logger) {
+impl Show for BuildError with fn output(self, logger) {
   let BuildError(text) = self
   logger.write_string(text)
 }
@@ -93,18 +93,24 @@ test "readable text with an error" {
   )
   let time = @formatting.LogTimestamp::from_epoch_millis(1793110987041L)
   let record = @formatting.LogRecord::capture(memory.events()[0], time)
-  inspect(@formatting.format_text(record), content=(
-    #|2026-10-27T14:23:07.041Z [ERR] build.compiler: Compilation failed for app.mbt
-    #|    CompilerError: Unknown identifier calculate_total
-    #|      at app.mbt:42
-    #|
-  ))
-  inspect(@formatting.format_console(record, Plain), content=(
-    #|[14:23:07.041Z ERR] build.compiler: Compilation failed for app.mbt
-    #|    CompilerError: Unknown identifier calculate_total
-    #|      at app.mbt:42
-    #|
-  ))
+  inspect(
+    @formatting.format_text(record),
+    content=(
+      #|2026-10-27T14:23:07.041Z [ERR] build.compiler: Compilation failed for app.mbt
+      #|    CompilerError: Unknown identifier calculate_total
+      #|      at app.mbt:42
+      #|
+    ),
+  )
+  inspect(
+    @formatting.format_console(record, Plain),
+    content=(
+      #|[14:23:07.041Z ERR] build.compiler: Compilation failed for app.mbt
+      #|    CompilerError: Unknown identifier calculate_total
+      #|      at app.mbt:42
+      #|
+    ),
+  )
 }
 ```
 
@@ -133,10 +139,13 @@ test "an escape character becomes visible text" {
     memory.events()[0],
     @formatting.LogTimestamp::earliest(),
   )
-  inspect(@formatting.format_console(record, Plain), content=(
-    #|[00:00:00.000Z WRN] Input \x1b[2Jcleared\x0d
-    #|
-  ))
+  inspect(
+    @formatting.format_console(record, Plain),
+    content=(
+      #|[00:00:00.000Z WRN] Input \x1b[2Jcleared\x0d
+      #|
+    ),
+  )
 }
 ```
 
@@ -217,10 +226,13 @@ test "one JSON Lines record" {
   )
   let time = @formatting.LogTimestamp::from_epoch_millis(1793110987024L)
   let record = @formatting.LogRecord::capture(memory.events()[0], time)
-  inspect(@formatting.format_json_line(record), content=(
-    #|{"schemaVersion":1,"timestamp":"2026-10-27T14:23:07.024Z","level":"Information","category":"workspace.loader","messageTemplate":"Loaded {Count} files from {Path}","message":"Loaded 3 files from src","properties":[{"name":"Count","value":3},{"name":"Path","value":"src"}],"error":null}
-    #|
-  ))
+  inspect(
+    @formatting.format_json_line(record),
+    content=(
+      #|{"schemaVersion":1,"timestamp":"2026-10-27T14:23:07.024Z","level":"Information","category":"workspace.loader","messageTemplate":"Loaded {Count} files from {Path}","message":"Loaded 3 files from src","properties":[{"name":"Count","value":3},{"name":"Path","value":"src"}],"error":null}
+      #|
+    ),
+  )
 }
 ```
 
@@ -241,9 +253,28 @@ test "named JSON with complete duplicate history" {
   (memory : &@logging.Logger).info("{path} {path} {level}", [
     "/repo/morphir.toml", "/repo/app/morphir.toml", "event value",
   ])
-  let record = @formatting.LogRecord::capture(memory.events()[0], @formatting.LogTimestamp::earliest())
+  let record = @formatting.LogRecord::capture(
+    memory.events()[0],
+    @formatting.LogTimestamp::earliest(),
+  )
   let line = @formatting.format_json_object_line(record)
-  guard @json.parse(line) is { "schemaVersion": 2, "level": "Information", "properties": { "path": "/repo/app/morphir.toml", "level": "event value", .. }, "duplicateProperties": { "path": ["/repo/morphir.toml", "/repo/app/morphir.toml"], .. }, .. } else { fail(line) }
+  guard @json.parse(line)
+    is {
+      "schemaVersion": 2,
+      "level": "Information",
+      "properties": {
+        "path": "/repo/app/morphir.toml",
+        "level": "event value",
+        ..
+      },
+      "duplicateProperties": {
+        "path": ["/repo/morphir.toml", "/repo/app/morphir.toml"],
+        ..
+      },
+      ..
+    } else {
+    fail(line)
+  }
 }
 ```
 

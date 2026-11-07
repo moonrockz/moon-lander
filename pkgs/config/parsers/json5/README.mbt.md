@@ -13,10 +13,9 @@ test "parse JSON5 with a comment" {
     #|  "ir": { "layout": "tree" }
     #|}
   let value = @json5.parse(text, origin="app.json")
-  @expect.expect(@config.get_text(
-    @config.build([@config.in_memory(value)]),
-    "ir.layout",
-  )).to_equal("tree")
+  @expect.expect(
+    @config.get_text(@config.build([@config.in_memory(value)]), "ir.layout"),
+  ).to_equal("tree")
 }
 ```
 
@@ -31,10 +30,7 @@ or Ion, or a string, when a value must stay exact beyond that range.
 ```mbt check
 ///|
 test "safe integers stay exact; larger magnitudes become floats" {
-  let safe = @json5.parse(
-    "{\"n\": 9007199254740992}",
-    origin="app.json",
-  )
+  let safe = @json5.parse("{\"n\": 9007199254740992}", origin="app.json")
   guard safe.to_ion().kind() is Struct(fields) else { fail("expected object") }
   guard fields[0].value().kind() is Int(_) else {
     fail("2^53 should stay an integer")
@@ -60,8 +56,6 @@ JSON or JSON5 sources.
 ///|
 test "duplicate JSON keys keep the last value" {
   let value = @json5.parse("{\"a\": 1, \"a\": 2}", origin="app.json")
-  @expect.expect(value).to_equal(
-    @config.fields([("a", @config.int(2))]),
-  )
+  @expect.expect(value).to_equal(@config.fields([("a", @config.int(2))]))
 }
 ```

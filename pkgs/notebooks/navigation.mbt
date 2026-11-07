@@ -1,6 +1,7 @@
 ///|
 /// The common role of a cell, independent of its file format.
 /// Unknown retains the original format's cell-type name.
+#derive(Eq, Debug)
 pub(all) enum CellKind {
   /// Executable source, with stored outputs when supported by the format.
   Code
@@ -10,7 +11,7 @@ pub(all) enum CellKind {
   Raw
   /// A cell type introduced by a format extension or a future revision.
   Unknown(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CellKind with Eq::{equal, not_equal}
@@ -22,6 +23,7 @@ pub extend CellKind with @debug.Debug::{to_repr}
 /// The role of a node during shared traversal. Output variants carry the
 /// output type; attachments carry filenames; directives carry command names.
 /// Use the concrete node value to inspect format-specific payloads.
+#derive(Eq, Debug)
 pub(all) enum NodeKind {
   /// The root document containing ordered cells.
   Notebook
@@ -33,7 +35,7 @@ pub(all) enum NodeKind {
   Attachment(String)
   /// A retained source directive, carrying its command name without #!.
   Directive(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend NodeKind with Eq::{equal, not_equal}
@@ -72,9 +74,10 @@ impl Node with fn source(_self) {
 /// An immutable sequence of zero-based child indices relative to a tree root.
 /// The empty path denotes that root. Paths describe traversal children, not
 /// JSON keys or persistent cell IDs; they may not resolve in another tree.
+#derive(Eq, Debug)
 struct NodePath {
   indices : ReadOnlyArray[Int32]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend NodePath with Eq::{equal, not_equal}
@@ -250,6 +253,7 @@ pub fn[N : Node] Cursor::children(self : Cursor[N]) -> ReadOnlyArray[Cursor[N]] 
 /// A decision returned by an enter callback during depth-first traversal.
 /// Continue descends, SkipChildren prunes but still calls leave, and Stop
 /// returns immediately without calling any pending leave callbacks.
+#derive(Eq, Debug)
 pub(all) enum Control {
   /// Visit descendants, then call leave for this node.
   Continue
@@ -257,7 +261,7 @@ pub(all) enum Control {
   SkipChildren
   /// End traversal immediately, without this or any pending leave callbacks.
   Stop
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Control with Eq::{equal, not_equal}

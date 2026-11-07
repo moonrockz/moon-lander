@@ -2,9 +2,10 @@
 /// A path to a value in a configuration tree: a non-empty list of non-empty
 /// field names. Name matches are exact and case-sensitive. A key path does not
 /// select list items.
+#derive(Eq, Hash, Debug)
 pub struct KeyPath {
   priv names : Array[String]
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend KeyPath with Eq::{equal, not_equal}
@@ -86,7 +87,7 @@ pub fn KeyPath::parse(text : String) -> KeyPath raise ConfigError {
 /// A key path from field names, from the root down. The list and each name
 /// must not be empty.
 pub fn KeyPath::from_names(names : Array[String]) -> KeyPath raise ConfigError {
-  let path = { names: names.copy() }
+  let path = { names: names.copy(), }
   if names.is_empty() {
     raise InvalidKeyPath(text="", reason="the key path is empty")
   }
@@ -107,7 +108,7 @@ pub fn KeyPath::names(self : KeyPath) -> Array[String] {
 
 ///|
 /// The text form, which `KeyPath::parse` reads back to an equal key path.
-pub impl Show for KeyPath with output(self, logger) {
+pub impl Show for KeyPath with fn output(self, logger) {
   for index, name in self.names {
     if index > 0 {
       logger.write_char('.')

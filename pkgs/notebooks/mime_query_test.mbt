@@ -40,7 +40,11 @@ test "consumer-defined MIME-capable cells use the shared query" {
       @notebooks.cells_by_mime_type(cells, "text/plain").map(cell => cell.name),
     )
     .to_equal(["first"])
-    s.expect(@notebooks.cells_by_mime_type(cells, "IMAGE/PNG").length()).to_equal(0)
-    s.expect(@notebooks.cells_by_mime_type(cells, "image/jpeg").length()).to_equal(0)
+    s
+    .expect(@notebooks.cells_by_mime_type(cells, "IMAGE/PNG").length())
+    .to_equal(0)
+    s
+    .expect(@notebooks.cells_by_mime_type(cells, "image/jpeg").length())
+    .to_equal(0)
   })
 }

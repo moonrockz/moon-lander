@@ -15,13 +15,13 @@ fn leaves(
         continue
       }
       let path = [..names, name]
-      let child = { ion: value }
+      let child = { ion: value, }
       if is_secret_reference(child, secret_syntax) {
-        out.push(({ names: path }, child))
+        out.push(({ names: path, }, child))
       } else if value.kind() is Struct(_) {
         walk(value, path)
       } else {
-        out.push(({ names: path }, child))
+        out.push(({ names: path, }, child))
       }
     }
   }
@@ -70,7 +70,10 @@ fn record_origins(
       provenance.remove(key)
     }
     if list_merge {
-      let existing = provenance.get(path).map(origins => origins.copy()).unwrap_or([])
+      let existing = provenance
+        .get(path)
+        .map(origins => origins.copy())
+        .unwrap_or([])
       existing.push(origin)
       provenance[path] = existing
     } else {
@@ -97,17 +100,20 @@ fn without_nulls(value : ConfigValue) -> ConfigValue {
         let child = field.value()
         if !child.is_null() {
           kept.push(
-            @ion.Field::from_token(field.name(), without_nulls({ ion: child }).ion),
+            @ion.Field::from_token(
+              field.name(),
+              without_nulls({ ion: child, }).ion,
+            ),
           )
         }
       }
       @ion.Ion::from_fields(kept)
     }
     List(items) =>
-      @ion.Ion::list(items.map(item => without_nulls({ ion: item }).ion))
+      @ion.Ion::list(items.map(item => without_nulls({ ion: item, }).ion))
     Sexp(items) =>
-      @ion.Ion::sexp(items.map(item => without_nulls({ ion: item }).ion))
+      @ion.Ion::sexp(items.map(item => without_nulls({ ion: item, }).ion))
     _ => return value
   }
-  { ion: ion.with_annotations(value.ion.annotations()) }
+  { ion: ion.with_annotations(value.ion.annotations()), }
 }

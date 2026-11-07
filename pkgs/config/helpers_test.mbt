@@ -15,7 +15,9 @@ test "Redact nested keys" {
   @expect.expect(@config.get_text(config, "toolchain.elm.env.NPM_TOKEN")).to_equal(
     "<redacted>",
   )
-  @expect.expect(@config.get_text(config, "registry.username")).to_equal("alice")
+  @expect.expect(@config.get_text(config, "registry.username")).to_equal(
+    "alice",
+  )
 }
 
 ///|
@@ -32,12 +34,9 @@ test "Key name shapes" {
       "base",
     ),
   ])
-  for name in [
-      "apiKey",
-      "client-secret",
-      "aws_access_key_id",
-      "credentials",
-      "tokenizer_mode",
+  for
+    name in [
+      "apiKey", "client-secret", "aws_access_key_id", "credentials", "tokenizer_mode",
     ] {
     @expect.expect(@config.get_text(config, name)).to_equal("<redacted>")
   }
@@ -85,9 +84,7 @@ test "Get a string" {
 
 ///|
 test "Get as JSON" {
-  let config = @config.build([
-    named({ "ir": { "format_version": 4 } }, "base"),
-  ])
+  let config = @config.build([named({ "ir": { "format_version": 4 } }, "base")])
   @expect.expect(@config.get_json(config, "ir.format_version")).to_equal({
     "key": "ir.format_version",
     "value": 4,
@@ -138,9 +135,7 @@ test "Show as JSON" {
 
 ///|
 test "Show as TOML" {
-  let config = @config.build([
-    named({ "ir": { "format_version": 3 } }, "base"),
-  ])
+  let config = @config.build([named({ "ir": { "format_version": 3 } }, "base")])
   let text = @config.show(config, Toml)
   @expect.expect(text.contains("format_version = 3")).to_equal(true)
 }
@@ -170,9 +165,9 @@ test "Path as text" {
     ),
   ])
   let text = @config.path_text(config.reports())
-  @expect.expect(
-    text.has_prefix("Configuration sources (in priority order):"),
-  ).to_equal(true)
+  @expect.expect(text.has_prefix("Configuration sources (in priority order):")).to_equal(
+    true,
+  )
   @expect.expect(text.contains("[✓]")).to_equal(true)
   @expect.expect(text.contains("Path: /w/app.toml")).to_equal(true)
   @expect.expect(text.contains("Status: loaded")).to_equal(true)
@@ -232,9 +227,9 @@ test "Explain a struct" {
   ])
   let explained = @config.explain(config, "project")
   @expect.expect(
-    explained.map(entry =>
+    explained.map(entry => {
       (entry.0.to_string(), entry.1.map(origin => origin.source))
-    ),
+    }),
   ).to_equal([("project.name", ["base"]), ("project.version", ["user"])])
 }
 

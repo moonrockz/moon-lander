@@ -61,7 +61,9 @@ test "metadata registers custom kernels and remains immutable" {
     s
     .expect(book.cells().map(cell => cell.kernel().to_string()))
     .to_equal(["custom", "custom", "markdown"])
-    s.expect(book.metadata().get_json("vendor")).to_equal(Some({ "items": [1, 2] }))
+    s
+    .expect(book.metadata().get_json("vendor"))
+    .to_equal(Some({ "items": [1, 2] }))
     s.expect(@dib.parse(book.to_string())).to_equal(book)
   })
 }

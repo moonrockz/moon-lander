@@ -1,5 +1,6 @@
 ///|
 /// The rule that a file-tree path text breaks.
+#derive(Eq, Debug)
 pub(all) enum FilePathRule {
   /// The text is empty.
   Empty
@@ -16,7 +17,7 @@ pub(all) enum FilePathRule {
   IncompleteUnc
   /// A name for one entry is empty, `.` or `..`, or holds `/`.
   NotAName
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FilePathRule with Eq::{equal, not_equal}
@@ -31,7 +32,8 @@ pub fn FilePathRule::describe(self : FilePathRule) -> String {
     Empty => "the path is empty"
     Nul => "the path holds a NUL character"
     Backslash => "the path holds \\; a portable path uses / separators"
-    DriveRelative => "a drive letter and : must have / after them, for example C:/"
+    DriveRelative =>
+      "a drive letter and : must have / after them, for example C:/"
     IncompleteUnc => "a path that starts with // must name a server and a share"
     NotAName => "an entry name must not be empty, . or .., and must not hold /"
   }
@@ -39,6 +41,7 @@ pub fn FilePathRule::describe(self : FilePathRule) -> String {
 
 ///|
 /// The root of a file-tree path.
+#derive(Eq, Hash)
 priv enum PathRoot {
   /// `/`
   Posix
@@ -48,7 +51,7 @@ priv enum PathRoot {
   Unc(String, String)
   /// `.`, the directory that a relative path starts from.
   Current
-} derive(Eq, Hash)
+}
 
 ///|
 /// A path in the file-tree protocol: a root and a list of names, with `/` as
@@ -60,10 +63,11 @@ priv enum PathRoot {
 /// names are left out, so `/w//a/./b/` is `/w/a/b`. A `..` name stays, because
 /// the parent of a symbolic link on the disk is not the lexical parent. A path
 /// does not tell that a file exists, can be read, or is in a browser mount.
+#derive(Eq, Hash)
 pub struct FileTreePath {
   priv root : PathRoot
   priv names : Array[String]
-} derive(Eq, Hash)
+}
 
 ///|
 pub extend FileTreePath with Eq::{equal, not_equal}
@@ -102,15 +106,20 @@ pub fn FileTreePath::parse(text : String) -> FileTreePath raise ConfigError {
     (Unc(server, share), rest.to_owned())
   } else if text.has_prefix("/") {
     (Posix, text[1:].split("/").map(part => part.to_owned()).collect())
-  } else if chars.length() >= 2 && chars[0].is_ascii_alphabetic() && chars[1] == ':' {
+  } else if chars.length() >= 2 &&
+    chars[0].is_ascii_alphabetic() &&
+    chars[1] == ':' {
     guard chars.length() >= 3 && chars[2] == '/' else {
       raise invalid(DriveRelative)
     }
-    (Drive(chars[0]), text[3:].split("/").map(part => part.to_owned()).collect())
+    (
+      Drive(chars[0]),
+      text[3:].split("/").map(part => part.to_owned()).collect(),
+    )
   } else {
     (Current, text.split("/").map(part => part.to_owned()).collect())
   }
-  { root, names: rest.filter(name => name != "" && name != ".") }
+  { root, names: rest.filter(name => name != "" && name != "."), }
 }
 
 ///|
@@ -159,7 +168,7 @@ pub fn FileTreePath::to_native(
 ///|
 /// The root of the path: `/`, a drive root, a UNC share root, or `.`.
 pub fn FileTreePath::root(self : FileTreePath) -> FileTreePath {
-  { root: self.root, names: [] }
+  { root: self.root, names: [], }
 }
 
 ///|
@@ -180,7 +189,10 @@ pub fn FileTreePath::is_absolute(self : FileTreePath) -> Bool {
 /// `C:/acme.toml` is `C:/`, and the parent of `acme.toml` is `.`.
 pub fn FileTreePath::parent(self : FileTreePath) -> FileTreePath? {
   guard !self.names.is_empty() else { None }
-  Some({ root: self.root, names: self.names[:self.names.length() - 1].to_owned() })
+  Some({
+    root: self.root,
+    names: self.names[:self.names.length() - 1].to_owned(),
+  })
 }
 
 ///|
@@ -211,7 +223,7 @@ pub fn FileTreePath::child(
   if name.contains("\\") {
     raise InvalidFilePath(text=name, rule=Backslash)
   }
-  { root: self.root, names: [..self.names, name] }
+  { root: self.root, names: [..self.names, name], }
 }
 
 ///|
@@ -222,7 +234,7 @@ pub fn FileTreePath::resolve(
   other : FileTreePath,
 ) -> FileTreePath {
   guard other.root is Current else { other }
-  { root: self.root, names: [..self.names, ..other.names] }
+  { root: self.root, names: [..self.names, ..other.names], }
 }
 
 ///|
@@ -264,7 +276,7 @@ pub fn FileTreePath::common_dir(paths : Array[FileTreePath]) -> FileTreePath? {
 }
 
 ///|
-pub impl Show for FileTreePath with output(self, logger) {
+pub impl Show for FileTreePath with fn output(self, logger) {
   match self.root {
     Posix => logger.write_string("/")
     Drive(letter) => {
@@ -294,7 +306,7 @@ pub extend FileTreePath with Show::{output, to_string}
 
 ///|
 /// The debug form is the text form, so a test failure shows `"/w/acme.toml"`.
-pub impl @debug.Debug for FileTreePath with to_repr(self) {
+pub impl @debug.Debug for FileTreePath with fn to_repr(self) {
   @debug.Repr(self.to_string())
 }
 
@@ -303,7 +315,7 @@ pub extend FileTreePath with @debug.Debug::{to_repr}
 
 ///|
 /// Paths compare by their text form.
-pub impl Compare for FileTreePath with compare(self, other) {
+pub impl Compare for FileTreePath with fn compare(self, other) {
   self.to_string().compare(other.to_string())
 }
 

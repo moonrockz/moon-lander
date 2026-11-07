@@ -1,11 +1,11 @@
 ///|
-extern "C" fn stub_install() -> Int = "moonlander_console_install"
+extern "C" fn stub_install() -> Int32 = "moonlander_console_install"
 
 ///|
-extern "C" fn stub_signal_kind() -> Int = "moonlander_console_signal_kind"
+extern "C" fn stub_signal_kind() -> Int32 = "moonlander_console_signal_kind"
 
 ///|
-extern "C" fn libc_exit(code : Int) = "exit"
+extern "C" fn libc_exit(code : Int32) = "exit"
 
 ///|
 /// Turn off the signal handling of the `moonbitlang/async` runtime, then
@@ -65,7 +65,11 @@ pub async fn[S] run(
       signal_kind
     }
   }
-  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
+  let outcome = @hosting.run(
+    host,
+    command,
+    signals=@hosting.SignalProbe::new(read),
+  )
   let selected = selected_exit_code(outcome, read())
   let finalized = finish(selected, finalize, read)
   libc_exit(report_completion(outcome, finalized, completed, read).to_int())

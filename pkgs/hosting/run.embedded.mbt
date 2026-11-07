@@ -5,7 +5,10 @@
 fn run_until_suspension(work : async () -> Unit noraise) -> Unit = "%async.run"
 
 ///|
-async fn[X] capture_cancellation(f : async () -> X, handler~ : async () -> X nocancel) -> X nocancel = "%async.capture_cancellation"
+async fn[X] capture_cancellation(
+  f : async () -> X,
+  handler~ : async () -> X nocancel,
+) -> X nocancel = "%async.capture_cancellation"
 
 ///|
 /// How one hook, the command or one report ended in `%async.run`.
@@ -25,11 +28,19 @@ fn run_to_completion(work : async () -> Unit) -> Completion {
   let completion = Ref(Completion::Suspended)
   let open = Ref(true)
   run_until_suspension(() => {
-    let result = capture_cancellation(() => { work(); Completion::Returned }, handler=() => Completion::Cancelled) catch {
+    let result = capture_cancellation(
+      () => {
+        work()
+        Completion::Returned
+      },
+      handler=() => Completion::Cancelled,
+    ) catch {
       StopRequested => Stopped
       error => Failed(error)
     }
-    if open.val { completion.val = result }
+    if open.val {
+      completion.val = result
+    }
   })
   open.val = false
   completion.val
@@ -58,20 +69,42 @@ fn run_to_completion(work : async () -> Unit) -> Completion {
 /// cannot change the result of that step. It still runs with the context of
 /// the run, so it can make a stop request while the run is in progress. Do not
 /// keep continuations of hooks or the command.
-pub fn[S] run_embedded(host : Host[S], command : Hook[S], stop_probe? : () -> Bool) -> RunOutcome {
-  run_embedded_with_writer(host, command, stop_probe?, write_line=line => eprintln(line), write_output=text => println(text))
+pub fn[S] run_embedded(
+  host : Host[S],
+  command : Hook[S],
+  stop_probe? : () -> Bool,
+) -> RunOutcome {
+  run_embedded_with_writer(
+    host,
+    command,
+    stop_probe?,
+    write_line=line => eprintln(line),
+    write_output=text => println(text),
+  )
 }
 
 ///|
-fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : () -> Bool, write_line~ : (String) -> Unit, write_output~ : (String) -> Unit) -> RunOutcome {
+fn[S] run_embedded_with_writer(
+  host : Host[S],
+  command : Hook[S],
+  stop_probe? : () -> Bool,
+  write_line~ : (String) -> Unit,
+  write_output~ : (String) -> Unit,
+) -> RunOutcome {
   let result = execute_embedded(host, command, stop_probe, write_output~)
   for error in result.failures {
-    if error is ShutdownTimedOut(_) || result.exit_code == ExitCode::failure() || result.exit_code == usage_exit_code() {
+    if error is ShutdownTimedOut(_) ||
+      result.exit_code == ExitCode::failure() ||
+      result.exit_code == usage_exit_code() {
       match host.report {
-        Some(report) => ignore(run_to_completion(() => report(error, result.exit_code)))
+        Some(report) =>
+          ignore(run_to_completion(() => report(error, result.exit_code)))
         None =>
           match host.report_writer {
-            Some(writer) => ignore(run_to_completion(() => writer(report_text(host.name, error))))
+            Some(writer) =>
+              ignore(
+                run_to_completion(() => writer(report_text(host.name, error))),
+              )
             None => write_line(report_text(host.name, error))
           }
       }
@@ -81,7 +114,12 @@ fn[S] run_embedded_with_writer(host : Host[S], command : Hook[S], stop_probe? : 
 }
 
 ///|
-fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bool)?, write_output~ : (String) -> Unit) -> RunOutcome {
+fn[S] execute_embedded(
+  host : Host[S],
+  command : Hook[S],
+  stop_probe : (() -> Bool)?,
+  write_output~ : (String) -> Unit,
+) -> RunOutcome {
   let inputs = configuration_inputs(host) catch {
     DisplayRequested(text) => {
       write_output(text)
@@ -89,7 +127,9 @@ fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bo
     }
     err => return outcome(err)
   }
-  let config = configuration_from_tree(inputs.sources, host.file_tree) catch { err => return outcome(err) }
+  let config = configuration_from_tree(inputs.sources, host.file_tree) catch {
+    err => return outcome(err)
+  }
   let configured = finish_configuration(host, inputs, config) catch {
     StopRequested => return requested_outcome()
     err => return outcome(err)
@@ -97,36 +137,74 @@ fn[S] execute_embedded(host : Host[S], command : Hook[S], stop_probe : (() -> Bo
   let ctx = configured.context
   let lifetime = ctx.lifetime
   if stop_probe is Some(probe) {
-    lifetime.register_stop_probe(() => if probe() { Some(Embedder) } else { None })
+    lifetime.register_stop_probe(() => {
+      if probe() {
+        Some(Embedder)
+      } else {
+        None
+      }
+    })
   }
   let mut step = lifetime.start_engine(host.services)
   while step is Run(pending, action) {
-    step = lifetime.reply(pending, perform_embedded(host, ctx, command, pending, action))
+    step = lifetime.reply(
+      pending,
+      perform_embedded(host, ctx, command, pending, action),
+    )
   }
-  guard step is Finish(result) else { abort("the engine finishes after its last action") }
+  guard step is Finish(result) else {
+    abort("the engine finishes after its last action")
+  }
   lifetime.reason = Some(result.reason)
-  { ..result, exit_code: select_exit_code(result.signal, result.failures, result.timed_out,
-      match lifetime.exit_code { Some(code) => Some(code); None => result.requested_code }) }
+  {
+    ..result,
+    exit_code: select_exit_code(
+      result.signal,
+      result.failures,
+      result.timed_out,
+      match lifetime.exit_code {
+        Some(code) => Some(code)
+        None => result.requested_code
+      },
+    ),
+  }
 }
 
 ///|
-fn[S] perform_embedded(host : Host[S], ctx : Context[S], command : Hook[S], pending : Pending, action : Action) -> ActionResult {
+fn[S] perform_embedded(
+  host : Host[S],
+  ctx : Context[S],
+  command : Hook[S],
+  pending : Pending,
+  action : Action,
+) -> ActionResult {
   let lifetime = ctx.lifetime
-  if pending.engine.reason is Some(reason) { lifetime.reason = Some(reason) }
+  if pending.engine.reason is Some(reason) {
+    lifetime.reason = Some(reason)
+  }
   let (completion, suspended) = match action {
     Hook(reference, phase) => {
       let service = host.services[reference.index]
       guard service.hook(phase) is Some(hook) else { return Returned }
-      (run_to_completion(() => hook(ctx)), HookSuspended(service=service.name, phase=hook_phase(phase)))
+      (
+        run_to_completion(() => hook(ctx)),
+        HookSuspended(service=service.name, phase=hook_phase(phase)),
+      )
     }
     RunCommand => (run_to_completion(() => command(ctx)), CommandSuspended)
-    Raise(event) => { lifetime.raise_event(event); return Returned }
+    Raise(event) => {
+      lifetime.raise_event(event)
+      return Returned
+    }
   }
   match completion {
     Returned => Returned
     Failed(error) => Failed(error)
     Suspended => Failed(suspended)
-    Stopped | Cancelled => { lifetime.stop_application(); Interrupted }
+    Stopped | Cancelled => {
+      lifetime.stop_application()
+      Interrupted
+    }
   }
 }
 

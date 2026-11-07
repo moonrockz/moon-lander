@@ -1,5 +1,6 @@
 ///|
 /// How an actor ended.
+#derive(Debug)
 pub enum ActorEnd {
   /// The receive gave its result.
   Completed
@@ -9,13 +10,14 @@ pub enum ActorEnd {
   Failed(Error)
   /// The actor was cancelled.
   Cancelled
-} derive(Debug)
+}
 
 ///|
 pub extend ActorEnd with @debug.Debug::{to_repr}
 
 ///|
 /// An immutable snapshot of an actor's lifecycle.
+#derive(Debug)
 pub enum ActorStatus {
   /// The actor admits and processes messages.
   Running
@@ -24,7 +26,7 @@ pub enum ActorStatus {
   Closing
   /// The actor and its cleanup have ended.
   Ended(ActorEnd)
-} derive(Debug)
+}
 
 ///|
 pub extend ActorStatus with @debug.Debug::{to_repr}
@@ -53,8 +55,8 @@ priv struct Lifetime {
   /// True after close, drain or cancel, or when processing has ended.
   mut closing : Bool
   ended : @cond_var.Cond
-  watchers : Map[Int, (ActorEnd) -> Unit]
-  mut last_watcher : Int
+  watchers : Map[Int32, (ActorEnd) -> Unit]
+  mut last_watcher : Int32
   /// Close the mailbox. Set by the actor's typed part.
   close_mailbox : () -> Unit
   /// Cancel the actor task. Set when the task starts.
@@ -107,7 +109,7 @@ fn Lifetime::status(self : Lifetime) -> ActorStatus {
 /// Call `notify` when the actor's processing ends, before its cleanup, or now
 /// when it has already ended. Asks use it: no reply can come after that. The
 /// result is the key for `unwatch`.
-fn Lifetime::watch(self : Lifetime, notify : (ActorEnd) -> Unit) -> Int {
+fn Lifetime::watch(self : Lifetime, notify : (ActorEnd) -> Unit) -> Int32 {
   if self.ending is Some(ending) {
     notify(ending)
     // No key is stored, so `unwatch` of this key does nothing.
@@ -119,7 +121,7 @@ fn Lifetime::watch(self : Lifetime, notify : (ActorEnd) -> Unit) -> Int {
 }
 
 ///|
-fn Lifetime::unwatch(self : Lifetime, key : Int) -> Unit {
+fn Lifetime::unwatch(self : Lifetime, key : Int32) -> Unit {
   self.watchers.remove(key)
 }
 
@@ -173,7 +175,7 @@ async fn Cleanup::run(self : Cleanup, primary : Error?) -> Error? {
   let finished = @aio.protect_from_cancel(() => {
     @aio.with_timeout_opt(self.limit.to_millis(), () => {
       for index = self.steps.length() - 1; index >= 0; index = index - 1 {
-        (self.steps[index])() catch {
+        self.steps[index]() catch {
           error => errors.push(error)
         }
       }
@@ -198,9 +200,7 @@ async fn Lifetime::run(
   body : async () -> BodyEnd,
   on_start_failure~ : (Error) -> Unit = _ => (),
 ) -> Unit {
-  let ended : Result[BodyEnd?, Error] = try
-    Ok(@aio.handle_cancellation(body))
-  catch {
+  let ended : Result[BodyEnd?, Error] = Ok(@aio.handle_cancellation(body)) catch {
     error => Err(error)
   }
   // `primary` is the actor's own failure. `start_error` is what the creator

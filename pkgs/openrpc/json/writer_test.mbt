@@ -67,9 +67,14 @@ test "raw unpaired surrogates are syntax errors, so everything read can be writt
   let low = String::from_array([(0xDC00).unsafe_to_char()])
   for
     source in [
-      "\"a" + lone + "\"", "{\"" + lone + "\":1}", "[\"" + low + "x\"]", "\"" + lone + "\"",
+      "\"a" + lone + "\"",
+      "{\"" + lone + "\":1}",
+      "[\"" + low + "x\"]",
+      "\"" + lone + "\"",
     ] {
-    guard @json.parse(source) is Err(d) else { fail("accepted a lone surrogate") }
+    guard @json.parse(source) is Err(d) else {
+      fail("accepted a lone surrogate")
+    }
     assert_eq(d.code(), @json.Syntax)
     let span = d.span().unwrap()
     assert_eq(span.end() - span.start(), 1)

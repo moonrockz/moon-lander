@@ -2,6 +2,7 @@
 /// A JSON decoding or notebook validation failure. InvalidField reports a
 /// logical JSON field path and the expected value. UnsupportedVersion carries
 /// file format numbers, not the upstream Python library release version.
+#derive(Eq, Debug)
 pub(all) suberror FormatError {
   /// Input text is not valid JSON; carries the JSON parser's diagnostic.
   InvalidJson(String)
@@ -13,7 +14,7 @@ pub(all) suberror FormatError {
   DuplicateCellId(String)
   /// More than one cell uses the given metadata.name.
   DuplicateCellName(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FormatError with Eq::{equal, not_equal}
@@ -39,9 +40,10 @@ fn copy_json(value : Json) -> Json {
 /// An immutable JSON object. Construction and JSON exports copy the entire
 /// value graph, including nested arrays and objects. Accessors never expose
 /// mutable aliases to the stored object.
+#derive(Eq, Debug)
 struct JsonObject {
   fields : Map[String, Json]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend JsonObject with Eq::{equal, not_equal}
@@ -137,9 +139,10 @@ fn integer_at(value : Json, path : String) -> Int32 raise FormatError {
 ///|
 /// An immutable mapping of MIME types to data. Textual data is normalized
 /// to strings; application/json and +json values retain their JSON structure.
+#derive(Eq, Debug)
 struct MimeBundle {
   object : JsonObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MimeBundle with Eq::{equal, not_equal}
@@ -191,9 +194,10 @@ pub fn MimeBundle::to_json(self : MimeBundle) -> Json {
 ///|
 /// An immutable mapping from attachment filenames to validated MIME bundles.
 /// Traversal and names use lexical filename order, independent of input key order.
+#derive(Eq, Debug)
 struct Attachments {
   entries : ReadOnlyArray[(String, MimeBundle)]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Attachments with Eq::{equal, not_equal}
@@ -255,7 +259,10 @@ fn metadata_at(value : Json, path : String) -> Metadata raise FormatError {
 }
 
 ///|
-fn metadata_json_at(metadata : Metadata, path : String) -> Json raise FormatError {
+fn metadata_json_at(
+  metadata : Metadata,
+  path : String,
+) -> Json raise FormatError {
   metadata.to_json() catch {
     error => invalid(path, "JSON-compatible metadata: " + error.message())
   }

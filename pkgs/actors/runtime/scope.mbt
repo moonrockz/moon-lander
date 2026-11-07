@@ -8,8 +8,8 @@ pub struct Scope {
   /// The names that live actors of this scope hold, with their addresses.
   priv names : Map[@policy.ActorName, ActorAddress]
   /// What runs when the body returns, such as ending subscriptions, by key.
-  priv exits : Map[Int, () -> Unit]
-  priv mut last_exit : Int
+  priv exits : Map[Int32, () -> Unit]
+  priv mut last_exit : Int32
   /// The opt-in runtime event channel for this scope, if any.
   priv events : RuntimeEvents?
 }
@@ -21,10 +21,7 @@ pub struct Scope {
 /// fails the scope and cancels the other actors and `body`. With `events`, the
 /// scope publishes lifecycle events to that channel; without it, it publishes
 /// nothing. Child scopes of actors in this scope use the same channel.
-pub async fn[X] scope(
-  events? : RuntimeEvents,
-  body : async (Scope) -> X,
-) -> X {
+pub async fn[X] scope(events? : RuntimeEvents, body : async (Scope) -> X) -> X {
   @aio.with_task_group(group => {
     let scope = {
       spawn_task: task => {

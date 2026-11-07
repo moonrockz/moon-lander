@@ -1,11 +1,13 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum NodeKind {
   Scalar
   ArrayNode
   ObjectNode
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct Node {
   kind : NodeKind
   span : Span
@@ -15,7 +17,7 @@ pub struct Node {
   scalar : Value?
   parent : Int32?
   ordinal : Int32
-} derive(Debug)
+}
 
 ///|
 pub fn Node::kind(self : Node) -> NodeKind {
@@ -43,12 +45,13 @@ pub fn Node::children(self : Node) -> Array[Int32] {
 }
 
 ///|
+#derive(Debug)
 pub struct CstDocument {
   source : String
   source_id : String?
   nodes : Array[Node]
   limits : Limits
-} derive(Debug)
+}
 
 ///|
 pub fn CstDocument::reproduce(self : CstDocument) -> String {
@@ -199,9 +202,10 @@ priv struct Parser {
 }
 
 ///|
+#derive(Debug)
 priv suberror ReadError {
   ReadError(Diagnostic)
-} derive(Debug)
+}
 
 ///|
 fn Parser::error(

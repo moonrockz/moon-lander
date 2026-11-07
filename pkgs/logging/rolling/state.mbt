@@ -1,6 +1,7 @@
 ///|
 /// One entry of a log directory, as the host adapter found it. The adapter
 /// gives the entries; this package does no I/O.
+#derive(Eq, Debug)
 pub(all) struct ListedFile {
   /// The entry name, with no directory part.
   name : String
@@ -10,7 +11,7 @@ pub(all) struct ListedFile {
   /// other kind of entry: the plan never appends to them and retention never
   /// deletes them.
   regular : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ListedFile with Eq::{equal, not_equal}
@@ -21,6 +22,7 @@ pub extend ListedFile with @debug.Debug::{to_repr}
 ///|
 /// The file action for the next record. The adapter does the action, and then
 /// tells the state the result with `opened` and `wrote`.
+#derive(Eq, Debug)
 pub(all) enum FilePlan {
   /// Write the record to the open active file.
   Append(LogFileName)
@@ -32,7 +34,7 @@ pub(all) enum FilePlan {
   /// record. After the open, run retention. When the period changed, this can
   /// be an existing file of the new period with `existing_size` bytes.
   Roll(LogFileName, existing_size~ : ByteCount)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FilePlan with Eq::{equal, not_equal}
@@ -45,11 +47,12 @@ pub extend FilePlan with @debug.Debug::{to_repr}
 /// The value is immutable: `opened` and `wrote` give a new state. The adapter
 /// calls them only after its I/O succeeds, so a failed action does not move the
 /// state.
+#derive(Eq, Debug)
 pub struct RollingState {
   priv set : FileSet
   priv active : LogFileName?
   priv size : ByteCount
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend RollingState with Eq::{equal, not_equal}
@@ -60,7 +63,7 @@ pub extend RollingState with @debug.Debug::{to_repr}
 ///|
 /// The state of a writer of `set` that has no open file.
 pub fn RollingState::new(set : FileSet) -> RollingState {
-  { set, active: None, size: ByteCount::zero() }
+  { set, active: None, size: ByteCount::zero(), }
 }
 
 ///|
@@ -196,7 +199,7 @@ pub fn RollingState::opened(
   name : LogFileName,
   size : ByteCount,
 ) -> RollingState {
-  { ..self, active: Some(name), size }
+  { ..self, active: Some(name), size, }
 }
 
 ///|
@@ -205,7 +208,7 @@ pub fn RollingState::wrote(
   self : RollingState,
   bytes : ByteCount,
 ) -> RollingState {
-  { ..self, size: { bytes: self.size.bytes + bytes.bytes } }
+  { ..self, size: { bytes: self.size.bytes + bytes.bytes, }, }
 }
 
 ///|

@@ -1,2 +1,4 @@
 ///|
-fn announce_ready() -> Unit { println("ready") }
+fn announce_ready() -> Unit {
+  println("ready")
+}

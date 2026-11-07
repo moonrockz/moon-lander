@@ -36,27 +36,13 @@ fn merge_at(
   match (base.ion.kind(), overlay.ion.kind()) {
     (Struct(base_fields), Struct(overlay_fields)) =>
       merge_structs(
-        base,
-        base_fields,
-        overlay,
-        overlay_fields,
-        path,
-        source_policy,
-        key_policies,
-        source,
-        secret_syntax,
+        base, base_fields, overlay, overlay_fields, path, source_policy, key_policies,
+        source, secret_syntax,
       )
     (List(base_items), List(overlay_items)) =>
       merge_lists(
-        base,
-        base_items,
-        overlay,
-        overlay_items,
-        path,
-        source_policy,
-        key_policies,
-        source,
-        secret_syntax,
+        base, base_items, overlay, overlay_items, path, source_policy, key_policies,
+        source, secret_syntax,
       )
     _ => overlay
   }
@@ -88,8 +74,8 @@ fn merge_structs(
     match merged.search_by(existing => existing.name().text() == name.text()) {
       Some(index) => {
         let value = merge_at(
-          { ion: merged[index].value() },
-          { ion: field.value() },
+          { ion: merged[index].value(), },
+          { ion: field.value(), },
           child_path,
           source_policy,
           key_policies,
@@ -107,7 +93,7 @@ fn merge_structs(
   } else {
     base.ion.annotations()
   }
-  { ion: @ion.Ion::from_fields(merged).with_annotations(annotations) }
+  { ion: @ion.Ion::from_fields(merged).with_annotations(annotations), }
 }
 
 ///|
@@ -135,16 +121,8 @@ fn merge_lists(
     }
     MergeByKey(key_name) =>
       merge_lists_by_key(
-        base,
-        base_items,
-        overlay,
-        overlay_items,
-        path,
-        key_name,
-        source_policy,
-        key_policies,
-        source,
-        secret_syntax,
+        base, base_items, overlay, overlay_items, path, key_name, source_policy,
+        key_policies, source, secret_syntax,
       )
   }
 }
@@ -163,11 +141,11 @@ fn merge_lists_by_key(
   secret_syntax : SecretSyntax,
 ) -> ConfigValue raise ConfigError {
   // A list under the struct root always has a non-empty path.
-  let key_path : KeyPath = { names: path.copy() }
+  let key_path : KeyPath = { names: path.copy(), }
   let result = []
-  let index_by_key : Map[String, Int] = Map([])
+  let index_by_key : Map[String, Int32] = Map([])
   for index, item in base_items {
-    let key = list_item_key({ ion: item }, key_name, key_path, index, source)
+    let key = list_item_key({ ion: item, }, key_name, key_path, index, source)
     if index_by_key.contains(key) {
       raise MergeKey(key=key_path, index~, source~)
     }
@@ -176,7 +154,7 @@ fn merge_lists_by_key(
   }
   let overlay_keys : Set[String] = Set([])
   for index, item in overlay_items {
-    let key = list_item_key({ ion: item }, key_name, key_path, index, source)
+    let key = list_item_key({ ion: item, }, key_name, key_path, index, source)
     if overlay_keys.contains(key) {
       raise MergeKey(key=key_path, index~, source~)
     }
@@ -184,8 +162,8 @@ fn merge_lists_by_key(
     match index_by_key.get(key) {
       Some(position) => {
         let merged = merge_at(
-          { ion: result[position] },
-          { ion: item },
+          { ion: result[position], },
+          { ion: item, },
           path,
           source_policy,
           key_policies,
@@ -213,7 +191,7 @@ fn list_item_key(
   item : ConfigValue,
   key_name : String,
   list_path : KeyPath,
-  index : Int,
+  index : Int32,
   source : String,
 ) -> String raise ConfigError {
   guard item.ion.kind() is Struct(_) else {
@@ -236,7 +214,10 @@ fn list_item_key(
 }
 
 ///|
-fn list_annotations(base : ConfigValue, overlay : ConfigValue) -> Array[@ion.SymbolToken] {
+fn list_annotations(
+  base : ConfigValue,
+  overlay : ConfigValue,
+) -> Array[@ion.SymbolToken] {
   if overlay.ion.has_annotations() {
     overlay.ion.annotations()
   } else {

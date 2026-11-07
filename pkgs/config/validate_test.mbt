@@ -1,18 +1,20 @@
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct PipelineRules {
   target : String
   validation : String
   ir : IrRules
-} derive(FromJson, ToJson, Debug, Eq)
+}
 
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct IrRules {
   layout : String
   strict_mode : Bool
-} derive(FromJson, ToJson, Debug, Eq)
+}
 
 ///|
-impl @config.Validate for IrRules with validate(self) {
+impl @config.Validate for IrRules with fn validate(self) {
   if self.layout == "split" && !self.strict_mode {
     [
       @config.violation(
@@ -26,7 +28,7 @@ impl @config.Validate for IrRules with validate(self) {
 }
 
 ///|
-impl @config.Validate for PipelineRules with validate(self) {
+impl @config.Validate for PipelineRules with fn validate(self) {
   let found = []
   if self.target == "" {
     found.push(@config.violation(["target"], "must not be empty"))
@@ -39,12 +41,13 @@ impl @config.Validate for PipelineRules with validate(self) {
 }
 
 ///|
+#derive(FromJson, Debug, Eq)
 struct Port {
-  port : Int
-} derive(FromJson, Debug, Eq)
+  port : Int32
+}
 
 ///|
-impl @config.Validate for Port with validate(self) {
+impl @config.Validate for Port with fn validate(self) {
   if self.port > 0 {
     []
   } else {
@@ -54,21 +57,23 @@ impl @config.Validate for Port with validate(self) {
 
 ///|
 /// A type with no rules: the default `validate` applies.
+#derive(FromJson, Debug, Eq)
 struct Plain {
   name : String
-} derive(FromJson, Debug, Eq)
+}
 
 ///|
 impl @config.Validate for Plain
 
 ///|
 /// A rule over the whole value, with no field.
+#derive(FromJson, Debug, Eq)
 struct Whole {
   name : String
-} derive(FromJson, Debug, Eq)
+}
 
 ///|
-impl @config.Validate for Whole with validate(_) {
+impl @config.Validate for Whole with fn validate(_) {
   [@config.violation([], "is not allowed here")]
 }
 
@@ -108,16 +113,16 @@ test "violation and nested build relative paths" {
 
 ///|
 test "maps, lists and options prefix the paths of their values" {
-  let ports : Map[String, Port] = { "ts": { port: 1 }, "scala": { port: 0 } }
+  let ports : Map[String, Port] = { "ts": { port: 1, }, "scala": { port: 0, } }
   @expect.expect(@config.Validate::validate(ports).map(v => v.at)).to_equal([
     [[Field("scala"), Field("port")]],
   ])
-  let list : Array[Port] = [{ port: 1 }, { port: -1 }, { port: 0 }]
+  let list : Array[Port] = [{ port: 1, }, { port: -1, }, { port: 0, }]
   @expect.expect(@config.Validate::validate(list).map(v => v.at)).to_equal([
     [[Index(1), Field("port")]],
     [[Index(2), Field("port")]],
   ])
-  let some : Port? = Some({ port: 0 })
+  let some : Port? = Some({ port: 0, })
   let none : Port? = None
   @expect.expect(@config.Validate::validate(some).length()).to_equal(1)
   @expect.expect(@config.Validate::validate(none)).to_equal([])
@@ -129,7 +134,7 @@ test "Type without rules" {
     @config.in_memory_pairs([("plain.name", @config.string("x"))]),
   ])
   let options : @config.Options[Plain] = @config.options(config, "plain")
-  @expect.expect(options.value).to_equal({ name: "x" })
+  @expect.expect(options.value).to_equal({ name: "x", })
 }
 
 ///|
@@ -169,13 +174,11 @@ test "Cross-field failure" {
   ])
   let (failures, text) = validation_failures(() => {
     config
-    |> @config.bind_or("ir", ({ layout: "tree", strict_mode: true } : IrRules))
+    |> @config.bind_or("ir", ({ layout: "tree", strict_mode: true, } : IrRules))
     |> @config.validated(config, "ir")
     |> ignore
   })
-  @expect.expect(failures.map(paths)).to_equal([
-    ["ir.layout", "ir.strict_mode"],
-  ])
+  @expect.expect(failures.map(paths)).to_equal([["ir.layout", "ir.strict_mode"]])
   @expect.expect(text).to_equal(
     (
       #|ir.layout: split layout needs strict_mode = true (set in project /repo/morphir.toml)
@@ -187,11 +190,7 @@ test "Cross-field failure" {
 ///|
 test "a failure inside a list names the index and the list sources" {
   let config = load_files([
-    (
-      "/repo/morphir.toml",
-      Workspace,
-      "servers = [{ port = 80 }, { port = 0 }]",
-    ),
+    ("/repo/morphir.toml", Workspace, "servers = [{ port = 80 }, { port = 0 }]"),
   ])
   let (failures, text) = validation_failures(() => {
     let _ : @config.Options[Array[Port]] = @config.options(config, "servers")
@@ -224,9 +223,12 @@ test "Options from a valid section" {
     ),
   ])
   let options = config
-    |> @config.bind_or("ir", ({ layout: "tree", strict_mode: false } : IrRules))
+    |> @config.bind_or(
+      "ir",
+      ({ layout: "tree", strict_mode: false, } : IrRules),
+    )
     |> @config.validated(config, "ir", name="main")
-  @expect.expect(options.value).to_equal({ layout: "split", strict_mode: true })
+  @expect.expect(options.value).to_equal({ layout: "split", strict_mode: true, })
   @expect.expect(options.key.to_string()).to_equal("ir")
   @expect.expect(options.name).to_equal(Some("main"))
 }

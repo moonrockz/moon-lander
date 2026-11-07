@@ -32,7 +32,10 @@ async test "NAME-1: the named counter example compiles and finds the counter" {
     guard found is Found(entry) else { fail("lookup did not find counter") }
     entry.send(Increment)
     assert_eq(exact.unwrap().ask(reply => Read(reply)), 1)
-    assert_eq(counters.lookup(@actors.ActorName::parse("Counter")) is Missing, true)
+    assert_eq(
+      counters.lookup(@actors.ActorName::parse("Counter")) is Missing,
+      true,
+    )
   })
 }
 
@@ -51,7 +54,11 @@ async test "DIR-1: the composition example compiles with Add, Sub and methods" {
     let singleton = extended - @actors.Directory::of(extra.to_ref())
     assert_eq(combined.size(), 2)
     assert_eq(extended.size(), 3)
-    assert_true(restricted == @actors.Directory::of(other.to_ref()) + @actors.Directory::of(extra.to_ref()))
+    assert_true(
+      restricted ==
+      @actors.Directory::of(other.to_ref()) +
+      @actors.Directory::of(extra.to_ref()),
+    )
     assert_true(difference == dir1.add(extra.to_ref()))
     assert_true(singleton == combined)
     assert_eq(dir1.size(), 1)
@@ -69,14 +76,14 @@ async test "DIR-1: union and difference laws hold for overlapping members" {
     let b = @actors.Directory::of(two).add(three)
     let c = @actors.Directory::of(three).add(one)
     assert_true(empty + a == a && a + empty == a)
-    assert_true((a + b) + c == a + (b + c))
+    assert_true(a + b + c == a + (b + c))
     assert_true(a + b == b + a)
     assert_true(a + a == a)
     assert_true(a.add(three).add(three) == a.add(three))
     assert_true(a.remove(one).remove(one) == a.remove(one))
     assert_true(a.remove(three) == a)
     assert_true(a - empty == a && a - a == empty)
-    assert_true((a + b) - c == (a - c) + (b - c))
+    assert_true(a + b - c == a - c + (b - c))
     assert_true(a - b == @actors.Directory::of(one))
     assert_eq((a + @actors.Directory::of(two)).size(), 2)
   })
@@ -100,10 +107,18 @@ async test "NAME-1: the same name in two scopes gives distinct addresses" {
     fail("worker is not ambiguous")
   }
   assert_eq(conflict.refs().length(), 2)
-  assert_eq(combined.resolve(first.address()).unwrap().address(), first.address())
-  assert_eq(combined.resolve(second.address()).unwrap().address(), second.address())
+  assert_eq(
+    combined.resolve(first.address()).unwrap().address(),
+    first.address(),
+  )
+  assert_eq(
+    combined.resolve(second.address()).unwrap().address(),
+    second.address(),
+  )
   assert_eq(found(combined.remove(second), worker), first.address().to_string())
-  assert_true((combined + @actors.Directory::of(first)).lookup(worker) is Ambiguous(_))
+  assert_true(
+    (combined + @actors.Directory::of(first)).lookup(worker) is Ambiguous(_),
+  )
 }
 
 ///|
@@ -219,8 +234,8 @@ async test "DIR-1: union, add, remove and difference keep their laws for every s
       for b in all {
         assert_true(a + b == b + a)
         for c in all {
-          assert_true((a + b) + c == a + (b + c))
-          assert_true((a + b) - c == (a - c) + (b - c))
+          assert_true(a + b + c == a + (b + c))
+          assert_true(a + b - c == a - c + (b - c))
         }
       }
     }
@@ -267,9 +282,10 @@ async test "NAME-1: of two concurrent named creators only one initializer runs" 
 }
 
 ///|
+#derive(Debug)
 suberror Unready {
   Unready
-} derive(Debug)
+}
 
 ///|
 async test "NAME-1: a failed named startup releases the name after its cleanup" {
@@ -332,7 +348,10 @@ async test "NAME-1: a closing actor keeps its name until its cleanup ends" {
     assert_true(replacement.address() != old.address())
     // The old directory still holds the old actor, which stays closed.
     assert_eq(found(directory, counter), old.address().to_string())
-    assert_eq(directory.resolve(old.address()).unwrap().try_send(Increment), Closed)
+    assert_eq(
+      directory.resolve(old.address()).unwrap().try_send(Increment),
+      Closed,
+    )
   })
 }
 
@@ -343,7 +362,10 @@ async test "NAME-1: names are case sensitive in lookup and in reservations" {
     let lower = scope.start(0, handle_counter, name=name("counter"))
     let directory = @actors.Directory::of(upper.to_ref())
     assert_true(directory.lookup(name("counter")) is Missing)
-    assert_eq(found(directory.add(lower.to_ref()), name("counter")), lower.address().to_string())
+    assert_eq(
+      found(directory.add(lower.to_ref()), name("counter")),
+      lower.address().to_string(),
+    )
     assert_eq(upper.address().name(), Some(name("Counter")))
     assert_eq(upper.address().to_string().has_suffix("(Counter)"), true)
   })
@@ -453,7 +475,8 @@ async test "DIR-1: the same named reference through both inputs gives one member
   @actors.scope(scope => {
     let actor = scope.start(0, handle_counter, name=name("counter"))
     let copy = actor.to_ref()
-    let combined = @actors.Directory::of(actor.to_ref()) + @actors.Directory::of(copy)
+    let combined = @actors.Directory::of(actor.to_ref()) +
+      @actors.Directory::of(copy)
     assert_eq(combined.size(), 1)
     assert_true(combined.lookup(name("counter")) is Found(_))
   })

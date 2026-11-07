@@ -1,2 +1,5 @@
-import { "moonrockz/moon-lander-core" @library }
+import {
+  "moonrockz/moon-lander-core" @library,
+}
+
 pkgtype(kind: "executable")

@@ -9,12 +9,12 @@
 /// `log` has no error effect. A backend that can fail handles its own failure, so
 /// a log call never fails the code that writes it.
 pub(open) trait Logger {
-  enabled(Self, Level) -> Bool = _
-  log(Self, LogEvent) -> Unit
+  fn enabled(Self, Level) -> Bool = _
+  fn log(Self, LogEvent) -> Unit
 }
 
 ///|
-impl Logger with enabled(_self, _level) {
+impl Logger with fn enabled(_self, _level) {
   true
 }
 
@@ -32,7 +32,7 @@ pub fn &Logger::write(
 ) -> Unit {
   guard self.enabled(level) else { return }
   let properties = bind_properties(parse_template(template), args)
-  self.log({ level, category: None, template, props: properties, error })
+  self.log({ level, category: None, template, props: properties, error, })
 }
 
 ///|

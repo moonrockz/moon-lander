@@ -6,8 +6,8 @@ fn acme_envs(default? : String) -> @conventions.Conventions {
 
 ///|
 fn name_of(
-  options? : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
-  env_vars? : Map[String, String] = {},
+  options~ : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
+  env_vars~ : Map[String, String] = {},
   default? : String,
 ) -> String? raise @config.ConfigError {
   @conventions.environment_name(acme_envs(default?), options~, env_vars)

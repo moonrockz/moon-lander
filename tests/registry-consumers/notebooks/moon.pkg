@@ -6,4 +6,5 @@ import {
   "moonrockz/notebooks/files/ipynb" @tree_ipynb,
   "moonrockz/notebooks/conversion",
 }
+
 pkgtype(kind: "executable")

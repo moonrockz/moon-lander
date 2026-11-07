@@ -12,19 +12,25 @@ test "MIME queries select rich outputs and attachments once in document order" {
     #|{"id":"raw","cell_type":"raw","metadata":{},"source":"","attachments":{"data.json":{"application/json":[]}}}]}
   let book = @nbformat.parse(source)
   @expect.expect_all(s => {
-    s.expect(book.cells_by_mime_type("image/png")).to_equal([
-      book.cells()[0], book.cells()[1],
-    ])
+    s
+    .expect(book.cells_by_mime_type("image/png"))
+    .to_equal([book.cells()[0], book.cells()[1]])
     s.expect(book.cells()[0].has_mime_type("application/json")).to_be_true()
-    s.expect(book.cells()[0].mime_capability().map(mime => {
-      mime.has_mime_type("application/json")
-    })).to_equal(Some(true))
+    s
+    .expect(
+      book.cells()[0]
+      .mime_capability()
+      .map(mime => mime.has_mime_type("application/json")),
+    )
+    .to_equal(Some(true))
     s.expect(book.cells()[1].has_mime_type("image/png")).to_be_true()
     s.expect(book.cells()[2].has_mime_type("image/png")).to_be_false()
-    s.expect(book.cells_by_mime_type("application/json")).to_equal([
-      book.cells()[0], book.cells()[2], book.cells()[3],
-    ])
-    s.expect(book.cells_by_mime_type("image/svg+xml")).to_equal([book.cells()[1]])
+    s
+    .expect(book.cells_by_mime_type("application/json"))
+    .to_equal([book.cells()[0], book.cells()[2], book.cells()[3]])
+    s
+    .expect(book.cells_by_mime_type("image/svg+xml"))
+    .to_equal([book.cells()[1]])
     s.expect(book.cells_by_mime_type("image/jpeg")).to_equal([])
     s.expect(book.cells_by_mime_type("IMAGE/PNG")).to_equal([])
     s.expect(book.cells_by_mime_type("image/*")).to_equal([])

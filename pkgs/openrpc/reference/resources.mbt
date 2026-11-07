@@ -1,13 +1,14 @@
 ///|
 /// An immutable caller-supplied JSON resource. Its retrieval URI and aliases
 /// are absolute and fragment-free; the value can be any extracted JSON fragment.
+#derive(Debug)
 pub struct Resource {
   uri : UriReference
   value : @json.Value
   priv aliases : Array[UriReference]
   priv schema_roots : Array[JsonPointer]
   priv nodes : Int32
-} derive(Debug)
+}
 
 ///|
 pub extend Resource with @debug.Debug::{to_repr}
@@ -125,11 +126,12 @@ pub fn Resource::schema_roots(self : Resource) -> Array[JsonPointer] {
 ///|
 /// Explicit immutable resource snapshots with an optional root base URI.
 /// Lookup uses syntax-based URI identity and never retrieves anything.
+#derive(Debug)
 pub struct ResourceSet {
   priv resources : Array[Resource]
   root_base : UriReference?
   priv index : Map[String, Int32]
-} derive(Debug)
+}
 
 ///|
 pub extend ResourceSet with @debug.Debug::{to_repr}

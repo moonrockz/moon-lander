@@ -8,10 +8,13 @@ test "issue 109 public empty Markdown cell round trip" {
     ],
     default_kernel=@dib.KernelName("scheme"),
   )
-  let original = @dib.Notebook::Notebook([
-    @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
-    @dib.Cell::Cell("42", kernel=@dib.KernelName("scheme"), source_mode~),
-  ], registry~)
+  let original = @dib.Notebook::Notebook(
+    [
+      @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
+      @dib.Cell::Cell("42", kernel=@dib.KernelName("scheme"), source_mode~),
+    ],
+    registry~,
+  )
   let encoded = original.to_string(source_mode~)
   let parsed = @dib.parse(encoded, registry~, source_mode~)
   assert_eq(encoded, "#!markdown\n\n#!scheme\n42\n")
@@ -54,9 +57,13 @@ test "lossless empty notebooks and explicit empty selectors differ" {
   assert_eq(@dib.parse(empty.to_string(source_mode~), source_mode~), empty)
   let selected = @dib.parse("#!fsharp\n#!fsharp\n#!markdown", source_mode~)
   assert_eq(selected.cells().length(), 3)
-  assert_eq(@dib.parse(selected.to_string(source_mode~), source_mode~), selected)
+  assert_eq(
+    @dib.parse(selected.to_string(source_mode~), source_mode~),
+    selected,
+  )
   let metadata_only = @dib.Notebook::Notebook(
-    [], metadata=@dib.Metadata({ "title": "Empty" }),
+    [],
+    metadata=@dib.Metadata({ "title": "Empty" }),
   )
   assert_eq(
     @dib.parse(metadata_only.to_string(source_mode~), source_mode~),
@@ -67,18 +74,20 @@ test "lossless empty notebooks and explicit empty selectors differ" {
 ///|
 test "lossless metadata and source metadata directives retain cell boundaries" {
   let source_mode = @dib.SourceMode::Lossless
-  for metadata in [
-    @dib.Metadata::empty(),
-    @dib.Metadata({ "title": "Example" }),
-  ] {
-    let original = @dib.Notebook::Notebook([
-      @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
-      @dib.Cell::Cell(
-        "\n#!meta\nretained as source\n#!unknown\n",
-        kernel=@dib.KernelName("csharp"), source_mode~,
-      ),
-      @dib.Cell::Cell("", kernel=@dib.KernelName("csharp"), source_mode~),
-    ], metadata~)
+  for
+    metadata in [@dib.Metadata::empty(), @dib.Metadata({ "title": "Example" })] {
+    let original = @dib.Notebook::Notebook(
+      [
+        @dib.Cell::Cell("", kernel=@dib.KernelName("markdown"), source_mode~),
+        @dib.Cell::Cell(
+          "\n#!meta\nretained as source\n#!unknown\n",
+          kernel=@dib.KernelName("csharp"),
+          source_mode~,
+        ),
+        @dib.Cell::Cell("", kernel=@dib.KernelName("csharp"), source_mode~),
+      ],
+      metadata~,
+    )
     assert_eq(
       @dib.parse(original.to_string(source_mode~), source_mode~),
       original,
@@ -90,7 +99,11 @@ test "lossless metadata and source metadata directives retain cell boundaries" {
 test "lossless source refuses registered selector collisions at original lines" {
   let source_mode = @dib.SourceMode::Lossless
   let original = @dib.Notebook::Notebook([
-    @dib.Cell::Cell("\n#!fsharp\nx\n", kernel=@dib.KernelName("csharp"), source_mode~),
+    @dib.Cell::Cell(
+      "\n#!fsharp\nx\n",
+      kernel=@dib.KernelName("csharp"),
+      source_mode~,
+    ),
   ])
   try original.to_string(source_mode~) catch {
     @dib.UnrepresentableSource(cell~, line~) => {

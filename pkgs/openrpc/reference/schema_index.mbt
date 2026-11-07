@@ -4,6 +4,7 @@
 /// siblings and declared foreign dialects never establish identifiers.
 /// The optional input is the caller's own document, named by `input_base`
 /// when it has one, and is never registered as a resource.
+#derive(Debug)
 pub struct SchemaIndex {
   priv resources : ResourceSet
   priv input : @json.Value?
@@ -14,7 +15,7 @@ pub struct SchemaIndex {
   priv diagnostics : Array[@json.Diagnostic]
   priv mut complete : Bool
   priv max_findings : Int32
-} derive(Debug)
+}
 
 ///|
 pub extend SchemaIndex with @debug.Debug::{to_repr}

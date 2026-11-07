@@ -150,7 +150,10 @@ fn output_at(value : Json, path : String) -> Output raise FormatError {
         path + ".metadata",
       )
       optional_type(
-        object_at(metadata_json_at(metadata, path + ".metadata"), path + ".metadata"),
+        object_at(
+          metadata_json_at(metadata, path + ".metadata"),
+          path + ".metadata",
+        ),
         "isolated",
         "boolean",
         path + ".metadata",

@@ -8,7 +8,7 @@ fn group_file(group : Array[(String, String)], path : String) -> String raise {
 
 ///|
 /// The bytes with one bit of byte `index` changed.
-fn flip_byte(bytes : Bytes, index : Int) -> Bytes {
+fn flip_byte(bytes : Bytes, index : Int32) -> Bytes {
   let array = bytes.to_array()
   array[index] = (array[index].to_int() ^ 1).to_byte()
   Bytes::from_array(array)
@@ -25,7 +25,11 @@ fn bundle_and_leaf(text : String) -> (Bundle, Leaf) raise {
 
 ///|
 fn morphir_parts() -> (Bundle, Leaf) raise {
-  bundle_and_leaf(group_file(@fixtures.github, "morphir-rust-provider-snapshot-0.2.0.sigstore.json"))
+  bundle_and_leaf(
+    group_file(
+      @fixtures.github, "morphir-rust-provider-snapshot-0.2.0.sigstore.json",
+    ),
+  )
 }
 
 ///|
@@ -44,8 +48,10 @@ fn step_rejection(step : () -> Unit raise Stop) -> Rejection? {
 ///|
 fn with_signature(bundle : Bundle, signature : Bytes) -> Bundle {
   match bundle.content {
-    Dsse(envelope) => { ..bundle, content: Dsse({ ..envelope, signatures: [signature] }) }
-    Message(algorithm~, digest~, ..) => { ..bundle, content: Message(algorithm~, digest~, signature~) }
+    Dsse(envelope) =>
+      { ..bundle, content: Dsse({ ..envelope, signatures: [signature], }), }
+    Message(algorithm~, digest~, ..) =>
+      { ..bundle, content: Message(algorithm~, digest~, signature~), }
   }
 }
 
@@ -54,19 +60,26 @@ test "scenario: signature that does not verify" {
   let (bundle, leaf) = morphir_parts()
   let artifact = ArtifactDigest::parse(morphir_artifact)
   // The unchanged bundle passes the content check.
-  guard check_content(bundle, leaf, artifact) is Some(statement) else { fail("no statement") }
+  guard check_content(bundle, leaf, artifact) is Some(statement) else {
+    fail("no statement")
+  }
   assert_eq(statement.subjects.length(), 4)
   guard bundle.content is Dsse(envelope) else { fail("not DSSE") }
   let signature = envelope.signatures[0]
   // One bit of the last byte of the DER signature changes; the log body check is
   // not run, so the content check sees the changed signature.
-  let changed = with_signature(bundle, flip_byte(signature, signature.length() - 1))
+  let changed = with_signature(
+    bundle,
+    flip_byte(signature, signature.length() - 1),
+  )
   assert_eq(
     step_rejection(() => ignore(check_content(changed, leaf, artifact))),
     Some(Invalid(ContentSignature)),
   )
   // A valid signature of another bundle by another key.
-  let (other, _) = bundle_and_leaf(group_file(@fixtures.github, "cli-2.83.0.sigstore.json"))
+  let (other, _) = bundle_and_leaf(
+    group_file(@fixtures.github, "cli-2.83.0.sigstore.json"),
+  )
   guard other.content is Dsse(other_envelope) else { fail("not DSSE") }
   let foreign = with_signature(bundle, other_envelope.signatures[0])
   assert_eq(
@@ -74,7 +87,10 @@ test "scenario: signature that does not verify" {
     Some(Invalid(ContentSignature)),
   )
   // A changed payload with the original signature.
-  let payload = { ..bundle, content: Dsse({ ..envelope, payload: flip_byte(envelope.payload, 40) }) }
+  let payload = {
+    ..bundle,
+    content: Dsse({ ..envelope, payload: flip_byte(envelope.payload, 40), }),
+  }
   assert_eq(
     step_rejection(() => ignore(check_content(payload, leaf, artifact))),
     Some(Invalid(ContentSignature)),
@@ -82,7 +98,10 @@ test "scenario: signature that does not verify" {
   // Another payload type is refused before the signature check.
   let payload_type = {
     ..bundle,
-    content: Dsse({ ..envelope, payload_type: "application/vnd.in-toto+json; charset=utf-8" }),
+    content: Dsse({
+      ..envelope,
+      payload_type: "application/vnd.in-toto+json; charset=utf-8",
+    }),
   }
   assert_eq(
     step_rejection(() => ignore(check_content(payload_type, leaf, artifact))),
@@ -99,11 +118,17 @@ test "message signature content checks" {
   let artifact = ArtifactDigest::of_bytes(
     @utf8.encode(group_file(@fixtures.conformance, "a.txt")),
   )
-  assert_eq(step_rejection(() => ignore(check_content(bundle, leaf, artifact))), None)
+  assert_eq(
+    step_rejection(() => ignore(check_content(bundle, leaf, artifact))),
+    None,
+  )
   guard bundle.content is Message(algorithm~, digest~, signature~) else {
     fail("not a message signature")
   }
-  let changed = with_signature(bundle, flip_byte(signature, signature.length() - 1))
+  let changed = with_signature(
+    bundle,
+    flip_byte(signature, signature.length() - 1),
+  )
   assert_eq(
     step_rejection(() => ignore(check_content(changed, leaf, artifact))),
     Some(Invalid(ContentSignature)),
@@ -113,7 +138,10 @@ test "message signature content checks" {
     step_rejection(() => ignore(check_content(bundle, leaf, other))),
     Some(Invalid(ArtifactDigestMismatch(other))),
   )
-  let sha384 = { ..bundle, content: Message(algorithm=Sha2_384, digest~, signature~) }
+  let sha384 = {
+    ..bundle,
+    content: Message(algorithm=Sha2_384, digest~, signature~),
+  }
   assert_eq(
     step_rejection(() => ignore(check_content(sha384, leaf, artifact))),
     Some(Unsupported(DigestAlgorithm("SHA2_384"))),
@@ -121,11 +149,15 @@ test "message signature content checks" {
   assert_true(algorithm is Sha2_256)
   let short = {
     ..bundle,
-    content: Message(algorithm~, digest=Bytes::from_array(digest.to_array()[:31].to_owned()), signature~),
+    content: Message(
+      algorithm~,
+      digest=Bytes::from_array(digest.to_array()[:31].to_owned()),
+      signature~,
+    ),
   }
   assert_true(
-    step_rejection(() => ignore(check_content(short, leaf, artifact))) is
-    Some(Invalid(BundleShape(_))),
+    step_rejection(() => ignore(check_content(short, leaf, artifact)))
+    is Some(Invalid(BundleShape(_))),
   )
 }
 
@@ -137,7 +169,9 @@ test "scenario: leaf expired at log time (certificate validity bounds)" {
   let not_after = leaf.certificate.not_after
   assert_true(not_before <= 1792133282L && 1792133282L <= not_after)
   fn at(seconds : Int64) -> Rejection? {
-    step_rejection(() => ignore(check_certificate(leaf, root, Instant::from_unix_seconds(seconds))))
+    step_rejection(() => {
+      ignore(check_certificate(leaf, root, Instant::from_unix_seconds(seconds)))
+    })
   }
 
   // Both bounds are inclusive.
@@ -173,36 +207,59 @@ test "read_statement refuses a payload that is not a statement" {
     Some(Invalid(Statement("the payload is not JSON, or has a duplicate key"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"subject\":[],\"subject\":[]}"),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"subject\":[],\"subject\":[]}",
+    ),
     Some(Invalid(Statement("the payload is not JSON, or has a duplicate key"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"not a uri\",\"subject\":[]}"),
-    Some(Invalid(Statement("Invalid predicate type \"not a uri\": use an absolute URI"))),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"not a uri\",\"subject\":[]}",
+    ),
+    Some(
+      Invalid(
+        Statement("Invalid predicate type \"not a uri\": use an absolute URI"),
+      ),
+    ),
   )
   assert_eq(
-    reason("{\"_type\":\"https://example.com/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[]}"),
+    reason(
+      "{\"_type\":\"https://example.com/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[]}",
+    ),
     Some(Invalid(Statement("the payload is not an in-toto statement"))),
   )
   assert_eq(
     reason("{\"_type\":\"https://in-toto.io/Statement/v0.1\",\"subject\":[]}"),
     Some(Invalid(Statement("the statement has no predicate type"))),
   )
-  assert_true(reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\"}") is Some(Invalid(Statement(_))))
   assert_true(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"name\":\"a\"}]}") is
-    Some(Invalid(Statement(_))),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\"}",
+    )
+    is Some(Invalid(Statement(_))),
+  )
+  assert_true(
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"name\":\"a\"}]}",
+    )
+    is Some(Invalid(Statement(_))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}"),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"zz\"}}]}",
+    ),
     Some(Invalid(Statement("a subject digest is not hex"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}"),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":1}}]}",
+    ),
     Some(Invalid(Statement("a subject digest is not a string"))),
   )
   assert_eq(
-    reason("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"\{"ab".repeat(31)}\"}}]}"),
+    reason(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[{\"digest\":{\"sha256\":\"\{"ab".repeat(31)}\"}}]}",
+    ),
     Some(Invalid(Statement("a subject sha256 digest does not have 32 bytes"))),
   )
   // Upper-case hex is read as lower-case; a subject without sha256 is kept.
@@ -217,28 +274,37 @@ test "read_statement refuses a payload that is not a statement" {
   assert_eq(statement.subjects[0].name, "a")
   assert_eq(
     statement.subjects[0].sha256.map(digest => digest.to_string()),
-    Some("sha256:abababababababababababababababababababababababababababababababab"),
+    Some(
+      "sha256:abababababababababababababababababababababababababababababababab",
+    ),
   )
   assert_eq(statement.subjects[1].sha256, None)
 }
 
 ///|
 test "read_statement limits subjects and digests" {
-  fn subjects(count : Int, digests : Int) -> Bytes {
-    let digest_map = Array::makei(digests, index => "\"d\{index}\":\"00\"").join(",")
+  fn subjects(count : Int32, digests : Int32) -> Bytes {
+    let digest_map = Array::makei(digests, index => "\"d\{index}\":\"00\"").join(
+      ",",
+    )
     let items = Array::make(count, "{\"digest\":{\{digest_map}}}").join(",")
-    @encoding.utf8("{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[\{items}]}")
+    @encoding.utf8(
+      "{\"_type\":\"https://in-toto.io/Statement/v1\",\"predicateType\":\"https://example.com/p\",\"subject\":[\{items}]}",
+    )
   }
 
-  assert_eq(step_rejection(() => ignore(read_statement(subjects(1024, 1)))), None)
+  assert_eq(
+    step_rejection(() => ignore(read_statement(subjects(1024, 1)))),
+    None,
+  )
   assert_true(
-    step_rejection(() => ignore(read_statement(subjects(1025, 1)))) is
-    Some(Invalid(Statement(_))),
+    step_rejection(() => ignore(read_statement(subjects(1025, 1))))
+    is Some(Invalid(Statement(_))),
   )
   assert_eq(step_rejection(() => ignore(read_statement(subjects(1, 32)))), None)
   assert_true(
-    step_rejection(() => ignore(read_statement(subjects(1, 33)))) is
-    Some(Invalid(Statement(_))),
+    step_rejection(() => ignore(read_statement(subjects(1, 33))))
+    is Some(Invalid(Statement(_))),
   )
 }
 
@@ -250,9 +316,9 @@ test "an SCT time keeps its milliseconds" {
   // one that starts 13 ms after it does not hold it either.
   let end = parse_timestamp("2026-10-16T06:48:02.010Z").unwrap()
   assert_true(end < sct)
-  assert_false(({ start: None, end: Some(end) } : Period).contains(sct))
+  assert_false(({ start: None, end: Some(end), } : Period).contains(sct))
   let start = parse_timestamp("2026-10-16T06:48:02.036Z").unwrap()
-  assert_false(({ start: Some(start), end: None } : Period).contains(sct))
-  assert_true(({ start: Some(end), end: Some(start) } : Period).contains(sct))
+  assert_false(({ start: Some(start), end: None, } : Period).contains(sct))
+  assert_true(({ start: Some(end), end: Some(start), } : Period).contains(sct))
   assert_eq(Instant::from_unix_millis(-1L).unix_seconds(), -1L)
 }

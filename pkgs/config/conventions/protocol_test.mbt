@@ -55,7 +55,7 @@ test "Complete tree" {
 ///|
 test "wasm uses injected tree" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }])
+    .with_listing(p("/w"), [{ name: "acme.toml", kind: File, }])
     .with_file(p("/w/acme.toml"), "project.name = \"injected\"")
   let builder = @config.builder()
     |> @config.working_dir("/w")
@@ -105,10 +105,7 @@ test "Same result on all targets" {
     ("environment", 600, None, 0, Loaded),
   ])
   @expect.expect(
-    (
-      @config.get_text(config, "ui.theme"),
-      @config.get_text(config, "ui.font"),
-    ),
+    (@config.get_text(config, "ui.theme"), @config.get_text(config, "ui.font")),
   ).to_equal(("dark", "mono"))
   let error = try
     load_from(

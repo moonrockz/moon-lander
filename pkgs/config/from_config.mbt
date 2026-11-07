@@ -50,14 +50,16 @@ pub fn ConfigNode::children(self : ConfigNode) -> Array[(String, ConfigNode)] {
   let children = []
   for field in fields {
     guard field.name().text() is Some(name) else { continue }
-    children.push((
-      name,
-      {
-        config: self.config,
-        path: self.path.below([Field(name)]),
-        value: Some({ ion: field.value() }),
-      },
-    ))
+    children.push(
+      (
+        name,
+        {
+          config: self.config,
+          path: self.path.below([Field(name)]),
+          value: Some({ ion: field.value(), }),
+        },
+      ),
+    )
   }
   children
 }
@@ -72,7 +74,7 @@ pub fn ConfigNode::items(self : ConfigNode) -> Array[ConfigNode] {
       items.mapi((index, item) => {
         config: self.config,
         path: self.path.below([Index(index)]),
-        value: Some({ ion: item }),
+        value: Some({ ion: item, }),
       })
     _ => []
   }
@@ -95,7 +97,11 @@ pub fn[T : FromJson] ConfigNode::json(self : ConfigNode) -> T raise ConfigError 
   match self.value {
     Some(value) => {
       self.config.check_no_secret(self.path, value)
-      decode(self.config, self.path, section_json(self.config, self.path, value))
+      decode(
+        self.config,
+        self.path,
+        section_json(self.config, self.path, value),
+      )
     }
     None => decode(self.config, self.path, Json::null())
   }
@@ -104,9 +110,12 @@ pub fn[T : FromJson] ConfigNode::json(self : ConfigNode) -> T raise ConfigError 
 ///|
 /// Raise `Decode` at the node with `detail` and the blame of the node. Use it
 /// for a rule that a `FromConfig` implementation checks while it decodes.
-pub fn[T] ConfigNode::fail(self : ConfigNode, detail : String) -> T raise ConfigError {
+pub fn[T] ConfigNode::fail(
+  self : ConfigNode,
+  detail : String,
+) -> T raise ConfigError {
   raise Decode(failure={
-    at: [{ path: self.path, blame: self.blame() }],
+    at: [{ path: self.path, blame: self.blame(), }],
     detail,
   })
 }
@@ -116,7 +125,7 @@ pub fn[T] ConfigNode::fail(self : ConfigNode, detail : String) -> T raise Config
 /// decimals, timestamps and integers of any size, and it can read the blame of
 /// each value.
 pub(open) trait FromConfig {
-  from_config(ConfigNode) -> Self raise ConfigError
+  fn from_config(ConfigNode) -> Self raise ConfigError
 }
 
 ///|
@@ -124,11 +133,14 @@ pub(open) trait FromConfig {
 /// sets gives a node with no value, so an `Option` target gives `None`. A
 /// failure raises `Decode` with the decode path and the sources to blame.
 /// Binding never resolves a secret reference: only `SecretRef` accepts one.
-pub fn[T : FromConfig] bind_with(config : Config, key : String) -> T raise ConfigError {
+pub fn[T : FromConfig] bind_with(
+  config : Config,
+  key : String,
+) -> T raise ConfigError {
   let path = KeyPath::parse(key)
   T::from_config({
     config,
-    path: { key: Some(path), suffix: [] },
+    path: { key: Some(path), suffix: [], },
     value: config.get(path),
   })
 }
@@ -156,13 +168,16 @@ fn[T] ConfigNode::mismatch(
 
 ///|
 /// Fail because an integer is out of the range of `target`.
-fn[T] ConfigNode::out_of_range(self : ConfigNode, target : String) -> T raise ConfigError {
+fn[T] ConfigNode::out_of_range(
+  self : ConfigNode,
+  target : String,
+) -> T raise ConfigError {
   self.fail("the integer is out of range for \{target}")
 }
 
 ///|
 /// Text or a symbol with text.
-pub impl FromConfig for String with from_config(node) {
+pub impl FromConfig for String with fn from_config(node) {
   let value = node.present()
   match value.ion.kind() {
     String(text) => text
@@ -176,13 +191,12 @@ pub impl FromConfig for String with from_config(node) {
 /// text or a symbol with text can give one: a number has no unit, so it fails.
 /// Text that `TimeLimit::parse` rejects fails with the parse message, which
 /// names the input and the broken rule.
-pub impl FromConfig for @lander_core.TimeLimit with from_config(node) {
+pub impl FromConfig for @lander_core.TimeLimit with fn from_config(node) {
   let value = node.present()
   let text = match value.ion.kind() {
     String(text) => text
     Symbol(token) if token.text() is Some(text) => text
-    _ =>
-      node.mismatch(value, "time limit text with a unit, such as \"30s\"")
+    _ => node.mismatch(value, "time limit text with a unit, such as \"30s\"")
   }
   @lander_core.TimeLimit::parse(text) catch {
     error => node.fail(error.message())
@@ -190,7 +204,7 @@ pub impl FromConfig for @lander_core.TimeLimit with from_config(node) {
 }
 
 ///|
-pub impl FromConfig for Bool with from_config(node) {
+pub impl FromConfig for Bool with fn from_config(node) {
   let value = node.present()
   guard value.ion.kind() is Bool(flag) else { node.mismatch(value, "bool") }
   flag
@@ -206,7 +220,7 @@ fn ConfigNode::integer(self : ConfigNode) -> @bigint.BigInt raise ConfigError {
 
 ///|
 /// An integer in the range of `Int`. A fraction fails.
-pub impl FromConfig for Int with from_config(node) {
+pub impl FromConfig for Int32 with fn from_config(node) {
   let number = node.integer()
   if number.compare_int(@int.MIN_VALUE) < 0 ||
     number.compare_int(@int.MAX_VALUE) > 0 {
@@ -217,7 +231,7 @@ pub impl FromConfig for Int with from_config(node) {
 
 ///|
 /// An integer in the range of `Int64`. A fraction fails.
-pub impl FromConfig for Int64 with from_config(node) {
+pub impl FromConfig for Int64 with fn from_config(node) {
   let number = node.integer()
   if number.compare_int64(@int64.MIN_VALUE) < 0 ||
     number.compare_int64(@int64.MAX_VALUE) > 0 {
@@ -228,7 +242,7 @@ pub impl FromConfig for Int64 with from_config(node) {
 
 ///|
 /// An integer in the range of `UInt64`. A fraction fails.
-pub impl FromConfig for UInt64 with from_config(node) {
+pub impl FromConfig for UInt64 with fn from_config(node) {
   let number = node.integer()
   if number.compare_int(0) < 0 || number.compare_uint64(@uint64.MAX_VALUE) > 0 {
     node.out_of_range("UInt64")
@@ -238,13 +252,13 @@ pub impl FromConfig for UInt64 with from_config(node) {
 
 ///|
 /// An integer of any size.
-pub impl FromConfig for @bigint.BigInt with from_config(node) {
+pub impl FromConfig for @bigint.BigInt with fn from_config(node) {
   node.integer()
 }
 
 ///|
 /// A float, an integer or a decimal, as the nearest `Double`.
-pub impl FromConfig for Double with from_config(node) {
+pub impl FromConfig for Double with fn from_config(node) {
   let value = node.present()
   let double = match value.ion.kind() {
     Float(double) => Some(double)
@@ -252,14 +266,16 @@ pub impl FromConfig for Double with from_config(node) {
     Decimal(decimal) => decimal.to_double()
     _ => node.mismatch(value, "float")
   }
-  guard double is Some(double) else { node.fail("the number has no Double value") }
+  guard double is Some(double) else {
+    node.fail("the number has no Double value")
+  }
   double
 }
 
 ///|
 /// A decimal, or an integer as a decimal with exponent 0. A float fails,
 /// because a binary float has no exact decimal scale.
-pub impl FromConfig for @ion.Decimal with from_config(node) {
+pub impl FromConfig for @ion.Decimal with fn from_config(node) {
   let value = node.present()
   match value.ion.kind() {
     Decimal(decimal) => decimal
@@ -270,7 +286,7 @@ pub impl FromConfig for @ion.Decimal with from_config(node) {
 
 ///|
 /// A timestamp with its precision, fraction and offset.
-pub impl FromConfig for @ion.Timestamp with from_config(node) {
+pub impl FromConfig for @ion.Timestamp with fn from_config(node) {
   let value = node.present()
   guard value.ion.kind() is Timestamp(timestamp) else {
     node.mismatch(value, "timestamp")
@@ -280,7 +296,7 @@ pub impl FromConfig for @ion.Timestamp with from_config(node) {
 
 ///|
 /// `None` when no source sets the value or the value is a null.
-pub impl[T : FromConfig] FromConfig for T? with from_config(node) {
+pub impl[T : FromConfig] FromConfig for T? with fn from_config(node) {
   match node.value {
     None => None
     Some(value) if value.ion.kind() is Null(_) => None
@@ -290,7 +306,7 @@ pub impl[T : FromConfig] FromConfig for T? with from_config(node) {
 
 ///|
 /// Each item of a list, in order.
-pub impl[T : FromConfig] FromConfig for Array[T] with from_config(node) {
+pub impl[T : FromConfig] FromConfig for Array[T] with fn from_config(node) {
   let value = node.present()
   guard value.ion.kind() is (List(_) | Sexp(_)) else {
     node.mismatch(value, "list")
@@ -300,7 +316,7 @@ pub impl[T : FromConfig] FromConfig for Array[T] with from_config(node) {
 
 ///|
 /// Each field of a table, in configuration order.
-pub impl[T : FromConfig] FromConfig for Map[String, T] with from_config(node) {
+pub impl[T : FromConfig] FromConfig for Map[String, T] with fn from_config(node) {
   let value = node.present()
   guard value.ion.kind() is Struct(_) else { node.mismatch(value, "struct") }
   let map = Map([])
@@ -313,7 +329,7 @@ pub impl[T : FromConfig] FromConfig for Map[String, T] with from_config(node) {
 ///|
 /// The unresolved reference. Binding never resolves it; use
 /// `Config::secret` for that.
-pub impl FromConfig for SecretRef with from_config(node) {
+pub impl FromConfig for SecretRef with fn from_config(node) {
   guard node.value is Some(value) else { node.fail("no value") }
   guard node.config.secret_syntax is Standard &&
     secret_ref_of(value) is Some(reference) else {
@@ -328,10 +344,11 @@ pub extend SecretRef with FromConfig::{from_config}
 ///|
 /// A decoded value with the sources to blame for it, for example to resolve a
 /// relative path against the file that set it.
+#derive(Eq, Debug)
 pub struct Sourced[T] {
   value : T
   blame : Blame
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Sourced with Eq::{equal, not_equal}
@@ -340,8 +357,8 @@ pub extend Sourced with Eq::{equal, not_equal}
 pub extend Sourced with @debug.Debug::{to_repr}
 
 ///|
-pub impl[T : FromConfig] FromConfig for Sourced[T] with from_config(node) {
-  { value: T::from_config(node), blame: node.blame() }
+pub impl[T : FromConfig] FromConfig for Sourced[T] with fn from_config(node) {
+  { value: T::from_config(node), blame: node.blame(), }
 }
 
 ///|

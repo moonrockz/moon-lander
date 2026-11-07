@@ -81,7 +81,11 @@ priv enum Frame[M] {
 ///|
 /// The oldest message. The receive waits when the mailbox is empty.
 pub fn[M] receive() -> Receive[M, M] {
-  { steps: k => Take({ choose: message => Some(() => k(message)), on_empty: None }) }
+  {
+    steps: k => {
+      Take({ choose: message => Some(() => k(message)), on_empty: None, })
+    },
+  }
 }
 
 ///|
@@ -92,13 +96,17 @@ pub fn[M] receive() -> Receive[M, M] {
 pub fn[M, T] select(choose : (M) -> T? raise?) -> Receive[M, T] {
   let choose = lift_selector(choose)
   {
-    steps: k => Take({
-      choose: message => match choose(message) {
-        Some(value) => Some(() => k(value))
-        None => None
-      },
-      on_empty: None,
-    }),
+    steps: k => {
+      Take({
+        choose: message => {
+          match choose(message) {
+            Some(value) => Some(() => k(value))
+            None => None
+          }
+        },
+        on_empty: None,
+      })
+    },
   }
 }
 
@@ -114,7 +122,7 @@ fn[M, T] lift_selector(choose : (M) -> T? raise?) -> (M) -> T? raise {
 ///|
 /// The result `value`, with no receive.
 pub fn[M, R] done(value : R) -> Receive[M, R] {
-  { steps: k => direct(() => k(value)) }
+  { steps: k => direct(() => k(value)), }
 }
 
 ///|
@@ -123,17 +131,22 @@ pub fn[M, R] done(value : R) -> Receive[M, R] {
 /// receive, not with `on_empty`.
 pub fn[M] poll(on_empty~ : () -> Receive[M, M]) -> Receive[M, M] {
   {
-    steps: k => Take({
-      choose: message => Some(() => k(message)),
-      on_empty: Some(() => on_empty().build(k)),
-    }),
+    steps: k => {
+      Take({
+        choose: message => Some(() => k(message)),
+        on_empty: Some(() => on_empty().build(k)),
+      })
+    },
   }
 }
 
 ///|
 /// Change the result with `f`.
-pub fn[M, R, T] Receive::map(self : Receive[M, R], f : (R) -> T) -> Receive[M, T] {
-  { steps: k => direct(() => self.build(value => direct(() => k(f(value))))) }
+pub fn[M, R, T] Receive::map(
+  self : Receive[M, R],
+  f : (R) -> T,
+) -> Receive[M, T] {
+  { steps: k => direct(() => self.build(value => direct(() => k(f(value))))), }
 }
 
 ///|
@@ -153,9 +166,13 @@ pub fn[M, R, T, U] Receive::zip_with(
   f : (R, T) -> U,
 ) -> Receive[M, U] {
   {
-    steps: k => direct(() => self.build(left => {
-      direct(() => other.build(right => direct(() => k(f(left, right)))))
-    })),
+    steps: k => {
+      direct(() => {
+        self.build(left => {
+          direct(() => other.build(right => direct(() => k(f(left, right)))))
+        })
+      })
+    },
   }
 }
 
@@ -165,7 +182,7 @@ pub fn[M, R, T] Receive::then(
   self : Receive[M, R],
   other : Receive[M, T],
 ) -> Receive[M, T] {
-  { steps: k => direct(() => self.build(_ => direct(() => other.build(k)))) }
+  { steps: k => direct(() => self.build(_ => direct(() => other.build(k)))), }
 }
 
 ///|
@@ -177,7 +194,9 @@ pub fn[M, R, T] Receive::bind(
   next : async (R) -> Receive[M, T],
 ) -> Receive[M, T] {
   {
-    steps: k => direct(() => self.build(value => Work(() => next(value).build(k)))),
+    steps: k => {
+      direct(() => self.build(value => Work(() => next(value).build(k))))
+    },
   }
 }
 
@@ -192,9 +211,11 @@ pub fn[M, R] Receive::within(
   on_timeout~ : () -> Receive[M, R],
 ) -> Receive[M, R] {
   {
-    steps: k => Enter(Deadline(limit, () => on_timeout().build(k)), () => {
-      self.build(value => Leave(() => k(value)))
-    }),
+    steps: k => {
+      Enter(Deadline(limit, () => on_timeout().build(k)), () => {
+        self.build(value => Leave(() => k(value)))
+      })
+    },
   }
 }
 
@@ -206,9 +227,11 @@ pub fn[M, R] Receive::on_closed(
   f : () -> Receive[M, R],
 ) -> Receive[M, R] {
   {
-    steps: k => Enter(OnClosed(() => f().build(k)), () => {
-      self.build(value => Leave(() => k(value)))
-    }),
+    steps: k => {
+      Enter(OnClosed(() => f().build(k)), () => {
+        self.build(value => Leave(() => k(value)))
+      })
+    },
   }
 }
 
@@ -220,9 +243,11 @@ pub fn[M, R] Receive::recover(
   on_error : (Error) -> Receive[M, R],
 ) -> Receive[M, R] {
   {
-    steps: k => Enter(Recover(error => on_error(error).build(k)), () => {
-      self.build(value => Leave(() => k(value)))
-    }),
+    steps: k => {
+      Enter(Recover(error => on_error(error).build(k)), () => {
+        self.build(value => Leave(() => k(value)))
+      })
+    },
   }
 }
 
@@ -238,12 +263,14 @@ pub fn[M, S] receive_loop(
     steps: k => {
       let state = Ref(initial)
       Repeat({
-        handle: message => match handler(state.val, message) {
-          Continue(next) => {
-            state.val = next
-            None
+        handle: message => {
+          match handler(state.val, message) {
+            Continue(next) => {
+              state.val = next
+              None
+            }
+            Stop => Some(k(state.val))
           }
-          Stop => Some(k(state.val))
         },
         finish: () => k(state.val),
       })
@@ -255,13 +282,15 @@ pub fn[M, S] receive_loop(
 /// Call `handler` for each message until the mailbox closes.
 pub fn[M] receive_all(handler : async (M) -> Unit) -> Receive[M, Unit] {
   {
-    steps: k => Repeat({
-      handle: message => {
-        handler(message)
-        None
-      },
-      finish: () => k(()),
-    }),
+    steps: k => {
+      Repeat({
+        handle: message => {
+          handler(message)
+          None
+        },
+        finish: () => k(()),
+      })
+    },
   }
 }
 
@@ -294,11 +323,11 @@ pub fn[M] receive_n(
 ///|
 /// The number of pure steps that run in one call chain before a step returns
 /// to the runner.
-const DIRECT_LIMIT : Int = 32
+const DIRECT_LIMIT : Int32 = 32
 
 ///|
 /// The depth of the current chain of pure steps.
-let direct_depth : Ref[Int] = Ref(0)
+let direct_depth : Ref[Int32] = Ref(0)
 
 ///|
 /// Call `next` at once while the chain is short, else return it to the runner.

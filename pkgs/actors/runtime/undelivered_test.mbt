@@ -36,7 +36,7 @@ fn describe_field(field : @ion.Field) -> String {
 
 ///|
 /// The policy of the tests: each message is an Ion integer.
-fn int_payload() -> @actors.PayloadPolicy[Int] {
+fn int_payload() -> @actors.PayloadPolicy[Int32] {
   @actors.PayloadPolicy::encode(message => @ion.Ion::int(message))
 }
 
@@ -46,12 +46,12 @@ fn blocked_actor(
   scope : @actors.Scope,
   ready : @aio.Queue[Unit],
   gate : @aio.Queue[Unit],
-) -> @actors.Actor[Int, Unit] raise {
+) -> @actors.Actor[Int32, Unit] raise {
   scope.start(
     (),
     mailbox=Bounded(@actors.MailboxCapacity::from_int(1)),
     payload=int_payload(),
-    (_, _ : Int) => {
+    (_, _ : Int32) => {
       ready.put(())
       gate.get()
       Continue(())
@@ -93,7 +93,7 @@ async test "UND: reenqueue to a full mailbox publishes Full" {
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
     let actor = scope.spawn(
-      (context : @actors.ActorContext[Int]) => {
+      (context : @actors.ActorContext[Int32]) => {
         @actors.receive_all(message => {
           if message == 1 {
             ready.put(())
@@ -160,15 +160,11 @@ async test "UND: cancellation discards two queued messages in queue order before
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start(
-      (),
-      payload=int_payload(),
-      (_, _ : Int) => {
-        ready.put(())
-        gate.get()
-        Continue(())
-      },
-    )
+    let actor = scope.start((), payload=int_payload(), (_, _ : Int32) => {
+      ready.put(())
+      gate.get()
+      Continue(())
+    })
     let address = actor.address().to_string()
     actor.send(1)
     ready.get()
@@ -190,14 +186,10 @@ async test "UND: stop and failure discard queued messages before Ended" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let stopping = scope.start(
-      (),
-      payload=int_payload(),
-      (_, _ : Int) => {
-        gate.get()
-        Stop
-      },
-    )
+    let stopping = scope.start((), payload=int_payload(), (_, _ : Int32) => {
+      gate.get()
+      Stop
+    })
     let address = stopping.address().to_string()
     assert_eq(next_label(probe), "started \{address}")
     assert_eq(stopping.try_send(1), Accepted)
@@ -212,14 +204,10 @@ async test "UND: stop and failure discard queued messages before Ended" {
   let failed = try {
     @actors.scope(events~, scope => {
       ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-      let failing = scope.start(
-        (),
-        payload=int_payload(),
-        (_, _ : Int) => {
-          gate.get()
-          raise Broken("boom")
-        },
-      )
+      let failing = scope.start((), payload=int_payload(), (_, _ : Int32) => {
+        gate.get()
+        raise Broken("boom")
+      })
       let address = failing.address().to_string()
       assert_eq(next_label(probe), "started \{address}")
       assert_eq(failing.try_send(1), Accepted)
@@ -245,21 +233,19 @@ async test "UND: close returns pending messages and publishes no event for them"
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start(
-      (),
-      payload=int_payload(),
-      (_, _ : Int) => {
-        ready.put(())
-        gate.get()
-        Continue(())
-      },
-    )
+    let actor = scope.start((), payload=int_payload(), (_, _ : Int32) => {
+      ready.put(())
+      gate.get()
+      Continue(())
+    })
     let address = actor.address().to_string()
     actor.send(1)
     ready.get()
     actor.send(2)
     actor.send(3)
-    guard actor.close() is Some(pending) else { fail("missing pending snapshot") }
+    guard actor.close() is Some(pending) else {
+      fail("missing pending snapshot")
+    }
     assert_eq(pending.messages(), [2, 3])
     gate.put(())
     actor.join()
@@ -275,7 +261,11 @@ async test "ORD: Started comes first for an actor closed at once, then Closed, t
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start(0, (count, _ : Int) => Continue(count + 1), payload=@actors.PayloadPolicy::json())
+    let actor = scope.start(
+      0,
+      (count, _ : Int32) => Continue(count + 1),
+      payload=@actors.PayloadPolicy::json(),
+    )
     let address = actor.address().to_string()
     ignore(actor.close())
     assert_eq(actor.to_ref().try_send(7), Closed)
@@ -291,7 +281,7 @@ async test "ORD: after Ended only Closed events follow for the actor" {
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start((), (_, _ : Int) => Stop, payload=int_payload())
+    let actor = scope.start((), (_, _ : Int32) => Stop, payload=int_payload())
     let address = actor.address().to_string()
     actor.send(0)
     actor.join()
@@ -318,7 +308,7 @@ async test "PAY: the default policy omits the payload" {
   let probe : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start((), (_, _ : Int) => Stop)
+    let actor = scope.start((), (_, _ : Int32) => Stop)
     let address = actor.address().to_string()
     actor.send(0)
     actor.join()
@@ -335,7 +325,7 @@ enum Reading {
 }
 
 ///|
-impl @ion.ToIon for Reading with to_ion(self) {
+impl @ion.ToIon for Reading with fn to_ion(self) {
   let Reading(amount, time) = self
   @ion.Ion::list([@ion.Ion::decimal(amount), @ion.Ion::timestamp(time)])
 }
@@ -368,9 +358,10 @@ async test "PAY: the Ion policy keeps a decimal and a timestamp" {
 }
 
 ///|
+#derive(ToJson)
 enum PaidCounter {
-  Add(Int)
-} derive(ToJson)
+  Add(Int32)
+}
 
 ///|
 async test "PAY: the JSON policy gives the Ion form of the JSON value" {
@@ -457,7 +448,7 @@ async test "PAY: service closures have no payload; respond encodes the request" 
     assert_eq(next_label(probe), "undelivered \{service_address} closed -")
     assert_eq(next_label(probe), "ended \{service_address} completed")
     let responder = scope.respond(
-      (request : Int) => request * 2,
+      (request : Int32) => request * 2,
       payload=int_payload(),
     )
     let responder_address = responder.address().to_string()
@@ -481,13 +472,13 @@ async test "PAY: service closures have no payload; respond encodes the request" 
 ///|
 async test "COST: no subscriber means the encoder is never called" {
   let calls = Ref(0)
-  let counting : @actors.PayloadPolicy[Int] = @actors.PayloadPolicy::encode(message => {
+  let counting : @actors.PayloadPolicy[Int32] = @actors.PayloadPolicy::encode(message => {
     calls.val += 1
     @ion.Ion::int(message)
   })
   let events = @actors.RuntimeEvents::new()
   @actors.scope(events~, scope => {
-    let actor = scope.start((), (_, _ : Int) => Stop, payload=counting)
+    let actor = scope.start((), (_, _ : Int32) => Stop, payload=counting)
     ignore(actor.close())
     for index in 0..<10 {
       assert_eq(actor.try_send(index), Closed)
@@ -496,7 +487,7 @@ async test "COST: no subscriber means the encoder is never called" {
   assert_eq(calls.val, 0)
   // A scope without a channel never encodes either.
   @actors.scope(scope => {
-    let actor = scope.start((), (_, _ : Int) => Stop, payload=counting)
+    let actor = scope.start((), (_, _ : Int32) => Stop, payload=counting)
     actor.send(0)
     actor.join()
     for index in 0..<10 {
@@ -509,7 +500,7 @@ async test "COST: no subscriber means the encoder is never called" {
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
     ignore(events.subscribe(scope, @actors.Subject::from_queue(probe)))
-    let actor = scope.start((), (_, _ : Int) => Stop, payload=counting)
+    let actor = scope.start((), (_, _ : Int32) => Stop, payload=counting)
     actor.send(0)
     actor.join()
     assert_eq(actor.try_send(1), Closed)
@@ -521,7 +512,7 @@ async test "COST: no subscriber means the encoder is never called" {
 async test "COST: each subscriber gets an independent payload" {
   let events = @actors.RuntimeEvents::new()
   let second : @aio.Queue[@actors.ActorEvent] = @aio.Queue(kind=Unbounded)
-  let policy : @actors.PayloadPolicy[Int] = @actors.PayloadPolicy::encode(message => {
+  let policy : @actors.PayloadPolicy[Int32] = @actors.PayloadPolicy::encode(message => {
     @ion.Ion::from_fields([
       @ion.Field("items", @ion.Ion::list([@ion.Ion::int(message)])),
     ]).with_annotations([@ion.SymbolToken("sample")])
@@ -532,7 +523,8 @@ async test "COST: each subscriber gets an independent payload" {
     try_send=event => {
       if event is Undelivered(_, _, payload=Some(payload)) {
         payload.annotations().push(@ion.SymbolToken("changed"))
-        if payload.kind() is Struct(fields) && fields[0].value().kind() is List(items) {
+        if payload.kind() is Struct(fields) &&
+          fields[0].value().kind() is List(items) {
           items.push(@ion.Ion::int(99))
         }
       }
@@ -542,7 +534,7 @@ async test "COST: each subscriber gets an independent payload" {
   @actors.scope(events~, scope => {
     ignore(events.subscribe(scope, mutate))
     ignore(events.subscribe(scope, @actors.Subject::from_queue(second)))
-    let actor = scope.start((), (_, _ : Int) => Stop, payload=policy)
+    let actor = scope.start((), (_, _ : Int32) => Stop, payload=policy)
     ignore(actor.close())
     assert_eq(actor.try_send(1), Closed)
     ignore(second.get())

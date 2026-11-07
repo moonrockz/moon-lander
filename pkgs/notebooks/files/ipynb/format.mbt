@@ -1,9 +1,10 @@
 ///|
 /// A malformed VFS metadata declaration or marked cell without source.
+#derive(Eq, Debug)
 pub(all) suberror MappingError {
   InvalidMetadata(path~ : String, expected~ : String)
-  UnsupportedCell(index~ : Int, cell_type~ : String)
-} derive(Eq, Debug)
+  UnsupportedCell(index~ : Int32, cell_type~ : String)
+}
 
 ///|
 pub extend MappingError with Eq::{equal, not_equal}
@@ -18,7 +19,9 @@ struct Format {}
 
 ///|
 /// Select the source-only Jupyter VFS projection.
-pub fn Format::new() -> Format { Format::{} }
+pub fn Format::new() -> Format {
+  Format::{ }
+}
 
 ///|
 fn invalid(path : String, expected : String) -> Unit raise MappingError {
@@ -56,11 +59,17 @@ pub fn Format::from_notebook(
         Some(Array(items)) =>
           for index, value in items {
             guard value is String(path) else {
-              raise InvalidMetadata(path="$.metadata.vfs.directories[\{index}]", expected="relative path string")
+              raise InvalidMetadata(
+                path="$.metadata.vfs.directories[\{index}]",
+                expected="relative path string",
+              )
             }
             directories.push(@files.TreePath::parse(path))
           }
-        Some(_) => invalid("$.metadata.vfs.directories", "array of relative path strings")
+        Some(_) =>
+          invalid(
+            "$.metadata.vfs.directories", "array of relative path strings",
+          )
       }
     }
     Some(_) => invalid("$.metadata.vfs", "object")
@@ -71,8 +80,12 @@ pub fn Format::from_notebook(
     match cell.metadata().get_json("vfs") {
       None => ()
       Some(Object(fields)) => {
-        let path = @files.TreePath::parse(required_string(fields, "path", location))
-        let kernel = @source_dib.KernelName(required_string(fields, "kernel", location))
+        let path = @files.TreePath::parse(
+          required_string(fields, "path", location),
+        )
+        let kernel = @source_dib.KernelName(
+          required_string(fields, "kernel", location),
+        )
         guard cell.source() is Some(source) else {
           raise UnsupportedCell(index~, cell_type=cell.cell_type())
         }
@@ -81,7 +94,10 @@ pub fn Format::from_notebook(
       Some(_) => invalid(location, "object with path and kernel strings")
     }
   }
-  @files.FileTree::new(ReadOnlyArray::from_array(files[:]), directories=ReadOnlyArray::from_array(directories[:]))
+  @files.FileTree::new(
+    ReadOnlyArray::from_array(files[:]),
+    directories=ReadOnlyArray::from_array(directories[:]),
+  )
 }
 
 ///|
@@ -99,21 +115,33 @@ pub fn Format::to_notebook(
   tree : @files.FileTree,
 ) -> @nbformat.Notebook raise {
   let directories : Array[Json] = []
-  for path in tree.explicit_directories() { directories.push(Json(path.to_string())) }
-  let metadata = @notebooks.Metadata({ "vfs": { "version": 1, "directories": Json(directories), }, })
+  for path in tree.explicit_directories() {
+    directories.push(Json(path.to_string()))
+  }
+  let metadata = @notebooks.Metadata({
+    "vfs": { "version": 1, "directories": Json(directories) },
+  })
   let cells = []
   for index, file in tree.files() {
-    let metadata = @notebooks.Metadata({ "vfs": {
-      "path": Json(file.path().to_string()),
-      "kernel": Json(file.kernel().to_string()),
-    }, })
+    let metadata = @notebooks.Metadata({
+      "vfs": {
+        "path": Json(file.path().to_string()),
+        "kernel": Json(file.kernel().to_string()),
+      },
+    })
     let source = file.source()
     let content = match file.kernel().to_string() {
       "markdown" => @nbformat.Markdown(source~, attachments=None)
       "text" => @nbformat.Raw(source~, attachments=None)
       _ => @nbformat.Code(source~, execution_count=None, outputs=[])
     }
-    cells.push(@nbformat.Cell::Cell(content, id=Some(@nbformat.CellId("file-\{index}")), metadata~))
+    cells.push(
+      @nbformat.Cell::Cell(
+        content,
+        id=Some(@nbformat.CellId("file-\{index}")),
+        metadata~,
+      ),
+    )
   }
   @nbformat.Notebook::Notebook(ReadOnlyArray::from_array(cells[:]), metadata~)
 }
@@ -126,7 +154,11 @@ pub fn Format::write(self : Format, tree : @files.FileTree) -> String raise {
 }
 
 ///|
-pub impl @files.TreeFormat for Format with fn read(self, text) { self.read(text) }
+pub impl @files.TreeFormat for Format with fn read(self, text) {
+  self.read(text)
+}
 
 ///|
-pub impl @files.TreeFormat for Format with fn write(self, tree) { self.write(tree) }
+pub impl @files.TreeFormat for Format with fn write(self, tree) {
+  self.write(tree)
+}

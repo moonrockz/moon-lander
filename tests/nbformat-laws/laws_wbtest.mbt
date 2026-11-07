@@ -1,9 +1,10 @@
 ///|
 /// Shrink generation choices, then rebuild validated cells with unique IDs.
+#derive(Debug)
 priv struct NotebookCase {
   choices : ReadOnlyArray[UInt32]
   style : UInt32
-} derive(Debug)
+}
 
 ///|
 impl @quickcheck.Arbitrary for NotebookCase with fn arbitrary(size, state) {

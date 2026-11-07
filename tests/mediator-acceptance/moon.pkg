@@ -5,3 +5,5 @@ import {
   "moonrockz/moonspec/runner",
   "moonrockz/expect",
 } for "wbtest"
+
+supported_targets = "wasm+wasm-gc+js+native"

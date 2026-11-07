@@ -5,4 +5,6 @@ extern "js" fn foreign_read(read : () -> Bool) -> @js_async.Promise[Bool] =
   #|}, 0))
 
 ///|
-async fn poll(read : () -> Bool) -> Bool { foreign_read(read).wait() }
+async fn poll(read : () -> Bool) -> Bool {
+  foreign_read(read).wait()
+}

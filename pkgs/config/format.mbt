@@ -10,7 +10,7 @@ pub(all) struct Format {
 ///|
 /// A copy that does not share the extension list with `self`.
 fn Format::copy(self : Format) -> Format {
-  { ..self, extensions: self.extensions.copy() }
+  { ..self, extensions: self.extensions.copy(), }
 }
 
 ///|

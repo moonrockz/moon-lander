@@ -1,5 +1,5 @@
 ///|
-fn ms(count : Int) -> @lander_core.TimeLimit {
+fn ms(count : Int32) -> @lander_core.TimeLimit {
   @lander_core.TimeLimit::millis(count) catch {
     _ => panic()
   }
@@ -59,7 +59,13 @@ async test "Poll after close: a poll on a closed empty mailbox continues as clos
 async test "Skip an earlier message: select B, then receive A and C" {
   let log = @actors.scope(scope => {
     let actor = scope.spawn(_ => {
-      @actors.select(message => if message == "B" { Some(message) } else { None })
+      @actors.select(message => {
+        if message == "B" {
+          Some(message)
+        } else {
+          None
+        }
+      })
       .zip(@actors.receive())
       .zip_with(@actors.receive(), (pair, c) => [pair.0, pair.1, c])
     })
@@ -75,7 +81,13 @@ async test "Skip an earlier message: select B, then receive A and C" {
 async test "Non-matches still occupy capacity, and a timed select keeps them" {
   let log = @actors.scope(scope => {
     let actor = scope.spawn(mailbox=one(), _ => {
-      @actors.select(message => if message == "match" { Some(message) } else { None })
+      @actors.select(message => {
+        if message == "match" {
+          Some(message)
+        } else {
+          None
+        }
+      })
       .within(ms(20), on_timeout=() => @actors.done("expired"))
       .zip(@actors.receive())
       .zip_with(@actors.receive(), (pair, last) => [pair.0, pair.1, last])
@@ -97,7 +109,7 @@ async test "Full mailbox: the producer waits until the actor takes the queued me
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let events = []
   @actors.scope(scope => {
-    let actor = scope.start((), mailbox=one(), (_, _ : Int) => {
+    let actor = scope.start((), mailbox=one(), (_, _ : Int32) => {
       started.put(())
       gate.get()
       Continue(())
@@ -124,7 +136,7 @@ async test "Full mailbox: the producer waits until the actor takes the queued me
 async test "Unbounded opt-in: more than 128 messages without a wait" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(scope => {
-    let actor = scope.start((), mailbox=Unbounded, (_, _ : Int) => {
+    let actor = scope.start((), mailbox=Unbounded, (_, _ : Int32) => {
       gate.get()
       Continue(())
     })
@@ -155,11 +167,16 @@ async test "Reenqueue keeps FIFO order: B then C" {
 
 ///|
 async test "Unit test of a protocol: the test runner keeps the noise in order" {
-  let receive = @actors.select(message => if message == "hello" { Some(1) } else { None })
-    .zip_with(
-      @actors.select(message => if message == "pin" { Some(2) } else { None }),
-      (a, b) => a + b,
-    )
+  let receive = @actors.select(message => {
+    if message == "hello" {
+      Some(1)
+    } else {
+      None
+    }
+  }).zip_with(
+    @actors.select(message => if message == "pin" { Some(2) } else { None }),
+    (a, b) => a + b,
+  )
   let run = @actors.run_test(receive, ["noise", "pin", "hello", "noise"])
   assert_eq(run.result(), Some(3))
   assert_eq(run.remaining(), ["noise", "noise"])

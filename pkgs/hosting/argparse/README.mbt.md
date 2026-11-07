@@ -14,14 +14,25 @@ the core types, and the application does not change. A re-exported enum such as
 through the re-export.
 
 ```mbt check
+///|
 test "build a command with global standard flags" {
-  let host : @hosting.Host[Unit] =
-  @hosting.builder(@lander_core.AppName::parse("acme"), ["build", "--environment", "Staging"])
-  |> @hosting_argparse.command(name => @hosting_argparse.Command(name,
-    options=[@hosting_argparse.environment_option(), @hosting_argparse.config_option(), @hosting_argparse.project_option()],
-    flags=[@hosting_argparse.isolated_flag()],
-    subcommands=[@hosting_argparse.Command("build")]))
-  |> @hosting.build(_ => ())
+  let host : @hosting.Host[Unit] = @hosting.builder(
+      @lander_core.AppName::parse("acme"),
+      ["build", "--environment", "Staging"],
+    )
+    |> @hosting_argparse.command(name => {
+      @hosting_argparse.Command(
+        name,
+        options=[
+          @hosting_argparse.environment_option(),
+          @hosting_argparse.config_option(),
+          @hosting_argparse.project_option(),
+        ],
+        flags=[@hosting_argparse.isolated_flag()],
+        subcommands=[@hosting_argparse.Command("build")],
+      )
+    })
+    |> @hosting.build(_ => ())
   ignore(host)
 }
 ```
@@ -60,34 +71,68 @@ Use `@hosting.run(host, command)` on native or js, and
 `@hosting.run_embedded(host, command)` on wasm or wasm-gc.
 
 ```mbt check
+///|
 test "D2 pipeline with typed argument mappings" {
   let flushes = Ref(0)
-  let host : @hosting.Host[Ref[Int]] =
-  "morphir"
-  |> @lander_core.AppName::parse
-  |> @hosting.builder(["build", "--log-format", "json", "-vvv"],
-    env_vars=({} : Map[String, String]), working_dir=@lander_core.AbsolutePath::root())
-  |> @hosting_argparse.command(name => @hosting_argparse.Command(name,
-    options=[@hosting_argparse.environment_option(), @hosting_argparse.config_option(),
-      @hosting_argparse.project_option(), @hosting_argparse.OptionArg("log-format", global=true)],
-    flags=[@hosting_argparse.isolated_flag(), @hosting_argparse.FlagArg("verbose", short='v', action=Count, global=true)],
-    subcommands=[@hosting_argparse.Command("build"), @hosting_argparse.Command("workspace")]),
-    mappings=[
-      @hosting_argparse.map(@hosting_argparse.OverrideOption::parse("log-format"), @config.KeyPath::parse("log.format")),
-      @hosting_argparse.map(@hosting_argparse.OverrideOption::parse("verbose"), @config.KeyPath::parse("log.verbosity"), action=Count),
-    ])
-  |> @hosting.configure(s => s |> @config.format(@toml.format())
-    |> @config.defaults({ "log": { "format": "text", "verbosity": 0 } }))
-  |> @hosting.app_dirs()
-  |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
-  |> @hosting.service("telemetry", stopping=ctx => ctx.services.val += 1)
-  |> @hosting.shutdown_timeout(@lander_core.TimeLimit::seconds(5))
-  |> @hosting.build(b => {
-    assert_eq(@config.get_text(b.config, "log.format"), "json")
-    assert_eq((@config.bind(b.config, "log.verbosity") : Int), 3)
-    flushes
-  })
-  let command : @hosting.Hook[Ref[Int]] = ctx => {
+  let host : @hosting.Host[Ref[Int32]] = "morphir"
+    |> @lander_core.AppName::parse
+    |> @hosting.builder(
+      ["build", "--log-format", "json", "-vvv"],
+      env_vars=({} : Map[String, String]),
+      working_dir=@lander_core.AbsolutePath::root(),
+    )
+    |> @hosting_argparse.command(
+      name => {
+        @hosting_argparse.Command(
+          name,
+          options=[
+            @hosting_argparse.environment_option(),
+            @hosting_argparse.config_option(),
+            @hosting_argparse.project_option(),
+            @hosting_argparse.OptionArg("log-format", global=true),
+          ],
+          flags=[
+            @hosting_argparse.isolated_flag(),
+            @hosting_argparse.FlagArg(
+              "verbose",
+              short='v',
+              action=Count,
+              global=true,
+            ),
+          ],
+          subcommands=[
+            @hosting_argparse.Command("build"),
+            @hosting_argparse.Command("workspace"),
+          ],
+        )
+      },
+      mappings=[
+        @hosting_argparse.map(
+          @hosting_argparse.OverrideOption::parse("log-format"),
+          @config.KeyPath::parse("log.format"),
+        ),
+        @hosting_argparse.map(
+          @hosting_argparse.OverrideOption::parse("verbose"),
+          @config.KeyPath::parse("log.verbosity"),
+          action=Count,
+        ),
+      ],
+    )
+    |> @hosting.configure(s => {
+      s
+      |> @config.format(@toml.format())
+      |> @config.defaults({ "log": { "format": "text", "verbosity": 0 } })
+    })
+    |> @hosting.app_dirs()
+    |> @hosting.reserve_env(["MORPHIR_LOG_DIR"])
+    |> @hosting.service("telemetry", stopping=ctx => ctx.services.val += 1)
+    |> @hosting.shutdown_timeout(@lander_core.TimeLimit::seconds(5))
+    |> @hosting.build(b => {
+      assert_eq(@config.get_text(b.config, "log.format"), "json")
+      assert_eq((@config.bind(b.config, "log.verbosity") : Int32), 3)
+      flushes
+    })
+  let command : @hosting.Hook[Ref[Int32]] = ctx => {
     // The application dispatches the subcommand from this same parse result.
     assert_true(ctx.args.subcommand is Some(("build", _)))
   }
@@ -105,14 +150,18 @@ one Append value stays a list. A custom `parse` function converts each text, or 
 item. For flags it receives `true` or `false`; for counts it receives integer text.
 
 ```mbt check
+///|
 test "Append keeps one value as a list" {
-  let matches = @hosting_argparse.Command("acme",
-    options=[@hosting_argparse.OptionArg("include", action=Append)])
-    .parse(argv=["--include", "src"], env={})
+  let matches = @hosting_argparse.Command("acme", options=[
+    @hosting_argparse.OptionArg("include", action=Append),
+  ]).parse(argv=["--include", "src"], env={})
   let source = @hosting_argparse.to_overrides(matches, [
-    @hosting_argparse.map(@hosting_argparse.OverrideOption::parse("include"),
-      @config.KeyPath::parse("build.include"), action=Append,
-      parse=text => @config.string(text)),
+    @hosting_argparse.map(
+      @hosting_argparse.OverrideOption::parse("include"),
+      @config.KeyPath::parse("build.include"),
+      action=Append,
+      parse=text => @config.string(text),
+    ),
   ])
   let config = @config.build([source])
   assert_eq((@config.bind(config, "build.include") : Array[String]), ["src"])
@@ -140,13 +189,22 @@ parses names once. Empty elements and names outside the lowercase ASCII grammar
 give usage code 2. The disabling flag conflicts with every profile option.
 
 ```mbt check
+///|
 test "declare repeatable profile selectors" {
-  let command = @hosting_argparse.Command("acme",
+  let command = @hosting_argparse.Command(
+    "acme",
     options=[@hosting_argparse.profiles_option()],
     flags=[@hosting_argparse.no_profiles_flag()],
-    subcommands=[@hosting_argparse.Command("build")])
-  let matches = command.parse(argv=["--profiles", "postgres", "build", "--profiles", "metrics,tracing"], env={})
-  assert_eq(matches.values.get("profiles"), Some(["postgres", "metrics,tracing"]))
+    subcommands=[@hosting_argparse.Command("build")],
+  )
+  let matches = command.parse(
+    argv=["--profiles", "postgres", "build", "--profiles", "metrics,tracing"],
+    env={},
+  )
+  assert_eq(
+    matches.values.get("profiles"),
+    Some(["postgres", "metrics,tracing"]),
+  )
 }
 ```
 

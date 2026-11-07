@@ -92,7 +92,6 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:framework-registry` | Audit all twelve candidate archives and build isolated registry consumers on supported targets |
 | `mise run check:framework-published` | Release-only gate for all twelve public archives and approved checksums |
 | `mise run check:moonx` | Qualify the optional launcher with the primary stock compiler and a real Node-owned host |
-| `mise run check:moonx-stock16` | Qualify the same public APIs with pinned stock 0.10.16 |
 | `mise run check:moonx-runtime` | Reconstruct and verify frozen source, patches, licenses and provenance |
 | `mise run check:moonx-retained` | Run retained upstream native and Wasm tests sequentially |
 | `mise run check:formats-registry` | Package the candidate and verify an isolated registry consumer on all four targets |
@@ -125,7 +124,7 @@ Run tasks through mise, or run a script directly as `moonx scripts/toolchain.mbt
 | `mise run check:browser-fixture` | Reject a stale generated spike FFI without rewriting it |
 | `mise run build:browser-adapter` | Generate the production browser Web API adapter |
 | `mise run check:browser-adapter` | Reject stale production browser FFI without rewriting it |
-| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.3.2` |
+| `mise run test:native-zig` | Test native code using external `moonrockz/zig-cross@0.4.1` |
 | `mise run doctor:zig-cross` | Diagnose zig-cross targets without building (args: targets, `--json`) |
 | `mise run build:cross` | Run doctor, then cross-build Linux arm64, macOS and Windows programs (args: plans `full`, `sync` or target names) |
 | `mise run clean` | Remove build artifacts |
@@ -146,8 +145,9 @@ mise run doctor:zig-cross -- --json
 
 zig-cross accepts the sync runtime only with stock MoonBit `0.10.17+d971670cd`.
 With the primary pin, `ZIG_CROSS_RUNTIME=sync` doctor reports
-`ZC_SYNC_UNAVAILABLE`. `mise run build:cross -- sync` installs that stock
-release as a task-scoped tool and runs the sync doctor and build with it.
+`ZC_SYNC_UNAVAILABLE`. Stock 0.10.17 does not apply the `#derive(...)` syntax
+of the framework code, so `build:cross` has no sync plan for Darwin and Windows
+until zig-cross assesses the sync runtime on the primary pin.
 
 The JSON report (`schema_version: 1`) has a status, and findings with stable
 codes and next steps. Status `error` exits with 1. In a next step, replace
@@ -157,38 +157,34 @@ enough). Replace example paths such as `fixtures/consumer` with a program of
 this workspace, such as `tests/formats-default`.
 
 `mise run build:cross` runs doctor, stops on status `error`, and then builds
-these plans. It checks the header of each executable. It does not run them.
-Arguments select plans (`full`, `sync`) or single targets (`darwin-x64`). CI
-runs `mise run build:cross -- linux-arm64 darwin-x64`: the targets that no CI
-machine builds. The macOS and Windows jobs build `darwin-arm64` and
-`windows-x64` natively, and run the programs.
+the full plan: the full runtime for `linux-arm64`, with the programs in
+`programs` of `scripts/cross-build.mbtx` (`tests/console-host-program`, with
+hosting, the console signal stub and `moonbitlang/async`, and programs without
+`moonbitlang/async`). It checks the header of each executable. It does not run
+them. The arguments `full` and `linux-arm64` select that plan. CI runs
+`mise run build:cross -- linux-arm64`: the target that no CI machine builds.
+The macOS and Windows jobs build `darwin-arm64` and `windows-x64` natively, and
+run the programs.
 
-| Plan | Runtime | Targets | Programs |
-| --- | --- | --- | --- |
-| `full` | full (default) | `linux-arm64` | `full_programs`: `tests/console-host-program` (hosting, the console signal stub and `moonbitlang/async`) and the sync programs |
-| `sync` | experimental `ZIG_CROSS_RUNTIME=sync`, with stock MoonBit `0.10.17+d971670cd` | `darwin-arm64`, `darwin-x64`, `windows-x64` | Only the programs in `sync_programs` of `scripts/cross-build.mbtx` |
-
-What a Linux machine can and cannot do, with zig-cross `0.3.2`, Zig `0.17.0`,
-MoonBit `0.10.18+6c83a7f62` for the full runtime and `0.10.17+d971670cd` for
-the sync runtime:
+What a Linux machine can and cannot do, with zig-cross `0.4.1`, Zig `0.17.0` and
+MoonBit `0.10.20+65efd5b93`:
 
 | Code | What doctor reports | Result for Moon-Lander |
 | --- | --- | --- |
-| `ZC_LINUX_NAME_MAX` | Linux targets get `-include limits.h` | Linux x64 and arm64 build with the full runtime, also `moonbitlang/async` and the hosting signal stub. The plan builds only arm64, because the Linux x64 jobs already build and run x64 with gcc and with zig |
-| `ZC_DARWIN_VNODE_HEADER` | The full runtime needs the macOS SDK; on Linux this is an error | Use the sync runtime, or build on macOS |
-| `ZC_WINDOWS_MSVC_RUNTIME` | The full runtime needs MSVC | Use the sync runtime, or build on Windows |
-| `ZC_COMPATIBILITY_MODE` | Sync runtime selected; no event loop, async file system, network, processes, TLS, thread pools or watchers | Programs that do not import `moonbitlang/async` link for Darwin and Windows |
+| `ZC_LINUX_NAME_MAX` | Linux targets get `-DNAME_MAX=255` for the MoonBit runtime and `moonbitlang/async` C sources | Linux x64 and arm64 build with the full runtime, also `moonbitlang/async` and the hosting signal stub. The plan builds only arm64, because the Linux x64 jobs already build and run x64 with gcc and with zig |
+| `ZC_DARWIN_VNODE_HEADER` | The full runtime needs the macOS SDK; on Linux this is an error | Build on macOS |
+| `ZC_WINDOWS_MSVC_RUNTIME` | The full runtime needs MSVC | Build on Windows |
+| `ZC_SYNC_UNAVAILABLE` | The sync runtime needs stock MoonBit `0.10.17+d971670cd` | No sync plan until zig-cross assesses the sync runtime on the primary pin |
 | `ZC_WINDOWS_OSSTRING` | A cross-built Windows program can read arguments, environment variables and paths wrongly | Do not ship or trust a cross-built Windows program ([moon#2320](https://github.com/moonbitlang/moon/issues/2320)) |
 
-`moonbitlang/async` does not cross-build to Darwin or Windows in either runtime.
+`moonbitlang/async` does not cross-build to Darwin or Windows.
 Its own C files need `sys/vnode.h` from the macOS SDK and MSVC. The hosting and
 configuration host packages use it, so CI runs them natively with the compiler
 of each OS: on macOS, the native legs of `check:console`, `check:config` and
 `check:formats`; on Windows, also `mise run test -- native`. That is the
 recovery that doctor gives for excluded APIs.
 
-Before you add a program to `sync_programs`, run
-`mise run build:cross -- sync`, which runs the sync doctor first. Before you change the zig-cross pin, a runtime
+Before you change the zig-cross pin, a runtime
 mode or the CI cross-build job, run doctor on Linux and macOS. Record the codes
 in the pull request. Change the pin in `scripts/cross-build.mbtx`,
 `.config/mise/config.toml` and this file together; `mise run test:scripts` fails
@@ -272,7 +268,7 @@ script. Also update the assessed versions above.
   and `openspec/specs/sigstore-identity-policy/`.
 - `apps/site/` is the unpublished docs site tool `moonrockz/moon-lander-site`. It
   builds the static site at `https://moonrockz.github.io/moon-lander/` with
-  `moonrockz/telescope@0.5.1`. It owns the Moon-Lander landing page and content adapters.
+  `moonrockz/telescope@0.6.0`. It owns the Moon-Lander landing page and content adapters.
 - `tests/` is an unpublished workspace module containing the notebook acceptance
   suites and property laws. See [the test guide](tests/README.md) for focused runs.
 - `openspec/` holds the requirements (`specs/`) and the changes in progress

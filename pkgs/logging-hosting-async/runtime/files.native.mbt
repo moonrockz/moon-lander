@@ -38,7 +38,12 @@ async fn remove_file(path : String) -> String? {
 /// Open `path` to append, and create it when it is missing. The file is never
 /// truncated. It gives the handle and the current size of the file.
 async fn open_append(path : String) -> Result[(FileHandle, Int64), String] {
-  let file = @fs.open(path, mode=WriteOnly, append=true, create_mode=OpenOrCreate) catch {
+  let file = @fs.open(
+    path,
+    mode=WriteOnly,
+    append=true,
+    create_mode=OpenOrCreate,
+  ) catch {
     error => return Err(failure_text(error))
   }
   let size = file.size() catch {
@@ -73,7 +78,9 @@ async fn close_handle(handle : FileHandle) -> String? {
 /// The entries of `path`, with their size, and whether each is a regular file.
 /// Links are not followed, so a link is not a regular file. An entry that
 /// disappears while the listing runs is left out.
-async fn list_directory(path : String) -> Result[Array[@rolling.ListedFile], String] {
+async fn list_directory(
+  path : String,
+) -> Result[Array[@rolling.ListedFile], String] {
   let names = @fs.readdir(path, include_hidden=true, sort=true) catch {
     error => return Err(failure_text(error))
   }

@@ -1,5 +1,6 @@
 ///|
 /// Why the runtime did not deliver a message to an actor.
+#derive(Eq, Debug)
 pub enum Undelivered {
   /// A non-waiting send or `reenqueue` found the mailbox full.
   Full
@@ -7,7 +8,7 @@ pub enum Undelivered {
   Closed
   /// Stop, cancellation or failure removed the queued message.
   Discarded
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Undelivered with Eq::{equal, not_equal}
@@ -18,6 +19,7 @@ pub extend Undelivered with @debug.Debug::{to_repr}
 ///|
 /// A runtime observation of an actor lifetime or of a message that the
 /// runtime did not deliver.
+#derive(Debug)
 pub enum ActorEvent {
   /// The actor can receive messages, after initialization.
   Started(ActorAddress)
@@ -26,7 +28,7 @@ pub enum ActorEvent {
   /// The target actor did not get a message. The payload is present only when
   /// the actor's payload policy selects one.
   Undelivered(ActorAddress, Undelivered, payload~ : @ion.Ion?)
-} derive(Debug)
+}
 
 ///|
 pub extend ActorEvent with @debug.Debug::{to_repr}
@@ -59,12 +61,12 @@ pub fn ActorEvent::to_string(self : ActorEvent) -> String {
 ///|
 /// One subscription of a runtime event channel.
 priv struct EventSubscriber {
-  id : Int
+  id : Int32
   subject : Subject[ActorEvent]
   /// Remove the subscription's exit hook from its scope.
   release : () -> Unit
   /// Events dropped for this subscriber because its destination was full.
-  dropped : Ref[Int]
+  dropped : Ref[Int32]
 }
 
 ///|
@@ -72,24 +74,24 @@ priv struct EventSubscriber {
 /// Application code has no publish operation.
 pub struct RuntimeEvents {
   priv mut entries : Array[EventSubscriber]
-  priv mut last_id : Int
+  priv mut last_id : Int32
   priv mut open : Bool
 }
 
 ///|
 /// A channel with no subscribers.
 pub fn RuntimeEvents::new() -> RuntimeEvents {
-  { entries: [], last_id: 0, open: true }
+  { entries: [], last_id: 0, open: true, }
 }
 
 ///|
 /// The number of subscriptions now.
-pub fn RuntimeEvents::subscriber_count(self : RuntimeEvents) -> Int {
+pub fn RuntimeEvents::subscriber_count(self : RuntimeEvents) -> Int32 {
   self.entries.length()
 }
 
 ///|
-fn RuntimeEvents::remove(self : RuntimeEvents, id : Int) -> Unit {
+fn RuntimeEvents::remove(self : RuntimeEvents, id : Int32) -> Unit {
   for entry in self.entries {
     if entry.id == id {
       (entry.release)()
@@ -104,7 +106,7 @@ fn RuntimeEvents::remove(self : RuntimeEvents, id : Int) -> Unit {
 /// this subscription missed because its destination was full.
 pub struct EventSubscription {
   priv cancel : () -> Unit
-  priv dropped : Ref[Int]
+  priv dropped : Ref[Int32]
 }
 
 ///|
@@ -117,7 +119,7 @@ pub fn EventSubscription::unsubscribe(self : EventSubscription) -> Unit {
 ///|
 /// How many events this subscription dropped because its destination was full.
 /// It is a snapshot, not a live view.
-pub fn EventSubscription::dropped_count(self : EventSubscription) -> Int {
+pub fn EventSubscription::dropped_count(self : EventSubscription) -> Int32 {
   self.dropped.val
 }
 
@@ -136,8 +138,8 @@ pub fn RuntimeEvents::subscribe(
   let dropped = Ref(0)
   let cancel = () => self.remove(id)
   let release = owner.on_exit(cancel)
-  self.entries.push({ id, subject, release, dropped })
-  { cancel, dropped }
+  self.entries.push({ id, subject, release, dropped, })
+  { cancel, dropped, }
 }
 
 ///|

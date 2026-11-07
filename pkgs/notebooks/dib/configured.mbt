@@ -53,7 +53,9 @@ pub fn Codec::with_kernel(
 ) -> Codec raise FormatError {
   let info = descriptor.kernel_info()
   let registry = KernelRegistry::KernelRegistry(
-    ReadOnlyArray::from_iter(self.registry.kernels().iter().concat([info].iter())),
+    ReadOnlyArray::from_iter(
+      self.registry.kernels().iter().concat([info].iter()),
+    ),
     default_kernel=self.registry.default_kernel(),
   )
   { ..self, registry, }
@@ -98,13 +100,19 @@ pub fn Codec::notebook(
 
 ///|
 /// Read source with this codec's registry and source policy.
-pub fn Codec::parse(self : Codec, source : String) -> Notebook raise FormatError {
+pub fn Codec::parse(
+  self : Codec,
+  source : String,
+) -> Notebook raise FormatError {
   parse(source, registry=self.registry, source_mode=self.source_mode)
 }
 
 ///|
 /// Write a notebook with this codec's source policy. The notebook retains its
 /// effective registry, including definitions supplied by document metadata.
-pub fn Codec::write(self : Codec, notebook : Notebook) -> String raise FormatError {
+pub fn Codec::write(
+  self : Codec,
+  notebook : Notebook,
+) -> String raise FormatError {
   notebook.to_string(source_mode=self.source_mode)
 }

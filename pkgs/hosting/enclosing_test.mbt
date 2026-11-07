@@ -1,5 +1,8 @@
 ///|
-suberror EnclosingFailure { Broken } derive(Debug)
+#derive(Debug)
+suberror EnclosingFailure {
+  Broken
+}
 
 ///|
 async test "a public embedder request cancels an active command and preserves cleanup" {
@@ -8,28 +11,32 @@ async test "a public embedder request cancels an active command and preserves cl
     let reasons : Array[@hosting.StopReason?] = []
     let ready : @async.Queue[@hosting.Lifetime] = @async.Queue(kind=Unbounded)
     let mut builder : @hosting.HostBuilder[Unit] = @hosting.builder(
-      @lander_core.AppName::parse("embedded"), [],
+      @lander_core.AppName::parse("embedded"),
+      [],
     )
     for name in ["a", "b"] {
-      builder = builder |> @hosting.service(
-        @hosting.ServiceName::parse(name),
-        start=_ => log.push(name + ".start"),
-        stopping=ctx => {
-          log.push(name + ".stopping")
-          reasons.push(ctx.lifetime.stop_reason())
-        },
-        stop=_ => log.push(name + ".stop"),
-        stopped=_ => log.push(name + ".stopped"),
-      )
+      builder = builder
+        |> @hosting.service(
+          @hosting.ServiceName::parse(name),
+          start=_ => log.push(name + ".start"),
+          stopping=ctx => {
+            log.push(name + ".stopping")
+            reasons.push(ctx.lifetime.stop_reason())
+          },
+          stop=_ => log.push(name + ".stop"),
+          stopped=_ => log.push(name + ".stopped"),
+        )
     }
     let host = builder |> @hosting.build(_ => ())
     let outcome = @async.with_task_group(group => {
-      let run = group.spawn(() => @hosting.run(host, ctx => {
-        defer log.push("command.defer")
-        ready.put(ctx.lifetime)
-        @async.sleep(60000)
-        fail("an embedder request must cancel the active command")
-      }))
+      let run = group.spawn(() => {
+        @hosting.run(host, ctx => {
+          defer log.push("command.defer")
+          ready.put(ctx.lifetime)
+          @async.sleep(60000)
+          fail("an embedder request must cancel the active command")
+        })
+      })
       let lifetime = ready.get()
       lifetime.stop_from_embedder(exit_code?=code)
       lifetime.stop_application(exit_code=@hosting.ExitCode::from_int(9))
@@ -42,8 +49,8 @@ async test "a public embedder request cancels an active command and preserves cl
     assert_eq(reasons.length(), 2)
     assert_true(reasons.iter().all(reason => reason is Some(Embedder)))
     assert_eq(log, [
-      "a.start", "b.start", "command.defer", "b.stopping", "a.stopping",
-      "b.stop", "a.stop", "b.stopped", "a.stopped",
+      "a.start", "b.start", "command.defer", "b.stopping", "a.stopping", "b.stop",
+      "a.stop", "b.stopped", "a.stopped",
     ])
   }
 }

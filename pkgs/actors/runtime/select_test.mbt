@@ -137,15 +137,16 @@ async test "RECV-1: a selector error leaves the message and reaches recover" {
 }
 
 ///|
+#derive(Debug)
 suberror Boom {
   Boom
-} derive(Debug)
+}
 
 ///|
 async test "LIFE-1: a recovered receive keeps the owner scope live and the actor processes another message" {
   let result = @actors.scope(scope => {
     let actor = scope.spawn(_ => {
-      let failing : @actors.Receive[Int, Int] = @actors.receive().bind(_ => {
+      let failing : @actors.Receive[Int32, Int32] = @actors.receive().bind(_ => {
         raise Boom
       })
       failing.recover(_ => @actors.receive().map(next => next * 2))
@@ -162,7 +163,7 @@ async test "LIFE-1: an unrecovered step error fails the actor and its scope" {
   let outcome = try {
     @actors.scope(scope => {
       let actor = scope.spawn(_ => {
-        let failing : @actors.Receive[Int, Int] = @actors.receive().bind(_ => {
+        let failing : @actors.Receive[Int32, Int32] = @actors.receive().bind(_ => {
           raise Boom
         })
         failing
@@ -205,7 +206,7 @@ async test "LIFE-1: recover does not catch cancellation" {
   let log = []
   let actor = @actors.scope(scope => {
     let actor = scope.spawn(_ => {
-      let waiting : @actors.Receive[Int, Int] = @actors.receive().bind(value => {
+      let waiting : @actors.Receive[Int32, Int32] = @actors.receive().bind(value => {
         started.put(())
         gate.get()
         @actors.done(value)

@@ -3,10 +3,10 @@
 enum Clerk {
   Hold(@actors.Reply[String])
   Answer(@actors.Reply[String])
-  Number(@actors.Reply[Int])
+  Number(@actors.Reply[Int32])
   Text(@actors.Reply[String])
-  Twice(@actors.Reply[Int])
-  Leave(@actors.Reply[Int])
+  Twice(@actors.Reply[Int32])
+  Leave(@actors.Reply[Int32])
 }
 
 ///|
@@ -40,8 +40,20 @@ fn clerk(
         Continue(count)
       }
       Twice(reply) => {
-        log.push(if reply.send(1) is Delivered { "Delivered" } else { "Expired" })
-        log.push(if reply.send(2) is Delivered { "Delivered" } else { "Expired" })
+        log.push(
+          if reply.send(1) is Delivered {
+            "Delivered"
+          } else {
+            "Expired"
+          },
+        )
+        log.push(
+          if reply.send(2) is Delivered {
+            "Delivered"
+          } else {
+            "Expired"
+          },
+        )
         Continue(count)
       }
       Leave(reply) => {
@@ -85,7 +97,7 @@ async test "Different replies in one protocol: an Int and a String" {
   let held : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(scope => {
     let actor = clerk(scope, held, [])
-    let number : Int = actor.ask(reply => Number(reply))
+    let number : Int32 = actor.ask(reply => Number(reply))
     let text : String = actor.ask(reply => Text(reply))
     assert_eq((number, text), (0, "count 1"))
   })
@@ -108,28 +120,31 @@ async test "Explicit indefinite wait: the ask wakes with closed" {
 }
 
 ///|
+#derive(Debug)
 suberror Fault {
   Fault
-} derive(Debug)
+}
 
 ///|
 async test "Actor fails before replying: every caller wakes with the cause" {
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
-  let ready : @aio.Queue[@actors.ActorRef[@actors.Reply[Int]]] = @aio.Queue(
+  let ready : @aio.Queue[@actors.ActorRef[@actors.Reply[Int32]]] = @aio.Queue(
     kind=Unbounded,
   )
   let outcomes = @aio.with_task_group(group => {
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let actor = scope.start((), (_, reply : @actors.Reply[Int]) => {
-        ignore(reply)
-        started.put(())
-        gate.get()
-        raise Fault
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let actor = scope.start((), (_, reply : @actors.Reply[Int32]) => {
+          ignore(reply)
+          started.put(())
+          gate.get()
+          raise Fault
+        })
+        ready.put(actor.to_ref())
+        actor.join()
       })
-      ready.put(actor.to_ref())
-      actor.join()
-    }))
+    })
     let actor = ready.get()
     let ask = async fn() -> String {
       try {
@@ -171,7 +186,10 @@ async test "Cancel a caller: the request changes the state and its reply expires
 ///|
 async test "Map an event to a protocol: the event enters the same mailbox" {
   @actors.scope(scope => {
-    let totals = scope.start(0, (sum, message : Result[Int, @actors.Reply[Int]]) => {
+    let totals = scope.start(0, (
+      sum,
+      message : Result[Int32, @actors.Reply[Int32]],
+    ) => {
       match message {
         Ok(value) => Continue(sum + value)
         Err(reply) => {
@@ -180,7 +198,10 @@ async test "Map an event to a protocol: the event enters the same mailbox" {
         }
       }
     })
-    let events : @actors.Subject[Int] = totals.to_ref().to_subject().contramap(value => Ok(value))
+    let events : @actors.Subject[Int32] = totals
+      .to_ref()
+      .to_subject()
+      .contramap(value => Ok(value))
     events.send(2)
     totals.send(Ok(40))
     assert_eq(totals.ask(reply => Err(reply)), 42)

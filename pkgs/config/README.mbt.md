@@ -131,9 +131,9 @@ test "a decreasing priority is an error" {
     |> @config.file("/srv/app.toml", priority=300)
   try @config.load(builder, @config.FileTree::new(complete=true)) catch {
     SourceOrder(previous~, previous_priority~, ..) =>
-      @expect.expect((previous, previous_priority)).to_equal((
-        "environment", 600,
-      ))
+      @expect.expect((previous, previous_priority)).to_equal(
+        ("environment", 600),
+      )
     _ => fail("expected a source-order error")
   } noraise {
     _ => fail("expected a source-order error")
@@ -186,9 +186,9 @@ fn answer(
         guard path != dir && path.is_within(dir) else { continue }
         let below = path.names()[dir.names().length():]
         let entry : @config.DirEntry = if below.length() > 1 {
-          { name: below[0], kind: Directory }
+          { name: below[0], kind: Directory, }
         } else {
-          { name: below[0], kind: File }
+          { name: below[0], kind: File, }
         }
         if !entries.contains(entry) {
           entries.push(entry)
@@ -272,7 +272,9 @@ browser mount holds it.
 ///|
 test "file-tree paths keep their root" {
   let file = @config.FileTreePath::parse("C:/w/app.toml")
-  @expect.expect(file.parent().map(dir => dir.to_string())).to_equal(Some("C:/w"))
+  @expect.expect(file.parent().map(dir => dir.to_string())).to_equal(
+    Some("C:/w"),
+  )
   let root = @config.FileTreePath::parse("D:/")
   @expect.expect(root.parent()).to_equal(None)
   @expect.expect(root.join("acme.toml").to_string()).to_equal("D:/acme.toml")
@@ -314,10 +316,9 @@ test "one existing candidate loads" {
     )
   let config = load_from(builder, { "/srv/.config/app.toml": "mode = \"dev\"" })
   let report = config.reports()[0]
-  @expect.expect((report.status, report.path)).to_equal((
-    Loaded,
-    Some("/srv/.config/app.toml"),
-  ))
+  @expect.expect((report.status, report.path)).to_equal(
+    (Loaded, Some("/srv/.config/app.toml")),
+  )
 }
 
 ///|
@@ -410,15 +411,17 @@ example `project` for a workspace file and `user-override` for a user override.
 ///|
 test "the origin of each value" {
   let config = @config.build([
-    @config.ConfigSource::defaults({ "ir": { "layout": "tree", "mode": "safe" } }),
+    @config.ConfigSource::defaults({
+      "ir": { "layout": "tree", "mode": "safe" },
+    }),
     @config.in_memory_pairs(
       [("ir.mode", @config.string("fast"))],
       name="command line",
     ),
   ])
-  let origins = config.provenance().map(record => {
-    (record.0.to_string(), record.1.map(origin => origin.source))
-  })
+  let origins = config
+    .provenance()
+    .map(record => (record.0.to_string(), record.1.map(origin => origin.source)))
   @expect.expect(origins).to_equal([
     ("ir.layout", ["defaults"]),
     ("ir.mode", ["command line"]),
@@ -437,10 +440,9 @@ member layer can drop a key that only the workspace may set, with a warning.
 ///|
 test "an excluded key warns" {
   let source = @config.in_memory_pairs([
-      ("workspace.out_dir", @config.string("out")),
-      ("ir.layout", @config.string("tree")),
-    ])
-    .exclude([@config.KeyPath::parse("workspace.out_dir")], warn=true)
+    ("workspace.out_dir", @config.string("out")),
+    ("ir.layout", @config.string("tree")),
+  ]).exclude([@config.KeyPath::parse("workspace.out_dir")], warn=true)
   let config = @config.build([source])
   @expect.expect(config.get(@config.KeyPath::parse("workspace.out_dir"))).to_equal(
     None,
@@ -473,13 +475,15 @@ test "a provider adds the file of its directory" {
       guard context.working_dir is Some(dir) else {
         return Done(@config.Expansion::new([]))
       }
-      Done(@config.Expansion::new([
+      Done(
+        @config.Expansion::new([
           @config.ConfigSource::candidates(
             ["\{dir}/app.local.toml"],
             display="local",
             role=LocalOverride,
           ),
-        ]))
+        ]),
+      )
     },
   }
   let builder = @config.builder()
@@ -501,10 +505,11 @@ Read a section into a typed value with `bind`, or the full configuration with
 
 ```mbt check
 ///|
+#derive(FromJson, Eq, Debug)
 struct ServerOptions {
   host : String
-  port : Int
-} derive(FromJson, Eq, Debug)
+  port : Int32
+}
 
 ///|
 test "bind a section to a record" {
@@ -514,7 +519,7 @@ test "bind a section to a record" {
     }),
   ])
   let server : ServerOptions = config |> @config.bind("server")
-  @expect.expect(server).to_equal({ host: "localhost", port: 8080 })
+  @expect.expect(server).to_equal({ host: "localhost", port: 8080, })
   let metrics : ServerOptions? = config.bind("metrics")
   @expect.expect(metrics).to_equal(None)
 }
@@ -565,11 +570,12 @@ well as `FromJson`. A failure in a value that the default gave says
 
 ```mbt check
 ///|
+#derive(FromJson, ToJson, Eq, Debug)
 struct ServerDefaults {
   host : String
-  port : Int
+  port : Int32
   tags : Array[String]
-} derive(FromJson, ToJson, Eq, Debug)
+}
 
 ///|
 test "configured keys win over the default" {
@@ -580,12 +586,15 @@ test "configured keys win over the default" {
     ]),
   ])
   let server = config
-    |> @config.bind_or("server", ({
-      host: "localhost",
-      port: 8080,
-      tags: ["default"],
-    } : ServerDefaults))
-  @expect.expect(server).to_equal({ host: "localhost", port: 9000, tags: ["eu"] })
+    |> @config.bind_or(
+      "server",
+      ({ host: "localhost", port: 8080, tags: ["default"], } : ServerDefaults),
+    )
+  @expect.expect(server).to_equal({
+    host: "localhost",
+    port: 9000,
+    tags: ["eu"],
+  })
   @expect.expect(config.bind_or("mode", "safe")).to_equal("safe")
 }
 ```
@@ -615,9 +624,10 @@ that holds no reference. Read the secret value with `Config::secret`.
 
 ```mbt check
 ///|
+#derive(FromJson)
 struct ApiClient {
   url : String
-} derive(FromJson)
+}
 
 ///|
 test "a secret reference stops binding" {
@@ -663,13 +673,14 @@ name. All violations raise one `Validation` error, with one line for each path:
 
 ```mbt check
 ///|
+#derive(FromJson, ToJson)
 struct IrSettings {
   layout : String
   strict_mode : Bool
-} derive(FromJson, ToJson)
+}
 
 ///|
-impl @config.Validate for IrSettings with validate(self) {
+impl @config.Validate for IrSettings with fn validate(self) {
   if self.layout == "split" && !self.strict_mode {
     [
       @config.violation(
@@ -692,7 +703,7 @@ test "validation names each value and its source" {
     "ir.layout = \"split\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
-  let default : IrSettings = { layout: "tree", strict_mode: false }
+  let default : IrSettings = { layout: "tree", strict_mode: false, }
   try {
     let ir = config
       |> @config.bind_or("ir", default)
@@ -723,13 +734,14 @@ one `Validation` error. A section that no source sets gives no instances.
 
 ```mbt check
 ///|
+#derive(FromJson, ToJson)
 struct BackendSettings {
   out_dir : String
-  level : Int
-} derive(FromJson, ToJson)
+  level : Int32
+}
 
 ///|
-impl @config.Validate for BackendSettings with validate(self) {
+impl @config.Validate for BackendSettings with fn validate(self) {
   if self.level > 0 {
     []
   } else {
@@ -748,7 +760,7 @@ test "bind each backend as a named instance" {
   let backends : @config.NamedOptions[BackendSettings] = config
     |> @config.named("backends", (config, key) => {
       config
-      |> @config.bind_or(key, ({ out_dir: "out", level: 1 } : BackendSettings))
+      |> @config.bind_or(key, ({ out_dir: "out", level: 1, } : BackendSettings))
       |> @config.validated(config, key)
     })
   @expect.expect(backends.names()).to_equal(["ts", "scala"])
@@ -786,12 +798,10 @@ test "a misspelled key is an error with its source" {
     "ir.layout = \"split\"\nir.strict_mod = true",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
-  let default : IrSettings = { layout: "tree", strict_mode: false }
+  let default : IrSettings = { layout: "tree", strict_mode: false, }
   let ir = config |> @config.bind_or("ir", default)
   @expect.expect(ir.strict_mode).to_equal(false)
-  try {
-    config |> @config.bind_or("ir", default, unknown=Reject) |> ignore
-  } catch {
+  try config |> @config.bind_or("ir", default, unknown=Reject) |> ignore catch {
     error =>
       @expect.expect(error.message()).to_equal(
         "ir.strict_mod: is an unknown key (set in project /srv/app.toml)",
@@ -847,7 +857,7 @@ struct Invoice {
 }
 
 ///|
-impl @config.FromConfig for Invoice with from_config(node) {
+impl @config.FromConfig for Invoice with fn from_config(node) {
   {
     rate: node.get("rate"),
     max_items: node.get("max_items"),
@@ -881,7 +891,7 @@ test "exact decoding keeps the decimal scale and the file" {
   @expect.expect(billing.max_items).to_equal(9007199254740993L)
   guard billing.lock.blame is Set([origin]) else { fail("one origin") }
   @expect.expect(origin.location).to_equal(Some("/srv/app.ion"))
-  @expect.expect(billing.server).to_equal({ host: "localhost", port: 8080 })
+  @expect.expect(billing.server).to_equal({ host: "localhost", port: 8080, })
 }
 ```
 
@@ -900,7 +910,8 @@ test "bind a timeout from configuration text" {
     |> @config.format(@toml.format())
     |> @config.file("/srv/app.toml")
   let tree = @config.FileTree::new(complete=true).with_file(
-    @config.FileTreePath::parse("/srv/app.toml"), "[http]\ntimeout = \"1m 30s\"",
+    @config.FileTreePath::parse("/srv/app.toml"),
+    "[http]\ntimeout = \"1m 30s\"",
   )
   guard @config.load(builder, tree) is Done(config) else { fail("no config") }
   let timeout : @lander_core.TimeLimit = config

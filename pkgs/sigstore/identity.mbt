@@ -1,5 +1,6 @@
 ///|
 /// The kind of identity value that a text failed to parse as.
+#derive(Eq, Debug)
 pub enum IdentityKind {
   IssuerUrl
   SubjectName
@@ -10,7 +11,7 @@ pub enum IdentityKind {
   NumericId
   Predicate
   Tag
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend IdentityKind with Eq::{equal, not_equal}
@@ -20,10 +21,11 @@ pub extend IdentityKind with @debug.Debug::{to_repr}
 
 ///|
 /// A text that is not a valid identity value.
+#derive(Debug)
 pub suberror IdentityError {
   /// The text `text` is not a valid `kind`: it breaks `rule`.
   InvalidIdentity(kind~ : IdentityKind, text~ : String, rule~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend IdentityError with @debug.Debug::{to_repr}
@@ -53,9 +55,10 @@ fn has_space_or_control(text : String) -> Bool {
 
 ///|
 /// An OIDC issuer URL, for example `https://token.actions.githubusercontent.com`.
+#derive(Eq, Debug)
 pub struct Issuer {
   priv url : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Issuer with Eq::{equal, not_equal}
@@ -68,19 +71,23 @@ pub extend Issuer with @debug.Debug::{to_repr}
 pub fn Issuer::parse(text : String) -> Issuer raise IdentityError {
   let fail = rule => InvalidIdentity(kind=IssuerUrl, text~, rule~)
   guard text.has_prefix("https://") else { raise fail("use an https URL") }
-  guard text.length() > 8 && text[8] != '/' else { raise fail("the URL has no host") }
-  guard !has_space_or_control(text) else { raise fail("the URL has a space or a control character") }
-  { url: text }
+  guard text.length() > 8 && text[8] != '/' else {
+    raise fail("the URL has no host")
+  }
+  guard !has_space_or_control(text) else {
+    raise fail("the URL has a space or a control character")
+  }
+  { url: text, }
 }
 
 ///|
 /// The GitHub Actions OIDC issuer.
 pub fn Issuer::github_actions() -> Issuer {
-  { url: "https://token.actions.githubusercontent.com" }
+  { url: "https://token.actions.githubusercontent.com", }
 }
 
 ///|
-pub impl Show for Issuer with output(self, logger) {
+pub impl Show for Issuer with fn output(self, logger) {
   logger.write_string(self.url)
 }
 
@@ -89,9 +96,10 @@ pub extend Issuer with Show::{output, to_string}
 
 ///|
 /// An exact certificate identity: the URI or email subject alternative name.
+#derive(Eq, Debug)
 pub struct SubjectName {
   priv text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SubjectName with Eq::{equal, not_equal}
@@ -106,13 +114,17 @@ pub fn SubjectName::parse(text : String) -> SubjectName raise IdentityError {
     raise InvalidIdentity(kind=SubjectName, text~, rule="the identity is empty")
   }
   guard !has_space_or_control(text) else {
-    raise InvalidIdentity(kind=SubjectName, text~, rule="the identity has a space or a control character")
+    raise InvalidIdentity(
+      kind=SubjectName,
+      text~,
+      rule="the identity has a space or a control character",
+    )
   }
   { text, }
 }
 
 ///|
-pub impl Show for SubjectName with output(self, logger) {
+pub impl Show for SubjectName with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -124,7 +136,9 @@ fn owner_rule(owner : StringView) -> String? {
   guard owner.length() >= 1 && owner.length() <= 39 else {
     return Some("an owner has 1 to 39 characters")
   }
-  guard owner.iter().all(c => c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '-') else {
+  guard owner
+    .iter()
+    .all(c => c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '-') else {
     return Some("an owner has only ASCII letters, digits and '-'")
   }
   guard !owner.has_prefix("-") && !owner.has_suffix("-") else {
@@ -135,16 +149,17 @@ fn owner_rule(owner : StringView) -> String? {
 
 ///|
 /// A GitHub account name, for example `finos`.
+#derive(Debug)
 pub struct GitHubOwner {
   priv name : String
-} derive(Debug)
+}
 
 ///|
 pub extend GitHubOwner with @debug.Debug::{to_repr}
 
 ///|
 /// GitHub names are case-insensitive, so equality ignores ASCII case.
-pub impl Eq for GitHubOwner with equal(self, other) {
+pub impl Eq for GitHubOwner with fn equal(self, other) {
   self.name.to_lower() == other.name.to_lower()
 }
 
@@ -157,11 +172,11 @@ pub fn GitHubOwner::parse(text : String) -> GitHubOwner raise IdentityError {
   if owner_rule(text) is Some(rule) {
     raise InvalidIdentity(kind=Owner, text~, rule~)
   }
-  { name: text }
+  { name: text, }
 }
 
 ///|
-pub impl Show for GitHubOwner with output(self, logger) {
+pub impl Show for GitHubOwner with fn output(self, logger) {
   logger.write_string(self.name)
 }
 
@@ -170,17 +185,18 @@ pub extend GitHubOwner with Show::{output, to_string}
 
 ///|
 /// A GitHub repository, for example `finos/morphir-rust`.
+#derive(Debug)
 pub struct GitHubRepository {
   priv owner : GitHubOwner
   priv name : String
-} derive(Debug)
+}
 
 ///|
 pub extend GitHubRepository with @debug.Debug::{to_repr}
 
 ///|
 /// GitHub names are case-insensitive, so equality ignores ASCII case.
-pub impl Eq for GitHubRepository with equal(self, other) {
+pub impl Eq for GitHubRepository with fn equal(self, other) {
   self.owner == other.owner && self.name.to_lower() == other.name.to_lower()
 }
 
@@ -189,7 +205,9 @@ pub extend GitHubRepository with Eq::{equal, not_equal}
 
 ///|
 /// Parse a repository in the form `owner/repo`.
-pub fn GitHubRepository::parse(text : String) -> GitHubRepository raise IdentityError {
+pub fn GitHubRepository::parse(
+  text : String,
+) -> GitHubRepository raise IdentityError {
   let fail = rule => InvalidIdentity(kind=Repository, text~, rule~)
   let parts = text.split("/").collect()
   guard parts.length() == 2 else { raise fail("use the form owner/repo") }
@@ -200,11 +218,23 @@ pub fn GitHubRepository::parse(text : String) -> GitHubRepository raise Identity
   guard name.length() >= 1 && name.length() <= 100 else {
     raise fail("a repository name has 1 to 100 characters")
   }
-  guard name.iter().all(c => c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '-' || c == '_' || c == '.') else {
-    raise fail("a repository name has only ASCII letters, digits, '-', '_' and '.'")
+  guard name
+    .iter()
+    .all(c => {
+      c.is_ascii_alphabetic() ||
+      c.is_ascii_digit() ||
+      c == '-' ||
+      c == '_' ||
+      c == '.'
+    }) else {
+    raise fail(
+      "a repository name has only ASCII letters, digits, '-', '_' and '.'",
+    )
   }
-  guard name != "." && name != ".." else { raise fail("a repository name cannot be . or ..") }
-  { owner: { name: parts[0].to_owned() }, name: name.to_owned() }
+  guard name != "." && name != ".." else {
+    raise fail("a repository name cannot be . or ..")
+  }
+  { owner: { name: parts[0].to_owned(), }, name: name.to_owned(), }
 }
 
 ///|
@@ -220,7 +250,7 @@ pub fn GitHubRepository::url(self : GitHubRepository) -> String {
 }
 
 ///|
-pub impl Show for GitHubRepository with output(self, logger) {
+pub impl Show for GitHubRepository with fn output(self, logger) {
   logger.write_string("\{self.owner}/\{self.name}")
 }
 
@@ -230,9 +260,10 @@ pub extend GitHubRepository with Show::{output, to_string}
 ///|
 /// A workflow file in a repository, for example
 /// `.github/workflows/release.yml`.
+#derive(Eq, Debug)
 pub struct WorkflowPath {
   priv path : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend WorkflowPath with Eq::{equal, not_equal}
@@ -252,7 +283,9 @@ pub fn WorkflowPath::parse(text : String) -> WorkflowPath raise IdentityError {
     raise fail("a workflow path starts with .github/workflows/")
   }
   let file = text[workflow_folder.length():]
-  guard !file.contains("/") else { raise fail("a workflow file is directly in .github/workflows/") }
+  guard !file.contains("/") else {
+    raise fail("a workflow file is directly in .github/workflows/")
+  }
   guard file.has_suffix(".yml") || file.has_suffix(".yaml") else {
     raise fail("a workflow file ends with .yml or .yaml")
   }
@@ -262,11 +295,11 @@ pub fn WorkflowPath::parse(text : String) -> WorkflowPath raise IdentityError {
   guard !file.contains("@") && !has_space_or_control(text) else {
     raise fail("a workflow path has no '@', space or control character")
   }
-  { path: text }
+  { path: text, }
 }
 
 ///|
-pub impl Show for WorkflowPath with output(self, logger) {
+pub impl Show for WorkflowPath with fn output(self, logger) {
   logger.write_string(self.path)
 }
 
@@ -275,9 +308,10 @@ pub extend WorkflowPath with Show::{output, to_string}
 
 ///|
 /// A fully qualified Git ref, for example `refs/tags/v1.0.0`.
+#derive(Eq, Debug)
 pub struct GitRef {
   priv text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend GitRef with Eq::{equal, not_equal}
@@ -299,7 +333,7 @@ pub fn GitRef::parse(text : String) -> GitRef raise IdentityError {
 }
 
 ///|
-pub impl Show for GitRef with output(self, logger) {
+pub impl Show for GitRef with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -309,9 +343,10 @@ pub extend GitRef with Show::{output, to_string}
 ///|
 /// A numeric GitHub repository or account ID, for example `513894754`. A
 /// deleted and recreated repository keeps its name and gets a new ID.
+#derive(Eq, Debug)
 pub struct GitHubId {
   priv text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend GitHubId with Eq::{equal, not_equal}
@@ -323,14 +358,20 @@ pub extend GitHubId with @debug.Debug::{to_repr}
 /// Parse an ID: 1 to 20 decimal digits without a leading zero.
 pub fn GitHubId::parse(text : String) -> GitHubId raise IdentityError {
   let fail = rule => InvalidIdentity(kind=NumericId, text~, rule~)
-  guard text.length() >= 1 && text.length() <= 20 else { raise fail("an ID has 1 to 20 digits") }
-  guard text.iter().all(c => c.is_ascii_digit()) else { raise fail("an ID has only digits") }
-  guard text == "0" || !text.has_prefix("0") else { raise fail("an ID has no leading zero") }
+  guard text.length() >= 1 && text.length() <= 20 else {
+    raise fail("an ID has 1 to 20 digits")
+  }
+  guard text.iter().all(c => c.is_ascii_digit()) else {
+    raise fail("an ID has only digits")
+  }
+  guard text == "0" || !text.has_prefix("0") else {
+    raise fail("an ID has no leading zero")
+  }
   { text, }
 }
 
 ///|
-pub impl Show for GitHubId with output(self, logger) {
+pub impl Show for GitHubId with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -340,9 +381,10 @@ pub extend GitHubId with Show::{output, to_string}
 ///|
 /// The predicate type of an in-toto statement, for example
 /// `https://slsa.dev/provenance/v1`. It tells what the attestation claims.
+#derive(Eq, Debug)
 pub struct PredicateType {
   priv uri : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PredicateType with Eq::{equal, not_equal}
@@ -364,23 +406,23 @@ pub fn PredicateType::parse(text : String) -> PredicateType raise IdentityError 
   guard !has_space_or_control(text) else {
     raise fail("the URI has a space or a control character")
   }
-  { uri: text }
+  { uri: text, }
 }
 
 ///|
 /// The in-toto release predicate v0.2, which GitHub immutable releases use.
 pub fn PredicateType::github_release_v0_2() -> PredicateType {
-  { uri: "https://in-toto.io/attestation/release/v0.2" }
+  { uri: "https://in-toto.io/attestation/release/v0.2", }
 }
 
 ///|
 /// SLSA provenance v1, the predicate type of `actions/attest` build provenance.
 pub fn PredicateType::slsa_provenance_v1() -> PredicateType {
-  { uri: "https://slsa.dev/provenance/v1" }
+  { uri: "https://slsa.dev/provenance/v1", }
 }
 
 ///|
-pub impl Show for PredicateType with output(self, logger) {
+pub impl Show for PredicateType with fn output(self, logger) {
   logger.write_string(self.uri)
 }
 
@@ -389,9 +431,10 @@ pub extend PredicateType with Show::{output, to_string}
 
 ///|
 /// The tag of a GitHub release, for example `v2.103.3`.
+#derive(Eq, Debug)
 pub struct ReleaseTag {
   priv name : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ReleaseTag with Eq::{equal, not_equal}
@@ -405,18 +448,22 @@ pub extend ReleaseTag with @debug.Debug::{to_repr}
 pub fn ReleaseTag::parse(text : String) -> ReleaseTag raise IdentityError {
   let fail = rule => InvalidIdentity(kind=Tag, text~, rule~)
   guard !text.is_empty() else { raise fail("the tag is empty") }
-  guard !text.has_prefix("refs/") else { raise fail("give the tag name without refs/tags/") }
-  guard !has_space_or_control(text) && !text.contains("..") && !text.contains("@{") else {
+  guard !text.has_prefix("refs/") else {
+    raise fail("give the tag name without refs/tags/")
+  }
+  guard !has_space_or_control(text) &&
+    !text.contains("..") &&
+    !text.contains("@{") else {
     raise fail("a tag has no space, control character, '..' or '@{'")
   }
   guard !text.has_prefix("/") && !text.has_suffix("/") else {
     raise fail("a tag does not start or end with '/'")
   }
-  { name: text }
+  { name: text, }
 }
 
 ///|
-pub impl Show for ReleaseTag with output(self, logger) {
+pub impl Show for ReleaseTag with fn output(self, logger) {
   logger.write_string(self.name)
 }
 

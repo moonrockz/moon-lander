@@ -13,7 +13,7 @@ async fn materialize(
 ) -> @moonx.Command {
   let owned = @runtime.protect_from_cancel(() => {
     let root = @fs.tmpdir(prefix="moon-lander-moonx")
-    let owned = { root, removed: false }
+    let owned = { root, removed: false, }
     owner.val = Some(owned)
     owned
   })
@@ -28,22 +28,30 @@ async fn materialize(
         directories.set(prefix, true)
       }
     }
-    let file = @runtime.protect_from_cancel(() => @fs.open(
-      owned.root + "/" + path, mode=WriteOnly, create_mode=CreateNew,
-      permission=0o600,
-    ))
+    let file = @runtime.protect_from_cancel(() => {
+      @fs.open(
+        owned.root + "/" + path,
+        mode=WriteOnly,
+        create_mode=CreateNew,
+        permission=0o600,
+      )
+    })
     defer file.close()
     @io.Writer::write(file, entry.bytes())
   }
   // The absolute entry avoids cwd changes and relative executable resolution.
   let root = @fs.realpath(owned.root)
-  let prefix = @moonx.Arguments::parse([root + "/" + node.payload().entry().to_string()])
+  let prefix = @moonx.Arguments::parse([
+    root + "/" + node.payload().entry().to_string(),
+  ])
   @moonx.Command::new(node.executable(), prefix.concat(node.arguments()))
 }
 
 ///|
 async fn OwnedPayload::cleanup(self : OwnedPayload) -> Unit {
-  if self.removed { return }
+  if self.removed {
+    return
+  }
   // Check the root itself without following links as well as relying on the
   // frozen recursive remover's no-follow directory entries. The owned child
   // has already been reaped before this method is called.

@@ -80,13 +80,14 @@ test "New keys follow base keys" {
 /// Generation choices for a value tree. Struct names (`s1`, `s2`) always hold
 /// structs and leaf names (`x`, `y`, `z`) always hold leaves, so no path is a
 /// struct in one tree and a leaf in another.
+#derive(Debug)
 priv struct TreeCase {
-  choices : Array[UInt]
-} derive(Debug)
+  choices : Array[UInt32]
+}
 
 ///|
 impl @quickcheck.Arbitrary for TreeCase with fn arbitrary(size, state) {
-  { choices: @quickcheck.Arbitrary::arbitrary(size, state) }
+  { choices: @quickcheck.Arbitrary::arbitrary(size, state), }
 }
 
 ///|
@@ -106,7 +107,7 @@ fn TreeCase::tree(self : TreeCase) -> @config.ConfigValue {
       0
     }
   }
-  fn build(depth : Int) -> Json {
+  fn build(depth : Int32) -> Json {
     let object : Map[String, Json] = Map([])
     for name in ["s1", "s2"] {
       if depth > 0 && next() % 3 == 0 {
@@ -178,8 +179,9 @@ test "a struct over a leaf removes the leaf record" {
     named({ "ir": {} }, "empty"),
   ])
   @expect.expect(config.provenance().map(record => record.0.to_string())).to_equal([
-    "ir.layout",
-  ])
+      "ir.layout",
+    ],
+  )
   @expect.expect(config.origins(key("ir"))).to_equal([])
 }
 
@@ -190,13 +192,14 @@ test "an origin holds the kind, name, priority, and file path" {
     |> @config.defaults({ "ir": { "layout": "tree" } })
     |> @config.file("/w/app.toml")
     |> @config.load(
-      @config.FileTree::new(complete=true).with_file(p("/w/app.toml"),
+      @config.FileTree::new(complete=true).with_file(
+        p("/w/app.toml"),
         "ir.mode = \"fast\"",
       ),
     )
     |> done
   @expect.expect(config.origins(key("ir.layout"))).to_equal([
-    { kind: Defaults, source: "defaults", priority: 0, location: None },
+    { kind: Defaults, source: "defaults", priority: 0, location: None, },
   ])
   @expect.expect(config.origins(key("ir.mode"))).to_equal([
     {
@@ -254,7 +257,7 @@ test "Report order and status" {
     )
     |> @config.load(
       @config.FileTree::new(complete=true)
-      .with_listing(p("/w"), [{ name: "app.toml", kind: File }])
+      .with_listing(p("/w"), [{ name: "app.toml", kind: File, }])
       .with_file(p("/w/app.toml"), "b = 2"),
     )
     |> done
@@ -276,8 +279,9 @@ test "File role names" {
     }),
   )
   @expect.expect(config.reports().map(report => report.kind.report_name())).to_equal([
-    "workspace-member", "local-override", "user-override",
-  ])
+      "workspace-member", "local-override", "user-override",
+    ],
+  )
 }
 
 ///|
@@ -307,7 +311,10 @@ test "report names of every kind" {
 ///|
 test "a struct inside a list holds no null field" {
   let config = @config.build([
-    named({ "items": [{ "optional": null, "a": 1 }, null, [{ "b": null }]] }, "one"),
+    named(
+      { "items": [{ "optional": null, "a": 1 }, null, [{ "b": null }]] },
+      "one",
+    ),
   ])
   @expect.expect(config.value()).to_equal(
     json_tree({ "items": [{ "a": 1 }, null, [{}]] }),

@@ -72,8 +72,10 @@ pub fn Scenario::parse(text : String) -> Scenario? {
     "completion-timeout" => Some(Completion(ShutdownTimeout))
     "completion-closed" => Some(Completion(AlreadyClosed))
     "completion-throws" => Some(Completion(ReporterFailure(None)))
-    "completion-throws-int" => Some(Completion(ReporterFailure(Some(Interrupt))))
-    "completion-throws-term" => Some(Completion(ReporterFailure(Some(Terminate))))
+    "completion-throws-int" =>
+      Some(Completion(ReporterFailure(Some(Interrupt))))
+    "completion-throws-term" =>
+      Some(Completion(ReporterFailure(Some(Terminate))))
     "completion-legacy-int" => Some(Completion(LegacyPending(Interrupt)))
     "completion-legacy-term" => Some(Completion(LegacyPending(Terminate)))
     "completion-default-int" => Some(Completion(Unreported(Interrupt)))
@@ -106,11 +108,11 @@ pub fn Scenario::parse(text : String) -> Scenario? {
 
 ///|
 /// The count of events in the burst of `Fanout`.
-pub let burst_events : Int = 500
+pub let burst_events : Int32 = 500
 
 ///|
 /// The outstanding record limit of `Fanout`.
-pub let burst_limit : Int = 64
+pub let burst_limit : Int32 = 64
 
 ///|
 fn absolute(text : String) -> @lander_core.AbsolutePath {
@@ -144,7 +146,7 @@ fn plain_console() -> @sinks.ConsoleSink {
 fn settings(
   console : @sinks.ConsoleSink,
   files : Array[@sinks.FileSink],
-  event_limit? : Int = 1024,
+  event_limit~ : Int32 = 1024,
 ) -> @sinks.SessionSettings {
   @sinks.SessionSettings::new(
     console~,
@@ -161,7 +163,7 @@ priv suberror CompilerError {
 }
 
 ///|
-impl Show for CompilerError with output(self, logger) {
+impl Show for CompilerError with fn output(self, logger) {
   let CompilerError(text) = self
   logger.write_string(text)
 }
@@ -206,23 +208,55 @@ async fn standalone(dir : String) -> Unit {
 ///|
 async fn object_properties(dir : String) -> Unit {
   let logs = directory(dir)
-  let limit = @rolling.FileByteLimit::bytes(1L) catch { error => abort(error.message()) }
+  let limit = @rolling.FileByteLimit::bytes(1L) catch {
+    error => abort(error.message())
+  }
   let settings = settings(plain_console(), [
-    @sinks.FileSink::new(logs, stem("array"), format=JsonLines, policy=Size(limit), retention=KeepAll),
-    @sinks.FileSink::new(logs, stem("named"), format=JsonLines, json_properties=NamedObject, policy=Size(limit), retention=KeepAll),
+    @sinks.FileSink::new(
+      logs,
+      stem("array"),
+      format=JsonLines,
+      policy=Size(limit),
+      retention=KeepAll,
+    ),
+    @sinks.FileSink::new(
+      logs,
+      stem("named"),
+      format=JsonLines,
+      json_properties=NamedObject,
+      policy=Size(limit),
+      retention=KeepAll,
+    ),
   ])
   let report = @sink_runtime.with_session(settings, session => {
     let logger : &@logging.Logger = session.logger()
     logger.info("{path} {array} {object} {nothing} {flag} {number}", [
-      "/repo/morphir.toml", [1, Json::null(), { "nested": true }],
-      { "items": [false, 2] }, Json::null(), true, 2.5,
+      "/repo/morphir.toml",
+      [1, Json::null(), { "nested": true }],
+      { "items": [false, 2] },
+      Json::null(),
+      true,
+      2.5,
     ])
-    logger.info("{path} {level} {path} {command} {path} {level} {duplicateProperties} {properties}", [
-      Json::null(), "event", [1, Json::null()], "project.list",
-      { "nested": [true, 2] }, false, "inside", "safe",
-    ])
+    logger.info(
+      "{path} {level} {path} {command} {path} {level} {duplicateProperties} {properties}",
+      [
+        Json::null(),
+        "event",
+        [1, Json::null()],
+        "project.list",
+        { "nested": [true, 2] },
+        false,
+        "inside",
+        "safe",
+      ],
+    )
     ignore(session.drain())
-    logger.info("{value} {value} {text}", [1, Json::null(), "é 😀\n\r\u{1b}\"\\"])
+    logger.info("{value} {value} {text}", [
+      1,
+      Json::null(),
+      "é 😀\n\r\u{1b}\"\\",
+    ])
     logger.info("empty", [])
     session.close()
   })
@@ -243,15 +277,15 @@ async fn quiet(dir : String) -> Unit {
 
 ///|
 /// The count of events of `Volume`.
-pub let volume_events : Int = 4000
+pub let volume_events : Int32 = 4000
 
 ///|
 /// The events of `Volume` between two drains: less than the default queue.
-pub let volume_batch : Int = 500
+pub let volume_batch : Int32 = 500
 
 ///|
 /// The message of event `index` of `Volume`: 72 characters.
-pub fn volume_line(index : Int) -> String {
+pub fn volume_line(index : Int32) -> String {
   let number = index.to_string()
   "line=" + "0".repeat(6 - number.length()) + number + " " + "x".repeat(60)
 }
@@ -367,103 +401,158 @@ async fn session_hosted(
 ) -> Unit {
   let console = if scenario is SessionLateFailure {
     @sinks.ConsoleSink::new()
-  } else { plain_console() }
+  } else {
+    plain_console()
+  }
   let settings = settings(console, [
     @sinks.FileSink::new(directory(dir), stem("session"), minimum=Trace),
   ])
   let pending : Ref[@hosting.SignalKind?] = Ref(None)
-  let probe = signals.unwrap_or(@hosting.SignalProbe::new(() => {
-    let value = pending.val
-    pending.val = None
-    value
-  }))
+  let probe = signals.unwrap_or(
+    @hosting.SignalProbe::new(() => {
+      let value = pending.val
+      pending.val = None
+      value
+    }),
+  )
   let polled = Ref(false)
-  @hosting_logging.run_with_session(settings, session => {
-    let log : &@logging.Logger = session.logger()
-    let builder = @hosting.builder(@lander_core.AppName::parse("session-host"), [])
-      |> @hosting.service("telemetry", start=_ => {
-        say("telemetry=start")
-        log.info("telemetry.start", [])
-      }, stop=ctx => {
-        if scenario is (SessionOrdered | SessionLateFailure | SessionSignal | SessionPoll) {
-          let report = session.status()
-          assert_true(report.closed())
-          assert_false(report.delivery_failed())
-          for destination in report.destinations() {
-            assert_eq(destination.written(), report.accepted())
-          }
-          assert_eq(report.dropped().closed(), 1L)
-          say("telemetry=flushed-after-drain")
+  @hosting_logging.run_with_session(
+    settings,
+    session => {
+      let log : &@logging.Logger = session.logger()
+      let builder = @hosting.builder(
+          @lander_core.AppName::parse("session-host"),
+          [],
+        )
+        |> @hosting.service(
+          "telemetry",
+          start=_ => {
+            say("telemetry=start")
+            log.info("telemetry.start", [])
+          },
+          stop=ctx => {
+            if scenario
+              is (SessionOrdered
+              | SessionLateFailure
+              | SessionSignal
+              | SessionPoll) {
+              let report = session.status()
+              assert_true(report.closed())
+              assert_false(report.delivery_failed())
+              for destination in report.destinations() {
+                assert_eq(destination.written(), report.accepted())
+              }
+              assert_eq(report.dropped().closed(), 1L)
+              say("telemetry=flushed-after-drain")
+            }
+            say("reason=" + stop_reason(ctx.lifetime.stop_reason()))
+            say("telemetry=stop")
+            if scenario is SessionLateFailure {
+              fail("telemetry flush failed")
+            }
+          },
+        )
+        |> @hosting.service(
+          "diagnostic",
+          start=_ => {
+            log.info("diagnostic.start", [])
+            say("diagnostic=start")
+            if scenario is SessionStartFailure {
+              fail("diagnostic startup failed")
+            }
+          },
+          stop=ctx => {
+            say("diagnostic=stop")
+            say("reason=" + stop_reason(ctx.lifetime.stop_reason()))
+            if polled.val {
+              say("polled=true")
+            }
+            log.info("diagnostic.last", [])
+            if scenario is SessionTimedStop {
+              @async.sleep(60000)
+            }
+            let first = session.close()
+            assert_eq(first, session.close())
+            assert_true(first.closed())
+            assert_false(first.delivery_failed())
+            // A direct event after close is rejected and counted, not admitted.
+            let memory = @logging.MemoryLogger::new()
+            (memory : &@logging.Logger).info("late-after-close", [])
+            session.logger().log(memory.events()[0])
+            say("diagnostic=closed")
+          },
+          stopped=_ => log.info("late-stopped", []),
+        )
+      let builder = if scenario is SessionSkipped {
+        builder
+        |> @hosting.service("blocker", stop=_ => {
+          log.info("blocker.stop", [])
+          say("blocker=stop")
+          @async.sleep(60000)
+        })
+      } else {
+        builder
+      }
+      let builder = if scenario is (SessionSkipped | SessionTimedStop) {
+        builder
+        |> @hosting.shutdown_timeout(@lander_core.TimeLimit::millis(100))
+      } else {
+        builder
+      }
+      builder |> @hosting.build(_ => session.logger())
+    },
+    ctx => {
+      (ctx.services : &@logging.Logger).info("command", [])
+      if scenario is SessionSignal {
+        pending.val = Some(Terminate)
+      }
+      if scenario is (SessionSignal | SessionPoll) {
+        // No async operation between ready and the first cancellation read.
+        announce_ready()
+        let count = Ref(0UL)
+        while !ctx.cancelled() {
+          count.val += 1UL
         }
-        say("reason=" + stop_reason(ctx.lifetime.stop_reason()))
-        say("telemetry=stop")
-        if scenario is SessionLateFailure { fail("telemetry flush failed") }
-      })
-      |> @hosting.service("diagnostic", start=_ => {
-        log.info("diagnostic.start", [])
-        say("diagnostic=start")
-        if scenario is SessionStartFailure { fail("diagnostic startup failed") }
-      }, stop=ctx => {
-        say("diagnostic=stop")
-        say("reason=" + stop_reason(ctx.lifetime.stop_reason()))
-        if polled.val { say("polled=true") }
-        log.info("diagnostic.last", [])
-        if scenario is SessionTimedStop { @async.sleep(60000) }
-        let first = session.close()
-        assert_eq(first, session.close())
-        assert_true(first.closed())
-        assert_false(first.delivery_failed())
-        // A direct event after close is rejected and counted, not admitted.
-        let memory = @logging.MemoryLogger::new()
-        (memory : &@logging.Logger).info("late-after-close", [])
-        session.logger().log(memory.events()[0])
-        say("diagnostic=closed")
-      }, stopped=_ => log.info("late-stopped", []))
-    let builder = if scenario is SessionSkipped {
-      builder |> @hosting.service("blocker", stop=_ => {
-        log.info("blocker.stop", [])
-        say("blocker=stop")
-        @async.sleep(60000)
-      })
-    } else { builder }
-    let builder = if scenario is (SessionSkipped | SessionTimedStop) {
-      builder |> @hosting.shutdown_timeout(@lander_core.TimeLimit::millis(100))
-    } else { builder }
-    builder |> @hosting.build(_ => session.logger())
-  }, ctx => {
-    (ctx.services : &@logging.Logger).info("command", [])
-    if scenario is SessionSignal { pending.val = Some(Terminate) }
-    if scenario is (SessionSignal | SessionPoll) {
-      // No async operation between ready and the first cancellation read.
-      announce_ready()
-      let count = Ref(0UL)
-      while !ctx.cancelled() { count.val += 1UL }
-      polled.val = true
-    }
-  }, signals=probe)
+        polled.val = true
+      }
+    },
+    signals=probe,
+  )
 }
 
 ///|
 async fn legacy_probe(dir : String, failed_sink~ : Bool) -> Unit {
   let pending : Ref[@hosting.SignalKind?] = Ref(None)
   let settings = settings(plain_console(), [
-    @sinks.FileSink::new(directory(if failed_sink { dir + "/blocker/logs" } else { dir }), stem("legacy")),
+    @sinks.FileSink::new(
+      directory(if failed_sink { dir + "/blocker/logs" } else { dir }),
+      stem("legacy"),
+    ),
   ])
-  @hosting_logging.run(settings, logger => {
-    @hosting.builder(@lander_core.AppName::parse("legacy-probe"), [])
-    |> @hosting.service("diagnostic", stop=ctx => {
-      (logger : &@logging.Logger).info("reason={Reason}", [Json(stop_reason(ctx.lifetime.stop_reason()))])
-    })
-    |> @hosting.build(_ => logger)
-  }, ctx => {
-    (ctx.services : &@logging.Logger).info("legacy.accepted", [])
-    pending.val = Some(Interrupt)
-    while !ctx.cancelled() { () }
-  }, signals=@hosting.SignalProbe::new(() => {
-    let value = pending.val
-    pending.val = None
-    value
-  }))
+  @hosting_logging.run(
+    settings,
+    logger => {
+      @hosting.builder(@lander_core.AppName::parse("legacy-probe"), [])
+      |> @hosting.service("diagnostic", stop=ctx => {
+        (logger : &@logging.Logger).info("reason={Reason}", [
+          Json(stop_reason(ctx.lifetime.stop_reason())),
+        ])
+      })
+      |> @hosting.build(_ => logger)
+    },
+    ctx => {
+      (ctx.services : &@logging.Logger).info("legacy.accepted", [])
+      pending.val = Some(Interrupt)
+      while !ctx.cancelled() {
+        ()
+      }
+    },
+    signals=@hosting.SignalProbe::new(() => {
+      let value = pending.val
+      pending.val = None
+      value
+    }),
+  )
 }
 
 ///|
@@ -542,11 +631,20 @@ async fn fanout(dir : String) -> Unit {
 ///|
 /// Run the scenario. On native a host scenario ends the process inside the
 /// console driver; on js it ends when the event loop is empty.
-pub async fn run(scenario : Scenario, dir : String, signals? : @hosting.SignalProbe) -> Unit {
+pub async fn run(
+  scenario : Scenario,
+  dir : String,
+  signals? : @hosting.SignalProbe,
+) -> Unit {
   match scenario {
     Completion(mode) => completion_hosted(mode, dir)
-    SessionOrdered | SessionLateFailure | SessionStartFailure | SessionSkipped | SessionTimedStop |
-    SessionSignal | SessionPoll => session_hosted(scenario, dir, signals?)
+    SessionOrdered
+    | SessionLateFailure
+    | SessionStartFailure
+    | SessionSkipped
+    | SessionTimedStop
+    | SessionSignal
+    | SessionPoll => session_hosted(scenario, dir, signals?)
     ProbeLegacy => legacy_probe(dir, failed_sink=false)
     ProbeFailure => legacy_probe(dir, failed_sink=true)
     ObjectProperties => object_properties(dir)

@@ -56,6 +56,8 @@ async test "read a file through the host adapter" {
     |> @config.format(format)
     |> @config.file("moon.mod")
     |> @host.load
-  @expect.expect(@config.get_text(config, "text").contains("moonrockz/moon-lander")).to_equal(true)
+  @expect.expect(
+    @config.get_text(config, "text").contains("moonrockz/moon-lander"),
+  ).to_equal(true)
 }
 ```

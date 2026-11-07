@@ -1,5 +1,6 @@
 ///|
 /// The kind of a directory entry.
+#derive(Eq, Debug)
 pub(all) enum EntryKind {
   File
   Directory
@@ -7,7 +8,7 @@ pub(all) enum EntryKind {
   /// The host lists the entry but cannot inspect its kind, for example a file
   /// that another process locks, a link loop, or a missing permission.
   Inaccessible
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend EntryKind with Eq::{equal, not_equal}
@@ -17,10 +18,11 @@ pub extend EntryKind with @debug.Debug::{to_repr}
 
 ///|
 /// One entry of a directory listing, with its real name.
+#derive(Eq, Debug)
 pub(all) struct DirEntry {
   name : String
   kind : EntryKind
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DirEntry with Eq::{equal, not_equal}
@@ -31,10 +33,11 @@ pub extend DirEntry with @debug.Debug::{to_repr}
 ///|
 /// A request that the pure load passes out to a host: the listing of a
 /// directory or the text of a file.
+#derive(Eq, Hash, Debug)
 pub(all) enum FileRequest {
   ListDir(FileTreePath)
   ReadFile(FileTreePath)
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend FileRequest with Eq::{equal, not_equal}
@@ -48,10 +51,11 @@ pub extend FileRequest with @debug.Debug::{to_repr}
 ///|
 /// One step of a pure load: the file requests that it still needs, or the
 /// result.
+#derive(Eq, Debug)
 pub(all) enum LoadStep[T] {
   Need(Array[FileRequest])
   Done(T)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend LoadStep with Eq::{equal, not_equal}
@@ -62,11 +66,12 @@ pub extend LoadStep with @debug.Debug::{to_repr}
 ///|
 /// What a file tree knows about a path: it holds the value, it records the
 /// path as absent, or it does not know.
+#derive(Eq, Debug)
 pub(all) enum Lookup[T] {
   Found(T)
   Missing
   Unknown
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Lookup with Eq::{equal, not_equal}
@@ -89,8 +94,8 @@ pub struct FileTree {
 ///|
 /// An empty tree. With `complete=true`, every path is absent until a
 /// `with_*` call adds it, so a load over it never asks for files.
-pub fn FileTree::new(complete? : Bool = false) -> FileTree {
-  { complete, listings: Map([]), files: Map([]), missing: [] }
+pub fn FileTree::new(complete~ : Bool = false) -> FileTree {
+  { complete, listings: Map([]), files: Map([]), missing: [], }
 }
 
 ///|
@@ -121,7 +126,7 @@ pub fn FileTree::with_file(
 /// A new tree that records `path` as absent. When `path` is a directory, every
 /// path under it is also absent.
 pub fn FileTree::with_missing(self : FileTree, path : FileTreePath) -> FileTree {
-  { ..self, missing: [..self.missing, path] }
+  { ..self, missing: [..self.missing, path], }
 }
 
 ///|

@@ -9,7 +9,7 @@ starting point and move common site behavior into Telescope.
 
 ## What Changes
 
-- Build the unpublished docs tool on the published `moonrockz/telescope@0.5.1`
+- Build the unpublished docs tool on the published `moonrockz/telescope@0.6.0`
   package, with its shared shell, theme, search, navigation and site checks.
 - Add a landing page with a large headline, the bunny-and-lander mark, direct
   documentation and API links, installation instructions and package guides.

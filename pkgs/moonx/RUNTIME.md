@@ -31,15 +31,16 @@ async; no framework module imports this optional launcher.
 The upstream public observer request is
 [moonbitlang/async#706](https://github.com/moonbitlang/async/issues/706). When a
 released canonical async version provides a compatible observer and explicit
-entry on both supported stock consumers, qualify it through the same real-host
+entry on the pinned stock toolchain, qualify it through the same real-host
 and public-registry tests, remove this frozen closure and its generation inputs,
 and replace only the launcher's adapter imports. Preserve the launch-plan API
 and cleanup behavior. An upstream issue or unreleased source change alone is
 not enough to remove the compatibility boundary.
 
-Windows signal delivery is a separate host capability. Stock Moonrun commits
-`2284bd2` and `3778465` send Ctrl-Break to the owned process group even when
-the launcher observed Ctrl-C. The owner approved this Windows Moonx limitation:
+Windows signal delivery is a separate host capability. Stock Moonrun (commits
+`2284bd2` and `3778465`, qualified until Moon-Lander 0.11.0) sends Ctrl-Break to
+the owned process group even when the launcher observed Ctrl-C. The Windows CI
+job checks the same behavior on the pinned stock toolchain. The owner approved this Windows Moonx limitation:
 retain the genuine Node-host Quit/131 outcome and the parent's original
 Interrupt observation and full status. The frozen observer does not rewrite
 either value. [moon #2419](https://github.com/moonbitlang/moon/issues/2419) tracks

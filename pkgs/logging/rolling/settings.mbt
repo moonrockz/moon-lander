@@ -1,5 +1,6 @@
 ///|
 /// The rule of a file stem that an input breaks.
+#derive(Eq, Debug)
 pub enum StemRule {
   /// The text is empty.
   Empty
@@ -16,7 +17,7 @@ pub enum StemRule {
   /// The text is a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM0` to
   /// `COM9` or `LPT0` to `LPT9`) in any letter case.
   ReservedDeviceName
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend StemRule with Eq::{equal, not_equal}
@@ -27,9 +28,10 @@ pub extend StemRule with @debug.Debug::{to_repr}
 ///|
 /// A count of bytes: a file size or the encoded size of a record. It is zero or
 /// more.
+#derive(Eq, Compare, Hash, Debug)
 pub struct ByteCount {
   priv bytes : Int64
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 pub extend ByteCount with Eq::{equal, not_equal}
@@ -55,13 +57,13 @@ pub fn ByteCount::of(bytes : Int64) -> ByteCount raise RollingError {
 /// The count of UTF-8 bytes of `text`, for example a rendered record with its
 /// LF.
 pub fn ByteCount::of_text(text : String) -> ByteCount {
-  { bytes: @formatting.utf8_length(text) }
+  { bytes: @formatting.utf8_length(text), }
 }
 
 ///|
 /// No bytes.
 pub fn ByteCount::zero() -> ByteCount {
-  { bytes: 0L }
+  { bytes: 0L, }
 }
 
 ///|
@@ -72,7 +74,7 @@ pub fn ByteCount::to_int64(self : ByteCount) -> Int64 {
 
 ///|
 /// The count as text, for example `2048`.
-pub impl Show for ByteCount with output(self, logger) {
+pub impl Show for ByteCount with fn output(self, logger) {
   logger.write_string(self.bytes.to_string())
 }
 
@@ -82,19 +84,20 @@ pub extend ByteCount with Show::{output, to_string}
 ///|
 /// A rolling input that breaks a rule, or a file set that has no next file
 /// name. Callers can match the cases, but only this package makes them.
+#derive(Debug)
 pub suberror RollingError {
   /// The stem `input` breaks the rule `rule`.
   InvalidStem(input~ : String, rule~ : StemRule)
   /// The file byte limit `bytes` is zero or less.
   NotPositiveByteLimit(bytes~ : Int64)
   /// The retained file count `count` is zero or less.
-  NotPositiveFileCount(count~ : Int)
+  NotPositiveFileCount(count~ : Int32)
   /// The byte count `bytes` is less than zero.
   NegativeByteCount(bytes~ : Int64)
   /// The file `last` has the largest sequence number, so the period has no
   /// next file name. The file set does not use a name again.
   SequenceExhausted(last~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend RollingError with @debug.Debug::{to_repr}
@@ -129,7 +132,7 @@ pub fn RollingError::message(self : RollingError) -> String {
 
 ///|
 /// The largest number of characters in a stem.
-const MAX_STEM_LENGTH : Int = 64
+const MAX_STEM_LENGTH : Int32 = 64
 
 ///|
 /// The first part of each file name of a file set, for example `acme` in
@@ -137,9 +140,10 @@ const MAX_STEM_LENGTH : Int = 64
 /// letters, ASCII digits, `_` and `-`. It does not end with `_` or `-` and
 /// digits, and it is not a Windows device name. So the file names are valid on
 /// each OS, and two stems never make the same file name.
+#derive(Eq, Compare, Hash, Debug)
 pub struct LogFileStem {
   priv text : String
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 pub extend LogFileStem with Eq::{equal, not_equal}
@@ -205,14 +209,14 @@ fn is_device_name(upper : String) -> Bool {
       let chars = upper.to_array()
       chars.length() == 4 &&
       is_ascii_digit(chars[3]) &&
-      (String::from_array(chars[0:3]) is ("COM" | "LPT"))
+      String::from_array(chars[0:3]) is ("COM" | "LPT")
     }
   }
 }
 
 ///|
 /// The stem text.
-pub impl Show for LogFileStem with output(self, logger) {
+pub impl Show for LogFileStem with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -221,9 +225,10 @@ pub extend LogFileStem with Show::{output, to_string}
 
 ///|
 /// The size at which a file rolls: a positive number of bytes.
+#derive(Eq, Compare, Hash, Debug)
 pub struct FileByteLimit {
   priv bytes : Int64
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 pub extend FileByteLimit with Eq::{equal, not_equal}
@@ -247,7 +252,7 @@ pub fn FileByteLimit::bytes(bytes : Int64) -> FileByteLimit raise RollingError {
 ///|
 /// The default limit: 10 MiB (10 485 760 bytes).
 pub fn FileByteLimit::default() -> FileByteLimit {
-  { bytes: 10L * 1024L * 1024L }
+  { bytes: 10L * 1024L * 1024L, }
 }
 
 ///|
@@ -259,9 +264,10 @@ pub fn FileByteLimit::to_int64(self : FileByteLimit) -> Int64 {
 ///|
 /// The number of newest files that retention keeps, including the active file:
 /// a positive count.
+#derive(Eq, Compare, Hash, Debug)
 pub struct RetainedFileCount {
-  priv count : Int
-} derive(Eq, Compare, Hash, Debug)
+  priv count : Int32
+}
 
 ///|
 pub extend RetainedFileCount with Eq::{equal, not_equal}
@@ -277,7 +283,9 @@ pub extend RetainedFileCount with @debug.Debug::{to_repr}
 
 ///|
 /// Make a count of `count` files. The value must be greater than zero.
-pub fn RetainedFileCount::count(count : Int) -> RetainedFileCount raise RollingError {
+pub fn RetainedFileCount::count(
+  count : Int32,
+) -> RetainedFileCount raise RollingError {
   guard count > 0 else { raise NotPositiveFileCount(count~) }
   { count, }
 }
@@ -285,17 +293,18 @@ pub fn RetainedFileCount::count(count : Int) -> RetainedFileCount raise RollingE
 ///|
 /// The default count: 31 files.
 pub fn RetainedFileCount::default() -> RetainedFileCount {
-  { count: 31 }
+  { count: 31, }
 }
 
 ///|
 /// The count, greater than zero.
-pub fn RetainedFileCount::to_int(self : RetainedFileCount) -> Int {
+pub fn RetainedFileCount::to_int(self : RetainedFileCount) -> Int32 {
   self.count
 }
 
 ///|
 /// When a file set starts a new file. Periods are UTC days.
+#derive(Eq, Debug)
 pub(all) enum RollingPolicy {
   /// A new file for each UTC day, of any size.
   Daily
@@ -304,7 +313,7 @@ pub(all) enum RollingPolicy {
   Size(FileByteLimit)
   /// A new file for each UTC day, and in a day also at the size limit.
   DailyAndSize(FileByteLimit)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend RollingPolicy with Eq::{equal, not_equal}
@@ -320,12 +329,13 @@ pub fn RollingPolicy::default() -> RollingPolicy {
 
 ///|
 /// Which old files of a file set stay after a roll.
+#derive(Eq, Debug)
 pub(all) enum Retention {
   /// Keep this number of the newest files, including the active file.
   KeepNewest(RetainedFileCount)
   /// Keep all files.
   KeepAll
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Retention with Eq::{equal, not_equal}
@@ -341,12 +351,13 @@ pub fn Retention::default() -> Retention {
 
 ///|
 /// The format of the records in the files of a file set.
+#derive(Eq, Debug)
 pub(all) enum FileFormat {
   /// Readable text, from `@formatting.format_text`.
   Text
   /// JSON Lines, from `@formatting.format_json_line`.
   JsonLines
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FileFormat with Eq::{equal, not_equal}

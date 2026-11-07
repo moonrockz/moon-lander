@@ -2,6 +2,7 @@
 /// A fault in the program that sets up a host: a service name, a code or a
 /// service set that breaks its rules. An invalid application name is an
 /// `@lander_core.AppNameError`.
+#derive(Debug)
 pub(all) suberror HostError {
   /// The text is not a valid service name.
   InvalidServiceName(text~ : String, reason~ : String)
@@ -9,8 +10,8 @@ pub(all) suberror HostError {
   /// or differs from it only in letter case.
   DuplicateService(name~ : ServiceName, existing~ : ServiceName)
   /// The number is not in the exit code range 0 to 255.
-  InvalidExitCode(code~ : Int)
-} derive(Debug)
+  InvalidExitCode(code~ : Int32)
+}
 
 ///|
 pub extend HostError with @debug.Debug::{to_repr}
@@ -53,9 +54,10 @@ pub fn HostError::message(self : HostError) -> String {
 ///
 /// The parse does not normalize the text. Two names that differ only in their
 /// Unicode normalization form are different names.
+#derive(Eq, Hash, Debug)
 pub struct ServiceName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend ServiceName with Eq::{equal, not_equal}
@@ -68,7 +70,7 @@ pub extend ServiceName with @debug.Debug::{to_repr}
 
 ///|
 /// The longest service name in UTF-8 bytes.
-const MAX_SERVICE_NAME_BYTES : Int = 128
+const MAX_SERVICE_NAME_BYTES : Int32 = 128
 
 ///|
 /// Parse a service name, for example `db`, `db.primary` or `données`.
@@ -115,7 +117,7 @@ pub fn ServiceName::parse(text : String) -> ServiceName raise HostError {
 
 ///|
 /// The name as text, which `ServiceName::parse` reads back to an equal name.
-pub impl Show for ServiceName with output(self, logger) {
+pub impl Show for ServiceName with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -127,11 +129,11 @@ pub extend ServiceName with Show::{output, to_string}
 /// `ServiceName::parse` reads. So `service` takes either, and parses text at the
 /// boundary. After that step, the host holds only the `ServiceName`.
 pub trait IntoServiceName {
-  into_service_name(Self) -> ServiceName raise HostError
+  fn into_service_name(Self) -> ServiceName raise HostError
 }
 
 ///|
-pub impl IntoServiceName for ServiceName with into_service_name(self) {
+pub impl IntoServiceName for ServiceName with fn into_service_name(self) {
   self
 }
 
@@ -139,7 +141,7 @@ pub impl IntoServiceName for ServiceName with into_service_name(self) {
 pub extend ServiceName with IntoServiceName::{into_service_name}
 
 ///|
-pub impl IntoServiceName for String with into_service_name(self) {
+pub impl IntoServiceName for String with fn into_service_name(self) {
   ServiceName::parse(self)
 }
 
@@ -169,22 +171,20 @@ fn fold_case(text : String) -> String {
 /// default-ignorable code point that `XID_Continue` allows, or a Hangul filler.
 fn is_invisible(char : Char) -> Bool {
   char
-  is (
-    '\u{034F}'
-    | '\u{115F}'..='\u{1160}'
-    | '\u{17B4}'..='\u{17B5}'
-    | '\u{180B}'..='\u{180F}'
-    | '\u{200C}'..='\u{200D}'
-    | '\u{3164}'
-    | '\u{FE00}'..='\u{FE0F}'
-    | '\u{FFA0}'
-    | '\u{E0100}'..='\u{E01EF}'
-  )
+  is ('\u{034F}'
+  | '\u{115F}'..<='\u{1160}'
+  | '\u{17B4}'..<='\u{17B5}'
+  | '\u{180B}'..<='\u{180F}'
+  | '\u{200C}'..<='\u{200D}'
+  | '\u{3164}'
+  | '\u{FE00}'..<='\u{FE0F}'
+  | '\u{FFA0}'
+  | '\u{E0100}'..<='\u{E01EF}')
 }
 
 ///|
 /// The number of bytes that `char` takes in UTF-8.
-fn utf8_length(char : Char) -> Int {
+fn utf8_length(char : Char) -> Int32 {
   let code = char.to_int()
   if code < 0x80 {
     1
@@ -204,7 +204,7 @@ fn utf8_length(char : Char) -> Int {
 /// digit, but a service name cannot hold a superscript digit.
 fn is_windows_device_name(text : String) -> Bool {
   let base = match text.find(".") {
-    Some(index) => text.view(end_offset=index).to_owned()
+    Some(index) => text.exact_view(end=index).to_owned()
     None => text
   }
   let upper = base.to_upper()
@@ -214,5 +214,5 @@ fn is_windows_device_name(text : String) -> Bool {
   let chars = Array::from_iter(upper.iter())
   chars.length() == 4 &&
   (upper.has_prefix("COM") || upper.has_prefix("LPT")) &&
-  (chars[3] is ('0'..='9'))
+  chars[3] is ('0'..<='9')
 }

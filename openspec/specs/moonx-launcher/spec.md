@@ -95,7 +95,7 @@ cancellation MUST NOT be reported as an observed OS signal.
 ### Requirement: Truthful Windows console semantics
 
 The Windows launcher SHALL retain actual child and parent cancellation outcomes.
-Stock Moonrun Ctrl-C delivery MUST be documented as Ctrl-Break, with genuine
+Ctrl-C delivery of the qualified stock Moonrun MUST be documented as Ctrl-Break, with genuine
 Quit/131 and the parent's original Interrupt observation and full status.
 It MUST NOT claim original Windows Ctrl-C forwarding or describe SIGTERM as a
 console event. Finite transport, payload lifetime, Ctrl-Break and bounded forced
@@ -108,7 +108,7 @@ cleanup MUST remain supported. Existing framework hosts MUST remain unchanged.
 
 #### Scenario: Stock Moonrun receives Ctrl-C
 
-- **WHEN** Ctrl-C reaches a ready Moonrun launcher at commit `2284bd2` or `3778465` whose Node child owns a Moon-Lander host
+- **WHEN** Ctrl-C reaches a ready Moonrun launcher of the pinned stock toolchain whose Node child owns a Moon-Lander host
 - **THEN** the parent records Interrupt, the genuine Node host reports Quit and completion 131, and the parent retains status bits `0xc000013a` after worker, service and finalizer completion and child reaping
 
 #### Scenario: Targeted Ctrl-Break
@@ -241,7 +241,7 @@ An external upstream release MUST NOT be a prerequisite for this release.
 
 #### Scenario: Upstream observer becomes available
 
-- **WHEN** a public upstream release supplies the required observer on both supported stock toolchains
+- **WHEN** a public upstream release supplies the required observer on the pinned stock toolchain
 - **THEN** the documented return procedure requires the same isolation, lifecycle and registry acceptance proof before removing the frozen subset
 
 ### Requirement: Public generic Moonx launcher command
@@ -267,19 +267,23 @@ The command MUST document its report schema and argument boundary.
 - **WHEN** the launcher receives `--help --json`, or child arguments after the executable contain `--json` and `--help`
 - **THEN** the former reports JSON help without starting a child and the latter forwards those arguments unchanged
 
-### Requirement: Stock and public artifact qualification
+### Requirement: Pinned stock and public artifact qualification
 
-Release qualification SHALL exercise stock `0.10.16+b1a0e846e` and
-`0.10.17+d971670cd`, including genuine top-level Moonx and real Node-host
-completion under the declared platform contract. After publication, fresh
-consumers MUST use the default public
-registry with no source override. Every released archive checksum MUST match
-the actual approved release artifact.
+Release qualification SHALL exercise the stock toolchain of the primary MoonBit
+pin, including genuine top-level Moonx and real Node-host completion under the
+declared platform contract. After publication, fresh consumers MUST use the
+default public registry with no source override. Every released archive
+checksum MUST match the actual approved release artifact.
 
 #### Scenario: Platform-specific signal evidence
 
-- **WHEN** host qualification runs on both required stock toolchains
+- **WHEN** host qualification runs on the pinned stock toolchain, `0.10.20+65efd5b93` at this change
 - **THEN** POSIX proves original SIGINT/130 and SIGTERM/143, while Windows retains actual Ctrl-C-to-Ctrl-Break delivery, full parent status, graceful and forced cleanup, and opaque finite transport
+
+#### Scenario: Other stock toolchains
+
+- **WHEN** a stock toolchain other than the primary pin, such as `0.10.17+d971670cd`, is given to the qualification
+- **THEN** the qualification refuses it as an unsupported stock toolchain before it builds a consumer
 
 #### Scenario: Local candidate proof
 
@@ -289,4 +293,4 @@ the actual approved release artifact.
 #### Scenario: Fresh public consumers
 
 - **WHEN** the approved release has published
-- **THEN** independent cold consumers resolve and execute the public module on both stock toolchains and verify the actual released archive identities
+- **THEN** independent cold consumers resolve and execute the public module on the pinned stock toolchain and verify the actual released archive identities

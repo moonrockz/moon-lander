@@ -39,15 +39,18 @@ test "a time on each side of each limit" {
 
 ///|
 test "the error names the input and the range" {
-  let result : Result[_, @formatting.TimestampError] = try
-    Ok(@formatting.LogTimestamp::from_epoch_millis(-1L))
-  catch {
+  let result : Result[_, @formatting.TimestampError] = Ok(
+    @formatting.LogTimestamp::from_epoch_millis(-1L),
+  ) catch {
     error => Err(error)
   }
   guard result is Err(failure) else { fail("no range error") }
-  inspect(failure.message(), content=(
-    #|Invalid log timestamp -1: the value must be from 0 (1970-01-01T00:00:00.000Z) to 253402300799999 (9999-12-31T23:59:59.999Z) milliseconds after the Unix epoch
-  ))
+  inspect(
+    failure.message(),
+    content=(
+      #|Invalid log timestamp -1: the value must be from 0 (1970-01-01T00:00:00.000Z) to 253402300799999 (9999-12-31T23:59:59.999Z) milliseconds after the Unix epoch
+    ),
+  )
 }
 
 ///|
@@ -89,7 +92,8 @@ test "leap days" {
 ///|
 test "timestamps compare in time order" {
   assert_true(at(1L) < at(2L))
-  assert_true(@formatting.LogTimestamp::earliest() <
-    @formatting.LogTimestamp::latest())
+  assert_true(
+    @formatting.LogTimestamp::earliest() < @formatting.LogTimestamp::latest(),
+  )
   assert_eq(at(5L), at(5L))
 }

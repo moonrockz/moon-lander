@@ -14,10 +14,11 @@ pub const TST_INFO : String = "1.2.840.113549.1.9.16.1.4"
 pub fn parse(BytesView) -> Timestamp raise TimestampError
 
 // Errors
+#derive(@debug.Debug)
 pub(all) suberror TimestampError {
   BadTimestamp(String)
   UnsupportedTimestamp(String)
-} derive(@debug.Debug)
+}
 pub fn TimestampError::message(Self) -> String
 pub fn TimestampError::to_repr(Self) -> @debug.Repr
 

@@ -9,7 +9,7 @@ pub struct PayloadPolicy[M] {
 ///|
 /// Omit the message from the event payload, with no encoding work.
 pub fn[M] PayloadPolicy::omit() -> PayloadPolicy[M] {
-  { encoder: None }
+  { encoder: None, }
 }
 
 ///|
@@ -21,25 +21,28 @@ pub fn[M] PayloadPolicy::default() -> PayloadPolicy[M] {
 ///|
 /// Apply the policy to a message. The runtime calls this only for an undelivered
 /// event with an active subscriber. `None` means the policy omits the payload.
-pub fn[M] PayloadPolicy::apply(self : PayloadPolicy[M], message : M) -> @ion.Ion? {
+pub fn[M] PayloadPolicy::apply(
+  self : PayloadPolicy[M],
+  message : M,
+) -> @ion.Ion? {
   self.encoder.map(encode => encode(message))
 }
 
 ///|
 /// Encode the whole message with its Ion implementation, preserving Ion types.
 pub fn[M : @ion.ToIon] PayloadPolicy::ion() -> PayloadPolicy[M] {
-  { encoder: Some(message => @ion.Ion(message)) }
+  { encoder: Some(message => @ion.Ion(message)), }
 }
 
 ///|
 /// Encode the whole message as JSON, then hold that JSON as an Ion value.
 pub fn[M : ToJson] PayloadPolicy::json() -> PayloadPolicy[M] {
-  { encoder: Some(message => @ion.Ion(message.to_json())) }
+  { encoder: Some(message => @ion.Ion(message.to_json())), }
 }
 
 ///|
 /// Use a custom encoder, for example to remove a secret or omit a reply field.
 /// The encoder cannot raise.
 pub fn[M] PayloadPolicy::encode(f : (M) -> @ion.Ion) -> PayloadPolicy[M] {
-  { encoder: Some(f) }
+  { encoder: Some(f), }
 }

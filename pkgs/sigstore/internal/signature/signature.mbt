@@ -1,10 +1,11 @@
 ///|
 /// A hash function of the SHA-2 family.
+#derive(Eq, Debug)
 pub(all) enum HashAlgorithm {
   Sha256
   Sha384
   Sha512
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend HashAlgorithm with Eq::{equal, not_equal}
@@ -31,10 +32,11 @@ pub fn sha256(bytes : BytesView) -> Bytes {
 
 ///|
 /// A public key type that the verifier knows.
+#derive(Eq, Debug)
 pub enum KeyKind {
   EcdsaP256
   EcdsaP384
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend KeyKind with Eq::{equal, not_equal}
@@ -53,13 +55,14 @@ pub fn KeyKind::hash(self : KeyKind) -> HashAlgorithm {
 
 ///|
 /// A key that cannot be used.
+#derive(Debug)
 pub suberror KeyError {
   /// The key is valid, but of a type that the verifier does not support, for
   /// example Ed25519 or RSA. The text names the type.
   UnsupportedKey(String)
   /// The key bytes break the rule that the text names.
   BadKey(String)
-} derive(Debug)
+}
 
 ///|
 pub extend KeyError with @debug.Debug::{to_repr}
@@ -89,7 +92,7 @@ let p256_prime : String = "ffffffff00000001000000000000000000000000fffffffffffff
 let p384_prime : String = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
 
 ///|
-fn KeyKind::size(self : KeyKind) -> Int {
+fn KeyKind::size(self : KeyKind) -> Int32 {
   match self {
     EcdsaP256 => 32
     EcdsaP384 => 48
@@ -160,11 +163,13 @@ pub fn PublicKey::from_spki(spki : BytesView) -> PublicKey raise KeyError {
       _ => raise BadKey("the point is not on the curve")
     },
   )
-  { kind, spki: spki.to_owned(), point: point.to_owned() }
+  { kind, spki: spki.to_owned(), point: point.to_owned(), }
 }
 
 ///|
-fn read_spki(spki : BytesView) -> (String, String?, BytesView) raise @der.DerError {
+fn read_spki(
+  spki : BytesView,
+) -> (String, String?, BytesView) raise @der.DerError {
   let outer = @der.parse_tag(spki, @der.SEQUENCE).children()
   let algorithm = outer.expect(@der.SEQUENCE).children()
   let oid = algorithm.expect(@der.OID).oid()
@@ -188,40 +193,40 @@ fn read_spki(spki : BytesView) -> (String, String?, BytesView) raise @der.DerErr
 /// caller computed.
 priv struct Prehashed {
   bytes : Array[Byte]
-  size : Int
+  size : Int32
 }
 
 ///|
-impl @spec.Hash for Prehashed with write(self, data) {
+impl @spec.Hash for Prehashed with fn write(self, data) {
   for byte in data {
     self.bytes.push(byte)
   }
 }
 
 ///|
-impl @spec.Hash for Prehashed with finish(self) {
+impl @spec.Hash for Prehashed with fn finish(self) {
   Bytes::from_array(self.bytes)
 }
 
 ///|
-impl @spec.Hash for Prehashed with reset(self) {
+impl @spec.Hash for Prehashed with fn reset(self) {
   self.bytes.clear()
 }
 
 ///|
-impl @spec.Hash for Prehashed with size(self) {
+impl @spec.Hash for Prehashed with fn size(self) {
   self.size
 }
 
 ///|
-impl @spec.Hash for Prehashed with block(_self) {
+impl @spec.Hash for Prehashed with fn block(_self) {
   128
 }
 
 ///|
 /// Read a strict DER ECDSA-Sig-Value into the fixed-width form `r ∥ s`, or
 /// `None` when it is not strict DER or a value is wider than `size` bytes.
-pub fn der_signature_to_raw(signature : BytesView, size : Int) -> Bytes? {
+pub fn der_signature_to_raw(signature : BytesView, size : Int32) -> Bytes? {
   let parts = try {
     let reader = @der.parse_tag(signature, @der.SEQUENCE).children()
     let r = reader.expect(@der.INTEGER).unsigned()
@@ -278,7 +283,7 @@ pub fn PublicKey::verify_digest_raw(
   let size = digest.length()
   let key = @ecdsa.PublicKey::with_hash(
     aligned_point(self.point),
-    () => ({ bytes: [], size } : Prehashed),
+    () => ({ bytes: [], size, } : Prehashed),
     curve=self.kind.curve(),
   ) catch {
     _ => return false

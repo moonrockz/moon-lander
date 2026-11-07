@@ -27,8 +27,8 @@ fn main raise {
 ```
 
 Use synchronous `fn main`, rather than `async fn main`. The driver owns one
-isolated runtime. Stock `0.10.16+b1a0e846e` and `0.10.17+d971670cd` Moonx run a
-prebuilt Wasm executable, while the Node child runs the application. The pure
+isolated runtime. Stock Moonx of the qualified toolchain (`0.10.20+65efd5b93`)
+runs a prebuilt Wasm executable, while the Node child runs the application. The pure
 plan package builds on Wasm, Wasm GC, JS and native; the process driver and owned
 runtime support Wasm and native. Node must be available through PATH, or be
 selected with `Executable::parse`.
@@ -47,7 +47,7 @@ identity remains fixed across repeated signals; the upstream runtime's existing
 exit selection can change when a later signal arrives.
 
 Windows process statuses retain all 32 bits. Console control events have Windows
-semantics. On stock `0.10.16+b1a0e846e` and `0.10.17+d971670cd`, Moonrun forwards
+semantics. On the qualified stock toolchain, Moonrun forwards
 parent Ctrl-C to its Node child as Ctrl-Break. A genuine Node-owned console host
 therefore reports Quit and completion 131. The parent still records Interrupt
 and retains its real status bits `0xc000013a`. The driver does not relabel either
@@ -136,8 +136,9 @@ owned runtime into their executable.
 
 ## Qualification and public release proof
 
-`mise run check:moonx` and `mise run check:moonx-stock16` build independent
-consumers with the two supported stock toolchains. They check real console-host
+`mise run check:moonx` builds an independent consumer with the supported stock
+toolchain, the primary pin. Moon-Lander 0.11.0 and older were qualified on stock
+`0.10.16+b1a0e846e` and `0.10.17+d971670cd`. They check real console-host
 completion under the POSIX guarantee and documented Windows limitation, idle
 stdin, repeated signals during finalization, ignored-signal
 forced reaping, cancellation during materialization, and opaque binary streams.

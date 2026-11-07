@@ -8,7 +8,7 @@ priv struct Mailbox[M] {
   /// For each queued message, what to do when close discards it. An ask uses
   /// it to wake its caller at once.
   discards : @deque.Deque[(() -> Unit)?]
-  limit : Int?
+  limit : Int32?
   /// False after close or drain: no message can enter.
   mut admitting : Bool
   /// True after the first close.
@@ -18,7 +18,7 @@ priv struct Mailbox[M] {
   /// Producers wait here for free space or for close.
   space : @cond_var.Cond
   /// The number of producers that wait for space now.
-  mut waiting_producers : Int
+  mut waiting_producers : Int32
   /// Publish an undelivered event for a message, when the owner scope has a
   /// runtime event channel. `None` does no work.
   mut undelivered : ((M, Undelivered) -> Unit)?
@@ -194,7 +194,7 @@ fn[M] Mailbox::clear(self : Mailbox[M], removed : (M) -> Unit) -> Array[M] {
 
 ///|
 /// Remove and give the queued message at `index`.
-fn[M] Mailbox::take_at(self : Mailbox[M], index : Int) -> M {
+fn[M] Mailbox::take_at(self : Mailbox[M], index : Int32) -> M {
   let message = self.queue.remove(index)
   ignore(self.discards.remove(index))
   if self.waiting_producers > 0 {

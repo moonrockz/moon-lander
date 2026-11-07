@@ -38,7 +38,7 @@ pub fn[M] ActorRef::try_send(
 ///|
 /// The number of queued messages now. Messages that a selective receive
 /// skips count; the message in progress does not.
-pub fn[M] ActorRef::queued_count(self : ActorRef[M]) -> Int {
+pub fn[M] ActorRef::queued_count(self : ActorRef[M]) -> Int32 {
   self.mailbox.queue.length()
 }
 
@@ -81,7 +81,7 @@ pub fn[M, R] Actor::try_send(
 
 ///|
 /// The number of queued messages now. See `ActorRef::queued_count`.
-pub fn[M, R] Actor::queued_count(self : Actor[M, R]) -> Int {
+pub fn[M, R] Actor::queued_count(self : Actor[M, R]) -> Int32 {
   self.target.queued_count()
 }
 
@@ -171,7 +171,7 @@ pub fn[M] Pending::messages(self : Pending[M]) -> Array[M] {
 
 ///|
 /// The number of removed messages.
-pub fn[M] Pending::length(self : Pending[M]) -> Int {
+pub fn[M] Pending::length(self : Pending[M]) -> Int32 {
   self.messages.length()
 }
 
@@ -210,7 +210,7 @@ pub fn[M] ActorContext::reenqueue(
 
 ///|
 /// The number of queued messages now. See `ActorRef::queued_count`.
-pub fn[M] ActorContext::queued_count(self : ActorContext[M]) -> Int {
+pub fn[M] ActorContext::queued_count(self : ActorContext[M]) -> Int32 {
   self.target.queued_count()
 }
 
@@ -239,7 +239,7 @@ fn[M] Scope::new_ref(
       channel.publish_undelivered(life.address, reason, payload, message)
     })
   }
-  { mailbox, life }
+  { mailbox, life, }
 }
 
 ///|
@@ -270,7 +270,7 @@ fn[M, R] Scope::run_actor(
     // Processing ends here, inside the child scope: admission closes and asks
     // wake before the children are cancelled and their cleanup runs.
     let ran : Result[RunEnd, Error] = try {
-      let receive = make({ target, children })
+      let receive = make({ target, children, })
       let runner = Runner::new(target.mailbox, live=true, expire=false)
       Ok(
         runner.run(
@@ -320,7 +320,7 @@ fn[M, R] Scope::run_actor(
   if init is None {
     publish_event(life.events, Started(life.address))
   }
-  { target, result }
+  { target, result, }
 }
 
 ///|
@@ -337,21 +337,15 @@ pub fn[S, M] Scope::start(
   self : Scope,
   initial : S,
   handler : async (S, M) -> Next[S],
-  mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
+  mailbox~ : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
-  cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  cleanup_limit~ : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
-  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
+  payload~ : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, Unit] raise ActorError {
-  self.start_encoded(
-    initial,
-    handler,
-    mailbox,
-    on_stop,
-    cleanup_limit,
-    name,
-    message => payload.apply(message),
-  )
+  self.start_encoded(initial, handler, mailbox, on_stop, cleanup_limit, name, message => {
+    payload.apply(message)
+  })
 }
 
 ///|
@@ -368,7 +362,10 @@ fn[S, M] Scope::start_encoded(
   payload : (M) -> @ion.Ion?,
 ) -> Actor[M, Unit] raise ActorError {
   let target = self.new_ref(mailbox, name, payload)
-  let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
+  let cleanup = {
+    steps: on_stop.map(step => [step]).unwrap_or([]),
+    limit: cleanup_limit,
+  }
   self.run_actor(target, cleanup, children=false, _ => {
     receive_loop(initial, handler).map(_ => ())
   })
@@ -399,19 +396,19 @@ pub async fn[S, M] Scope::start_with(
   self : Scope,
   init : async (Setup) -> S,
   handler : async (S, M) -> Next[S],
-  mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
-  cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  mailbox~ : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
+  cleanup_limit~ : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
-  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
+  payload~ : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, Unit] {
   let target = self.new_ref(mailbox, name, message => payload.apply(message))
   target.life.started = false
-  let setup : Setup = { steps: [] }
+  let setup : Setup = { steps: [], }
   let state = Ref(None)
   let ready : @aio.Queue[Error?] = @aio.Queue(kind=Unbounded)
   let actor = self.run_actor(
     target,
-    { steps: setup.steps, limit: cleanup_limit },
+    { steps: setup.steps, limit: cleanup_limit, },
     children=false,
     init=() => {
       state.val = Some(init(setup))
@@ -421,9 +418,7 @@ pub async fn[S, M] Scope::start_with(
     on_start_failure=error => {
       ignore(ready.try_put(Some(error)) catch { _ => false })
     },
-    _ => {
-      initialized_loop(state, handler)
-    },
+    _ => initialized_loop(state, handler),
   )
   let outcome = @aio.handle_cancellation(() => ready.get())
   match outcome {
@@ -460,13 +455,16 @@ fn[S, M] initialized_loop(
 pub fn[M, R] Scope::spawn(
   self : Scope,
   make : (ActorContext[M]) -> Receive[M, R] raise,
-  mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
+  mailbox~ : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
-  cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  cleanup_limit~ : @lander_core.TimeLimit = default_cleanup_limit(),
   name? : @policy.ActorName,
-  payload? : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
+  payload~ : @policy.PayloadPolicy[M] = @policy.PayloadPolicy::default(),
 ) -> Actor[M, R] raise ActorError {
   let target = self.new_ref(mailbox, name, message => payload.apply(message))
-  let cleanup = { steps: on_stop.map(step => [step]).unwrap_or([]), limit: cleanup_limit }
+  let cleanup = {
+    steps: on_stop.map(step => [step]).unwrap_or([]),
+    limit: cleanup_limit,
+  }
   self.run_actor(target, cleanup, children=true, make)
 }

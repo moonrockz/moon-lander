@@ -11,6 +11,7 @@ base pathname must end in `/`; credentials, queries and fragments are rejected.
 Each manifest entry is a relative path, never an independent URL.
 
 ```mbt check
+///|
 test "construct a hosted mount without fetching" {
   let mount = @browser.from_urls(
     "https://example.org/configs/",
@@ -26,17 +27,24 @@ Add files to the normal configuration builder, then await
 [`tests/browser-consumer`](../../../tests/browser-consumer/main.mbt) is a
 compiled example. It registers `loadHostedServer(base)` in its browser page:
 
-```moonbit
+```moonbit nocheck
+///|
 let mount = @browser.from_urls(
   base,
   { "version": 1, "files": ["acme.toml"] },
   root="/workspace",
 )
+
+///|
 let builder = @config.builder()
   |> @config.format(@toml.format())
   |> @config.file("acme.toml")
   |> @config.overrides([("server.port", @config.int(9000))])
+
+///|
 let config = @browser.load(builder, [mount])
+
+///|
 let server : Server = @config.bind(config, "server")
 ```
 
@@ -55,9 +63,11 @@ HTML input. The package opens no picker and has no UI. Map `File.name` or
 directory prefix by guessing. `File::name()` and `File::webkit_relative_path()`
 read these names without reading the contents.
 
-```moonbit
+```moonbit nocheck
 // A plain file input gives a name. A directory input gives the selected
 // directory as the first segment, and this application removes it.
+
+///|
 let relative = match file.webkit_relative_path() {
   "" => file.name()
   path =>
@@ -66,6 +76,8 @@ let relative = match file.webkit_relative_path() {
       None => path
     }
 }
+
+///|
 let project = @browser.from_files([(relative, file)], root="/workspace")
 ```
 
@@ -89,6 +101,7 @@ overrides inside the mount keep the core order, ambiguity, reports and
 provenance. Variables such as `HOME` or `ACME_HOME` give no file access.
 
 ```mbt check
+///|
 test "confine discovery to a mounted workspace" {
   let mount = @browser.from_urls(
     "https://example.org/project/",
@@ -111,14 +124,27 @@ The compiled consumer in
 hosted defaults with selected files. Its `loadSelectedServer(files, base)` maps a
 plain file input or a directory input, then loads in builder order:
 
-```moonbit
-let defaults = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/defaults")
+```moonbit nocheck
+///|
+let defaults = @browser.from_urls(
+  base,
+  { "version": 1, "files": ["acme.toml"] },
+  root="/defaults",
+)
+
+///|
 let project = @browser.from_files(project_files(files), root="/workspace")
+
+///|
 let builder = @config.builder()
   |> @config.format(@toml.format())
   |> @config.file("/defaults/acme.toml")
   |> @config.working_dir("/workspace/src")
-  |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+  |> @conventions.add(
+    @browser.workspace(@conventions.app_dirs("acme"), project),
+  )
+
+///|
 let config = @browser.load(builder, [defaults, project])
 ```
 
@@ -152,13 +178,20 @@ The compiled consumer exposes `browserCapabilities()` and
 `loadDirectoryServer(handle, base)`. Without a picker, it uses
 `loadSelectedServer(files, base)` with a file or directory input instead.
 
-```moonbit
+```moonbit nocheck
+///|
 let project = @browser.from_directory(handle, root="/workspace")
+
+///|
 let builder = @config.builder()
   |> @config.format(@toml.format())
   |> @config.file("/defaults/acme.toml")
   |> @config.working_dir("/workspace/src")
-  |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+  |> @conventions.add(
+    @browser.workspace(@conventions.app_dirs("acme"), project),
+  )
+
+///|
 let config = @browser.load(builder, [defaults, project])
 ```
 
@@ -171,7 +204,7 @@ any storage access. `store.mount()` gives a read-only directory mount at that
 root. Reopening the same namespace at `/restored` instead of `/state` reads the
 same files and reports `/restored/...` paths.
 
-```moonbit
+```moonbit nocheck
 let store = @browser.open_store("acme", root="/state")
 @browser.write_text(store, "acme.toml", "[server]\nport = 9999\n")
 let builder = @config.builder()

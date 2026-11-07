@@ -59,7 +59,9 @@ test "the default policy is bounded at 128" {
     fail("the default is unbounded")
   }
   assert_eq(capacity.to_int(), 128)
-  assert_true(@policy.MailboxPolicy::Unbounded != @policy.MailboxPolicy::default())
+  assert_true(
+    @policy.MailboxPolicy::Unbounded != @policy.MailboxPolicy::default(),
+  )
 }
 ```
 
@@ -78,9 +80,10 @@ cannot raise.
 
 ```mbt check
 ///|
+#derive(ToJson)
 enum Change {
-  Add(Int)
-} derive(ToJson)
+  Add(Int32)
+}
 
 ///|
 test "omit is the default and JSON bridges a derived protocol" {
@@ -104,7 +107,7 @@ enum Measurement {
 }
 
 ///|
-impl @ion.ToIon for Measurement with to_ion(self) {
+impl @ion.ToIon for Measurement with fn to_ion(self) {
   let Record(amount, time) = self
   @ion.Ion::list([@ion.Ion::decimal(amount), @ion.Ion::timestamp(time)])
 }
@@ -114,10 +117,14 @@ test "Ion keeps decimal and timestamp types" {
   let amount = @ion.Decimal::parse("12.340")
   let time = @ion.Timestamp::parse("2026-10-31T12:34:56Z")
   let policy : @policy.PayloadPolicy[Measurement] = @policy.PayloadPolicy::ion()
-  guard policy.apply(Record(amount, time)) is Some(payload) else { fail("missing payload") }
-  assert_true(payload.equals(@ion.Ion::list([
-    @ion.Ion::decimal(amount), @ion.Ion::timestamp(time),
-  ])))
+  guard policy.apply(Record(amount, time)) is Some(payload) else {
+    fail("missing payload")
+  }
+  assert_true(
+    payload.equals(
+      @ion.Ion::list([@ion.Ion::decimal(amount), @ion.Ion::timestamp(time)]),
+    ),
+  )
 }
 ```
 
@@ -141,10 +148,14 @@ test "redact a secret before it enters an event" {
   guard policy.apply(Authenticate("reader", "private-token")) is Some(payload) else {
     fail("missing payload")
   }
-  assert_true(payload.equals(@ion.Ion::from_fields([
-    @ion.Field("user", @ion.Ion::string("reader")),
-    @ion.Field("secret", @ion.Ion::string("[redacted]")),
-  ])))
+  assert_true(
+    payload.equals(
+      @ion.Ion::from_fields([
+        @ion.Field("user", @ion.Ion::string("reader")),
+        @ion.Field("secret", @ion.Ion::string("[redacted]")),
+      ]),
+    ),
+  )
 }
 ```
 

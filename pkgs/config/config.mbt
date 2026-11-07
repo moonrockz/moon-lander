@@ -32,9 +32,9 @@ pub fn Config::origins(self : Config, key : KeyPath) -> Array[Origin] {
 ///|
 /// The origins of every leaf, in tree order. Each array is not empty.
 pub fn Config::provenance(self : Config) -> Array[(KeyPath, Array[Origin])] {
-  leaves(self.root, secret_syntax=self.secret_syntax).map(leaf =>
+  leaves(self.root, secret_syntax=self.secret_syntax).map(leaf => {
     (leaf.0, self.origins(leaf.0))
-  )
+  })
 }
 
 ///|
@@ -75,7 +75,7 @@ pub fn[R : SecretResolver] Config::secret(
   resolver : R,
 ) -> Secret raise SecretError {
   let path = KeyPath::parse(key) catch {
-    _ => raise MissingConfigKey(key={ names: [key] })
+    _ => raise MissingConfigKey(key={ names: [key], })
   }
   guard self.get(path) is Some(value) else { raise MissingConfigKey(key=path) }
   match value.ion.kind() {
@@ -92,17 +92,10 @@ pub fn[R : SecretResolver] Config::secret(
   }
   let origin = match self.provenance.get(path) {
     Some(origins) if !origins.is_empty() => origins[0]
-    _ =>
-      {
-        kind: InMemory,
-        source: "unknown",
-        priority: 0,
-        location: None,
-      }
+    _ => { kind: InMemory, source: "unknown", priority: 0, location: None, }
   }
   resolver.resolve(reference, origin)
 }
-
 
 ///|
 /// The profile state recorded by the successful load.

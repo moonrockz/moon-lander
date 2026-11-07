@@ -1,6 +1,7 @@
 name = "moonrockz/moon-lander-tests"
 
 // Tooling and tests must never publish. The pinned toolchain rejects private publication.
+
 private = true
 
 version = "0.11.0"
@@ -20,7 +21,7 @@ import {
   "moonrockz/openrpc@0.11.0",
   "moonrockz/sigstore@0.11.0",
   "moonrockz/ion@0.6.0",
-  "moonrockz/moonspec@0.11.0",
+  "moonrockz/moonspec@0.12.0",
   "moonrockz/expect@0.6.1",
 }
 

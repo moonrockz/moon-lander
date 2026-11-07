@@ -103,7 +103,7 @@ struct Parts {
 fn split(raw : BytesView) -> Parts raise {
   let outer = children_raw(raw)
   assert_eq(outer.length(), 3)
-  { fields: children_raw(outer[0]), algorithm: outer[1], signature: outer[2] }
+  { fields: children_raw(outer[0]), algorithm: outer[1], signature: outer[2], }
 }
 
 ///|
@@ -124,7 +124,10 @@ fn Parts::extensions(self : Parts) -> Array[Bytes] raise {
 /// The parts with other extensions.
 fn Parts::with_extensions(self : Parts, extensions : Array[Bytes]) -> Parts {
   let fields = self.fields.copy()
-  fields[fields.length() - 1] = @der.encode(@der.context(3), sequence(extensions))
+  fields[fields.length() - 1] = @der.encode(
+    @der.context(3),
+    sequence(extensions),
+  )
   { ..self, fields, }
 }
 
@@ -185,7 +188,7 @@ test "the fields of a real Fulcio leaf certificate" {
 }
 
 ///|
-fn fulcio(certificate : @x509.Certificate, arc : Int) -> String raise {
+fn fulcio(certificate : @x509.Certificate, arc : Int32) -> String raise {
   guard certificate.extension("1.3.6.1.4.1.57264.1.\{arc}") is Some(extension) else {
     fail("no Fulcio extension .1.\{arc}")
   }
@@ -261,10 +264,7 @@ test "Fulcio values with the wrong encoding are refused" {
 test "the fields of the public-good CA certificates" {
   let intermediate = @x509.parse(base64(intermediate_base64))
   let root = @x509.parse(base64(root_base64))
-  assert_eq(
-    intermediate.key_usage,
-    Some(@x509.KEY_USAGE_CERT_SIGN | (1 << 6)),
-  )
+  assert_eq(intermediate.key_usage, Some(@x509.KEY_USAGE_CERT_SIGN | (1 << 6)))
   assert_true(
     intermediate.basic_constraints is Some(constraints) &&
     constraints.is_ca &&
@@ -313,7 +313,7 @@ test "is_issued_by refuses a changed signature or an unknown algorithm" {
   let last = signature.length() - 1
   signature[last] = signature[last] ^ b'\x01'
   let changed = @x509.parse(
-    { ..parts, signature: Bytes::from_array(signature) }.join(),
+    { ..parts, signature: Bytes::from_array(signature), }.join(),
   )
   assert_false(changed.is_issued_by(intermediate))
   // A changed TBS field (the serial number) breaks the signature.
@@ -321,13 +321,17 @@ test "is_issued_by refuses a changed signature or an unknown algorithm" {
   let serial = fields[1].to_array()
   serial[serial.length() - 1] = serial[serial.length() - 1] ^ b'\x01'
   fields[1] = Bytes::from_array(serial)
-  assert_false(@x509.parse({ ..parts, fields, }.join()).is_issued_by(intermediate))
+  assert_false(
+    @x509.parse({ ..parts, fields, }.join()).is_issued_by(intermediate),
+  )
   // RSA with SHA-256 on both sides is a signature algorithm that the
   // verifier does not know.
   let rsa = hex("300d06092a864886f70d01010b0500")
   let rsa_fields = parts.fields.copy()
   rsa_fields[2] = rsa
-  let unknown = @x509.parse({ fields: rsa_fields, algorithm: rsa, signature: parts.signature }.join())
+  let unknown = @x509.parse(
+    { fields: rsa_fields, algorithm: rsa, signature: parts.signature, }.join(),
+  )
   assert_eq(unknown.signature_algorithm, "1.2.840.113549.1.1.11")
   assert_eq(@x509.signature_hash(unknown.signature_algorithm), None)
   assert_false(unknown.is_issued_by(intermediate))
@@ -415,9 +419,7 @@ fn pem(der : Bytes, newline : String) -> String {
 ///|
 /// The rule of a `BadCertificate` from `decode_pem`, or the count.
 fn pem_outcome(text : String) -> String {
-  try {
-    "ok \{@x509.decode_pem(text).length()}"
-  } catch {
+  "ok \{@x509.decode_pem(text).length()}" catch {
     BadCertificate(rule) => rule
   }
 }
@@ -470,8 +472,12 @@ test "malformed certificates are refused" {
   let parts = split(leaf)
   assert_eq(parse_outcome(leaf), "ok")
   // Truncated, a trailing byte and empty input.
-  assert_true(parse_outcome(leaf[:leaf.length() - 1]).has_prefix("malformed DER"))
-  assert_true(parse_outcome(concat([leaf, b"\x00"])).has_prefix("malformed DER"))
+  assert_true(
+    parse_outcome(leaf[:leaf.length() - 1]).has_prefix("malformed DER"),
+  )
+  assert_true(
+    parse_outcome(concat([leaf, b"\x00"])).has_prefix("malformed DER"),
+  )
   assert_true(parse_outcome(b"").has_prefix("malformed DER"))
   // No signature after the algorithm.
   assert_true(
@@ -481,42 +487,47 @@ test "malformed certificates are refused" {
   )
   // A v1 certificate has no version field; v2 is version 1.
   assert_eq(
-    parse_outcome({ ..parts, fields: parts.fields[1:].to_owned() }.join()),
+    parse_outcome({ ..parts, fields: parts.fields[1:].to_owned(), }.join()),
     "not an X.509 v3 certificate",
   )
   let v2 = parts.fields.copy()
   v2[0] = hex("a003020101")
-  assert_eq(parse_outcome({ ..parts, fields: v2 }.join()), "not an X.509 v3 certificate")
+  assert_eq(
+    parse_outcome({ ..parts, fields: v2, }.join()),
+    "not an X.509 v3 certificate",
+  )
   // The two signature algorithms differ: another hash, or the same OID with
   // NULL parameters on one side.
   let sha256 = hex("300a06082a8648ce3d040302")
   assert_eq(
-    parse_outcome({ ..parts, algorithm: sha256 }.join()),
+    parse_outcome({ ..parts, algorithm: sha256, }.join()),
     "the two signature algorithms differ",
   )
   let other_inner = parts.fields.copy()
   other_inner[2] = sha256
   assert_eq(
-    parse_outcome({ ..parts, fields: other_inner }.join()),
+    parse_outcome({ ..parts, fields: other_inner, }.join()),
     "the two signature algorithms differ",
   )
   // ECDSA algorithms have no parameters (RFC 5758), on either side.
   let with_null = hex("300c06082a8648ce3d0403030500")
   assert_eq(
-    parse_outcome({ ..parts, algorithm: with_null }.join()),
+    parse_outcome({ ..parts, algorithm: with_null, }.join()),
     "malformed DER: an ECDSA algorithm has parameters",
   )
   let both_null = parts.fields.copy()
   both_null[2] = with_null
   assert_eq(
-    parse_outcome({ fields: both_null, algorithm: with_null, signature: parts.signature }.join()),
+    parse_outcome(
+      { fields: both_null, algorithm: with_null, signature: parts.signature, }.join(),
+    ),
     "malformed DER: an ECDSA algorithm has parameters",
   )
   // The signature BIT STRING has unused bits.
   let unused = parts.signature.to_array()
   unused[2] = b'\x01'
   assert_true(
-    parse_outcome({ ..parts, signature: Bytes::from_array(unused) }.join()).has_prefix(
+    parse_outcome({ ..parts, signature: Bytes::from_array(unused), }.join()).has_prefix(
       "malformed DER",
     ),
   )
@@ -544,19 +555,25 @@ test "extension rules" {
   let not_der = extensions.copy()
   not_der.push(extension("2a0304", Some("01"), b"\x05\x00"))
   assert_true(
-    parse_outcome(parts.with_extensions(not_der).join()).has_prefix("malformed DER"),
+    parse_outcome(parts.with_extensions(not_der).join()).has_prefix(
+      "malformed DER",
+    ),
   )
   // A known extension whose value is not its type.
   let bad_key_usage = extensions.copy()
   bad_key_usage[0] = extension("551d0f", Some("ff"), b"\x04\x00")
   assert_true(
-    parse_outcome(parts.with_extensions(bad_key_usage).join()).has_prefix("malformed DER"),
+    parse_outcome(parts.with_extensions(bad_key_usage).join()).has_prefix(
+      "malformed DER",
+    ),
   )
   // A SAN URI that is not printable ASCII.
-  let bad_san = extensions.map(raw => if oid_of(raw) == "2.5.29.17" {
-    extension("551d11", Some("ff"), b"\x30\x03\x86\x01\x0a")
-  } else {
-    raw
+  let bad_san = extensions.map(raw => {
+    if oid_of(raw) == "2.5.29.17" {
+      extension("551d11", Some("ff"), b"\x30\x03\x86\x01\x0a")
+    } else {
+      raw
+    }
   })
   assert_eq(
     parse_outcome(parts.with_extensions(bad_san).join()),

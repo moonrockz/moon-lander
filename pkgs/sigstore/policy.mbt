@@ -1,6 +1,7 @@
 ///|
 /// The identity claims of a Fulcio certificate. Each value is the text of its
 /// extension (`1.3.6.1.4.1.57264.1.*`), or `None` when the extension is absent.
+#derive(Eq, Debug)
 pub struct CertificateClaims {
   /// The OIDC issuer (`.1.8`, else `.1.1`).
   issuer : String?
@@ -20,7 +21,7 @@ pub struct CertificateClaims {
   build_trigger : String?
   run_invocation_uri : String?
   source_repository_visibility : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CertificateClaims with Eq::{equal, not_equal}
@@ -29,8 +30,10 @@ pub extend CertificateClaims with Eq::{equal, not_equal}
 pub extend CertificateClaims with @debug.Debug::{to_repr}
 
 ///|
-fn read_claims(leaf : @x509.Certificate) -> CertificateClaims raise @x509.X509Error {
-  fn claim(arc : Int) -> String? raise @x509.X509Error {
+fn read_claims(
+  leaf : @x509.Certificate,
+) -> CertificateClaims raise @x509.X509Error {
+  fn claim(arc : Int32) -> String? raise @x509.X509Error {
     match leaf.extension("1.3.6.1.4.1.57264.1.\{arc}") {
       Some(extension) => Some(@x509.fulcio_value(extension))
       None => None
@@ -104,7 +107,7 @@ fn Policy::new(issuer : Issuer?, identity : Identity) -> Policy {
 /// A policy that requires the exact subject alternative name `name`.
 pub fn Policy::subject_name(
   name : SubjectName,
-  issuer? : Issuer = Issuer::github_actions(),
+  issuer~ : Issuer = Issuer::github_actions(),
 ) -> Policy {
   Policy::new(Some(issuer), ExactName(name))
 }
@@ -117,7 +120,7 @@ pub fn Policy::signer_workflow(
   repository : GitHubRepository,
   path : WorkflowPath,
   git_ref? : GitRef,
-  issuer? : Issuer = Issuer::github_actions(),
+  issuer~ : Issuer = Issuer::github_actions(),
 ) -> Policy {
   Policy::new(Some(issuer), SignerWorkflow(repository, path, git_ref))
 }
@@ -133,8 +136,8 @@ pub fn Policy::github_workflow(
   repository : GitHubRepository,
   workflow~ : WorkflowPath,
   git_ref? : GitRef,
-  hosted_runner_only? : Bool = true,
-  predicate_type? : PredicateType = PredicateType::slsa_provenance_v1(),
+  hosted_runner_only~ : Bool = true,
+  predicate_type~ : PredicateType = PredicateType::slsa_provenance_v1(),
 ) -> Policy {
   let policy = Policy::signer_workflow(repository, workflow, git_ref?)
     .source_repository(repository)
@@ -149,8 +152,11 @@ pub fn Policy::github_workflow(
 ///|
 /// Also require an in-toto statement with the predicate type `predicate_type`.
 /// A message-signature bundle has no statement, so it does not match.
-pub fn Policy::predicate_type(self : Policy, predicate_type : PredicateType) -> Policy {
-  { ..self, predicate_type: Some(predicate_type) }
+pub fn Policy::predicate_type(
+  self : Policy,
+  predicate_type : PredicateType,
+) -> Policy {
+  { ..self, predicate_type: Some(predicate_type), }
 }
 
 ///|
@@ -168,58 +174,62 @@ let release_signer : String = "https://dotcom.releases.github.com"
 pub fn Policy::github_release(
   repository : GitHubRepository,
   tag~ : ReleaseTag,
-  predicate_type? : PredicateType = PredicateType::github_release_v0_2(),
+  predicate_type~ : PredicateType = PredicateType::github_release_v0_2(),
 ) -> Policy {
   Policy::new(None, Release(repository, tag)).predicate_type(predicate_type)
 }
 
 ///|
 /// Also require the source repository claim (`.1.12`).
-pub fn Policy::source_repository(self : Policy, repository : GitHubRepository) -> Policy {
-  { ..self, source_repository: Some(repository) }
+pub fn Policy::source_repository(
+  self : Policy,
+  repository : GitHubRepository,
+) -> Policy {
+  { ..self, source_repository: Some(repository), }
 }
 
 ///|
 /// Also require the source repository owner claim (`.1.16`).
 pub fn Policy::source_owner(self : Policy, owner : GitHubOwner) -> Policy {
-  { ..self, source_owner: Some(owner) }
+  { ..self, source_owner: Some(owner), }
 }
 
 ///|
 /// Also require the source repository ID claim (`.1.15`), or for a release
 /// policy the predicate `repositoryId`.
 pub fn Policy::repository_id(self : Policy, id : GitHubId) -> Policy {
-  { ..self, repository_id: Some(id) }
+  { ..self, repository_id: Some(id), }
 }
 
 ///|
 /// Also require the source repository owner ID claim (`.1.17`), or for a
 /// release policy the predicate `ownerId`.
 pub fn Policy::owner_id(self : Policy, id : GitHubId) -> Policy {
-  { ..self, owner_id: Some(id) }
+  { ..self, owner_id: Some(id), }
 }
 
 ///|
 /// Also require the source ref claim (`.1.14`).
 pub fn Policy::source_ref(self : Policy, git_ref : GitRef) -> Policy {
-  { ..self, source_ref: Some(git_ref) }
+  { ..self, source_ref: Some(git_ref), }
 }
 
 ///|
 /// Also require the runner environment `github-hosted` (`.1.11`).
 pub fn Policy::hosted_runners_only(self : Policy) -> Policy {
-  { ..self, hosted_runner_only: true }
+  { ..self, hosted_runner_only: true, }
 }
 
 ///|
 /// A certificate claim that a policy can require.
+#derive(Eq, Debug)
 pub enum Claim {
   SourceRepository
   SourceOwner
   RepositoryId
   OwnerId
   SourceRef
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Claim with Eq::{equal, not_equal}
@@ -229,6 +239,7 @@ pub extend Claim with @debug.Debug::{to_repr}
 
 ///|
 /// Why a certificate does not match one policy.
+#derive(Eq, Debug)
 pub enum PolicyMismatch {
   /// The certificate issuer is `actual`, not `expected`.
   IssuerMismatch(expected~ : String, actual~ : String?)
@@ -243,7 +254,7 @@ pub enum PolicyMismatch {
   PredicateTypeMismatch(expected~ : PredicateType, actual~ : PredicateType?)
   /// The release predicate field `field` is `actual`, not `expected`.
   ReleaseMismatch(field~ : ReleaseField, expected~ : String, actual~ : String?)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PolicyMismatch with Eq::{equal, not_equal}
@@ -316,7 +327,9 @@ fn Policy::mismatch(
   match self.identity {
     Release(_, _) => {
       guard claims.subject_names.contains(release_signer) else {
-        return Some(IdentityMismatch(expected=release_signer, actual=claims.subject_names))
+        return Some(
+          IdentityMismatch(expected=release_signer, actual=claims.subject_names),
+        )
       }
     }
     ExactName(name) => {
@@ -331,21 +344,23 @@ fn Policy::mismatch(
         Some(git_ref) => prefix + git_ref.to_string()
         None => prefix + "*"
       }
-      let matches = claims.subject_names.iter().any(name => {
-        // Owner and repository names are case-insensitive; the path and ref are not.
-        guard name.length() > prefix.length() else { return false }
-        let head = name[:repository.url().length()].to_owned()
-        let tail = name[repository.url().length():].to_owned()
-        guard head.to_lower() == repository.url().to_lower() &&
-          tail.has_prefix("/\{path}@") else {
-          return false
-        }
-        let actual_ref = tail["/\{path}@".length():].to_owned()
-        match git_ref {
-          Some(git_ref) => actual_ref == git_ref.to_string()
-          None => actual_ref.has_prefix("refs/")
-        }
-      })
+      let matches = claims.subject_names
+        .iter()
+        .any(name => {
+          // Owner and repository names are case-insensitive; the path and ref are not.
+          guard name.length() > prefix.length() else { return false }
+          let head = name[:repository.url().length()].to_owned()
+          let tail = name[repository.url().length():].to_owned()
+          guard head.to_lower() == repository.url().to_lower() &&
+            tail.has_prefix("/\{path}@") else {
+            return false
+          }
+          let actual_ref = tail["/\{path}@".length():].to_owned()
+          match git_ref {
+            Some(git_ref) => actual_ref == git_ref.to_string()
+            None => actual_ref.has_prefix("refs/")
+          }
+        })
       guard matches else {
         return Some(IdentityMismatch(expected~, actual=claims.subject_names))
       }
@@ -431,6 +446,7 @@ fn Policy::mismatch(
 
 ///|
 /// A field of the release predicate that a release policy matches.
+#derive(Eq, Debug)
 pub enum ReleaseField {
   /// The certificate has an OIDC issuer, so it is not a release certificate.
   Issuer
@@ -439,7 +455,7 @@ pub enum ReleaseField {
   Purl
   RepositoryId
   OwnerId
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ReleaseField with Eq::{equal, not_equal}
@@ -459,7 +475,13 @@ fn Policy::release_mismatch(
   // GitHub release certificates have no OIDC issuer; a Fulcio leaf of a
   // workflow always has one, so it cannot pass as a release.
   if claims.issuer is Some(issuer) {
-    return Some(ReleaseMismatch(field=Issuer, expected="no OIDC issuer", actual=Some(issuer)))
+    return Some(
+      ReleaseMismatch(
+        field=Issuer,
+        expected="no OIDC issuer",
+        actual=Some(issuer),
+      ),
+    )
   }
   if self.predicate_type is Some(expected) {
     let actual = statement.map(statement => statement.predicate_type)
@@ -468,10 +490,17 @@ fn Policy::release_mismatch(
     }
   }
   guard statement is Some(statement) else {
-    return Some(ReleaseMismatch(field=Repository, expected=repository.to_string(), actual=None))
+    return Some(
+      ReleaseMismatch(
+        field=Repository,
+        expected=repository.to_string(),
+        actual=None,
+      ),
+    )
   }
   fn field(name : String) -> String? {
-    if statement.predicate is Object(map) && map.get(name) is Some(String(value)) {
+    if statement.predicate is Object(map) &&
+      map.get(name) is Some(String(value)) {
       Some(value)
     } else {
       None
@@ -481,12 +510,18 @@ fn Policy::release_mismatch(
   let actual_repository = field("repository")
   guard equal_ignoring_case(actual_repository, repository.to_string()) else {
     return Some(
-      ReleaseMismatch(field=Repository, expected=repository.to_string(), actual=actual_repository),
+      ReleaseMismatch(
+        field=Repository,
+        expected=repository.to_string(),
+        actual=actual_repository,
+      ),
     )
   }
   let actual_tag = field("tag")
   guard actual_tag == Some(tag.to_string()) else {
-    return Some(ReleaseMismatch(field=Tag, expected=tag.to_string(), actual=actual_tag))
+    return Some(
+      ReleaseMismatch(field=Tag, expected=tag.to_string(), actual=actual_tag),
+    )
   }
   // The package name is case-insensitive like the repository; the version is the exact tag.
   let expected_purl = "pkg:github/\{repository}@\{tag}"
@@ -500,18 +535,24 @@ fn Policy::release_mismatch(
     None => false
   }
   guard purl_matches else {
-    return Some(ReleaseMismatch(field=Purl, expected=expected_purl, actual=actual_purl))
+    return Some(
+      ReleaseMismatch(field=Purl, expected=expected_purl, actual=actual_purl),
+    )
   }
   if self.repository_id is Some(id) {
     let actual = field("repositoryId")
     guard actual == Some(id.to_string()) else {
-      return Some(ReleaseMismatch(field=RepositoryId, expected=id.to_string(), actual~))
+      return Some(
+        ReleaseMismatch(field=RepositoryId, expected=id.to_string(), actual~),
+      )
     }
   }
   if self.owner_id is Some(id) {
     let actual = field("ownerId")
     guard actual == Some(id.to_string()) else {
-      return Some(ReleaseMismatch(field=OwnerId, expected=id.to_string(), actual~))
+      return Some(
+        ReleaseMismatch(field=OwnerId, expected=id.to_string(), actual~),
+      )
     }
   }
   None
@@ -539,7 +580,7 @@ fn percent_decode(text : String) -> String? {
       i += 1
     }
   }
-  @utf8.decode(Bytes::from_array(bytes)) catch {
+  try @utf8.decode(Bytes::from_array(bytes)) catch {
     _ => None
   } noraise {
     decoded => Some(decoded)
@@ -547,7 +588,7 @@ fn percent_decode(text : String) -> String? {
 }
 
 ///|
-fn hex_digit(code : Int) -> Int {
+fn hex_digit(code : Int32) -> Int32 {
   if code >= '0'.to_int() && code <= '9'.to_int() {
     code - '0'.to_int()
   } else if code >= 'a'.to_int() && code <= 'f'.to_int() {

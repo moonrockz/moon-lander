@@ -1,10 +1,10 @@
 ///|
 /// The number of steps of the stack tests.
-const STEPS : Int = 100000
+const STEPS : Int32 = 100000
 
 ///|
 /// A loop that carries its state forward: each step binds the next one.
-fn sum_forward(left : Int, total : Int) -> @actors.Receive[Int, Int] {
+fn sum_forward(left : Int32, total : Int32) -> @actors.Receive[Int32, Int32] {
   if left == 0 {
     @actors.done(total)
   } else {
@@ -14,7 +14,7 @@ fn sum_forward(left : Int, total : Int) -> @actors.Receive[Int, Int] {
 
 ///|
 /// A loop that builds its result after the recursive step.
-fn sum_back(left : Int) -> @actors.Receive[Int, Int] {
+fn sum_back(left : Int32) -> @actors.Receive[Int32, Int32] {
   if left == 0 {
     @actors.done(0)
   } else {
@@ -23,7 +23,7 @@ fn sum_back(left : Int) -> @actors.Receive[Int, Int] {
 }
 
 ///|
-fn ones() -> Array[Int] {
+fn ones() -> Array[Int32] {
   Array::make(STEPS, 1)
 }
 
@@ -39,7 +39,7 @@ async test "RECV-1: a 100,000-step loop that builds its result on the way back r
 
 ///|
 async test "RECV-1: 100,000 joined receives in one chain run without stack growth" {
-  let mut chain : @actors.Receive[Int, Int] = @actors.done(0)
+  let mut chain : @actors.Receive[Int32, Int32] = @actors.done(0)
   for _ in 0..<STEPS {
     chain = chain.zip_with(@actors.receive(), (total, value) => total + value)
   }
@@ -48,7 +48,7 @@ async test "RECV-1: 100,000 joined receives in one chain run without stack growt
 
 ///|
 async test "RECV-1: 100,000 nested recover frames that end normally leave no frame" {
-  let mut chain : @actors.Receive[Int, Int] = @actors.done(0)
+  let mut chain : @actors.Receive[Int32, Int32] = @actors.done(0)
   for _ in 0..<STEPS {
     chain = chain
       .zip_with(@actors.receive(), (total, value) => total + value)
@@ -59,7 +59,7 @@ async test "RECV-1: 100,000 nested recover frames that end normally leave no fra
 
 ///|
 /// Send `STEPS` ones to `actor` and give its result.
-async fn run_live(make : () -> @actors.Receive[Int, Int]) -> Int {
+async fn run_live(make : () -> @actors.Receive[Int32, Int32]) -> Int32 {
   @actors.scope(scope => {
     let actor = scope.spawn(_ => make())
     for _ in 0..<STEPS {
@@ -82,8 +82,8 @@ async test "RECV-1: a live actor runs a 100,000-step loop that builds its result
 ///|
 async test "RECV-1: a live receive_loop takes 100,000 messages" {
   let total = @actors.scope(scope => {
-    let ack : @aio.Queue[Int] = @aio.Queue(kind=Unbounded)
-    let actor = scope.start(0, (total, value : Int?) => {
+    let ack : @aio.Queue[Int32] = @aio.Queue(kind=Unbounded)
+    let actor = scope.start(0, (total, value : Int32?) => {
       match value {
         Some(value) => Continue(total + value)
         None => {

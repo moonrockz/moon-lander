@@ -9,7 +9,7 @@ pub struct ActorAddress {
 }
 
 ///|
-pub impl Eq for ActorAddress with equal(self, other) {
+pub impl Eq for ActorAddress with fn equal(self, other) {
   self.id == other.id
 }
 
@@ -17,7 +17,7 @@ pub impl Eq for ActorAddress with equal(self, other) {
 pub extend ActorAddress with Eq::{equal, not_equal}
 
 ///|
-pub impl Hash for ActorAddress with hash_combine(self, hasher) {
+pub impl Hash for ActorAddress with fn hash_combine(self, hasher) {
   hasher.combine(self.id)
 }
 
@@ -27,12 +27,12 @@ pub extend ActorAddress with Hash::{hash, hash_combine}
 ///|
 /// Creation order, only for the directory's internal map. The order is not
 /// part of the contract.
-impl Compare for ActorAddress with compare(self, other) {
+impl Compare for ActorAddress with fn compare(self, other) {
   self.id.compare(other.id)
 }
 
 ///|
-pub impl @debug.Debug for ActorAddress with to_repr(self) {
+pub impl @debug.Debug for ActorAddress with fn to_repr(self) {
   @debug.Repr(self.to_string())
 }
 
@@ -62,5 +62,5 @@ let last_address : Ref[Int64] = Ref(0L)
 ///|
 fn ActorAddress::next(name : @policy.ActorName?) -> ActorAddress {
   last_address.val += 1L
-  { id: last_address.val, name }
+  { id: last_address.val, name, }
 }

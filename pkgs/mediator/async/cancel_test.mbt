@@ -2,9 +2,10 @@
 struct Job(String)
 
 ///|
+#derive(Debug)
 suberror JobError {
   Broken(String)
-} derive(Debug)
+}
 
 ///|
 /// An async handler that records its start, waits `wait_ms`, records its end,
@@ -13,7 +14,7 @@ suberror JobError {
 fn job_step(
   log : Array[String],
   name : String,
-  wait_ms~ : Int = 10,
+  wait_ms~ : Int32 = 10,
   fails~ : Bool = false,
 ) -> async (Unit, Job) -> Unit {
   (_, ev) => {
@@ -33,7 +34,7 @@ fn job_step(
 /// and gives `done <id>`. A `defer` records `stopped` when the handler ends.
 fn slow_sender(
   log : Array[String],
-  wait_ms~ : Int,
+  wait_ms~ : Int32,
 ) -> @mediator_async.Sender[Unit, Job, String] {
   @mediator_async.sender((_, req) => {
     let Job(id) = req
@@ -105,12 +106,13 @@ async test "a caller cancellation stops every handler of a concurrent publish" {
 ///|
 async test "a handler timeout passes out of send as an ordinary error" {
   let timed : @mediator_async.Sender[Unit, Job, String] = @mediator_async.sender((
-    _,
-    _,
-  ) => {
-    @aio.with_timeout(10, () => @aio.sleep(1000), error=Broken("own limit"))
-    "never"
-  })
+      _,
+      _,
+    ) => {
+      @aio.with_timeout(10, () => @aio.sleep(1000), error=Broken("own limit"))
+      "never"
+    },
+  )
   try timed.send((), Job("a")) catch {
     Broken(text) => assert_eq(text, "own limit")
     other => fail("send raised another error: \{other}")
@@ -141,7 +143,9 @@ async test "a handler timeout is a publish failure and the other handlers run" {
 ///|
 async test "the timeout middleware stops a slow handler and raises TimedOut" {
   let log = []
-  let limited = slow_sender(log, wait_ms=1000).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(50)))
+  let limited = slow_sender(log, wait_ms=1000).use_(
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(50)),
+  )
   try limited.send((), Job("a")) catch {
     @mediator.TimedOut(after~) => assert_eq(after.to_millis(), 50)
     other => fail("send raised another error: \{other}")
@@ -154,7 +158,9 @@ async test "the timeout middleware stops a slow handler and raises TimedOut" {
 ///|
 async test "the timeout middleware gives the reply of a step that ends in time" {
   let log = []
-  let limited = slow_sender(log, wait_ms=10).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(1000)))
+  let limited = slow_sender(log, wait_ms=10).use_(
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(1000)),
+  )
   assert_eq(limited.send((), Job("a")), "done a")
   assert_eq(log, ["start a", "end a", "stopped a"])
 }
@@ -245,13 +251,20 @@ async test "timeout reports the exact typed limit and does not replace handler e
   try slow.send((), Job("secret")) catch {
     @mediator.TimedOut(after~) => assert_eq(after, limit)
     other => fail("unexpected error: \{other}")
-  } noraise { _ => fail("expected timeout") }
+  } noraise {
+    _ => fail("expected timeout")
+  }
   assert_eq(log, ["start secret", "stopped secret"])
-  let fast : @mediator_async.Sender[Unit, Unit, Unit] = @mediator_async.sender((_, _) => {
-    raise Broken("unchanged")
-  }).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(2147483647)))
+  let fast : @mediator_async.Sender[Unit, Unit, Unit] = @mediator_async.sender((
+    _,
+    _,
+  ) => raise Broken("unchanged")).use_(
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(2147483647)),
+  )
   try fast.send((), ()) catch {
     Broken(text) => assert_eq(text, "unchanged")
     other => fail("unexpected error: \{other}")
-  } noraise { _ => fail("expected handler error") }
+  } noraise {
+    _ => fail("expected handler error")
+  }
 }

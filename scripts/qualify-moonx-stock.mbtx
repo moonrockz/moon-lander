@@ -9,11 +9,10 @@ import {
 ----
 
 ///|
-/// A stock release that the Moonx spec qualifies. Each one is a task-scoped
-/// `http:moonbit` tool of its mise task, beside the newer primary pin.
+/// The stock release that the Moonx spec qualifies: the primary pin of
+/// `.config/mise/config.toml`. Change it with that pin.
 priv enum StockPin {
-  Stock16
-  Stock17
+  Stock20
 }
 
 ///|
@@ -24,8 +23,7 @@ suberror StockPinError {
 ///|
 fn StockPin::parse(input : String) -> StockPin raise StockPinError {
   match input {
-    "0.10.16+b1a0e846e" => Stock16
-    "0.10.17+d971670cd" => Stock17
+    "0.10.20+65efd5b93" => Stock20
     _ => raise UnsupportedStockPin(input)
   }
 }
@@ -33,17 +31,16 @@ fn StockPin::parse(input : String) -> StockPin raise StockPinError {
 ///|
 fn StockPin::text(self : StockPin) -> String {
   match self {
-    Stock16 => "0.10.16+b1a0e846e"
-    Stock17 => "0.10.17+d971670cd"
+    Stock20 => "0.10.20+65efd5b93"
   }
 }
 
 ///|
-test "StockPin accepts only the qualified stock releases" {
-  for pin in [Stock16, Stock17] {
+test "StockPin accepts only the qualified stock release" {
+  for pin in [Stock20] {
     assert_eq(StockPin::parse(pin.text()).text(), pin.text())
   }
-  for input in ["", "0.10.18+6c83a7f62", "0.10.17", "0.10.16+b1a0e846e "] {
+  for input in ["", "0.10.17+d971670cd", "0.10.20", "0.10.20+65efd5b93 "] {
     let result = Ok(StockPin::parse(input)) catch { error => Err(error) }
     assert_true(result is Err(UnsupportedStockPin(_)))
   }

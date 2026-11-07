@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 pub struct JsonPointer {
   priv parts : Array[String]
-} derive(Debug)
+}
 
 ///|
 pub extend JsonPointer with @debug.Debug::{to_repr}
@@ -201,20 +202,22 @@ pub fn JsonPointer::resolve(
 }
 
 ///|
+#derive(Debug)
 pub struct Reference {
   uri : UriReference
   fragment : ReferenceFragment
-} derive(Debug)
+}
 
 ///|
 pub extend Reference with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub enum ReferenceFragment {
   WholeResource
   PointerFragment(JsonPointer)
   IdentifierFragment(String)
-} derive(Debug)
+}
 
 ///|
 pub extend ReferenceFragment with @debug.Debug::{to_repr}

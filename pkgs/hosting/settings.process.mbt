@@ -11,7 +11,9 @@ fn process_directory() -> @lander_core.AbsolutePath raise WorkingDirectoryError 
 }
 
 ///|
-fn process_directory_from(read : () -> String?) -> @lander_core.AbsolutePath raise WorkingDirectoryError {
+fn process_directory_from(
+  read : () -> String?,
+) -> @lander_core.AbsolutePath raise WorkingDirectoryError {
   guard read() is Some(text) else { raise MissingWorkingDirectory }
   @lander_core.AbsolutePath::parse(text) catch {
     error => raise InvalidWorkingDirectory(error)

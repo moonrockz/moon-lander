@@ -1,11 +1,12 @@
 ///|
 /// How many queued messages a mailbox can hold.
+#derive(Eq, Debug)
 pub(all) enum MailboxPolicy {
   /// At most this many queued messages. A send waits while the mailbox is full.
   Bounded(MailboxCapacity)
   /// No limit. The caller selects this policy explicitly.
   Unbounded
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MailboxPolicy with Eq::{equal, not_equal}
@@ -21,6 +22,7 @@ pub fn MailboxPolicy::default() -> MailboxPolicy {
 
 ///|
 /// The result of a send that does not wait.
+#derive(Eq, Debug)
 pub(all) enum Admission {
   /// The mailbox admitted the message.
   Accepted
@@ -28,7 +30,7 @@ pub(all) enum Admission {
   Full
   /// The mailbox is closed. The message was not admitted.
   Closed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Admission with Eq::{equal, not_equal}

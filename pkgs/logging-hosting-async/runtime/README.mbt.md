@@ -19,7 +19,10 @@ async fn standalone_main() -> Unit {
   )
   let report = @runtime.with_session(settings, session => {
     let logger : &@logging.Logger = session.logger()
-    logger.info("Loaded {Count} files from {Path}", [Json::number(3.0), Json::string("src")])
+    logger.info("Loaded {Count} files from {Path}", [
+      Json::number(3.0),
+      Json::string("src"),
+    ])
     session.close()
   })
   for message in report.failure_messages() {

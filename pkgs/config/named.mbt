@@ -8,7 +8,10 @@ pub struct NamedOptions[T] {
 ///|
 /// The options value of the instance `name`, or `None` when the section has no
 /// child with that name.
-pub fn[T] NamedOptions::get(self : NamedOptions[T], name : String) -> Options[T]? {
+pub fn[T] NamedOptions::get(
+  self : NamedOptions[T],
+  name : String,
+) -> Options[T]? {
   self.instances.get(name)
 }
 
@@ -35,9 +38,9 @@ pub fn[T] named(
   let instances : Map[String, Options[T]] = Map([])
   guard config.get(path) is Some(section) else { return { instances, } }
   guard section.ion.kind() is Struct(fields) else {
-    let at : DecodePath = { key: Some(path), suffix: [] }
+    let at : DecodePath = { key: Some(path), suffix: [], }
     raise Decode(failure={
-      at: [{ path: at, blame: config.blame(at) }],
+      at: [{ path: at, blame: config.blame(at), }],
       detail: "must be a table of named instances",
     })
   }
@@ -50,7 +53,7 @@ pub fn[T] named(
       Validation(failures=found) => failures.append(found)
       error => raise error
     } noraise {
-      options => instances[name] = { ..options, name: Some(name) }
+      options => instances[name] = { ..options, name: Some(name), }
     }
   }
   if !failures.is_empty() {

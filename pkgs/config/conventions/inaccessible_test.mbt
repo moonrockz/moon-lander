@@ -20,20 +20,20 @@ fn unbounded(start : String) -> @config.ConfigBuilder {
 
 ///|
 fn locked(name : String) -> @config.DirEntry {
-  { name, kind: Inaccessible }
+  { name, kind: Inaccessible, }
 }
 
 ///|
 test "Unbounded search reaches a locked file at the drive root" {
   let tree = @config.FileTree::new(complete=true)
     .with_listing(p("D:/"), [
-      { name: "a", kind: Directory },
+      { name: "a", kind: Directory, },
       locked("pagefile.sys"),
       locked("System Volume Information"),
     ])
-    .with_listing(p("D:/a"), [{ name: "proj", kind: Directory }])
+    .with_listing(p("D:/a"), [{ name: "proj", kind: Directory, }])
     .with_listing(p("D:/a/proj"), [
-      { name: "acme.toml", kind: File },
+      { name: "acme.toml", kind: File, },
       locked("busy.log"),
     ])
     .with_file(p("D:/a/proj/acme.toml"), "project.name = \"proj\"")
@@ -45,18 +45,22 @@ test "Unbounded search reaches a locked file at the drive root" {
 ///|
 test "a locked entry does not change workspace and member selection" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing(p("D:/"), [{ name: "w", kind: Directory }, locked("pagefile.sys")])
+    .with_listing(p("D:/"), [
+      { name: "w", kind: Directory, },
+      locked("pagefile.sys"),
+    ])
     .with_listing(p("D:/w"), [
-      { name: "acme.toml", kind: File },
-      { name: "packages", kind: Directory },
+      { name: "acme.toml", kind: File, },
+      { name: "packages", kind: Directory, },
       locked("DumpStack.log.tmp"),
     ])
-    .with_listing(p("D:/w/packages"), [{ name: "billing", kind: Directory }])
+    .with_listing(p("D:/w/packages"), [{ name: "billing", kind: Directory, }])
     .with_listing(p("D:/w/packages/billing"), [
-      { name: "acme.toml", kind: File },
+      { name: "acme.toml", kind: File, },
       locked("busy.log"),
     ])
-    .with_file(p("D:/w/acme.toml"),
+    .with_file(
+      p("D:/w/acme.toml"),
       "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",
     )
     .with_file(p("D:/w/packages/billing/acme.toml"), "ui.font = \"member\"")
@@ -93,7 +97,10 @@ test "Inaccessible entry next to a candidate" {
   // The host is asked for the inaccessible candidate before discovery counts
   // the candidates, so its error passes out instead of an ambiguity error.
   let tree = @config.FileTree::new()
-    .with_listing(p("/w"), [{ name: "acme.toml", kind: File }, locked("acme.yaml")])
+    .with_listing(p("/w"), [
+      { name: "acme.toml", kind: File, },
+      locked("acme.yaml"),
+    ])
     .with_missing(p("/w/.acme"))
     .with_missing(p("/w/.config/acme"))
     .with_file(p("/w/acme.toml"), "a = 1")
@@ -123,17 +130,17 @@ test "Inaccessible file next to a workspace file" {
   // directory with several files before the host answers for `acme.yaml`.
   let tree = @config.FileTree::new()
     .with_listing(p("/w"), [
-      { name: "acme.toml", kind: File },
+      { name: "acme.toml", kind: File, },
       locked("acme.yaml"),
-      { name: "packages", kind: Directory },
+      { name: "packages", kind: Directory, },
     ])
     .with_missing(p("/w/.acme"))
     .with_missing(p("/w/.config/acme"))
     .with_file(p("/w/acme.toml"), "workspace.members = [\"packages/*\"]")
-    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory }])
+    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory, }])
     .with_missing(p("/w/packages/.acme"))
     .with_missing(p("/w/packages/.config/acme"))
-    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File }])
+    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File, }])
     .with_missing(p("/w/packages/a/.acme"))
     .with_missing(p("/w/packages/a/.config/acme"))
     .with_file(p("/w/packages/a/acme.toml"), "a = 1")
@@ -158,8 +165,8 @@ test "Inaccessible file next to a workspace file" {
 test "Inaccessible member directory is not dropped" {
   let tree = @config.FileTree::new()
     .with_listing(p("/w"), [
-      { name: "acme.toml", kind: File },
-      { name: "packages", kind: Directory },
+      { name: "acme.toml", kind: File, },
+      { name: "packages", kind: Directory, },
     ])
     .with_missing(p("/w/.acme"))
     .with_missing(p("/w/.config/acme"))
@@ -223,9 +230,9 @@ test "the search asks for the drive root, not the current directory of the drive
   // `D:` alone is the current directory of drive D. A host can answer it as
   // missing, and a missing `D:` would make every path on the drive missing.
   let listings : Map[String, Array[@config.DirEntry]] = {
-    "D:/": [{ name: "a", kind: Directory }, locked("pagefile.sys")],
-    "D:/a": [{ name: "proj", kind: Directory }],
-    "D:/a/proj": [{ name: "acme.toml", kind: File }],
+    "D:/": [{ name: "a", kind: Directory, }, locked("pagefile.sys")],
+    "D:/a": [{ name: "proj", kind: Directory, }],
+    "D:/a/proj": [{ name: "acme.toml", kind: File, }],
   }
   let asked = []
   let config = load_on_drive(
@@ -242,7 +249,7 @@ test "the search asks for the drive root, not the current directory of the drive
 ///|
 test "a candidate at the drive root is found" {
   let listings : Map[String, Array[@config.DirEntry]] = {
-    "D:/": [{ name: "acme.toml", kind: File }, { name: "a", kind: Directory }],
+    "D:/": [{ name: "acme.toml", kind: File, }, { name: "a", kind: Directory, }],
     "D:/a": [],
   }
   let asked = []
@@ -262,19 +269,19 @@ test "an inaccessible candidate is read before two readable ones are ambiguous" 
   // it must not decide that before the host answers for `acme.yaml`.
   let tree = @config.FileTree::new()
     .with_listing(p("/w"), [
-      { name: ".acme", kind: Directory },
-      { name: "acme.toml", kind: File },
+      { name: ".acme", kind: Directory, },
+      { name: "acme.toml", kind: File, },
       locked("acme.yaml"),
-      { name: "packages", kind: Directory },
+      { name: "packages", kind: Directory, },
     ])
-    .with_listing(p("/w/.acme"), [{ name: "acme.toml", kind: File }])
+    .with_listing(p("/w/.acme"), [{ name: "acme.toml", kind: File, }])
     .with_missing(p("/w/.config/acme"))
     .with_file(p("/w/acme.toml"), "workspace.members = [\"packages/*\"]")
     .with_file(p("/w/.acme/acme.toml"), "workspace.members = [\"packages/*\"]")
-    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory }])
+    .with_listing(p("/w/packages"), [{ name: "a", kind: Directory, }])
     .with_missing(p("/w/packages/.acme"))
     .with_missing(p("/w/packages/.config/acme"))
-    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File }])
+    .with_listing(p("/w/packages/a"), [{ name: "acme.toml", kind: File, }])
     .with_missing(p("/w/packages/a/.acme"))
     .with_missing(p("/w/packages/a/.config/acme"))
     .with_file(p("/w/packages/a/acme.toml"), "a = 1")

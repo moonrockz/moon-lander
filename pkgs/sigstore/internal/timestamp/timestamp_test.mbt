@@ -4,8 +4,7 @@ fn release_token() -> Bytes raise {
   let text = @fixtures.github
     .iter()
     .find_first(file => file.0 == "release-cli-2.103.3.sigstore.json")
-    .unwrap()
-    .1
+    .unwrap().1
   guard @json.parse(text) is Object(bundle) &&
     bundle.get("verificationMaterial") is Some(Object(material)) &&
     material.get("timestampVerificationData") is Some(Object(data)) &&
@@ -51,7 +50,9 @@ test "the release token gives its fields" {
 test "truncated, extended or changed responses are refused" {
   let bytes = release_token()
   assert_true(refusal(bytes[:bytes.length() - 1].to_owned()) is Some(_))
-  assert_true(refusal(Bytes::from_array([..bytes.to_array(), b'\x00'])) is Some(_))
+  assert_true(
+    refusal(Bytes::from_array([..bytes.to_array(), b'\x00'])) is Some(_),
+  )
   assert_true(refusal(b"") is Some(_))
   // The response is not a SEQUENCE.
   let changed = bytes.to_array()

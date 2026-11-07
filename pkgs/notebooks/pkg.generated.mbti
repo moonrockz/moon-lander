@@ -3,6 +3,7 @@ package "moonrockz/notebooks"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
   "moonrockz/ion/ion",
 }
 
@@ -18,32 +19,35 @@ pub fn[N : Node] walk(N, (N) -> Control, leave? : (N) -> Unit) -> Unit
 pub fn[N : Node] walk_cursor(N, (Cursor[N]) -> Control, leave? : (Cursor[N]) -> Unit) -> Unit
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror MetadataError {
   ExpectedObject
   InvalidKey(String)
   NotJson(path~ : String, reason~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn MetadataError::equal(Self, Self) -> Bool
 pub fn MetadataError::message(Self) -> String
 pub fn MetadataError::not_equal(Self, Self) -> Bool
 pub fn MetadataError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum CellKind {
   Code
   Markdown
   Raw
   Unknown(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn CellKind::equal(Self, Self) -> Bool
 pub fn CellKind::not_equal(Self, Self) -> Bool
 pub fn CellKind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Control {
   Continue
   SkipChildren
   Stop
-} derive(Eq, @debug.Debug)
+}
 pub fn Control::equal(Self, Self) -> Bool
 pub fn Control::not_equal(Self, Self) -> Bool
 pub fn Control::to_repr(Self) -> @debug.Repr
@@ -62,33 +66,36 @@ pub fn[N] Cursor::path(Self[N]) -> NodePath
 pub fn[N] Cursor::previous_sibling(Self[N]) -> Self[N]?
 pub fn[N : Node] Cursor::walk(Self[N], (Self[N]) -> Control, leave? : (Self[N]) -> Unit) -> Unit
 
-type Metadata derive(@debug.Debug)
-pub fn Metadata::Metadata(Json) -> Self raise MetadataError
+#derive(@debug.Debug)
+type Metadata
+pub fn Metadata::Metadata(@json.Json) -> Self raise MetadataError
 pub fn Metadata::empty() -> Self
 pub fn Metadata::equal(Self, Self) -> Bool
 pub fn Metadata::from_ion(@ion.Ion) -> Self raise MetadataError
 pub fn Metadata::get(Self, String) -> @ion.Ion?
-pub fn Metadata::get_json(Self, String) -> Json? raise MetadataError
+pub fn Metadata::get_json(Self, String) -> @json.Json? raise MetadataError
 pub fn Metadata::is_empty(Self) -> Bool
 pub fn Metadata::keys(Self) -> ReadOnlyArray[String]
 pub fn Metadata::not_equal(Self, Self) -> Bool
 pub fn Metadata::to_ion(Self) -> @ion.Ion
-pub fn Metadata::to_json(Self) -> Json raise MetadataError
+pub fn Metadata::to_json(Self) -> @json.Json raise MetadataError
 pub fn Metadata::to_repr(Self) -> @debug.Repr
 pub impl Eq for Metadata
 
+#derive(Eq, @debug.Debug)
 pub(all) enum NodeKind {
   Notebook
   Cell(CellKind)
   Output(String)
   Attachment(String)
   Directive(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn NodeKind::equal(Self, Self) -> Bool
 pub fn NodeKind::not_equal(Self, Self) -> Bool
 pub fn NodeKind::to_repr(Self) -> @debug.Repr
 
-type NodePath derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type NodePath
 pub fn NodePath::NodePath(ReadOnlyArray[Int32]) -> Self
 pub fn NodePath::equal(Self, Self) -> Bool
 pub fn NodePath::indices(Self) -> ReadOnlyArray[Int32]

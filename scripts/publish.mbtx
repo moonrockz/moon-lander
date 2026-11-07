@@ -37,12 +37,13 @@ let publish_list : Array[(String, String)] = [
 let duplicated : String = "is duplicated with an existing version"
 
 ///|
+#derive(Eq, Debug)
 priv enum Outcome {
   Published
   AlreadyPublished
   Transient
   Failed
-} derive(Eq, Debug)
+}
 
 ///|
 /// A refusal (401, 403) or conflict (409) is never retried.

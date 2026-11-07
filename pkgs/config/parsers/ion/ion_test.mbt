@@ -14,7 +14,9 @@ test "Ion keeps exact values" {
   let text =
     #|{ price: 1.10, at: 2026-09-28T12:30Z, kind: 'fast', n: 123456789012345678901234567890 }
   let value = @ion.parse(text, origin="app.ion")
-  guard value.to_ion().kind() is Struct(fields) else { fail("expected a struct") }
+  guard value.to_ion().kind() is Struct(fields) else {
+    fail("expected a struct")
+  }
   let by_name = Map::from_iter(
     fields.iter().map(field => (field.name().text().unwrap(), field.value())),
   )
@@ -33,9 +35,7 @@ test "Ion keeps exact values" {
   guard by_name.get("n").unwrap().kind() is Int(number) else {
     fail("n should be an integer")
   }
-  @expect.expect(number.to_string()).to_equal(
-    "123456789012345678901234567890",
-  )
+  @expect.expect(number.to_string()).to_equal("123456789012345678901234567890")
 }
 
 ///|

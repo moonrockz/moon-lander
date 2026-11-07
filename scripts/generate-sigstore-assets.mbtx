@@ -242,8 +242,27 @@ async fn generate() -> Array[(String, String)] {
 }
 
 ///|
+/// The text after the MoonBit formatter of the pinned toolchain, so that the
+/// generated files pass `moon fmt --check` and `--check` compares like with like.
+async fn format_source(text : String) -> String {
+  let dir = @fs.tmpdir(prefix="lander-sigstore-format")
+  defer @fs.rmdir(dir, recursive=true)
+  let path = "\{dir}/generated.mbt"
+  @fs.write_file(path, text)
+  let (code, out, err) = @process.collect_output("moonfmt", ["-w", path])
+  guard code == 0 else {
+    fail("moonfmt failed (\{code}): \{out.text()}\{err.text()}")
+  }
+  @fs.read_file(path).text()
+}
+
+///|
 async fn main {
-  let outputs = generate()
+  let outputs = []
+  for output in generate() {
+    let (path, text) = output
+    outputs.push((path, format_source(text)))
+  }
   if @env.args().contains("--check") {
     for output in outputs {
       let (path, text) = output

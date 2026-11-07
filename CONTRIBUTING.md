@@ -154,7 +154,7 @@ override check passes on all four targets and its source SHA and archive checksu
 are recorded in the bead.
 
 `scripts/publish.mbtx` owns the explicit twelve-library allowlist. The optional
-Moonx launcher also requires stock16/17 real-host, opaque transport, private
+Moonx launcher also requires stock primary-pin real-host, opaque transport, private
 payload and public prebuilt-asset qualification before release promotion.
 `mise run validate:publication` checks it against `moon.work` and the manifests.
 The workspace root, `tests/`, `apps/site` and generated consumer or fixture

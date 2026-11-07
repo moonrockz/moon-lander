@@ -6,21 +6,21 @@ enum Desk {
   /// Answer the held reply, then this one.
   Release(@actors.Reply[String])
   /// Reply two times.
-  Twice(@actors.Reply[Int])
+  Twice(@actors.Reply[Int32])
   /// Wait at the gate, then add one to the state and reply.
-  Slow(@actors.Reply[Int])
+  Slow(@actors.Reply[Int32])
   /// Reply with the state.
-  Count(@actors.Reply[Int])
+  Count(@actors.Reply[Int32])
   /// End without a reply.
-  Quit(@actors.Reply[Int])
+  Quit(@actors.Reply[Int32])
   /// Answer through a reply destination, two times.
-  ViaSubject(@actors.Reply[Int])
+  ViaSubject(@actors.Reply[Int32])
   /// A note without a reply.
   Noted(String)
 }
 
 ///|
-fn ms_limit(count : Int) -> @actors.WaitPolicy {
+fn ms_limit(count : Int32) -> @actors.WaitPolicy {
   Within(@lander_core.TimeLimit::millis(count)) catch {
     _ => panic()
   }
@@ -33,7 +33,7 @@ fn start_desk(
   gate : @aio.Queue[Unit],
   started : @aio.Queue[Unit],
   log : Array[String],
-  mailbox? : @actors.MailboxPolicy = @actors.MailboxPolicy::default(),
+  mailbox~ : @actors.MailboxPolicy = @actors.MailboxPolicy::default(),
 ) -> @actors.Actor[Desk, Unit] raise @actors.ActorError {
   let held : Ref[@actors.Reply[String]?] = Ref(None)
   scope.start(0, mailbox~, (count, message) => {
@@ -253,9 +253,10 @@ async test "ASK-1: close wakes a discarded ask at once and keeps the in-flight a
 }
 
 ///|
+#derive(Debug)
 suberror Jam {
   Jam
-} derive(Debug)
+}
 
 ///|
 async test "ASK-1: a failure wakes in-flight and queued asks with the cause" {
@@ -263,20 +264,22 @@ async test "ASK-1: a failure wakes in-flight and queued asks with the cause" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let ready : @aio.Queue[@actors.ActorRef[Desk]] = @aio.Queue(kind=Unbounded)
   let outcomes = @aio.with_task_group(group => {
-    group.spawn_bg(allow_failure=true, () => @actors.scope(scope => {
-      let desk = scope.start((), (_, message : Desk) => {
-        match message {
-          Slow(_) => {
-            started.put(())
-            gate.get()
-            raise Jam
+    group.spawn_bg(allow_failure=true, () => {
+      @actors.scope(scope => {
+        let desk = scope.start((), (_, message : Desk) => {
+          match message {
+            Slow(_) => {
+              started.put(())
+              gate.get()
+              raise Jam
+            }
+            _ => Continue(())
           }
-          _ => Continue(())
-        }
+        })
+        ready.put(desk.to_ref())
+        desk.join()
       })
-      ready.put(desk.to_ref())
-      desk.join()
-    }))
+    })
     let desk = ready.get()
     let asks = [
       group.spawn(() => {
@@ -362,7 +365,7 @@ async test "ASK-1: subjects of references, replies, queues and functions report 
     // A reply destination delivers once.
     assert_eq(desk.ask(reply => ViaSubject(reply)), 1)
     // A queue destination follows the queue.
-    let queue : @aio.Queue[Int] = @aio.Queue(kind=Blocking(1))
+    let queue : @aio.Queue[Int32] = @aio.Queue(kind=Blocking(1))
     let to_queue = @actors.Subject::from_queue(queue)
     to_queue.send(1)
     assert_eq(to_queue.try_send(2), Full)

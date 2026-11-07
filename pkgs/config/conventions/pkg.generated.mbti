@@ -66,21 +66,23 @@ pub fn Conventions::prefix(Self) -> String
 pub fn Conventions::profiles_enabled(Self) -> Bool
 pub fn Conventions::roots(Self, @moon-lander-config.LoadContext, options? : DiscoveryOptions) -> @moon-lander-config.LoadStep[RootEvidence] raise @moon-lander-config.ConfigError
 
+#derive(Eq, @debug.Debug)
 pub(all) struct DiscoveryOptions {
   environment : String?
   config : @moon-lander-config.SourceSelection[String]
   isolated : Bool
   project : String?
   profiles : @moon-lander-config.ProfileSelection
-} derive(Eq, @debug.Debug)
+}
 pub fn DiscoveryOptions::equal(Self, Self) -> Bool
 pub fn DiscoveryOptions::new(environment? : String, config? : @moon-lander-config.SourceSelection[String], isolated? : Bool, project? : String, profiles? : @moon-lander-config.ProfileSelection) -> Self
 pub fn DiscoveryOptions::not_equal(Self, Self) -> Bool
 pub fn DiscoveryOptions::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct EnvironmentName {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn EnvironmentName::equal(Self, Self) -> Bool
 pub fn EnvironmentName::not_equal(Self, Self) -> Bool
 pub fn EnvironmentName::output(Self, &Logger) -> Unit
@@ -89,9 +91,10 @@ pub fn EnvironmentName::to_repr(Self) -> @debug.Repr
 pub fn EnvironmentName::to_string(Self) -> String
 pub impl Show for EnvironmentName
 
+#derive(Eq, Hash, @debug.Debug)
 pub struct Extension {
   // private fields
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn Extension::equal(Self, Self) -> Bool
 pub fn Extension::hash(Self) -> Int32
 pub fn Extension::hash_combine(Self, Hasher) -> Unit
@@ -116,6 +119,7 @@ pub(all) enum MemberLoading {
   ExplicitOnly
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Part {
   SystemDir
   UserConfigDir
@@ -123,7 +127,7 @@ pub(all) enum Part {
   Layouts
   LocalOverrides
   UserOverrides
-} derive(Eq, @debug.Debug)
+}
 pub fn Part::equal(Self, Self) -> Bool
 pub fn Part::not_equal(Self, Self) -> Bool
 pub fn Part::to_repr(Self) -> @debug.Repr
@@ -140,10 +144,11 @@ pub(all) enum RootPolicy {
   WorkspaceFirst(@moon-lander-config.KeyPath)
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SelectedFilePolicy {
   Primary
   Overlay
-} derive(Eq, @debug.Debug)
+}
 pub fn SelectedFilePolicy::equal(Self, Self) -> Bool
 pub fn SelectedFilePolicy::not_equal(Self, Self) -> Bool
 pub fn SelectedFilePolicy::to_repr(Self) -> @debug.Repr

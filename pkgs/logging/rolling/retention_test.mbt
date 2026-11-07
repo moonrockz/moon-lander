@@ -6,14 +6,14 @@ fn daily_set() -> @rolling.FileSet raise {
 
 ///|
 /// Keep the newest `count` files.
-fn keep(count : Int) -> @rolling.Retention raise {
+fn keep(count : Int32) -> @rolling.Retention raise {
   KeepNewest(@rolling.RetainedFileCount::count(count))
 }
 
 ///|
 /// A listing of regular files of size 1 with the names `names`.
 fn files(names : Array[String]) -> Array[@rolling.ListedFile] {
-  names.map(name => { name, size: b(1L), regular: true })
+  names.map(name => { name, size: b(1L), regular: true, })
 }
 
 ///|
@@ -24,12 +24,24 @@ test "retention keeps the newest files including the active file" {
     "acme-20261026.log",
   ])
   let active = set.parse_name("acme-20261028.log").unwrap()
-  inspect(set.retention(keep(3), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261025.log acme-20261026.log
-  ))
-  inspect(set.retention(keep(1), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261025.log acme-20261026.log acme-20261027.log acme-20261027_001.log
-  ))
+  inspect(
+    set
+    .retention(keep(3), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261025.log acme-20261026.log
+    ),
+  )
+  inspect(
+    set
+    .retention(keep(1), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261025.log acme-20261026.log acme-20261027.log acme-20261027_001.log
+    ),
+  )
   assert_eq(set.retention(keep(5), listing, active), [])
   assert_eq(set.retention(keep(31), listing, active), [])
   assert_eq(set.retention(KeepAll, listing, active), [])
@@ -40,19 +52,33 @@ test "retention counts the active file when the listing does not have it" {
   let set = daily_set()
   let active = set.parse_name("acme-20261029.log").unwrap()
   let listing = files(["acme-20261027.log", "acme-20261028.log"])
-  inspect(set.retention(keep(2), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261027.log
-  ))
+  inspect(
+    set
+    .retention(keep(2), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261027.log
+    ),
+  )
 }
 
 ///|
 test "retention never deletes the active file, even when it is not newest" {
   let set = daily_set()
   let active = set.parse_name("acme-20261027.log").unwrap()
-  let listing = files(["acme-20261027.log", "acme-20261028.log", "acme-20261026.log"])
-  inspect(set.retention(keep(2), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261026.log
-  ))
+  let listing = files([
+    "acme-20261027.log", "acme-20261028.log", "acme-20261026.log",
+  ])
+  inspect(
+    set
+    .retention(keep(2), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261026.log
+    ),
+  )
 }
 
 ///|
@@ -62,9 +88,15 @@ test "retention sorts by sequence number, not by name text" {
   let listing = files([
     "acme-20261027_1000.log", "acme-20261027_999.log", "acme-20261027_998.log",
   ])
-  inspect(set.retention(keep(3), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261027_998.log
-  ))
+  inspect(
+    set
+    .retention(keep(3), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261027_998.log
+    ),
+  )
 }
 
 ///|
@@ -75,13 +107,19 @@ test "retention deletes only regular files of the complete owned form" {
     "acme-old.log", "acme-20261027.log.bak", "acmex.log", "other-20261020.log", "acme-20261020.jsonl",
     "acme.log.lock", "acme.log", "notes.txt",
   ])
-  listing.push({ name: "acme-20261021.log", size: b(0L), regular: false })
-  listing.push({ name: "acme-20261022.log", size: b(1L), regular: false })
-  listing.push({ name: "acme-20261023.log", size: b(1L), regular: true })
-  listing.push({ name: "acme-20261023.log", size: b(1L), regular: true })
-  inspect(set.retention(keep(1), listing, active).map(name => name.to_string()).join(" "), content=(
-    #|acme-20261023.log
-  ))
+  listing.push({ name: "acme-20261021.log", size: b(0L), regular: false, })
+  listing.push({ name: "acme-20261022.log", size: b(1L), regular: false, })
+  listing.push({ name: "acme-20261023.log", size: b(1L), regular: true, })
+  listing.push({ name: "acme-20261023.log", size: b(1L), regular: true, })
+  inspect(
+    set
+    .retention(keep(1), listing, active)
+    .map(name => name.to_string())
+    .join(" "),
+    content=(
+      #|acme-20261023.log
+    ),
+  )
 }
 
 ///|
@@ -94,6 +132,12 @@ test "two formats of one stem keep their own files" {
   ])
   let text_active = text.parse_name("acme-20261027.log").unwrap()
   let json_active = json.parse_name("acme-20261027.jsonl").unwrap()
-  assert_eq(text.retention(keep(1), listing, text_active).map(name => name.to_string()), ["acme-20261026.log"])
-  assert_eq(json.retention(keep(1), listing, json_active).map(name => name.to_string()), ["acme-20261026.jsonl"])
+  assert_eq(
+    text.retention(keep(1), listing, text_active).map(name => name.to_string()),
+    ["acme-20261026.log"],
+  )
+  assert_eq(
+    json.retention(keep(1), listing, json_active).map(name => name.to_string()),
+    ["acme-20261026.jsonl"],
+  )
 }

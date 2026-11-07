@@ -18,9 +18,10 @@ pub fn root_from_inclusion_proof(Int64, Int64, BytesView, Array[Bytes]) -> Bytes
 pub fn set_payload(BytesView, Int64, BytesView, Int64) -> Bytes
 
 // Errors
+#derive(@debug.Debug)
 pub suberror CheckpointError {
   BadCheckpoint(String)
-} derive(@debug.Debug)
+}
 pub fn CheckpointError::to_repr(Self) -> @debug.Repr
 
 // Types and methods

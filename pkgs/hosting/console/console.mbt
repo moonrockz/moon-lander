@@ -9,7 +9,8 @@ pub suberror ConsoleError {
 /// Text for people that names the failure.
 pub fn ConsoleError::message(self : ConsoleError) -> String {
   match self {
-    SignalHandlersUnavailable => "The console signal handlers cannot be installed"
+    SignalHandlersUnavailable =>
+      "The console signal handlers cannot be installed"
   }
 }
 
@@ -17,7 +18,7 @@ pub fn ConsoleError::message(self : ConsoleError) -> String {
 /// The kind of a signal code from the native stub or the Node.js adapter:
 /// 1 Interrupt, 2 Terminate, 3 Quit. Any other code is no signal. This is the
 /// one place where a signal code becomes a `SignalKind`.
-fn kind_of_code(code : Int) -> @hosting.SignalKind? {
+fn kind_of_code(code : Int32) -> @hosting.SignalKind? {
   match code {
     1 => Some(Interrupt)
     2 => Some(Terminate)
@@ -29,7 +30,9 @@ fn kind_of_code(code : Int) -> @hosting.SignalKind? {
 ///|
 /// Retain the first external signal for this run, including consuming readers.
 /// Repeated reads cannot count OS signals; escalation belongs to the owner.
-fn external_signal_reader(probe : @hosting.SignalProbe) -> () -> @hosting.SignalKind? {
+fn external_signal_reader(
+  probe : @hosting.SignalProbe,
+) -> () -> @hosting.SignalKind? {
   let observed : Ref[@hosting.SignalKind?] = Ref(None)
   () => {
     if observed.val is None {
@@ -104,9 +107,12 @@ async fn report_completion(
       report(outcome, before)
       before
     } catch {
-      _ => if before == @hosting.ExitCode::success() {
-        @hosting.ExitCode::failure()
-      } else { before }
+      _ =>
+        if before == @hosting.ExitCode::success() {
+          @hosting.ExitCode::failure()
+        } else {
+          before
+        }
     }
   })
   match signal() {
@@ -119,7 +125,10 @@ async fn report_completion(
 /// The exit code of the process after a run. A signal that arrived after the
 /// last probe read of the run, for example during the stopped event, still
 /// selects the signal code, because a signal code comes first.
-fn selected_exit_code(outcome : @hosting.RunOutcome, late : @hosting.SignalKind?) -> @hosting.ExitCode {
+fn selected_exit_code(
+  outcome : @hosting.RunOutcome,
+  late : @hosting.SignalKind?,
+) -> @hosting.ExitCode {
   match late {
     Some(kind) => kind.exit_code()
     None => outcome.exit_code()

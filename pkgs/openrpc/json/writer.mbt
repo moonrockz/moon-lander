@@ -17,7 +17,7 @@ fn key_compare(a : String, b : String) -> Int32 {
 }
 
 ///|
-fn hex4(unit : Int) -> String {
+fn hex4(unit : Int32) -> String {
   let digits = "0123456789abcdef"
   let out = StringBuilder()
   for shift in [12, 8, 4, 0] {
@@ -83,7 +83,7 @@ pub fn write(
   }
   // One shared line break per depth, built once and reused for every child.
   let breaks : Array[WriteItem] = []
-  let newline = (depth : Int) => {
+  let newline = (depth : Int32) => {
     while breaks.length() <= depth {
       let out = StringBuilder()
       out.write_char('\n')

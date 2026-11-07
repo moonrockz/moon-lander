@@ -63,9 +63,10 @@ Add the modules, then import the packages that you use in `moon.pkg`. The
 configuration packages are in the module `moonrockz/moon-lander-config`:
 
 ```moonbit notest
+///|
 import {
   "moonrockz/moon-lander-config" @config,
-  "moonrockz/moon-lander-config/parsers/toml" @toml,
+  "moonrockz/moon-lander-config/parsers/toml",
 }
 ```
 
@@ -112,11 +113,9 @@ fn acme_host(log : Array[String]) -> @hosting.Host[Unit] raise {
   "acme"
   |> @lander.AppName::parse
   |> @lander.cli([])
-  |> @hosting.service(
-    "greeter",
-    start=_ => log.push("greeter started"),
-    stop=_ => log.push("greeter stopped"),
-  )
+  |> @hosting.service("greeter", start=_ => log.push("greeter started"), stop=_ => {
+    log.push("greeter stopped")
+  })
   |> @hosting.build(_ => ())
 }
 
@@ -169,8 +168,12 @@ through `environment.environment_name` on their contexts.
 ///|
 test "explicit starting settings" {
   let host = @lander_core.AppName::parse("acme")
-    |> @lander.cli([], env_vars={ "ACME_PORT": "8080" },
-      working_dir=@lander_core.AbsolutePath::parse("/work"), environment=@lander.EnvironmentName::parse("Staging"))
+    |> @lander.cli(
+      [],
+      env_vars={ "ACME_PORT": "8080" },
+      working_dir=@lander_core.AbsolutePath::parse("/work"),
+      environment=@lander.EnvironmentName::parse("Staging"),
+    )
     |> @hosting.env_vars(({ "ACME_PORT": 9090, "ACME_DEBUG": true } : Json))
     |> @hosting.working_dir(@lander_core.AbsolutePath::parse("/other"))
     |> @hosting.build(_ => ())

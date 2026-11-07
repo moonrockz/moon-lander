@@ -1,9 +1,10 @@
 ///|
+#derive(Debug)
 pub(all) enum ExampleValue {
   NoExampleValue
   LiteralExample(@exact.Value)
   ExternalExample(@reference.UriReference)
-} derive(Debug)
+}
 
 ///|
 pub extend ExampleValue with @debug.Debug::{to_repr}
@@ -111,9 +112,10 @@ fn[T] checked_object(
 }
 
 ///|
+#derive(Debug)
 pub struct Contact {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Contact::to_json(self : Contact) -> @exact.Value {
@@ -159,9 +161,10 @@ pub fn Contact::email(self : Contact) -> String? {
 pub extend Contact with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct License {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn License::to_json(self : License) -> @exact.Value {
@@ -202,9 +205,10 @@ pub fn License::url(self : License) -> @reference.UriReference? {
 pub extend License with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct ExternalDocumentation {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ExternalDocumentation::to_json(
@@ -253,9 +257,10 @@ pub fn ExternalDocumentation::description(
 pub extend ExternalDocumentation with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct ServerVariable {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ServerVariable::to_json(self : ServerVariable) -> @exact.Value {
@@ -301,9 +306,10 @@ pub fn ServerVariable::enum_values(self : ServerVariable) -> Array[String]? {
 pub extend ServerVariable with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct Server {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Server::to_json(self : Server) -> @exact.Value {
@@ -363,9 +369,10 @@ pub fn Server::variables(self : Server) -> Array[(String, ServerVariable)]? {
 pub extend Server with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct Tag {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Tag::to_json(self : Tag) -> @exact.Value {
@@ -414,9 +421,10 @@ pub fn Tag::external_docs(self : Tag) -> ExternalDocumentation? {
 pub extend Tag with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct ErrorObject {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ErrorObject::to_json(self : ErrorObject) -> @exact.Value {
@@ -462,9 +470,10 @@ pub fn ErrorObject::data(self : ErrorObject) -> @exact.Value? {
 pub extend ErrorObject with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct Example {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Example::to_json(self : Example) -> @exact.Value {
@@ -522,9 +531,10 @@ pub fn Example::payload(self : Example) -> ExampleValue {
 pub extend Example with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct ExamplePairing {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ExamplePairing::to_json(self : ExamplePairing) -> @exact.Value {
@@ -588,9 +598,10 @@ pub fn ExamplePairing::result(
 pub extend ExamplePairing with @debug.Debug::{to_repr}
 
 ///|
+#derive(Debug)
 pub struct Link {
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Link::to_json(self : Link) -> @exact.Value {

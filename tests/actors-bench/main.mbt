@@ -10,19 +10,19 @@
 
 ///|
 /// The number of messages of each shape.
-const MESSAGES : Int = 200000
+const MESSAGES : Int32 = 200000
 
 ///|
 /// The number of scheduler round trips of the last shape.
-const PAUSES : Int = 1000
+const PAUSES : Int32 = 1000
 
 ///|
 /// The number of rounds of each shape. The report gives the fastest round.
-const ROUNDS : Int = 5
+const ROUNDS : Int32 = 5
 
 ///|
 /// A loop that carries its state forward with `bind`.
-fn sum_forward(left : Int, total : Int) -> @actors.Receive[Int, Int] {
+fn sum_forward(left : Int32, total : Int32) -> @actors.Receive[Int32, Int32] {
   if left == 0 {
     @actors.done(total)
   } else {
@@ -32,7 +32,7 @@ fn sum_forward(left : Int, total : Int) -> @actors.Receive[Int, Int] {
 
 ///|
 /// A loop that builds its result after the recursive step.
-fn sum_back(left : Int) -> @actors.Receive[Int, Int] {
+fn sum_back(left : Int32) -> @actors.Receive[Int32, Int32] {
   if left == 0 {
     @actors.done(0)
   } else {
@@ -45,8 +45,8 @@ fn sum_back(left : Int) -> @actors.Receive[Int, Int] {
 /// each message.
 async fn measure(
   name : String,
-  shape : async () -> Int,
-  count? : Int = MESSAGES,
+  shape : async () -> Int32,
+  count~ : Int32 = MESSAGES,
 ) -> Unit {
   let mut best = 0.0
   for round in 0..<ROUNDS {
@@ -67,7 +67,7 @@ async fn measure(
 
 ///|
 /// A subscriber that counts events and admits each one at once.
-fn counting_subject(count : Ref[Int]) -> @actors.Subject[@actors.ActorEvent] {
+fn counting_subject(count : Ref[Int32]) -> @actors.Subject[@actors.ActorEvent] {
   @actors.Subject::new(
     send=_ => {
       count.val += 1
@@ -84,16 +84,16 @@ fn counting_subject(count : Ref[Int]) -> @actors.Subject[@actors.ActorEvent] {
 /// Send each message to one actor and wait for its sum, in a scope with the
 /// channel `events`, if any, and with one counting subscriber if `subscribe`.
 async fn end_to_end(
-  messages : Array[Int],
+  messages : Array[Int32],
   events : @actors.RuntimeEvents?,
-  subscribe? : Bool = false,
-) -> Int {
+  subscribe~ : Bool = false,
+) -> Int32 {
   @actors.scope(events?, scope => {
     if subscribe && events is Some(events) {
       ignore(events.subscribe(scope, counting_subject(Ref(0))))
     }
-    let replies : @aio.Queue[Int] = @aio.Queue(kind=Unbounded)
-    let actor = scope.start(0, mailbox=Unbounded, (total, value : Int?) => {
+    let replies : @aio.Queue[Int32] = @aio.Queue(kind=Unbounded)
+    let actor = scope.start(0, mailbox=Unbounded, (total, value : Int32?) => {
       match value {
         Some(value) => Continue(total + value)
         None => {
@@ -114,17 +114,17 @@ async fn end_to_end(
 /// `try_send` each message to a closed actor, with a JSON payload policy, in
 /// a scope with the channel `events`, if any. Give the number of rejections.
 async fn rejected(
-  messages : Array[Int],
+  messages : Array[Int32],
   events : @actors.RuntimeEvents?,
-  subscribe? : Bool = false,
-) -> Int {
+  subscribe~ : Bool = false,
+) -> Int32 {
   @actors.scope(events?, scope => {
     if subscribe && events is Some(events) {
       ignore(events.subscribe(scope, counting_subject(Ref(0))))
     }
     let actor = scope.start(
       (),
-      (_, _ : Int) => Continue(()),
+      (_, _ : Int32) => Continue(()),
       payload=@actors.PayloadPolicy::json(),
     )
     ignore(actor.close())
@@ -141,7 +141,7 @@ async fn rejected(
 ///|
 async fn main {
   let messages = Array::make(MESSAGES, 1)
-  let handler : async (Int, Int) -> @actors.Next[Int] = (total, value) => {
+  let handler : async (Int32, Int32) -> @actors.Next[Int32] = (total, value) => {
     @actors.Continue(total + value)
   }
   measure("plain async handler call", () => {

@@ -1,6 +1,6 @@
 ///|
 /// The largest sequence number of a file in one period.
-const MAX_SEQUENCE : Int = 2147483647
+const MAX_SEQUENCE : Int32 = 2147483647
 
 ///|
 /// The files of one stem and one format in a log directory, with one rolling
@@ -14,11 +14,12 @@ const MAX_SEQUENCE : Int = 2147483647
 ///
 /// `JsonLines` uses `.jsonl` in place of `.log`. A sequence number has at least
 /// three digits, and has more digits after 999 (`_1000`).
+#derive(Eq, Debug)
 pub struct FileSet {
   priv stem : LogFileStem
   priv format : FileFormat
   priv policy : RollingPolicy
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FileSet with Eq::{equal, not_equal}
@@ -33,7 +34,7 @@ pub fn FileSet::new(
   format : FileFormat,
   policy : RollingPolicy,
 ) -> FileSet {
-  { stem, format, policy }
+  { stem, format, policy, }
 }
 
 ///|
@@ -81,20 +82,22 @@ fn FileSet::limit(self : FileSet) -> FileByteLimit? {
 ///|
 /// One UTC day of a dated file name: the days after 1970-01-01 and the date as
 /// eight digits.
+#derive(Eq, Compare, Hash, Debug)
 priv struct Period {
   day : Int64
   date : String
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 /// The name of one file that a file set owns: an optional UTC day and a sequence
 /// number, where 0 is the name with no number. Names of one file set sort by day
 /// and then by sequence number.
+#derive(Eq, Compare, Hash, Debug)
 pub struct LogFileName {
   priv period : Period?
-  priv sequence : Int
+  priv sequence : Int32
   priv text : String
-} derive(Eq, Compare, Hash, Debug)
+}
 
 ///|
 pub extend LogFileName with Eq::{equal, not_equal}
@@ -118,13 +121,13 @@ pub fn LogFileName::epoch_day(self : LogFileName) -> Int64? {
 ///|
 /// The sequence number in the period: 0 for the name with no number, then 1 for
 /// `_001` and so on.
-pub fn LogFileName::sequence(self : LogFileName) -> Int {
+pub fn LogFileName::sequence(self : LogFileName) -> Int32 {
   self.sequence
 }
 
 ///|
 /// The file name, for example `acme-20261027_001.log`.
-pub impl Show for LogFileName with output(self, logger) {
+pub impl Show for LogFileName with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -134,7 +137,7 @@ pub extend LogFileName with Show::{output, to_string}
 ///|
 /// The text of a sequence number in a name: nothing for 0, else `_` and at
 /// least three digits.
-fn sequence_text(sequence : Int) -> String {
+fn sequence_text(sequence : Int32) -> String {
   if sequence == 0 {
     ""
   } else if sequence < 10 {
@@ -151,21 +154,24 @@ fn sequence_text(sequence : Int) -> String {
 fn FileSet::make_name(
   self : FileSet,
   period : Period?,
-  sequence : Int,
+  sequence : Int32,
 ) -> LogFileName {
   let date = match period {
     Some(period) => "-" + period.date
     None => ""
   }
   let text = "\{self.stem}\{date}\{sequence_text(sequence)}.\{self.format.extension()}"
-  { period, sequence, text }
+  { period, sequence, text, }
 }
 
 ///|
 /// The first name of the period of `now`: with its UTC date for a daily policy.
-fn FileSet::first_name(self : FileSet, now : @formatting.LogTimestamp) -> LogFileName {
+fn FileSet::first_name(
+  self : FileSet,
+  now : @formatting.LogTimestamp,
+) -> LogFileName {
   let period = if self.is_daily() {
-    Some({ day: now.epoch_day(), date: now.compact_date() })
+    Some({ day: now.epoch_day(), date: now.compact_date(), })
   } else {
     None
   }
@@ -255,8 +261,7 @@ fn period_of(digits : ArrayView[Char]) -> Period? {
 pub fn FileSet::parse_name(self : FileSet, text : String) -> LogFileName? {
   let chars = text.to_array()
   let stem = self.stem.text.to_array()
-  guard chars.length() > stem.length() &&
-    chars[0:stem.length()] == stem[:] else {
+  guard chars.length() > stem.length() && chars[0:stem.length()] == stem[:] else {
     return None
   }
   let mut index = stem.length()
@@ -293,5 +298,5 @@ pub fn FileSet::parse_name(self : FileSet, text : String) -> LogFileName? {
   guard String::from_array(chars[index:]) == "." + self.format.extension() else {
     return None
   }
-  Some({ period, sequence, text })
+  Some({ period, sequence, text, })
 }

@@ -30,12 +30,13 @@ let fixture_digest = "50dbf06cf3ae54b2b7cd320fdc3f88ff7f0f9c04cdff347a08861455f2
 let destination = "pkgs/moonx/runtime"
 
 ///|
+#derive(ToJson)
 struct SourceFile {
   path : String
   upstream_sha256 : String
   generated_sha256 : String
   modification : String
-} derive(ToJson)
+}
 
 ///|
 fn digest(bytes : Bytes) -> String {

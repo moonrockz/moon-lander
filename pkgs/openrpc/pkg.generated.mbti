@@ -31,14 +31,16 @@ pub fn write(Document, format? : @json.Format, limits? : @json.Limits) -> Result
 // Errors
 
 // Types and methods
+#derive(@debug.Debug)
 pub struct ClosedValidation {
   report : ValidationReport
   document : ValidatedDocument?
-} derive(@debug.Debug)
+}
 pub fn ClosedValidation::document(Self) -> ValidatedDocument?
 pub fn ClosedValidation::report(Self) -> ValidationReport
 pub fn ClosedValidation::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Components {
   value : @json.Value
   schemas : Array[(@domain.ComponentKey, @schema.Schema)]?
@@ -49,7 +51,7 @@ pub struct Components {
   tags : Array[(@domain.ComponentKey, Tag)]?
   example_pairings : Array[(@domain.ComponentKey, ExamplePairing)]?
   example_pairing_objects : Array[(@domain.ComponentKey, ExamplePairing)]?
-} derive(@debug.Debug)
+}
 pub fn Components::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Components::content_descriptors(Self) -> Array[(@domain.ComponentKey, ContentDescriptor)]?
 pub fn Components::errors(Self) -> Array[(@domain.ComponentKey, ErrorObject)]?
@@ -65,9 +67,10 @@ pub fn Components::tags(Self) -> Array[(@domain.ComponentKey, Tag)]?
 pub fn Components::to_json(Self) -> @json.Value
 pub fn Components::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Contact {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Contact::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Contact::email(Self) -> String?
 pub fn Contact::extensions(Self) -> @domain.Extensions
@@ -78,12 +81,13 @@ pub fn Contact::to_json(Self) -> @json.Value
 pub fn Contact::to_repr(Self) -> @debug.Repr
 pub fn Contact::url(Self) -> @reference.UriReference?
 
+#derive(@debug.Debug)
 pub struct ContentDescriptor {
   name : String
   schema : @schema.Schema
   required : Bool?
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn ContentDescriptor::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn ContentDescriptor::deprecated(Self) -> Bool?
 pub fn ContentDescriptor::description(Self) -> String?
@@ -97,24 +101,27 @@ pub fn ContentDescriptor::summary(Self) -> String?
 pub fn ContentDescriptor::to_json(Self) -> @json.Value
 pub fn ContentDescriptor::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Coverage {
   Passed
   Failed
   Incomplete
-} derive(Eq, @debug.Debug)
+}
 pub fn Coverage::equal(Self, Self) -> Bool
 pub fn Coverage::not_equal(Self, Self) -> Bool
 pub fn Coverage::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Discrepancy {
   OptionalParameterBeforeRequired
   ServerNameOmitted
   LicenseNameOmitted
-} derive(Eq, @debug.Debug)
+}
 pub fn Discrepancy::equal(Self, Self) -> Bool
 pub fn Discrepancy::not_equal(Self, Self) -> Bool
 pub fn Discrepancy::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Document {
   version : DocumentVersion
   info : Info
@@ -124,7 +131,7 @@ pub struct Document {
   servers : Array[Server]?
   components : Components?
   external_docs : ExternalDocumentation?
-} derive(@debug.Debug)
+}
 pub fn Document::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Document::as_resource(Self, @reference.UriReference, aliases? : Array[@reference.UriReference], limits? : @json.Limits) -> Result[@reference.Resource, @json.Diagnostic]
 pub fn Document::components(Self) -> Components?
@@ -140,18 +147,20 @@ pub fn Document::to_json(Self) -> @json.Value
 pub fn Document::to_repr(Self) -> @debug.Repr
 pub fn Document::version(Self) -> DocumentVersion
 
+#derive(Eq, @debug.Debug)
 pub struct DocumentVersion {
   text : String
-} derive(Eq, @debug.Debug)
+}
 pub fn DocumentVersion::equal(Self, Self) -> Bool
 pub fn DocumentVersion::not_equal(Self, Self) -> Bool
 pub fn DocumentVersion::parse(String) -> Result[Self, @json.Diagnostic]
 pub fn DocumentVersion::to_repr(Self) -> @debug.Repr
 pub fn DocumentVersion::to_string(Self) -> String
 
+#derive(@debug.Debug)
 pub struct ErrorObject {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn ErrorObject::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn ErrorObject::code(Self) -> @domain.ErrorCode
 pub fn ErrorObject::data(Self) -> @json.Value?
@@ -162,9 +171,10 @@ pub fn ErrorObject::new(@domain.ErrorCode, String, data? : @json.Value?, extensi
 pub fn ErrorObject::to_json(Self) -> @json.Value
 pub fn ErrorObject::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Example {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Example::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Example::description(Self) -> String?
 pub fn Example::extensions(Self) -> @domain.Extensions
@@ -176,9 +186,10 @@ pub fn Example::summary(Self) -> String?
 pub fn Example::to_json(Self) -> @json.Value
 pub fn Example::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct ExamplePairing {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn ExamplePairing::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn ExamplePairing::description(Self) -> String?
 pub fn ExamplePairing::extensions(Self) -> @domain.Extensions
@@ -191,16 +202,18 @@ pub fn ExamplePairing::summary(Self) -> String?
 pub fn ExamplePairing::to_json(Self) -> @json.Value
 pub fn ExamplePairing::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub(all) enum ExampleValue {
   NoExampleValue
   LiteralExample(@json.Value)
   ExternalExample(@reference.UriReference)
-} derive(@debug.Debug)
+}
 pub fn ExampleValue::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct ExternalDocumentation {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn ExternalDocumentation::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn ExternalDocumentation::description(Self) -> String?
 pub fn ExternalDocumentation::extensions(Self) -> @domain.Extensions
@@ -210,12 +223,13 @@ pub fn ExternalDocumentation::to_json(Self) -> @json.Value
 pub fn ExternalDocumentation::to_repr(Self) -> @debug.Repr
 pub fn ExternalDocumentation::url(Self) -> @reference.UriReference
 
+#derive(@debug.Debug)
 pub struct Finding {
   diagnostic : @json.Diagnostic
   severity : Severity
   phase : Phase
   // private fields
-} derive(@debug.Debug)
+}
 pub fn Finding::chain(Self) -> Array[FindingLocation]
 pub fn Finding::diagnostic(Self) -> @json.Diagnostic
 pub fn Finding::discrepancy(Self) -> Discrepancy?
@@ -228,20 +242,22 @@ pub fn Finding::severity(Self) -> Severity
 pub fn Finding::to_repr(Self) -> @debug.Repr
 pub fn Finding::version(Self) -> DocumentVersion
 
+#derive(@debug.Debug)
 pub struct FindingLocation {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn FindingLocation::path(Self) -> Array[String]
 pub fn FindingLocation::resource(Self) -> @reference.UriReference?
 pub fn FindingLocation::source_id(Self) -> String?
 pub fn FindingLocation::span(Self) -> @json.Span?
 pub fn FindingLocation::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Info {
   title : String
   version : String
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Info::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Info::contact(Self) -> Contact?
 pub fn Info::description(Self) -> String?
@@ -255,15 +271,17 @@ pub fn Info::to_json(Self) -> @json.Value
 pub fn Info::to_repr(Self) -> @debug.Repr
 pub fn Info::version(Self) -> String
 
+#derive(@debug.Debug)
 pub(all) enum InlineOrReference[T] {
   Inline(T)
   Reference(@reference.Reference)
-} derive(@debug.Debug)
+}
 pub fn[T : @debug.Debug] InlineOrReference::to_repr(Self[T]) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct License {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn License::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn License::extensions(Self) -> @domain.Extensions
 pub fn License::from_json(@json.Value, limits? : @json.Limits) -> Result[Self, @json.Diagnostic]
@@ -273,9 +291,10 @@ pub fn License::to_json(Self) -> @json.Value
 pub fn License::to_repr(Self) -> @debug.Repr
 pub fn License::url(Self) -> @reference.UriReference?
 
+#derive(@debug.Debug)
 pub struct Link {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Link::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Link::description(Self) -> String?
 pub fn Link::extensions(Self) -> @domain.Extensions
@@ -289,13 +308,14 @@ pub fn Link::target_method(Self) -> MethodName?
 pub fn Link::to_json(Self) -> @json.Value
 pub fn Link::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Method {
   name : MethodName
   params : Array[InlineOrReference[ContentDescriptor]]
   result : InlineOrReference[ContentDescriptor]?
   param_structure : ParamStructure?
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Method::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Method::deprecated(Self) -> Bool?
 pub fn Method::description(Self) -> String?
@@ -316,15 +336,17 @@ pub fn Method::tags(Self) -> Array[InlineOrReference[Tag]]?
 pub fn Method::to_json(Self) -> @json.Value
 pub fn Method::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct MethodName {
   text : String
-} derive(Eq, @debug.Debug)
+}
 pub fn MethodName::equal(Self, Self) -> Bool
 pub fn MethodName::not_equal(Self, Self) -> Bool
 pub fn MethodName::parse(String) -> Result[Self, @json.Diagnostic]
 pub fn MethodName::to_repr(Self) -> @debug.Repr
 pub fn MethodName::to_string(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ObjectKind {
   DocumentObject
   InfoObject
@@ -342,47 +364,51 @@ pub(all) enum ObjectKind {
   LinkObject
   ComponentsObject
   ReferenceObject
-} derive(Eq, @debug.Debug)
+}
 pub fn ObjectKind::equal(Self, Self) -> Bool
 pub fn ObjectKind::name(Self) -> String
 pub fn ObjectKind::not_equal(Self, Self) -> Bool
 pub fn ObjectKind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ParamStructure {
   ByName
   ByPosition
   Either
-} derive(Eq, @debug.Debug)
+}
 pub fn ParamStructure::equal(Self, Self) -> Bool
 pub fn ParamStructure::not_equal(Self, Self) -> Bool
 pub fn ParamStructure::to_repr(Self) -> @debug.Repr
 pub fn ParamStructure::to_string(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Phase {
   Model
   SchemaDocument
   References
   Normative
   Artifact
-} derive(Eq, @debug.Debug)
+}
 pub fn Phase::equal(Self, Self) -> Bool
 pub fn Phase::not_equal(Self, Self) -> Bool
 pub fn Phase::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct ReadResult {
   cst : @json.CstDocument?
   document : Document?
   diagnostics : Array[@json.Diagnostic]
-} derive(@debug.Debug)
+}
 pub fn ReadResult::cst(Self) -> @json.CstDocument?
 pub fn ReadResult::diagnostics(Self) -> Array[@json.Diagnostic]
 pub fn ReadResult::document(Self) -> Document?
 pub fn ReadResult::source_map(Self) -> @json.SourceMap?
 pub fn ReadResult::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Server {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Server::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Server::description(Self) -> String?
 pub fn Server::extensions(Self) -> @domain.Extensions
@@ -395,9 +421,10 @@ pub fn Server::to_repr(Self) -> @debug.Repr
 pub fn Server::url(Self) -> String
 pub fn Server::variables(Self) -> Array[(String, ServerVariable)]?
 
+#derive(@debug.Debug)
 pub struct ServerVariable {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn ServerVariable::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn ServerVariable::default_value(Self) -> String
 pub fn ServerVariable::description(Self) -> String?
@@ -408,18 +435,20 @@ pub fn ServerVariable::new(String, enum_values? : Array[String]?, description? :
 pub fn ServerVariable::to_json(Self) -> @json.Value
 pub fn ServerVariable::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Severity {
   Error
   Warning
   Information
-} derive(Eq, @debug.Debug)
+}
 pub fn Severity::equal(Self, Self) -> Bool
 pub fn Severity::not_equal(Self, Self) -> Bool
 pub fn Severity::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Tag {
   value : @json.Value
-} derive(@debug.Debug)
+}
 pub fn Tag::additional_fields(Self) -> Array[(String, @json.Value)]
 pub fn Tag::description(Self) -> String?
 pub fn Tag::extensions(Self) -> @domain.Extensions
@@ -431,11 +460,12 @@ pub fn Tag::summary(Self) -> String?
 pub fn Tag::to_json(Self) -> @json.Value
 pub fn Tag::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct ValidatedDocument {
   document : Document
   report : ValidationReport
   // private fields
-} derive(@debug.Debug)
+}
 pub fn ValidatedDocument::document(Self) -> Document
 pub fn ValidatedDocument::profile(Self) -> ValidationProfile
 pub fn ValidatedDocument::report(Self) -> ValidationReport
@@ -443,14 +473,16 @@ pub fn ValidatedDocument::resources(Self) -> Array[@reference.UriReference]
 pub fn ValidatedDocument::to_repr(Self) -> @debug.Repr
 pub fn ValidatedDocument::version(Self) -> DocumentVersion
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ValidationProfile {
   Specification
   MetaschemaCompatibility
-} derive(Eq, @debug.Debug)
+}
 pub fn ValidationProfile::equal(Self, Self) -> Bool
 pub fn ValidationProfile::not_equal(Self, Self) -> Bool
 pub fn ValidationProfile::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct ValidationReport {
   profile : ValidationProfile
   version : DocumentVersion
@@ -460,7 +492,7 @@ pub struct ValidationReport {
   references : Coverage
   normative : Coverage
   artifact : Coverage
-} derive(@debug.Debug)
+}
 pub fn ValidationReport::artifact(Self) -> Coverage
 pub fn ValidationReport::findings(Self) -> Array[Finding]
 pub fn ValidationReport::model(Self) -> Coverage

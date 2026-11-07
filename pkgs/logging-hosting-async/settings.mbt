@@ -1,9 +1,10 @@
 ///|
 /// A rule of a log directory.
+#derive(Eq, Debug)
 pub enum LogDirectoryRule {
   /// The path has a NUL character, which no file system accepts.
   NulCharacter
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend LogDirectoryRule with Eq::{equal, not_equal}
@@ -13,9 +14,10 @@ pub extend LogDirectoryRule with @debug.Debug::{to_repr}
 
 ///|
 /// A session setting that breaks a rule. Each case names the input and the rule.
+#derive(Debug)
 pub suberror SettingsError {
   /// The outstanding record limit is not 1 or more.
-  InvalidQueueEventLimit(count~ : Int)
+  InvalidQueueEventLimit(count~ : Int32)
   /// The outstanding payload limit is not 1 byte or more.
   InvalidQueueByteLimit(bytes~ : Int64)
   /// The limit of one record is not 1 byte or more.
@@ -28,7 +30,7 @@ pub suberror SettingsError {
   /// Two file destinations use the same directory, stem and format. One file
   /// set has one writer.
   DuplicateFileSet(directory~ : String, name~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend SettingsError with @debug.Debug::{to_repr}
@@ -59,9 +61,10 @@ pub fn SettingsError::message(self : SettingsError) -> String {
 ///|
 /// The largest count of records that are accepted but not yet written, including
 /// the record that the writer writes now.
+#derive(Eq, Debug)
 pub struct QueueEventLimit {
-  priv count : Int
-} derive(Eq, Debug)
+  priv count : Int32
+}
 
 ///|
 pub extend QueueEventLimit with Eq::{equal, not_equal}
@@ -72,7 +75,9 @@ pub extend QueueEventLimit with @debug.Debug::{to_repr}
 ///|
 /// Make a queue event limit. It raises `InvalidQueueEventLimit` when `count` is
 /// less than 1.
-pub fn QueueEventLimit::count(count : Int) -> QueueEventLimit raise SettingsError {
+pub fn QueueEventLimit::count(
+  count : Int32,
+) -> QueueEventLimit raise SettingsError {
   guard count >= 1 else { raise InvalidQueueEventLimit(count~) }
   { count, }
 }
@@ -80,12 +85,12 @@ pub fn QueueEventLimit::count(count : Int) -> QueueEventLimit raise SettingsErro
 ///|
 /// The default limit: 1024 records.
 pub fn QueueEventLimit::default() -> QueueEventLimit {
-  { count: 1024 }
+  { count: 1024, }
 }
 
 ///|
 /// The limit as a count of records.
-pub fn QueueEventLimit::to_int(self : QueueEventLimit) -> Int {
+pub fn QueueEventLimit::to_int(self : QueueEventLimit) -> Int32 {
   self.count
 }
 
@@ -93,9 +98,10 @@ pub fn QueueEventLimit::to_int(self : QueueEventLimit) -> Int {
 /// The largest count of encoded payload bytes that are accepted but not yet
 /// written. The count includes the payload of each destination and the record
 /// that the writer writes now.
+#derive(Eq, Debug)
 pub struct QueueByteLimit {
   priv bytes : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend QueueByteLimit with Eq::{equal, not_equal}
@@ -106,7 +112,9 @@ pub extend QueueByteLimit with @debug.Debug::{to_repr}
 ///|
 /// Make a queue byte limit. It raises `InvalidQueueByteLimit` when `bytes` is
 /// less than 1.
-pub fn QueueByteLimit::bytes(bytes : Int64) -> QueueByteLimit raise SettingsError {
+pub fn QueueByteLimit::bytes(
+  bytes : Int64,
+) -> QueueByteLimit raise SettingsError {
   guard bytes >= 1L else { raise InvalidQueueByteLimit(bytes~) }
   { bytes, }
 }
@@ -114,7 +122,7 @@ pub fn QueueByteLimit::bytes(bytes : Int64) -> QueueByteLimit raise SettingsErro
 ///|
 /// The default limit: 8 MiB.
 pub fn QueueByteLimit::default() -> QueueByteLimit {
-  { bytes: 8L * 1024L * 1024L }
+  { bytes: 8L * 1024L * 1024L, }
 }
 
 ///|
@@ -126,9 +134,10 @@ pub fn QueueByteLimit::to_int64(self : QueueByteLimit) -> Int64 {
 ///|
 /// The largest count of encoded bytes of one record, for all its destinations
 /// together.
+#derive(Eq, Debug)
 pub struct RecordByteLimit {
   priv bytes : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend RecordByteLimit with Eq::{equal, not_equal}
@@ -139,7 +148,9 @@ pub extend RecordByteLimit with @debug.Debug::{to_repr}
 ///|
 /// Make a record byte limit. It raises `InvalidRecordByteLimit` when `bytes` is
 /// less than 1.
-pub fn RecordByteLimit::bytes(bytes : Int64) -> RecordByteLimit raise SettingsError {
+pub fn RecordByteLimit::bytes(
+  bytes : Int64,
+) -> RecordByteLimit raise SettingsError {
   guard bytes >= 1L else { raise InvalidRecordByteLimit(bytes~) }
   { bytes, }
 }
@@ -147,7 +158,7 @@ pub fn RecordByteLimit::bytes(bytes : Int64) -> RecordByteLimit raise SettingsEr
 ///|
 /// The default limit: 1 MiB.
 pub fn RecordByteLimit::default() -> RecordByteLimit {
-  { bytes: 1024L * 1024L }
+  { bytes: 1024L * 1024L, }
 }
 
 ///|
@@ -160,9 +171,10 @@ pub fn RecordByteLimit::to_int64(self : RecordByteLimit) -> Int64 {
 /// An absolute directory for log files. It holds an already parsed
 /// `AbsolutePath`, so it does not parse the path again; it adds only the rules of
 /// file I/O.
+#derive(Eq, Debug)
 pub struct LogDirectory {
   priv path : @lander_core.AbsolutePath
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend LogDirectory with Eq::{equal, not_equal}
@@ -223,7 +235,7 @@ fn LogDirectory::join(self : LogDirectory, name : String) -> String {
 
 ///|
 /// The directory as text.
-pub impl Show for LogDirectory with output(self, logger) {
+pub impl Show for LogDirectory with fn output(self, logger) {
   logger.write_string(self.path.to_string())
 }
 
@@ -232,13 +244,14 @@ pub extend LogDirectory with Show::{output, to_string}
 
 ///|
 /// The process stream of a console destination.
+#derive(Eq, Debug)
 pub(all) enum ConsoleStream {
   /// Standard error, the default, so the program output on standard output
   /// stays free of log records.
   StandardError
   /// Standard output, by explicit selection.
   StandardOutput
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ConsoleStream with Eq::{equal, not_equal}
@@ -248,7 +261,7 @@ pub extend ConsoleStream with @debug.Debug::{to_repr}
 
 ///|
 /// The stream name: `stderr` or `stdout`.
-pub impl Show for ConsoleStream with output(self, logger) {
+pub impl Show for ConsoleStream with fn output(self, logger) {
   logger.write_string(
     match self {
       StandardError => "stderr"
@@ -262,6 +275,7 @@ pub extend ConsoleStream with Show::{output, to_string}
 
 ///|
 /// When the console writes ANSI styles.
+#derive(Eq, Debug)
 pub(all) enum ColorMode {
   /// Write styles only when the stream is a color terminal, is not redirected,
   /// `TERM` is not `dumb` and `NO_COLOR` is empty or not set.
@@ -270,7 +284,7 @@ pub(all) enum ColorMode {
   Always
   /// Never write styles.
   Never
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ColorMode with Eq::{equal, not_equal}
@@ -280,6 +294,7 @@ pub extend ColorMode with @debug.Debug::{to_repr}
 
 ///|
 /// What the runtime knows about the terminal of a console stream.
+#derive(Eq, Debug)
 pub(all) enum TerminalCapability {
   /// The stream is a terminal that shows colors.
   ColorTerminal
@@ -289,7 +304,7 @@ pub(all) enum TerminalCapability {
   Redirected
   /// The runtime cannot tell. Auto writes no styles.
   Unknown
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TerminalCapability with Eq::{equal, not_equal}
@@ -299,10 +314,11 @@ pub extend TerminalCapability with @debug.Debug::{to_repr}
 
 ///|
 /// The environment hints for `Auto`, read once at the boundary.
+#derive(Eq, Debug)
 pub struct ColorHints {
   priv no_color : Bool
   priv dumb : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ColorHints with Eq::{equal, not_equal}
@@ -323,7 +339,7 @@ pub fn ColorHints::from_env(no_color~ : String?, term~ : String?) -> ColorHints 
 ///|
 /// No hint against colors.
 pub fn ColorHints::none() -> ColorHints {
-  { no_color: false, dumb: false }
+  { no_color: false, dumb: false, }
 }
 
 ///|
@@ -342,12 +358,13 @@ pub fn ColorMode::styles(
 
 ///|
 /// A console destination: a stream, a minimum level, a color mode and a theme.
+#derive(Eq, Debug)
 pub struct ConsoleSink {
   priv stream : ConsoleStream
   priv minimum : @logging.Level
   priv color : ColorMode
   priv theme : @formatting.Theme
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ConsoleSink with Eq::{equal, not_equal}
@@ -359,12 +376,12 @@ pub extend ConsoleSink with @debug.Debug::{to_repr}
 /// A console destination. The defaults are standard error, `Information`, `Auto`
 /// colors and the `Literate` theme.
 pub fn ConsoleSink::new(
-  stream? : ConsoleStream = StandardError,
-  minimum? : @logging.Level = Information,
-  color? : ColorMode = Auto,
-  theme? : @formatting.Theme = Literate,
+  stream~ : ConsoleStream = StandardError,
+  minimum~ : @logging.Level = Information,
+  color~ : ColorMode = Auto,
+  theme~ : @formatting.Theme = Literate,
 ) -> ConsoleSink {
-  { stream, minimum, color, theme }
+  { stream, minimum, color, theme, }
 }
 
 ///|
@@ -424,11 +441,11 @@ pub struct FileSink {
 pub fn FileSink::new(
   directory : LogDirectory,
   stem : @rolling.LogFileStem,
-  format? : @rolling.FileFormat = Text,
-  policy? : @rolling.RollingPolicy = @rolling.RollingPolicy::default(),
-  retention? : @rolling.Retention = @rolling.Retention::default(),
-  minimum? : @logging.Level = Information,
-  json_properties? : @formatting.JsonProperties = OrderedArray,
+  format~ : @rolling.FileFormat = Text,
+  policy~ : @rolling.RollingPolicy = @rolling.RollingPolicy::default(),
+  retention~ : @rolling.Retention = @rolling.Retention::default(),
+  minimum~ : @logging.Level = Information,
+  json_properties~ : @formatting.JsonProperties = OrderedArray,
 ) -> FileSink {
   {
     directory,
@@ -508,11 +525,11 @@ pub fn default_drain_limit() -> @lander_core.TimeLimit {
 /// one file set.
 pub fn SessionSettings::new(
   console? : ConsoleSink,
-  files? : Array[FileSink] = [],
-  event_limit? : QueueEventLimit = QueueEventLimit::default(),
-  byte_limit? : QueueByteLimit = QueueByteLimit::default(),
-  record_limit? : RecordByteLimit = RecordByteLimit::default(),
-  drain_limit? : @lander_core.TimeLimit = default_drain_limit(),
+  files~ : Array[FileSink] = [],
+  event_limit~ : QueueEventLimit = QueueEventLimit::default(),
+  byte_limit~ : QueueByteLimit = QueueByteLimit::default(),
+  record_limit~ : RecordByteLimit = RecordByteLimit::default(),
+  drain_limit~ : @lander_core.TimeLimit = default_drain_limit(),
 ) -> SessionSettings raise SettingsError {
   guard record_limit.bytes <= byte_limit.bytes else {
     raise RecordLimitAboveQueueLimit(

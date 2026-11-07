@@ -104,10 +104,12 @@ test "example: require MIME lookup capability" {
   @expect.expect_all(s => {
     s.expect(images).to_equal([book.cells()[0]])
     s.expect(book.cells_by_mime_type("image/png")).to_equal(images)
-    s.expect(@notebooks.MimeTyped::has_mime_type(book.cells()[0], "image/png"))
-      .to_be_true()
-    s.expect(@notebooks.MimeTyped::has_mime_type(book.cells()[1], "image/png"))
-      .to_be_false()
+    s
+    .expect(@notebooks.MimeTyped::has_mime_type(book.cells()[0], "image/png"))
+    .to_be_true()
+    s
+    .expect(@notebooks.MimeTyped::has_mime_type(book.cells()[1], "image/png"))
+    .to_be_false()
   })
 }
 ```
@@ -148,7 +150,9 @@ test "example: inspect MIME support on mixed cells" {
   })
   let dib = @dib.parse("#!csharp\nConsole.WriteLine(1);")
   let cells : ReadOnlyArray[&@notebooks.CellView] = [
-    jupyter.cells()[0], dib.cells()[0], jupyter.cells()[1],
+    jupyter.cells()[0],
+    dib.cells()[0],
+    jupyter.cells()[1],
   ]
   let matches = cells.map(cell => {
     match cell.mime_capability() {
@@ -158,15 +162,19 @@ test "example: inspect MIME support on mixed cells" {
   })
   @expect.expect_all(s => {
     s.expect(matches).to_equal([Some(true), None, Some(false)])
-    s.expect(cells.map(cell => cell.kind())).to_equal([
-      @notebooks.Markdown, @notebooks.Code, @notebooks.Markdown,
-    ])
-    s.expect(cells.map(cell => cell.source())).to_equal([
-      Some("![plot](attachment:plot.png)"), Some("Console.WriteLine(1);"),
+    s
+    .expect(cells.map(cell => cell.kind()))
+    .to_equal([@notebooks.Markdown, @notebooks.Code, @notebooks.Markdown])
+    s
+    .expect(cells.map(cell => cell.source()))
+    .to_equal([
+      Some("![plot](attachment:plot.png)"),
+      Some("Console.WriteLine(1);"),
       Some("No image"),
     ])
-    s.expect(cells[0].metadata().map(metadata => metadata.get_json("title")))
-      .to_equal(Some(Some(Json("Plot"))))
+    s
+    .expect(cells[0].metadata().map(metadata => metadata.get_json("title")))
+    .to_equal(Some(Some(Json("Plot"))))
     s.expect(cells[1].metadata()).to_equal(None)
     s.expect(jupyter.cells()[1].mime_capability() is Some(_)).to_be_true()
     s.expect(dib.cells()[0].mime_capability() is None).to_be_true()
@@ -400,7 +408,9 @@ are retained and JSON lookups return independent copies. Key order is unspecifie
 
 ```mbt check
 ///|
-fn[N : @notebooks.Node] example_title(root : N) -> Json? raise @notebooks.MetadataError {
+fn[N : @notebooks.Node] example_title(
+  root : N,
+) -> Json? raise @notebooks.MetadataError {
   match root.metadata() {
     Some(metadata) => metadata.get_json("title")
     None => None
@@ -446,12 +456,16 @@ timestamps, decimals or typed nulls into JSON substitutes.
 ```mbt check
 ///|
 test "example: native Ion metadata" {
-  let metadata = @notebooks.Metadata::from_ion(@ion_text.read_ion(
-    "{amount: 12345678901234567890.500, created: 2026-10-19T12:30:00Z, missing: null.int}",
-  ))
+  let metadata = @notebooks.Metadata::from_ion(
+    @ion_text.read_ion(
+      "{amount: 12345678901234567890.500, created: 2026-10-19T12:30:00Z, missing: null.int}",
+    ),
+  )
   guard metadata.get("amount") is Some(amount) else { fail("missing amount") }
   guard amount.kind() is Decimal(decimal) else { fail("expected decimal") }
-  guard metadata.get("missing") is Some(missing) else { fail("missing typed null") }
+  guard metadata.get("missing") is Some(missing) else {
+    fail("missing typed null")
+  }
   let book = @dib.Notebook::Notebook([], metadata~)
   @expect.expect_all(s => {
     s.expect(decimal.to_ion_string()).to_equal("12345678901234567890.500")

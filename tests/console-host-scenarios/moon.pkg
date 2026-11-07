@@ -14,11 +14,14 @@ supported_targets = "native+js"
 // on JS. The pinned build system cannot condition imports by target, so each
 // is unused on the other target (29).
 // Remove when the imports can be conditional.
+
 warnings = "-29"
 
-options(targets: {
-  "emit.native.mbt": ["native"],
-  "emit.js.mbt": ["js"],
-  "poll.native.mbt": ["native"],
-  "poll.js.mbt": ["js"],
-})
+options(
+  targets: {
+    "emit.native.mbt": [ "native" ],
+    "emit.js.mbt": [ "js" ],
+    "poll.native.mbt": [ "native" ],
+    "poll.js.mbt": [ "js" ],
+  },
+)

@@ -15,7 +15,9 @@ fn find(json : Json, path : String) -> Json raise {
         }
       Array(items) => {
         let index = @string.parse_int(step)
-        guard index >= 0 && index < items.length() else { fail("no \{step} in \{path}") }
+        guard index >= 0 && index < items.length() else {
+          fail("no \{step} in \{path}")
+        }
         items[index]
       }
       _ => fail("\{step} of \{path} is not in an object or array")
@@ -26,25 +28,36 @@ fn find(json : Json, path : String) -> Json raise {
 
 ///|
 fn object_at(json : Json, path : String) -> Map[String, Json] raise {
-  guard find(json, path) is Object(map) else { fail("\{path} is not an object") }
+  guard find(json, path) is Object(map) else {
+    fail("\{path} is not an object")
+  }
   map
 }
 
 ///|
 fn array_at(json : Json, path : String) -> Array[Json] raise {
-  guard find(json, path) is Array(items) else { fail("\{path} is not an array") }
+  guard find(json, path) is Array(items) else {
+    fail("\{path} is not an array")
+  }
   items
 }
 
 ///|
 fn text_at(json : Json, path : String) -> String raise {
-  guard find(json, path) is String(text) else { fail("\{path} is not a string") }
+  guard find(json, path) is String(text) else {
+    fail("\{path} is not a string")
+  }
   text
 }
 
 ///|
 /// Set the field `key` of the object at `path`; an empty path is the root.
-fn set_field(json : Json, path : String, key : String, value : Json) -> Unit raise {
+fn set_field(
+  json : Json,
+  path : String,
+  key : String,
+  value : Json,
+) -> Unit raise {
   let map = if path.is_empty() {
     guard json is Object(map) else { fail("the root is not an object") }
     map
@@ -69,7 +82,7 @@ fn remove_field(json : Json, path : String, key : String) -> Unit raise {
 
 ///|
 /// The base64 text with one bit of byte `index` changed.
-fn flip_base64(text : String, index : Int) -> String raise {
+fn flip_base64(text : String, index : Int32) -> String raise {
   let bytes = @encoding.decode_base64(text).to_array()
   bytes[index] = (bytes[index].to_int() ^ 1).to_byte()
   @encoding.encode_base64(Bytes::from_array(bytes))
@@ -130,7 +143,8 @@ test "scenario: each media type" {
     assert_eq(version, case.1, msg=case.0)
   }
   assert_true(
-    @sigstore.Bundle::parse(fixture(@fixtures.github, morphir_bundle)).version() is V0_3,
+    @sigstore.Bundle::parse(fixture(@fixtures.github, morphir_bundle)).version()
+    is V0_3,
   )
 }
 
@@ -138,8 +152,7 @@ test "scenario: each media type" {
 test "each media type form gives its version" {
   let doc = morphir_document()
   let forms = [
-    "application/vnd.dev.sigstore.bundle+json;version=0.2",
-    "application/vnd.dev.sigstore.bundle+json;version=0.3",
+    "application/vnd.dev.sigstore.bundle+json;version=0.2", "application/vnd.dev.sigstore.bundle+json;version=0.3",
     "application/vnd.dev.sigstore.bundle.v0.3+json",
   ]
   for form in forms {
@@ -171,13 +184,19 @@ test "scenario: unknown media type" {
 test "scenario: unknown field" {
   let doc = morphir_document()
   set_field(doc, "verificationMaterial", "extra", Json::string("x"))
-  assert_eq(document_error(doc), Some("verificationMaterial.extra: unknown field"))
+  assert_eq(
+    document_error(doc),
+    Some("verificationMaterial.extra: unknown field"),
+  )
   let err = try @sigstore.Bundle::parse(doc.stringify()) catch {
     err => err
   } noraise {
     _ => fail("parsed")
   }
-  assert_eq(err.message(), "Invalid bundle field verificationMaterial.extra: unknown field")
+  assert_eq(
+    err.message(),
+    "Invalid bundle field verificationMaterial.extra: unknown field",
+  )
 }
 
 ///|
@@ -186,10 +205,17 @@ test "protobuf JSON: an unknown field at the root and in an entry fails" {
   set_field(root, "", "extra", Json::boolean(true))
   assert_eq(document_error(root), Some("extra: unknown field"))
   let entry = morphir_document()
-  set_field(entry, "verificationMaterial.tlogEntries.0.inclusionProof", "extra", Json::number(1.0))
+  set_field(
+    entry,
+    "verificationMaterial.tlogEntries.0.inclusionProof",
+    "extra",
+    Json::number(1.0),
+  )
   assert_eq(
     document_error(entry),
-    Some("verificationMaterial.tlogEntries[0].inclusionProof.extra: unknown field"),
+    Some(
+      "verificationMaterial.tlogEntries[0].inclusionProof.extra: unknown field",
+    ),
   )
 }
 
@@ -247,7 +273,10 @@ test "protobuf JSON: int64 as a string and as a number" {
   let text = fixture(@fixtures.github, morphir_bundle)
   let numbers = text
     .replace(old="\"logIndex\":\"3275146211\"", new="\"logIndex\":3275146211")
-    .replace(old="\"integratedTime\":\"1792133282\"", new="\"integratedTime\":1792133282")
+    .replace(
+      old="\"integratedTime\":\"1792133282\"",
+      new="\"integratedTime\":1792133282",
+    )
     .replace(old="\"treeSize\":\"3153242266\"", new="\"treeSize\":3153242266")
   assert_true(numbers != text)
   let case = morphir_case()
@@ -263,14 +292,26 @@ test "protobuf JSON: int64 as a string and as a number" {
   assert_true(facts.times[0].source is Log(log_index=3275146211L, ..))
   assert_eq(facts.times[0].time.unix_seconds(), 1792133282L)
   // A number that is not an integer, and a text that is not one, fail.
-  let fraction = text.replace(old="\"logIndex\":\"3275146211\"", new="\"logIndex\":3275146211.5")
+  let fraction = text.replace(
+    old="\"logIndex\":\"3275146211\"",
+    new="\"logIndex\":3275146211.5",
+  )
   assert_eq(
     bundle_error(fraction),
     Some("verificationMaterial.tlogEntries[0].logIndex: not an integer"),
   )
-  let word = text.replace(old="\"logIndex\":\"3275146211\"", new="\"logIndex\":\"12a\"")
-  assert_eq(bundle_error(word), Some("verificationMaterial.tlogEntries[0].logIndex: not an integer"))
-  let negative = text.replace(old="\"logIndex\":\"3275146211\"", new="\"logIndex\":\"-1\"")
+  let word = text.replace(
+    old="\"logIndex\":\"3275146211\"",
+    new="\"logIndex\":\"12a\"",
+  )
+  assert_eq(
+    bundle_error(word),
+    Some("verificationMaterial.tlogEntries[0].logIndex: not an integer"),
+  )
+  let negative = text.replace(
+    old="\"logIndex\":\"3275146211\"",
+    new="\"logIndex\":\"-1\"",
+  )
   assert_eq(
     bundle_error(negative),
     Some("verificationMaterial.tlogEntries[0].logIndex: negative log index"),
@@ -288,12 +329,15 @@ test "protobuf JSON: bytes accept URL-safe base64" {
   assert_eq(document_error(doc), None)
   assert_eq(outcome(verify_document(doc, case_policy(morphir_case()))), "pass")
   set_field(doc, path, "rawBytes", Json::string("not base64!"))
-  assert_eq(document_error(doc), Some("verificationMaterial.certificate.rawBytes: not base64"))
+  assert_eq(
+    document_error(doc),
+    Some("verificationMaterial.certificate.rawBytes: not base64"),
+  )
 }
 
 ///|
 test "protobuf JSON: at most 32 tlog entries" {
-  fn with_entries(count : Int) -> Json raise {
+  fn with_entries(count : Int32) -> Json raise {
     let doc = morphir_document()
     let entries = array_at(doc, "verificationMaterial.tlogEntries")
     let first = entries[0]
@@ -315,12 +359,16 @@ test "protobuf JSON: at most 32 tlog entries" {
 test "protobuf JSON: v0.1 needs an inclusion promise, not a proof" {
   let name = "happy-path-v0.1"
   let without_proof = conformance_document(name)
-  remove_field(without_proof, "verificationMaterial.tlogEntries.0", "inclusionProof")
+  remove_field(
+    without_proof, "verificationMaterial.tlogEntries.0", "inclusionProof",
+  )
   assert_eq(document_error(without_proof), None)
   // A v0.1 bundle without a proof passes on its signed entry timestamp alone.
   assert_eq(verify_conformance_document(name, without_proof), "pass")
   let without_promise = conformance_document(name)
-  remove_field(without_promise, "verificationMaterial.tlogEntries.0", "inclusionPromise")
+  remove_field(
+    without_promise, "verificationMaterial.tlogEntries.0", "inclusionPromise",
+  )
   assert_eq(
     document_error(without_promise),
     Some(
@@ -353,7 +401,9 @@ test "protobuf JSON: v0.3 refuses x509CertificateChain" {
   )
   assert_eq(
     document_error(doc),
-    Some("verificationMaterial.x509CertificateChain: a v0.3 bundle must use certificate"),
+    Some(
+      "verificationMaterial.x509CertificateChain: a v0.3 bundle must use certificate",
+    ),
   )
   // A v0.2 bundle can give the leaf in a chain.
   set_field(
@@ -365,10 +415,17 @@ test "protobuf JSON: v0.3 refuses x509CertificateChain" {
   assert_eq(document_error(doc), None)
   assert_eq(outcome(verify_document(doc, case_policy(morphir_case()))), "pass")
   // An empty chain fails.
-  set_field(doc, "verificationMaterial.x509CertificateChain", "certificates", Json::array([]))
+  set_field(
+    doc,
+    "verificationMaterial.x509CertificateChain",
+    "certificates",
+    Json::array([]),
+  )
   assert_eq(
     document_error(doc),
-    Some("verificationMaterial.x509CertificateChain.certificates: the chain is empty"),
+    Some(
+      "verificationMaterial.x509CertificateChain.certificates: the chain is empty",
+    ),
   )
 }
 
@@ -413,8 +470,14 @@ test "protobuf JSON: messageSignature and dsseEnvelope together fail" {
 test "v0.1 and v0.2 also parse in the bundle.vX+json form" {
   for
     pair in [
-      ("happy-path-v0.1", "application/vnd.dev.sigstore.bundle+json;version=0.1", "application/vnd.dev.sigstore.bundle.v0.1+json"),
-      ("happy-path-v0.2", "application/vnd.dev.sigstore.bundle+json;version=0.2", "application/vnd.dev.sigstore.bundle.v0.2+json"),
+      (
+        "happy-path-v0.1", "application/vnd.dev.sigstore.bundle+json;version=0.1",
+        "application/vnd.dev.sigstore.bundle.v0.1+json",
+      ),
+      (
+        "happy-path-v0.2", "application/vnd.dev.sigstore.bundle+json;version=0.2",
+        "application/vnd.dev.sigstore.bundle.v0.2+json",
+      ),
     ] {
     let (name, old, new) = pair
     let text = fixture(@fixtures.conformance, "\{name}/bundle.sigstore.json")

@@ -1,5 +1,6 @@
 ///|
 /// The style of console output.
+#derive(Eq, Debug)
 pub(all) enum Theme {
   /// ANSI colors: muted time, brackets and category, a style for each level,
   /// muted literal text, a style for each JSON type of a bound value, and a
@@ -7,7 +8,7 @@ pub(all) enum Theme {
   Literate
   /// No ANSI escape codes.
   Plain
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Theme with Eq::{equal, not_equal}
@@ -80,7 +81,7 @@ const HEX_DIGITS : String = "0123456789abcdef"
 ///|
 /// True for a character that `escape_controls` replaces: a C0 control except
 /// LF and TAB, DEL, and a C1 control (U+0080 to U+009F).
-fn is_unsafe_control(code : Int) -> Bool {
+fn is_unsafe_control(code : Int32) -> Bool {
   (code < 0x20 && code != 0x0A && code != 0x09) ||
   code == 0x7F ||
   (code >= 0x80 && code <= 0x9F)
@@ -182,7 +183,7 @@ fn Painter::body(self : Painter, record : LogRecord) -> Unit {
 /// `Literate`, each styled part ends with a reset, so the event ends with no
 /// style before its LF. With `Plain`, the output has no ESC character.
 pub fn format_console(record : LogRecord, theme : Theme) -> String {
-  let painter = { out: StringBuilder(), styled: theme == Literate }
+  let painter = { out: StringBuilder(), styled: theme == Literate, }
   painter.span(META_STYLE, "[" + record.timestamp.time_of_day() + " ")
   painter.span(level_style(record.level), level_code(record.level))
   painter.span(META_STYLE, "]")
@@ -197,7 +198,7 @@ pub fn format_console(record : LogRecord, theme : Theme) -> String {
 /// with a final LF. The output has no ANSI codes. The category, the continuation
 /// lines and the escape of control characters are as in `format_console`.
 pub fn format_text(record : LogRecord) -> String {
-  let painter = { out: StringBuilder(), styled: false }
+  let painter = { out: StringBuilder(), styled: false, }
   painter.plain(record.timestamp.to_iso8601())
   painter.plain(" [" + level_code(record.level) + "] ")
   painter.body(record)

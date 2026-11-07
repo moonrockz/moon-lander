@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 priv suberror DecodeError {
   DecodeError(@exact.Diagnostic)
-} derive(Debug)
+}
 
 ///|
 fn object(

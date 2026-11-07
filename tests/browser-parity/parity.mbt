@@ -9,10 +9,11 @@ pub struct Case {
 }
 
 ///|
+#derive(FromJson)
 priv struct Server {
   host : String
-  port : Int
-} derive(FromJson)
+  port : Int32
+}
 
 ///|
 /// The shared cases: the complete core fixture, a parse failure and a binding
@@ -37,7 +38,9 @@ pub fn cases() -> Array[Case] raise @config.ConfigError {
     },
     {
       name: "binding",
-      builder: toml |> @config.file("defaults.toml") |> @config.file("wrong.toml"),
+      builder: toml
+      |> @config.file("defaults.toml")
+      |> @config.file("wrong.toml"),
       files: [
         ("/workspace/defaults.toml", "[server]\nhost = 'defaults'\nport = 80\n"),
         ("/workspace/wrong.toml", "[server]\nhost = 42\n"),

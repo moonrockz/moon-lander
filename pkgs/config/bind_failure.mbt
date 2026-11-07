@@ -1,9 +1,10 @@
 ///|
 /// One step of a decode path after the key path: a list index or a field name.
+#derive(Eq, Debug)
 pub(all) enum DecodeStep {
   Field(String)
-  Index(Int)
-} derive(Eq, Debug)
+  Index(Int32)
+}
 
 ///|
 pub extend DecodeStep with Eq::{equal, not_equal}
@@ -15,10 +16,11 @@ pub extend DecodeStep with @debug.Debug::{to_repr}
 /// The path of a value that failed to decode. `key` holds the leading names up
 /// to the first list index, and `None` is the root of the bound tree. `suffix`
 /// is empty or starts with an `Index` step.
+#derive(Eq, Debug)
 pub(all) struct DecodePath {
   key : KeyPath?
   suffix : Array[DecodeStep]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DecodePath with Eq::{equal, not_equal}
@@ -30,7 +32,7 @@ pub extend DecodePath with @debug.Debug::{to_repr}
 /// The text form, for example `targets[1].level` or `servers."eu.west".port`.
 /// A field name uses the quote rule of `KeyPath`. A path with no key and no
 /// suffix gives `(root)`.
-pub impl Show for DecodePath with output(self, logger) {
+pub impl Show for DecodePath with fn output(self, logger) {
   match self.key {
     Some(key) => key.output(logger)
     None => if self.suffix.is_empty() { logger.write_string("(root)") }
@@ -53,6 +55,7 @@ pub extend DecodePath with Show::{output, to_string}
 
 ///|
 /// The sources to blame for a value that failed to decode.
+#derive(Eq, Debug)
 pub(all) enum Blame {
   /// The sources that set this leaf or list, in merge order. Never empty.
   Set(Array[Origin])
@@ -62,7 +65,7 @@ pub(all) enum Blame {
   Default
   /// No source sets this key.
   Unset
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Blame with Eq::{equal, not_equal}
@@ -72,10 +75,11 @@ pub extend Blame with @debug.Debug::{to_repr}
 
 ///|
 /// A decode path and the sources to blame for it.
+#derive(Eq, Debug)
 pub(all) struct Located {
   path : DecodePath
   blame : Blame
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Located with Eq::{equal, not_equal}
@@ -86,10 +90,11 @@ pub extend Located with @debug.Debug::{to_repr}
 ///|
 /// A binding failure: the decoder or validation detail and the paths that it
 /// names. `at` holds one or more paths and is never empty.
+#derive(Eq, Debug)
 pub(all) struct BindFailure {
   at : Array[Located]
   detail : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend BindFailure with Eq::{equal, not_equal}
@@ -104,7 +109,9 @@ fn BindFailure::lines(self : BindFailure) -> String {
     return self.detail
   }
   self.at
-  .map(located => "\{located.path}: \{self.detail} (\{blame_text(located.blame)})")
+  .map(located => {
+    "\{located.path}: \{self.detail} (\{blame_text(located.blame)})"
+  })
   .join("\n")
 }
 

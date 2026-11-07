@@ -48,7 +48,9 @@ async test "Host adapter fills the inputs" {
   @env.set_env_var("LANDER_HOST_INPUT_A", "1")
   defer @env.unset_env_var("LANDER_HOST_INPUT_A")
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/app.toml", "project.name = \"disk\"")
   let seen = Ref(None)
   let config = @config.builder()
@@ -60,7 +62,9 @@ async test "Host adapter fills the inputs" {
   @expect.expect(@config.get_text(config, "project.name")).to_equal("disk")
   @expect.expect(@config.get_text(config, "a")).to_equal("1")
   guard seen.val is Some(context) else { fail("the provider did not run") }
-  @expect.expect(context.env_vars.get("LANDER_HOST_INPUT_A")).to_equal(Some("1"))
+  @expect.expect(context.env_vars.get("LANDER_HOST_INPUT_A")).to_equal(
+    Some("1"),
+  )
   // Another async test can set a variable between the load and the read below.
   // Do the same here, so the compare must leave it out on every run.
   @env.set_env_var("LANDER_HOST_INPUT_LATE", "1")
@@ -81,7 +85,9 @@ async test "Adapter uses the given values" {
   @env.set_env_var("APP_B", "2")
   defer @env.unset_env_var("APP_B")
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/conf/app.toml", "a = 1")
   let seen = Ref(None)
   let config = @config.builder()
@@ -95,7 +101,9 @@ async test "Adapter uses the given values" {
     |> load
   @expect.expect(@config.get_text(config, "a")).to_equal("1")
   @expect.expect(config.get(@config.KeyPath::parse("b"))).to_equal(None)
-  @expect.expect(config.reports()[0].path).to_equal(Some("\{dir}/conf/app.toml"))
+  @expect.expect(config.reports()[0].path).to_equal(
+    Some("\{dir}/conf/app.toml"),
+  )
   guard seen.val is Some(context) else { fail("the provider did not run") }
   @expect.expect(context.env_vars).to_equal({ "APP_A": "1" })
   @expect.expect(context.platform).to_equal(Some(Linux))
@@ -126,7 +134,9 @@ async test "Windows path in a report" {
 ///|
 async test "a missing explicit file raises file-not-found" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("\{dir}/missing/app.toml")
@@ -142,7 +152,9 @@ async test "a missing explicit file raises file-not-found" {
 ///|
 async test "discovery finds the project file on the disk" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "project.name = \"walked\"")
   write("\{dir}/src/nested/main.mbt", "")
   let config = @config.builder()
@@ -151,9 +163,9 @@ async test "discovery finds the project file on the disk" {
     |> @conventions.add(@conventions.app_dirs("acme"))
     |> load
   @expect.expect(@config.get_text(config, "project.name")).to_equal("walked")
-  @expect.expect(config.origins(@config.KeyPath::parse("project.name"))[0].location).to_equal(
-    Some("\{dir}/acme.toml"),
-  )
+  @expect.expect(
+    config.origins(@config.KeyPath::parse("project.name"))[0].location,
+  ).to_equal(Some("\{dir}/acme.toml"))
 }
 
 ///|
@@ -161,7 +173,10 @@ test "the adapter renders a typed path natively only for the file call" {
   let path = @config.FileTreePath::from_native("C:\\w\\app.toml", Windows)
   assert_eq(path.to_string(), "C:/w/app.toml")
   assert_eq(path.to_native(Windows), "C:\\w\\app.toml")
-  assert_eq(@config.FileTreePath::parse("/w/app.toml").to_native(MacOs), "/w/app.toml")
+  assert_eq(
+    @config.FileTreePath::parse("/w/app.toml").to_native(MacOs),
+    "/w/app.toml",
+  )
 }
 
 ///|
@@ -171,10 +186,10 @@ async test "a file that cannot be read is an error, not a missing file" {
     return
   }
   let dir = temp_dir()
-  defer remove_dir(dir)
+  defer @async.protect_from_cancel(() => remove_dir(dir))
   mkdir("\{dir}/locked", permission=0)
   // Restore access before recursive fixture cleanup.
-  defer chmod("\{dir}/locked", 0o755)
+  defer @async.protect_from_cancel(() => chmod("\{dir}/locked", 0o755))
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("\{dir}/locked/app.toml")
@@ -193,11 +208,11 @@ async test "discovery does not skip a file it cannot inspect" {
     return
   }
   let dir = temp_dir()
-  defer remove_dir(dir)
+  defer @async.protect_from_cancel(() => remove_dir(dir))
   write("\{dir}/acme.toml", "project.name = \"hidden\"")
   // Read but no search permission: the listing works, a stat of an entry fails.
   chmod(dir, 0o444)
-  defer chmod(dir, 0o755)
+  defer @async.protect_from_cancel(() => chmod(dir, 0o755))
   let builder = @config.builder()
     |> @config.working_dir(dir)
     |> @config.format(@toml.format())
@@ -206,7 +221,9 @@ async test "discovery does not skip a file it cannot inspect" {
     _ => ()
   } noraise {
     config =>
-      fail("discovery skipped an entry it could not inspect: \{config.reports().length()} reports")
+      fail(
+        "discovery skipped an entry it could not inspect: \{config.reports().length()} reports",
+      )
   }
 }
 
@@ -237,7 +254,9 @@ async test "Adapter uses the given variable set for a discovered environment sou
 ///|
 async test "a boundary at the temporary root keeps a parent file out" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "a = 1")
   write("\{dir}/case/.config/acme/config.toml", "b = 2")
   write("\{dir}/case/src/main.mbt", "")
@@ -263,7 +282,9 @@ async test "a boundary at the temporary root keeps a parent file out" {
 ///|
 async test "discovery reads the global file and the overrides on the disk" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/home/.acme/acme.toml", "a = \"global\"\nb = \"global\"")
   write("\{dir}/case/acme.toml", "a = \"project\"")
   write("\{dir}/case/acme.user.toml", "c = \"user\"")
@@ -304,7 +325,7 @@ async test "discovery passes over an entry it cannot inspect" {
     return
   }
   let dir = temp_dir()
-  defer remove_dir(dir)
+  defer @async.protect_from_cancel(() => remove_dir(dir))
   write("\{dir}/acme.toml", "project.name = \"found\"")
   write("\{dir}/src/main.mbt", "")
   // A link to itself: the listing holds it, and a stat of it fails (ELOOP).
@@ -326,10 +347,13 @@ async test "native and portable Windows spellings select the same file" {
   // The native spelling needs a Windows run; elsewhere `\` is a name character.
   guard running_platform() is Windows else { return }
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/cfg/app.toml", "a = 1")
   let paths = []
-  for given in ["\{dir}/cfg/app.toml", from_slash("\{dir}/cfg/app.toml", Windows)] {
+  for
+    given in ["\{dir}/cfg/app.toml", from_slash("\{dir}/cfg/app.toml", Windows)] {
     let config = @config.builder()
       |> @config.format(@toml.format())
       |> @config.file(given)

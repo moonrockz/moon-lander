@@ -2,11 +2,12 @@
 /// The selection of a source location or input. `Discover` uses the values
 /// that a host or a source provider supplies, `Explicit` uses only the given
 /// value, and `Skip` loads nothing.
+#derive(Eq, Debug)
 pub(all) enum SourceSelection[T] {
   Discover
   Explicit(T)
   Skip
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SourceSelection with Eq::{equal, not_equal}
@@ -21,7 +22,7 @@ pub extend SourceSelection with @debug.Debug::{to_repr}
 pub struct ConfigSource {
   priv kind : SourceKind
   priv name : String
-  priv priority : Int?
+  priv priority : Int32?
   priv policy : MergePolicy
   priv key_policies : Array[(KeyPath, MergePolicy)]
   priv input : SourceInput
@@ -54,8 +55,8 @@ pub fn ConfigSource::name(self : ConfigSource) -> String {
 /// An in-memory source from a value tree. The root must be a struct.
 pub fn in_memory(
   value : ConfigValue,
-  name? : String = "in-memory",
-  priority? : Int,
+  name~ : String = "in-memory",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
   value.check_root(name)
   value_source(InMemory, name, priority, value)
@@ -67,8 +68,8 @@ pub fn in_memory(
 /// merge rules, so a later pair wins. Pair values keep their type.
 pub fn in_memory_pairs(
   pairs : Array[(String, ConfigValue)],
-  name? : String = "in-memory",
-  priority? : Int,
+  name~ : String = "in-memory",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
   let mut value = fields([])
   for pair in pairs {
@@ -83,18 +84,23 @@ pub fn in_memory_pairs(
 /// The root must be an object.
 pub fn ConfigSource::defaults(
   json : Json,
-  name? : String = "defaults",
-  priority? : Int,
+  name~ : String = "defaults",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
-  value_source(Defaults, name, priority, ConfigValue::from_json(json, origin=name))
+  value_source(
+    Defaults,
+    name,
+    priority,
+    ConfigValue::from_json(json, origin=name),
+  )
 }
 
 ///|
 /// A defaults source from a value tree. The root must be a struct.
 pub fn ConfigSource::defaults_value(
   value : ConfigValue,
-  name? : String = "defaults",
-  priority? : Int,
+  name~ : String = "defaults",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
   value.check_root(name)
   value_source(Defaults, name, priority, value)
@@ -107,9 +113,9 @@ pub fn ConfigSource::defaults_value(
 /// path when no name is given.
 pub fn ConfigSource::file(
   path : String,
-  role? : FileRole = Explicit,
+  role~ : FileRole = Explicit,
   name? : String,
-  priority? : Int,
+  priority? : Int32,
 ) -> ConfigSource {
   {
     kind: File(role),
@@ -130,9 +136,9 @@ pub fn ConfigSource::file(
 pub fn ConfigSource::parsed_file(
   path : String,
   value : ConfigValue,
-  role? : FileRole = Explicit,
+  role~ : FileRole = Explicit,
   name? : String,
-  priority? : Int,
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
   value.check_root(path)
   {
@@ -155,9 +161,9 @@ pub fn ConfigSource::parsed_file(
 pub fn ConfigSource::candidates(
   paths : Array[String],
   display~ : String,
-  role? : FileRole = Explicit,
+  role~ : FileRole = Explicit,
   name? : String,
-  priority? : Int,
+  priority? : Int32,
 ) -> ConfigSource {
   {
     kind: File(role),
@@ -176,7 +182,7 @@ pub fn ConfigSource::candidates(
 pub fn ConfigSource::skipped(
   kind : SourceKind,
   name? : String,
-  priority? : Int,
+  priority? : Int32,
 ) -> ConfigSource {
   {
     kind,
@@ -198,7 +204,7 @@ pub fn ConfigSource::exclude(
   paths : Array[KeyPath],
   warn~ : Bool,
 ) -> ConfigSource {
-  { ..self, excluded: [..self.excluded, ..paths.map(path => (path, warn))] }
+  { ..self, excluded: [..self.excluded, ..paths.map(path => (path, warn))], }
 }
 
 ///|
@@ -221,14 +227,14 @@ pub fn ConfigSource::with_key_policy(
 ) -> ConfigSource {
   let policies = self.key_policies.filter(entry => entry.0 != key)
   policies.push((key, policy))
-  { ..self, key_policies: policies }
+  { ..self, key_policies: policies, }
 }
 
 ///|
 fn value_source(
   kind : SourceKind,
   name : String,
-  priority : Int?,
+  priority : Int32?,
   value : ConfigValue,
 ) -> ConfigSource {
   {
@@ -263,7 +269,7 @@ fn remove_key(value : ConfigValue, names : ArrayView[String]) -> ConfigValue? {
   if rest.is_empty() {
     kept.remove(index) |> ignore
   } else {
-    guard remove_key({ ion: fields[index].value() }, rest) is Some(child) else {
+    guard remove_key({ ion: fields[index].value(), }, rest) is Some(child) else {
       return None
     }
     kept[index] = @ion.Field::from_token(fields[index].name(), child.ion)

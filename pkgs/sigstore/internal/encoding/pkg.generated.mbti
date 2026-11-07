@@ -17,10 +17,11 @@ pub fn encode_hex(BytesView) -> String
 pub fn utf8(StringView) -> Bytes
 
 // Errors
+#derive(@debug.Debug)
 pub suberror EncodingError {
   BadBase64(String)
   BadHex(String)
-} derive(@debug.Debug)
+}
 pub fn EncodingError::to_repr(Self) -> @debug.Repr
 
 // Types and methods

@@ -11,9 +11,11 @@ a custom registry with Markdown available. Registration returns a new format.
 test "example: DIB file tree with a custom kernel" {
   let format = @tree_dib.Format::new(
     default=@source_dib.KernelInfo(@source_dib.KernelName("moonbit")),
-  ).with_kernel(@source_dib.KernelInfo(
-    @source_dib.KernelName("python"), aliases=[@source_dib.KernelName("py")],
-  ))
+  ).with_kernel(
+    @source_dib.KernelInfo(@source_dib.KernelName("python"), aliases=[
+      @source_dib.KernelName("py"),
+    ]),
+  )
   let source =
     #|#!tree
     #|#!directory fixtures/empty
@@ -30,7 +32,8 @@ test "example: DIB file tree with a custom kernel" {
   assert_eq(tree.files()[2].source(), "")
   assert_eq(format.read(format.write(tree)), tree)
   let file = format.file(
-    @files.TreePath::parse("other.py"), "print(1)\n",
+    @files.TreePath::parse("other.py"),
+    "print(1)\n",
     kernel=@source_dib.KernelName("py"),
   )
   assert_eq(file.kernel(), @source_dib.KernelName("python"))

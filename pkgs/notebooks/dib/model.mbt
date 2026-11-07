@@ -2,6 +2,7 @@
 /// A DIB metadata, kernel registration or serialization failure.
 /// UnrepresentableSource identifies a zero-based cell index and a one-based
 /// line within its normalized source. Metadata line numbers are one-based.
+#derive(Eq, Debug)
 pub(all) suberror FormatError {
   /// Invalid metadata syntax, representation or structure. Line numbers are one-based;
   /// programmatic validation and registration diagnostics use line 1.
@@ -15,7 +16,7 @@ pub(all) suberror FormatError {
   /// A zero-based cell and one-based source line contain a selector that
   /// would split the cell if serialized.
   UnrepresentableSource(cell~ : Int32, line~ : Int32)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FormatError with Eq::{equal, not_equal}
@@ -26,9 +27,10 @@ pub extend FormatError with @debug.Debug::{to_repr}
 ///|
 /// A validated kernel name or alias. Names are case-sensitive and nonblank;
 /// they cannot start with #, contain line breaks or name a metadata header.
+#derive(Eq, Debug)
 struct KernelName {
   value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend KernelName with Eq::{equal, not_equal}
@@ -68,11 +70,12 @@ pub fn KernelName::to_string(self : KernelName) -> String {
 ///|
 /// An immutable registration describing a canonical kernel name, its aliases
 /// and an optional language label. Names alone do not execute or install a kernel.
+#derive(Eq, Debug)
 struct KernelInfo {
   name : KernelName
   aliases : ReadOnlyArray[KernelName]
   language : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend KernelInfo with Eq::{equal, not_equal}
@@ -113,11 +116,12 @@ pub fn KernelInfo::language(self : KernelInfo) -> String? {
 /// An immutable execution environment used to distinguish cell selectors
 /// from source directives. Lookups map canonical names and aliases to canonical
 /// KernelName values. Parsing also supplies the Markdown pseudo-kernel.
+#derive(Eq, Debug)
 struct KernelRegistry {
   kernels : ReadOnlyArray[KernelInfo]
   default_kernel : KernelName
   aliases : Map[String, KernelName]
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend KernelRegistry with Eq::{equal, not_equal}
@@ -215,12 +219,13 @@ pub fn KernelRegistry::standard() -> KernelRegistry {
 ///|
 /// Select the compatible normalized DIB representation or preserve source-cell
 /// boundaries and LF-normalized payload exactly through the lossless codec.
+#derive(Eq, Debug)
 pub(all) enum SourceMode {
   /// Trim empty boundary lines and omit empty source sections.
   Normalized
   /// Retain empty cells and boundary lines, without writer padding.
   Lossless
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SourceMode with Eq::{equal, not_equal}
@@ -233,10 +238,11 @@ pub extend SourceMode with @debug.Debug::{to_repr}
 /// endings and, by default, trim only empty boundary lines. Lossless mode
 /// retains boundary lines. Notebook construction resolves kernel aliases;
 /// a standalone cell may still contain an alias.
+#derive(Eq, Debug)
 struct Cell {
   source : String
   kernel : KernelName
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Cell with Eq::{equal, not_equal}
@@ -284,12 +290,13 @@ pub fn Cell::kind(self : Cell) -> @notebooks.CellKind {
 /// An immutable column-zero #! line retained in cell source, with a name,
 /// unparsed arguments, exact normalized line text and one-based source line.
 /// This view does not execute commands or interpret quoted arguments.
+#derive(Eq, Debug)
 struct Directive {
   text : String
   name : String
   arguments : String
   line : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Directive with Eq::{equal, not_equal}
@@ -352,11 +359,12 @@ pub fn Cell::directives(self : Cell) -> ReadOnlyArray[Directive] {
 ///|
 /// An immutable DIB source notebook with ordered cells, metadata and the
 /// kernel registry needed to interpret its selectors. DIB stores no outputs.
+#derive(Eq, Debug)
 struct Notebook {
   cells : ReadOnlyArray[Cell]
   metadata : Metadata
   registry : KernelRegistry
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Notebook with Eq::{equal, not_equal}

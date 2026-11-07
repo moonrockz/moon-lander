@@ -91,9 +91,7 @@ fn sct_extension(certificate : @x509.Certificate) -> Bytes raise {
 ///|
 /// The rule of a `BadSct`, or the number of SCTs.
 fn list_outcome(value : BytesView) -> String {
-  try {
-    "ok \{@sct.parse_list(value).length()}"
-  } catch {
+  "ok \{@sct.parse_list(value).length()}" catch {
     BadSct(rule) => rule
   }
 }
@@ -218,7 +216,7 @@ fn morphir_list() -> Bytes raise {
 
 ///|
 /// `bytes` with the byte at `at` changed by `xor`.
-fn flip(bytes : Bytes, at : Int, xor : Byte) -> Bytes {
+fn flip(bytes : Bytes, at : Int32, xor : Byte) -> Bytes {
   let out = bytes.to_array()
   out[at] = out[at] ^ xor
   Bytes::from_array(out)

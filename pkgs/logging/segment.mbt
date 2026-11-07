@@ -2,6 +2,7 @@
 /// One ordered part of the message text of an event. A renderer uses the
 /// segments to show the literal text and the bound values in different styles.
 /// The text of all segments, in order, is equal to `LogEvent::message`.
+#derive(Eq, Debug)
 pub(all) enum MessageSegment {
   /// Literal text of the template. A hole that has no property stays here as
   /// its literal text, for example `{Target}`, as `message` shows it.
@@ -9,7 +10,7 @@ pub(all) enum MessageSegment {
   /// A hole with a bound property: the hole name and the JSON value. When a name
   /// occurs in more than one hole, each of these holes holds the first value.
   Value(name~ : String, value~ : Json)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MessageSegment with Eq::{equal, not_equal}

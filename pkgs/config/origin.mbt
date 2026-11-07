@@ -1,6 +1,7 @@
 ///|
 /// The role of a file source. Reports and error text show a role by its report
 /// name, for example `user-override`.
+#derive(Eq, Debug)
 pub(all) enum FileRole {
   Explicit
   System
@@ -12,7 +13,7 @@ pub(all) enum FileRole {
   LocalOverride
   UserOverride
   Legacy
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend FileRole with Eq::{equal, not_equal}
@@ -22,13 +23,14 @@ pub extend FileRole with @debug.Debug::{to_repr}
 
 ///|
 /// The kind of a configuration source.
+#derive(Eq, Debug)
 pub(all) enum SourceKind {
   Defaults
   InMemory
   File(FileRole)
   Environment
   Overrides
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SourceKind with Eq::{equal, not_equal}
@@ -40,12 +42,13 @@ pub extend SourceKind with @debug.Debug::{to_repr}
 /// The source that set a value: its kind, display name, display priority, and
 /// location. The location is a file path in the `/` form or an environment
 /// variable name.
+#derive(Eq, Debug)
 pub(all) struct Origin {
   kind : SourceKind
   source : String
-  priority : Int
+  priority : Int32
   location : String?
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Origin with Eq::{equal, not_equal}

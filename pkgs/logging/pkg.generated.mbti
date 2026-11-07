@@ -4,6 +4,7 @@ package "moonrockz/moon-lander-logging"
 import {
   "moonbitlang/core/builtin",
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -18,6 +19,7 @@ pub fn with_category(&Logger, String) -> &Logger
 // Errors
 
 // Types and methods
+#derive(Compare, Eq, @debug.Debug)
 pub(all) enum Level {
   Trace
   Debug
@@ -25,7 +27,7 @@ pub(all) enum Level {
   Warning
   Error
   Critical
-} derive(Compare, Eq, @debug.Debug)
+}
 pub fn Level::compare(Self, Self) -> Int32
 pub fn Level::equal(Self, Self) -> Bool
 pub fn Level::not_equal(Self, Self) -> Bool
@@ -46,8 +48,8 @@ pub struct LogEvent {
   // private fields
 }
 pub fn LogEvent::message(Self) -> String
-pub fn LogEvent::properties(Self) -> Array[(String, Json)]
-pub fn LogEvent::property(Self, String) -> Json?
+pub fn LogEvent::properties(Self) -> Array[(String, @json.Json)]
+pub fn LogEvent::property(Self, String) -> @json.Json?
 pub fn LogEvent::segments(Self) -> Array[MessageSegment]
 pub fn LogEvent::to_line(Self) -> String
 
@@ -60,10 +62,11 @@ pub fn MemoryLogger::log(Self, LogEvent) -> Unit
 pub fn MemoryLogger::new() -> Self
 pub impl Logger for MemoryLogger
 
+#derive(Eq, @debug.Debug)
 pub(all) enum MessageSegment {
   Text(String)
-  Value(name~ : String, value~ : Json)
-} derive(Eq, @debug.Debug)
+  Value(name~ : String, value~ : @json.Json)
+}
 pub fn MessageSegment::equal(Self, Self) -> Bool
 pub fn MessageSegment::not_equal(Self, Self) -> Bool
 pub fn MessageSegment::text(Self) -> String
@@ -76,10 +79,10 @@ pub(open) trait Logger {
   fn enabled(Self, Level) -> Bool = _
   fn log(Self, LogEvent) -> Unit
 }
-pub fn &Logger::critical(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::debug(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::error(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::info(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::trace(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::warn(Self, String, Array[Json], error? : Error) -> Unit
-pub fn &Logger::write(Self, Level, String, Array[Json], error? : Error) -> Unit
+pub fn &Logger::critical(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::debug(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::error(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::info(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::trace(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::warn(Self, String, Array[@json.Json], error? : Error) -> Unit
+pub fn &Logger::write(Self, Level, String, Array[@json.Json], error? : Error) -> Unit

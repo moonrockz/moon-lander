@@ -1,9 +1,10 @@
 ///|
 /// An argument id that can supply a configuration override. The standard
 /// discovery ids cannot be mapped.
+#derive(Eq, Debug)
 pub struct OverrideOption {
   priv id : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend OverrideOption with Eq::{equal, not_equal}
@@ -13,9 +14,10 @@ pub extend OverrideOption with @debug.Debug::{to_repr}
 
 ///|
 /// A mapping id is empty or is reserved for host discovery.
+#derive(Debug)
 pub suberror MappingError {
   InvalidOverrideOption(input~ : String, reason~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend MappingError with @debug.Debug::{to_repr}
@@ -24,14 +26,27 @@ pub extend MappingError with @debug.Debug::{to_repr}
 /// Parse a non-empty argparse id. Reject `environment`, `config`, `isolated`
 /// `project`, `profiles` and `no-profiles`, which supply host discovery inputs
 /// rather than config values.
-pub fn OverrideOption::parse(text : String) -> OverrideOption raise MappingError {
+pub fn OverrideOption::parse(
+  text : String,
+) -> OverrideOption raise MappingError {
   if text.is_empty() {
-    raise InvalidOverrideOption(input=text, reason="the argument id must not be empty")
+    raise InvalidOverrideOption(
+      input=text,
+      reason="the argument id must not be empty",
+    )
   }
   match text {
-    "environment" | "config" | "isolated" | "project" | "profiles" | "no-profiles" =>
-      raise InvalidOverrideOption(input=text, reason="the argument id is reserved for host discovery")
-    _ => { id: text }
+    "environment"
+    | "config"
+    | "isolated"
+    | "project"
+    | "profiles"
+    | "no-profiles" =>
+      raise InvalidOverrideOption(
+        input=text,
+        reason="the argument id is reserved for host discovery",
+      )
+    _ => { id: text, }
   }
 }
 
@@ -68,10 +83,10 @@ pub struct Mapping {
 pub fn map(
   option : OverrideOption,
   key : @config.KeyPath,
-  action? : MappingAction = Set,
+  action~ : MappingAction = Set,
   parse? : (String) -> @config.ConfigValue raise,
 ) -> Mapping {
-  { option, key, action, parse }
+  { option, key, action, parse, }
 }
 
 ///|
@@ -80,7 +95,10 @@ pub fn map(
 /// for the same id wins. A Default value never hides an explicit ancestor.
 /// The application still dispatches subcommands. Conversion failures give
 /// UsageError before the host loads configuration or creates services.
-pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @config.ConfigSource raise UsageError {
+pub fn to_overrides(
+  matches : @argparse.Matches,
+  mappings : Array[Mapping],
+) -> @config.ConfigSource raise UsageError {
   let mut tree = @config.fields([])
   for mapping in mappings {
     let mut selected = None
@@ -101,11 +119,16 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
             e => e.to_string()
           }
           let input = match mapping.action {
-            Count => node.flag_counts.get(mapping.option.id).unwrap_or(0).to_string()
-            Flag => node.flags.get(mapping.option.id).unwrap_or(false).to_string()
-            Set | Append => @debug.to_string(node.values.get(mapping.option.id).unwrap_or([]))
+            Count =>
+              node.flag_counts.get(mapping.option.id).unwrap_or(0).to_string()
+            Flag =>
+              node.flags.get(mapping.option.id).unwrap_or(false).to_string()
+            Set | Append =>
+              @debug.to_string(node.values.get(mapping.option.id).unwrap_or([]))
           }
-          raise UsageError("Cannot map argument \"\{mapping.option.id}\" with value \{input} to \"\{mapping.key}\": \{message}")
+          raise UsageError(
+            "Cannot map argument \"\{mapping.option.id}\" with value \{input} to \"\{mapping.key}\": \{message}",
+          )
         }
       }
       if value is Some(value) {
@@ -126,32 +149,49 @@ pub fn to_overrides(matches : @argparse.Matches, mappings : Array[Mapping]) -> @
 }
 
 ///|
-fn mapped_value(matches : @argparse.Matches, mapping : Mapping) -> @config.ConfigValue? raise {
+fn mapped_value(
+  matches : @argparse.Matches,
+  mapping : Mapping,
+) -> @config.ConfigValue? raise {
   let id = mapping.option.id
   match mapping.action {
     Count => {
       // Argparse omits a zero count from flag_counts, but keeps its flag and
       // source. The explicit-source gate has already excluded Default.
-      guard matches.flags.contains(id) else { raise UsageError("Count mapping requires a count flag") }
+      guard matches.flags.contains(id) else {
+        raise UsageError("Count mapping requires a count flag")
+      }
       let count = matches.flag_counts.get(id).unwrap_or(0)
-      Some(match mapping.parse {
-        Some(parse) => parse(count.to_string())
-        None => @config.int(count.to_int64())
-      })
+      Some(
+        match mapping.parse {
+          Some(parse) => parse(count.to_string())
+          None => @config.int(count.to_int64())
+        },
+      )
     }
     Flag => {
-      guard matches.flags.get(id) is Some(flag) else { raise UsageError("Flag mapping requires a boolean flag") }
-      Some(match mapping.parse {
-        Some(parse) => parse(flag.to_string())
-        None => @config.bool(flag)
-      })
+      guard matches.flags.get(id) is Some(flag) else {
+        raise UsageError("Flag mapping requires a boolean flag")
+      }
+      Some(
+        match mapping.parse {
+          Some(parse) => parse(flag.to_string())
+          None => @config.bool(flag)
+        },
+      )
     }
     Set | Append => {
-      guard matches.values.get(id) is Some(values) else { raise UsageError("Set or Append mapping requires a value argument") }
+      guard matches.values.get(id) is Some(values) else {
+        raise UsageError("Set or Append mapping requires a value argument")
+      }
       let parse = mapping.parse.unwrap_or(text => @config.string(text))
       match mapping.action {
         Append => Some(@config.list(values.map(value => parse(value))))
-        _ => match values { [.., last] => Some(parse(last)); _ => None }
+        _ =>
+          match values {
+            [.., last] => Some(parse(last))
+            _ => None
+          }
       }
     }
   }

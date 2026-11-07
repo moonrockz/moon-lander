@@ -1,7 +1,11 @@
 ///|
 /// The TOML format for `.toml` files.
 pub fn format() -> @config.Format {
-  { name: "TOML", extensions: ["toml"], parse: (text, origin) => parse(text, origin~) }
+  {
+    name: "TOML",
+    extensions: ["toml"],
+    parse: (text, origin) => parse(text, origin~),
+  }
 }
 
 ///|
@@ -41,10 +45,14 @@ fn to_ion(
     TomlDateTime(_) => {
       let (kind, spelling) = value.datetime_info().unwrap()
       if kind == "LocalTime" {
-        @ion.Ion::string(spelling).with_annotation(@ion.symbol("toml_local_time"))
+        @ion.Ion::string(spelling).with_annotation(
+          @ion.symbol("toml_local_time"),
+        )
       } else {
-        let text = spelling.replace_all(old=" ", new="T")
-          .replace_all(old="t", new="T").replace_all(old="z", new="Z")
+        let text = spelling
+          .replace_all(old=" ", new="T")
+          .replace_all(old="t", new="T")
+          .replace_all(old="z", new="Z")
         let text = if kind == "LocalDateTime" { text + "-00:00" } else { text }
         let timestamp = @ion.Timestamp::parse(text[:]) catch {
           error => raise parse_error(origin, error.message())

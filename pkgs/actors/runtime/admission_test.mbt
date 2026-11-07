@@ -2,12 +2,12 @@
 /// A protocol for admission tests: `Block` waits at a gate.
 enum Work {
   Block
-  Item(Int)
+  Item(Int32)
   End
 }
 
 ///|
-fn capacity(count : Int) -> @actors.MailboxPolicy {
+fn capacity(count : Int32) -> @actors.MailboxPolicy {
   Bounded(@actors.MailboxCapacity::from_int(count)) catch {
     _ => panic()
   }
@@ -19,7 +19,7 @@ fn capacity(count : Int) -> @actors.MailboxPolicy {
 fn start_worker(
   scope : @actors.Scope,
   mailbox : @actors.MailboxPolicy,
-  log : Array[Int],
+  log : Array[Int32],
   started : @aio.Queue[Unit],
   gate : @aio.Queue[Unit],
 ) -> @actors.Actor[Work, Unit] raise @actors.ActorError {
@@ -270,7 +270,7 @@ async test "ADM-1: a busy actor yields between batches so another ready actor ma
     // Each message takes about a millisecond and never suspends.
     let busy = scope.start(
       0,
-      (count, _ : Int) => {
+      (count, _ : Int32) => {
         spin_one_millisecond()
         if count == 199 {
           order.push("busy done")
@@ -279,7 +279,7 @@ async test "ADM-1: a busy actor yields between batches so another ready actor ma
       },
       mailbox=Unbounded,
     )
-    let other = scope.start((), (_, _ : Int) => {
+    let other = scope.start((), (_, _ : Int32) => {
       order.push("other")
       Continue(())
     })
@@ -298,9 +298,9 @@ async test "ADM-1: a busy actor yields between batches so another ready actor ma
 /// A receive that takes one message, puts it back and starts again, with no
 /// suspension.
 fn cycle(
-  context : @actors.ActorContext[Int],
+  context : @actors.ActorContext[Int32],
   one : @actors.MessageCount,
-) -> @actors.Receive[Int, Unit] {
+) -> @actors.Receive[Int32, Unit] {
   @actors.receive_n(one, value => ignore(context.reenqueue(value))).bind(_ => {
     cycle(context, one)
   })
@@ -312,7 +312,7 @@ async test "ADM-1: chained one-message loops still yield to another ready actor"
   @actors.scope(scope => {
     let one = @actors.MessageCount::from_int(1)
     let busy = scope.spawn(context => cycle(context, one))
-    let other = scope.start((), (_, _ : Int) => {
+    let other = scope.start((), (_, _ : Int32) => {
       order.push("other")
       Continue(())
     })

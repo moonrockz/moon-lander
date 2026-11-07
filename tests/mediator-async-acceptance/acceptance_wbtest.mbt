@@ -27,7 +27,7 @@ suberror AcceptanceError {
 
 ///|
 fn empty_context() -> AcceptanceContext {
-  { services: { greeting: "Pong" } }
+  { services: { greeting: "Pong", }, }
 }
 
 ///|
@@ -38,7 +38,7 @@ fn empty_context() -> AcceptanceContext {
 fn handler(
   log : Array[String],
   name : String,
-  wait_ms~ : Int = 10,
+  wait_ms~ : Int32 = 10,
   fails~ : Bool = false,
   stops~ : Bool = false,
 ) -> async (AcceptanceContext, Joined) -> Unit {
@@ -65,16 +65,18 @@ fn note_if(on : Bool, log : Array[String], text : String) -> Unit {
 ///|
 /// The positions and `Closed` names of a `PublishFailed`, and its handler
 /// count.
-fn publish_failures(error : Error) -> (Int, Array[(Int, String)]) raise {
+fn publish_failures(error : Error) -> (Int32, Array[(Int32, String)]) raise {
   guard error is @mediator.PublishFailed(handlers~, failures~) else {
     fail("publish raised another error: \{error}")
   }
-  let seen = failures.to_array().map(failure => {
-    guard failure.error is Closed(name) else {
-      fail("a failure holds another error: \{failure.error}")
-    }
-    (failure.position, name)
-  })
+  let seen = failures
+    .to_array()
+    .map(failure => {
+      guard failure.error is Closed(name) else {
+        fail("a failure holds another error: \{failure.error}")
+      }
+      (failure.position, name)
+    })
   (handlers, seen)
 }
 
@@ -84,7 +86,7 @@ fn publish_failures(error : Error) -> (Int, Array[(Int, String)]) raise {
 /// `ping stopped` when the handler ends in any way.
 fn ping_sender(
   log : Array[String],
-  wait_ms~ : Int = 10,
+  wait_ms~ : Int32 = 10,
   stops~ : Bool = false,
 ) -> @mediator_async.Sender[AcceptanceContext, Ping, String] {
   @mediator_async.sender((ctx, req) => {
@@ -114,8 +116,7 @@ async test "Send a ping through an async sender" {
 /// Stop, wanted : Ping` (moonc v0.10.17). This test proves that the sender
 /// type fixes the request type that compiles.
 async test "A request of the wrong type" {
-  let ping : @mediator_async.Sender[AcceptanceContext, Ping, String] = ping_sender(
-    [],
+  let ping : @mediator_async.Sender[AcceptanceContext, Ping, String] = ping_sender([],
   )
   assert_eq(ping.send(empty_context(), Ping("typed")), "Pong: typed")
 }
@@ -125,12 +126,13 @@ async test "A request of the wrong type" {
 ///|
 async test "Async handler raises" {
   let failing : @mediator_async.Sender[AcceptanceContext, Ping, String] = @mediator_async.sender((
-    _,
-    _,
-  ) => {
-    @async.sleep(10)
-    raise Closed("closed")
-  })
+      _,
+      _,
+    ) => {
+      @async.sleep(10)
+      raise Closed("closed")
+    },
+  )
   try failing.send(empty_context(), Ping("Hello")) catch {
     Closed(text) => assert_eq(text, "closed")
     other => fail("send raised another error: \{other}")
@@ -161,9 +163,13 @@ async test "Second of three async handlers raises" {
 ///|
 async test "No async handler raises" {
   let log = []
-  let topic = @mediator_async.topic(handler(log, "one")).add(handler(log, "two"))
+  let topic = @mediator_async.topic(handler(log, "one")).add(
+    handler(log, "two"),
+  )
   topic.publish(empty_context(), Joined("Ann"))
-  assert_eq(log, ["one start Ann", "one end Ann", "two start Ann", "two end Ann"])
+  assert_eq(log, [
+    "one start Ann", "one end Ann", "two start Ann", "two end Ann",
+  ])
 }
 
 // Requirement: Concurrent publish runs every handler at the same time
@@ -175,15 +181,17 @@ async test "Handlers overlap" {
     handler(log, "two", wait_ms=10),
   )
   topic.publish_concurrent(empty_context(), Joined("Ann"))
-  assert_eq(log, ["one start Ann", "two start Ann", "two end Ann", "one end Ann"])
+  assert_eq(log, [
+    "one start Ann", "two start Ann", "two end Ann", "one end Ann",
+  ])
 }
 
 ///|
 async test "Failures in add order" {
   let log = []
   let topic = @mediator_async.topic(
-    handler(log, "one", wait_ms=200, fails=true),
-  )
+      handler(log, "one", wait_ms=200, fails=true),
+    )
     .add(handler(log, "two", wait_ms=100))
     .add(handler(log, "three", wait_ms=10, fails=true))
   try topic.publish_concurrent(empty_context(), Joined("Ann")) catch {
@@ -290,7 +298,9 @@ async test "The handler is too slow" {
 ///|
 async test "The handler ends in time" {
   let log = []
-  let limited = ping_sender(log, wait_ms=10).use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(1000)))
+  let limited = ping_sender(log, wait_ms=10).use_(
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(1000)),
+  )
   assert_eq(limited.send(empty_context(), Ping("Hello")), "Pong: Hello")
 }
 
@@ -355,13 +365,14 @@ async test "Handler reads services from the context" {
 async test "Wrap a core sender" {
   let log = []
   let core : @mediator.Sender[AcceptanceContext, Ping, String] = @mediator.sender((
-    ctx,
-    req,
-  ) => {
-    log.push("core handler")
-    let Ping(text) = req
-    ctx.services.greeting + ": " + text
-  })
+      ctx,
+      req,
+    ) => {
+      log.push("core handler")
+      let Ping(text) = req
+      ctx.services.greeting + ": " + text
+    },
+  )
   let logged = core.use_(
     @mediator.middleware((next, ctx, req) => {
       log.push("core log in")

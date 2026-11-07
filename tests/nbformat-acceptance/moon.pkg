@@ -1,7 +1,7 @@
 import {
   "moonbitlang/async",
   "moonrockz/notebooks/nbformat",
-  "moonrockz/moonspec",
+  "moonrockz/moonspec/async" @moonspec,
   "moonrockz/expect",
 } for "wbtest"
 

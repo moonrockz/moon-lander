@@ -13,27 +13,30 @@ pub fn digest(HashAlgorithm, BytesView) -> Bytes
 pub fn sha256(BytesView) -> Bytes
 
 // Errors
+#derive(@debug.Debug)
 pub suberror KeyError {
   UnsupportedKey(String)
   BadKey(String)
-} derive(@debug.Debug)
+}
 pub fn KeyError::message(Self) -> String
 pub fn KeyError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum HashAlgorithm {
   Sha256
   Sha384
   Sha512
-} derive(Eq, @debug.Debug)
+}
 pub fn HashAlgorithm::equal(Self, Self) -> Bool
 pub fn HashAlgorithm::not_equal(Self, Self) -> Bool
 pub fn HashAlgorithm::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum KeyKind {
   EcdsaP256
   EcdsaP384
-} derive(Eq, @debug.Debug)
+}
 pub fn KeyKind::equal(Self, Self) -> Bool
 pub fn KeyKind::hash(Self) -> HashAlgorithm
 pub fn KeyKind::not_equal(Self, Self) -> Bool

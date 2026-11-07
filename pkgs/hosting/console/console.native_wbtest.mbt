@@ -1,11 +1,11 @@
 ///|
-extern "C" fn stub_kind_of_event(event : Int) -> Int = "moonlander_console_kind_of_event"
+extern "C" fn stub_kind_of_event(event : Int32) -> Int32 = "moonlander_console_kind_of_event"
 
 ///|
-extern "C" fn stub_kind_of_signal(signal : Int) -> Int = "moonlander_console_kind_of_signal"
+extern "C" fn stub_kind_of_signal(signal : Int32) -> Int32 = "moonlander_console_kind_of_signal"
 
 ///|
-extern "C" fn stub_exit_code(kind : Int) -> Int = "moonlander_console_exit_code"
+extern "C" fn stub_exit_code(kind : Int32) -> Int32 = "moonlander_console_exit_code"
 
 ///|
 test "install succeeds and no signal is recorded before a signal" {
@@ -18,7 +18,7 @@ test "install succeeds and no signal is recorded before a signal" {
 /// cannot send `CTRL_CLOSE_EVENT`, and `CTRL_C_EVENT` reaches every process
 /// on the console, so this test covers their mapping on every platform.
 test "each Windows console event maps to its kind and exit code" {
-  let cases : Array[(Int, @hosting.SignalKind, Int)] = [
+  let cases : Array[(Int32, @hosting.SignalKind, Int32)] = [
     (0, Interrupt, 130), // CTRL_C_EVENT
     (1, Quit, 131), // CTRL_BREAK_EVENT
     (2, Terminate, 143), // CTRL_CLOSE_EVENT
@@ -43,7 +43,7 @@ test "each POSIX signal maps to its kind and exit code" {
     return
   }
   // The signal numbers that Linux and macOS share.
-  let cases : Array[(Int, @hosting.SignalKind, Int)] = [
+  let cases : Array[(Int32, @hosting.SignalKind, Int32)] = [
     (2, Interrupt, 130), // SIGINT
     (15, Terminate, 143), // SIGTERM
     (3, Quit, 131), // SIGQUIT

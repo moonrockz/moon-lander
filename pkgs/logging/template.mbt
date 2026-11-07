@@ -66,7 +66,10 @@ fn is_hole_name_char(char : Char) -> Bool {
 /// Pair the holes of `parts` with `args` in order. A hole with no argument gives
 /// no property, and an argument with no hole is dropped. Each value is a copy, so
 /// a later change to an argument does not change the event.
-fn bind_properties(parts : Array[Part], args : Array[Json]) -> Array[(String, Json)] {
+fn bind_properties(
+  parts : Array[Part],
+  args : Array[Json],
+) -> Array[(String, Json)] {
   let properties = []
   for part in parts {
     guard part is Hole(name) else { continue }

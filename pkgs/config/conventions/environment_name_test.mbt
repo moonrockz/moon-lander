@@ -22,7 +22,8 @@ test "an environment name is nonempty but can have one character" {
 
 ///|
 test "only the complete reserved names user and local are rejected in any case" {
-  for text in ["user", "User", "uSeR", "USER", "local", "Local", "lOcAl", "LOCAL"] {
+  for
+    text in ["user", "User", "uSeR", "USER", "local", "Local", "lOcAl", "LOCAL"] {
     rejected_environment_name(text, "reserved")
   }
   for text in ["users", "locals", "use", "loca", "user-2", "local_2"] {
@@ -44,7 +45,8 @@ test "slashes backslashes and dots are rejected at any position" {
 
 ///|
 test "control character ranges reject their endpoints and accept adjacent characters" {
-  for char in ['\u{0}', '\u{1F}', '\u{7F}', '\u{80}', '\u{9F}', '\t', '\n', '\r'] {
+  for
+    char in ['\u{0}', '\u{1F}', '\u{7F}', '\u{80}', '\u{9F}', '\t', '\n', '\r'] {
     rejected_environment_name("a" + char.to_string() + "b", "control character")
   }
   for char in ['\u{20}', '\u{7E}', '\u{A0}'] {
@@ -63,12 +65,17 @@ test "environment names preserve text and equality is exact" {
 ///|
 test "parse errors name the input source including a builder default" {
   for source in [Some("--environment"), Some("ACME_ENVIRONMENT"), None] {
-    try { ignore(@conventions.EnvironmentName::parse("local", source?)) } catch {
+    try ignore(@conventions.EnvironmentName::parse("local", source?)) catch {
       @config.InvalidEnvironmentName(name~, reason~) => {
         assert_eq(name, "local")
-        assert_eq(reason, "the name is reserved (from \{source.unwrap_or("the builder default")})")
+        assert_eq(
+          reason,
+          "the name is reserved (from \{source.unwrap_or("the builder default")})",
+        )
       }
       error => raise error
-    } noraise { _ => fail("expected InvalidEnvironmentName") }
+    } noraise {
+      _ => fail("expected InvalidEnvironmentName")
+    }
   }
 }

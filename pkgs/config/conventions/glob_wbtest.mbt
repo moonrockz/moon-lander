@@ -8,24 +8,25 @@ let segment_names : Array[String] = [
 ///|
 /// A generated path: segment names, and a choice that a property uses to
 /// split or change the path.
+#derive(Debug)
 priv struct PathCase {
   choices : ReadOnlyArray[UInt32]
   pick : UInt32
-} derive(Debug)
+}
 
 ///|
 impl @quickcheck.Arbitrary for PathCase with fn arbitrary(size, state) {
   let (choices, pick) : (ReadOnlyArray[UInt32], UInt32) = @quickcheck.Arbitrary::arbitrary(
     size, state,
   )
-  { choices, pick }
+  { choices, pick, }
 }
 
 ///|
 impl @shrink.Shrink for PathCase with fn shrink(self) {
   @shrink.Shrink::shrink((self.choices, self.pick)).map(parts => {
     let (choices, pick) = parts
-    { choices, pick }
+    { choices, pick, }
   })
 }
 
@@ -48,13 +49,13 @@ fn PathCase::path(self : PathCase) -> Array[String] {
 
 ///|
 /// A split position in `0..=length`.
-fn PathCase::split(self : PathCase, length : Int) -> Int {
+fn PathCase::split(self : PathCase, length : Int32) -> Int32 {
   index_of(self.pick, length + 1)
 }
 
 ///|
 /// `choice` as an index in `0..<count`.
-fn index_of(choice : UInt, count : Int) -> Int {
+fn index_of(choice : UInt32, count : Int32) -> Int32 {
   (choice % count.reinterpret_as_uint()).reinterpret_as_int()
 }
 
@@ -83,9 +84,7 @@ test "law: a literal pattern matches only its own segments" {
       }
       @expect.expect_all(s => {
         s.expect(segments_match(path, path)).to_equal(true)
-        s
-        .expect(segments_match(path, [..path, "extra"]))
-        .to_equal(false)
+        s.expect(segments_match(path, [..path, "extra"])).to_equal(false)
         if !path.is_empty() {
           s.expect(segments_match(path, changed)).to_equal(false)
           s.expect(segments_match(changed, path)).to_equal(false)
@@ -129,9 +128,7 @@ test "law: prefix/** matches the prefix and every path below it" {
       @expect.expect_all(s => {
         s.expect(segments_match([..prefix, "**"], path)).to_equal(true)
         s.expect(segments_match([..prefix, "**"], prefix)).to_equal(true)
-        s
-        .expect(segments_match([..prefix, "*"], prefix))
-        .to_equal(false)
+        s.expect(segments_match([..prefix, "*"], prefix)).to_equal(false)
       })
     },
     count=200,
@@ -179,7 +176,10 @@ test "Multi-segment wildcard" {
   let pattern = entry_segments("packages/**")
   assert_eq(segments_match(pattern, ["packages", "billing"]), true)
   assert_eq(segments_match(pattern, ["packages", "billing", "core"]), true)
-  assert_eq(segments_match(entry_segments("packages/**/core"), ["packages", "core"]), true)
+  assert_eq(
+    segments_match(entry_segments("packages/**/core"), ["packages", "core"]),
+    true,
+  )
 }
 
 ///|

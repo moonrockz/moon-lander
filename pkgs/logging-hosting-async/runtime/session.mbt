@@ -84,10 +84,10 @@ priv struct Pending {
 /// one session run in one async runtime, so the state needs no lock.
 priv struct Core {
   sinks : Array[Sink]
-  event_limit : Int
+  event_limit : Int32
   byte_limit : Int64
   record_limit : Int64
-  drain_limit : Int
+  drain_limit : Int32
   clock : () -> @formatting.LogTimestamp
   observer : ((@sinks.SinkFailure) -> Unit)?
   queue : @deque.Deque[Pending]
@@ -105,7 +105,7 @@ priv struct Core {
   mut oversized : Int64
   mut closed_drops : Int64
   mut reentrant : Int64
-  mut cursor : Int
+  mut cursor : Int32
   mut cancel_writer : () -> Unit
   mut final_report : @sinks.SessionReport?
 }
@@ -171,14 +171,18 @@ fn Core::receive(self : Core, event : @logging.LogEvent) -> Unit {
   let level = event.level
   guard self.sinks.iter().any(sink => sink.takes(level)) else { return }
   let record = @formatting.LogRecord::capture(event, (self.clock)())
-  let payloads = self.sinks.map(sink => if sink.takes(level) {
-    Some((sink.render)(record))
-  } else {
-    None
+  let payloads = self.sinks.map(sink => {
+    if sink.takes(level) {
+      Some((sink.render)(record))
+    } else {
+      None
+    }
   })
-  let bytes = payloads.fold(init=0L, (sum, payload) => match payload {
-    Some(text) => sum + @formatting.utf8_length(text)
-    None => sum
+  let bytes = payloads.fold(init=0L, (sum, payload) => {
+    match payload {
+      Some(text) => sum + @formatting.utf8_length(text)
+      None => sum
+    }
   })
   if bytes > self.record_limit {
     self.oversized += 1L
@@ -190,7 +194,7 @@ fn Core::receive(self : Core, event : @logging.LogEvent) -> Unit {
     return
   }
   self.accepted += 1L
-  self.queue.push_back({ sequence: self.accepted, payloads, bytes })
+  self.queue.push_back({ sequence: self.accepted, payloads, bytes, })
   self.queued_bytes += bytes
   self.wake.signal()
 }
@@ -210,7 +214,7 @@ fn Core::notify(self : Core, failure : @sinks.SinkFailure) -> Unit {
 
 ///|
 /// Record a failure that does not stop the destination at `index`.
-fn Core::warn(self : Core, index : Int, failure : @sinks.SinkFailure) -> Unit {
+fn Core::warn(self : Core, index : Int32, failure : @sinks.SinkFailure) -> Unit {
   self.sinks[index].retention_failure = Some(failure)
   self.notify(failure)
 }
@@ -343,7 +347,7 @@ fn Core::snapshot_of(
 ///|
 /// The time that closing gives the cancelled writer to stop, and then the
 /// outputs to close, after a drain timeout: 500 ms each, 1 second together.
-let close_after_timeout : Int = 500
+let close_after_timeout : Int32 = 500
 
 ///|
 /// Stop admission, drain within the drain limit, stop the writer and close the
@@ -411,13 +415,13 @@ pub struct SessionLogger {
 /// A level is enabled while the session is open and a destination that has not
 /// failed takes it. A full queue does not disable a level, so its drops are
 /// counted.
-pub impl @logging.Logger for SessionLogger with enabled(self, level) {
+pub impl @logging.Logger for SessionLogger with fn enabled(self, level) {
   self.core.enabled(level)
 }
 
 ///|
 /// Capture the event and accept it, or count the reason it is dropped.
-pub impl @logging.Logger for SessionLogger with log(self, event) {
+pub impl @logging.Logger for SessionLogger with fn log(self, event) {
   self.core.receive(event)
 }
 
@@ -427,7 +431,7 @@ pub extend SessionLogger with @logging.Logger::{enabled, log}
 ///|
 /// The logger of the session.
 pub fn Session::logger(self : Session) -> SessionLogger {
-  { core: self.core }
+  { core: self.core, }
 }
 
 ///|
@@ -470,7 +474,7 @@ pub async fn[X] with_session(
   settings : @sinks.SessionSettings,
   body : async (Session) -> X,
   observer? : (@sinks.SinkFailure) -> Unit,
-  clock? : () -> @formatting.LogTimestamp = system_clock,
+  clock~ : () -> @formatting.LogTimestamp = system_clock,
 ) -> X {
   run_session(settings, production_sinks, clock, observer, body)
 }
@@ -480,22 +484,30 @@ pub async fn[X] with_session(
 /// so the tests can give their own.
 async fn[X] run_session(
   settings : @sinks.SessionSettings,
-  make_sinks : (@sinks.SessionSettings, () -> @formatting.LogTimestamp, (Int, @sinks.SinkFailure) -> Unit) -> Array[Sink],
+  make_sinks : (
+    @sinks.SessionSettings,
+    () -> @formatting.LogTimestamp,
+    (Int32, @sinks.SinkFailure) -> Unit,
+  ) -> Array[Sink],
   clock : () -> @formatting.LogTimestamp,
   observer : ((@sinks.SinkFailure) -> Unit)?,
   body : async (Session) -> X,
 ) -> X {
-  let warnings : Ref[(Int, @sinks.SinkFailure) -> Unit] = { val: (_, _) => () }
-  let sinks = make_sinks(settings, clock, (index, failure) => (warnings.val)(
-    index, failure,
-  ))
+  let warnings : Ref[(Int32, @sinks.SinkFailure) -> Unit] = {
+    val: (_, _) => (),
+  }
+  let sinks = make_sinks(settings, clock, (index, failure) => {
+    (warnings.val)(index, failure)
+  })
   let core = Core::new(settings, sinks, clock, observer)
   warnings.val = (index, failure) => core.warn(index, failure)
   let session : Session = { core, }
   @async.with_task_group(group => {
     let writer = group.spawn(() => core.run_writer(), allow_failure=true)
     core.cancel_writer = () => writer.cancel()
-    errdefer ignore(core.close())
+    // Close drains the writer within the drain limit. Cancellation of the body must not cancel
+    // that drain, so the close runs protected.
+    errdefer @async.protect_from_cancel(() => ignore(core.close()))
     let result = body(session)
     ignore(core.close())
     result
@@ -523,7 +535,7 @@ fn system_clock() -> @formatting.LogTimestamp {
 /// logger. It gives the error text when the write fails.
 pub async fn write_diagnostic(
   text : String,
-  stream? : @sinks.ConsoleStream = StandardError,
+  stream~ : @sinks.ConsoleStream = StandardError,
 ) -> String? {
   write_console(stream, text + "\n")
 }
@@ -532,9 +544,13 @@ pub async fn write_diagnostic(
 /// A directory entry from an adapter. The size is parsed once here; an entry
 /// with a size that is not valid is not regular, so the plan never appends to
 /// it and retention never deletes it.
-fn listed_file(name : String, size : Int64, regular : Bool) -> @rolling.ListedFile {
-  match (try { Some(@rolling.ByteCount::of(size)) } catch { _ => None }) {
-    Some(count) => { name, size: count, regular }
-    None => { name, size: @rolling.ByteCount::zero(), regular: false }
+fn listed_file(
+  name : String,
+  size : Int64,
+  regular : Bool,
+) -> @rolling.ListedFile {
+  match (Some(@rolling.ByteCount::of(size)) catch { _ => None }) {
+    Some(count) => { name, size: count, regular, }
+    None => { name, size: @rolling.ByteCount::zero(), regular: false, }
   }
 }

@@ -17,15 +17,17 @@ test "compose includes and a group with explicit later roots" {
   let postgres = @config.ProfileName::parse("postgres")
   let policy = @profiles.Policy::new()
     |> @profiles.includes(@config.ProfileNames::new([metrics]))
-    |> @profiles.group(production, @config.ProfileNames::new([postgres, metrics]))
+    |> @profiles.group(
+      production,
+      @config.ProfileNames::new([postgres, metrics]),
+    )
   let resolution = @profiles.resolve(
     policy,
     Selected(@config.ProfileNames::new([production, postgres])),
   )
-  assert_eq(
-    resolution.active().names().map(name => name.to_string()),
-    ["production", "metrics", "postgres"],
-  )
+  assert_eq(resolution.active().names().map(name => name.to_string()), [
+    "production", "metrics", "postgres",
+  ])
   assert_true(resolution.contains(postgres))
   assert_eq(resolution.selector(), Discovery)
 }
@@ -118,13 +120,16 @@ test "base controls retain selection and reason origins" {
     controls=(root, source),
   )
   assert_eq(resolution.selector(), BaseDefault(source))
-  assert_eq(
-    resolution.active().names().map(name => name.to_string()),
-    ["common", "development", "metrics"],
+  assert_eq(resolution.active().names().map(name => name.to_string()), [
+    "common", "development", "metrics",
+  ])
+  assert_true(
+    resolution
+    .controls()
+    .contains(
+      Control(source, @config.KeyPath::parse("profiles.groups.development")),
+    ),
   )
-  assert_true(resolution.controls().contains(
-    Control(source, @config.KeyPath::parse("profiles.groups.development")),
-  ))
 }
 ```
 
@@ -144,24 +149,40 @@ error; ordinary configuration's null-as-unset rule cannot hide it.
 ///|
 test "layered controls preserve each supplying origin" {
   let json : @config.Origin = {
-    kind: File(Workspace), source: "acme", priority: 300,
+    kind: File(Workspace),
+    source: "acme",
+    priority: 300,
     location: Some("/work/acme.json"),
   }
-  let toml = { ..json, location: Some("/work/acme.toml") }
+  let toml = { ..json, location: Some("/work/acme.toml"), }
   let layers = @profiles.ControlLayers::new([
-    @profiles.ControlLayer::new(@config.ConfigValue::from_json({
-      "profiles": { "default": ["development"] },
-    }), json),
-    @profiles.ControlLayer::new(@config.ConfigValue::from_json({
-      "profiles": { "groups": { "development": ["metrics"] } },
-    }), toml),
+    @profiles.ControlLayer::new(
+      @config.ConfigValue::from_json({
+        "profiles": { "default": ["development"] },
+      }),
+      json,
+    ),
+    @profiles.ControlLayer::new(
+      @config.ConfigValue::from_json({
+        "profiles": { "groups": { "development": ["metrics"] } },
+      }),
+      toml,
+    ),
   ])
   let input = @profiles.SelectionInput::new(Unspecified)
-  let resolution = @profiles.resolve_layers(@profiles.Policy::new(), input, layers)
+  let resolution = @profiles.resolve_layers(
+    @profiles.Policy::new(),
+    input,
+    layers,
+  )
   assert_eq(resolution.selector(), BaseDefault(json))
-  assert_true(resolution.controls().contains(
-    Control(toml, @config.KeyPath::parse("profiles.groups.development")),
-  ))
+  assert_true(
+    resolution
+    .controls()
+    .contains(
+      Control(toml, @config.KeyPath::parse("profiles.groups.development")),
+    ),
+  )
   assert_true(resolution.permits_controls(json))
 }
 ```

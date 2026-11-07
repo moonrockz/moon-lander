@@ -31,11 +31,9 @@ test "build a host with one service" {
   let host : @hosting.Host[Unit] = "acme"
     |> @lander_core.AppName::parse
     |> @hosting.builder(["greet"])
-    |> @hosting.service(
-      "greeter",
-      start=_ => log.push("greeter started"),
-      stop=_ => log.push("greeter stopped"),
-    )
+    |> @hosting.service("greeter", start=_ => log.push("greeter started"), stop=_ => {
+      log.push("greeter stopped")
+    })
     |> @hosting.build(_ => ())
   ignore(host)
   // The build runs no hook.
@@ -69,10 +67,7 @@ test "register lifetime handlers from a hook" {
     |> @hosting.builder([])
     |> @hosting.service("events", start=ctx => {
       ctx.lifetime.on_started(() => ())
-      ctx.lifetime.on_stopping(() => {
-        // Completed, Requested, Signal, Embedder, StartFailed or Failed.
-        ignore(ctx.lifetime.stop_reason())
-      })
+      ctx.lifetime.on_stopping(() => ignore(ctx.lifetime.stop_reason()))
       ctx.lifetime.on_stopped(() => ())
     })
     |> @hosting.build(_ => ())
@@ -287,7 +282,9 @@ test "replace the failure report" {
       reports.push((message, code))
     })
     |> @hosting.build(_ => ())
-  let command : @hosting.Hook[Unit] = _ => raise @hosting.UsageError("expected a command")
+  let command : @hosting.Hook[Unit] = _ => {
+    raise @hosting.UsageError("expected a command")
+  }
   ignore((host, command))
 }
 ```
@@ -327,8 +324,11 @@ the run with `WorkingDirectoryError` and code 1 before any file read or hook.
 ///|
 test "set the variable prefix and starting settings" {
   let host : @hosting.Host[Unit] = @lander_core.AppName::parse("my-tool")
-    |> @hosting.builder([], env_vars={ "MT_LOG__FORMAT": "json" },
-      working_dir=@lander_core.AbsolutePath::parse("/work"))
+    |> @hosting.builder(
+      [],
+      env_vars={ "MT_LOG__FORMAT": "json" },
+      working_dir=@lander_core.AbsolutePath::parse("/work"),
+    )
     |> @hosting.env_prefix(@lander_core.EnvPrefix::parse("MT"))
     |> @hosting.reserve_env(["MT_LOG_DIR"])
     |> @hosting.app_dirs()
@@ -444,19 +444,34 @@ Use a parsed `ProfileName` to query membership and choose services in the factor
 test "choose a database service from recorded profile membership" {
   let postgres = @config.ProfileName::parse("postgres")
   let host : @hosting.Host[String] = @hosting.builder(
-      @lander_core.AppName::parse("acme"), ["--profiles", "postgres"],
-      env_vars=({} : Map[String, String]), working_dir=@lander_core.AbsolutePath::root())
-    |> @hosting_argparse.command(name => @hosting_argparse.Command(name,
-      options=[@hosting_argparse.profiles_option()],
-      flags=[@hosting_argparse.no_profiles_flag()]))
+      @lander_core.AppName::parse("acme"),
+      ["--profiles", "postgres"],
+      env_vars=({} : Map[String, String]),
+      working_dir=@lander_core.AbsolutePath::root(),
+    )
+    |> @hosting_argparse.command(name => {
+      @hosting_argparse.Command(
+        name,
+        options=[@hosting_argparse.profiles_option()],
+        flags=[@hosting_argparse.no_profiles_flag()],
+      )
+    })
     |> @hosting.configure(s => s |> @config.format(@toml.format()))
     |> @hosting.app_dirs()
     |> @hosting.profiles(@profiles.Policy::new())
     |> @hosting.service("database", start=ctx => {
-      assert_eq(ctx.services == "postgres", ctx.config.profiles().contains(postgres))
+      assert_eq(
+        ctx.services == "postgres",
+        ctx.config.profiles().contains(postgres),
+      )
     })
-    |> @hosting.build(ctx =>
-      if ctx.config.profiles().contains(postgres) { "postgres" } else { "memory" })
+    |> @hosting.build(ctx => {
+      if ctx.config.profiles().contains(postgres) {
+        "postgres"
+      } else {
+        "memory"
+      }
+    })
   ignore(host)
 }
 ```

@@ -1,11 +1,19 @@
 ///|
 /// Headless hosted-configuration example. The caller supplies its authorized
 /// directory base. No fetch, UI, or ambient configuration runs at module import.
-struct Server { host : String; port : Int } derive(FromJson)
+#derive(FromJson)
+struct Server {
+  host : String
+  port : Int32
+}
 
 ///|
 async fn hosted(base : String) -> String {
-  let mount = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/workspace")
+  let mount = @browser.from_urls(
+    base,
+    { "version": 1, "files": ["acme.toml"] },
+    root="/workspace",
+  )
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("acme.toml")
@@ -22,11 +30,11 @@ async fn hosted(base : String) -> String {
 priv type FileList
 
 ///|
-extern "js" fn FileList::length(self : FileList) -> Int =
+extern "js" fn FileList::length(self : FileList) -> Int32 =
   #|files => files.length
 
 ///|
-extern "js" fn FileList::at(self : FileList, index : Int) -> @browser.File =
+extern "js" fn FileList::at(self : FileList, index : Int32) -> @browser.File =
   #|(files, index) => files[index]
 
 ///|
@@ -54,16 +62,24 @@ fn project_files(list : FileList) -> Array[(String, @browser.File)] {
 /// Merge hosted defaults with selected project files. The builder order gives
 /// the precedence: the project file overrides the hosted defaults.
 async fn selected(files : FileList, base : String) -> String {
-  let defaults = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/defaults")
+  let defaults = @browser.from_urls(
+    base,
+    { "version": 1, "files": ["acme.toml"] },
+    root="/defaults",
+  )
   let project = @browser.from_files(project_files(files), root="/workspace")
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("/defaults/acme.toml")
     |> @config.working_dir("/workspace/src")
-    |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+    |> @conventions.add(
+      @browser.workspace(@conventions.app_dirs("acme"), project),
+    )
   let config = @browser.load(builder, [defaults, project])
   let server : Server = @config.bind(config, "server")
-  let origin = config.origins(@config.KeyPath::parse("server.host"))[0].location.unwrap_or("none")
+  let origin = config.origins(@config.KeyPath::parse("server.host"))[0].location.unwrap_or(
+    "none",
+  )
   "\{server.host}:\{server.port} from \{origin}"
 }
 
@@ -71,16 +87,24 @@ async fn selected(files : FileList, base : String) -> String {
 /// Load a directory handle that the application already holds, for example from
 /// its own native picker. The library never opens a picker or asks permission.
 async fn directory(handle : @browser.DirectoryHandle, base : String) -> String {
-  let defaults = @browser.from_urls(base, { "version": 1, "files": ["acme.toml"] }, root="/defaults")
+  let defaults = @browser.from_urls(
+    base,
+    { "version": 1, "files": ["acme.toml"] },
+    root="/defaults",
+  )
   let project = @browser.from_directory(handle, root="/workspace")
   let builder = @config.builder()
     |> @config.format(@toml.format())
     |> @config.file("/defaults/acme.toml")
     |> @config.working_dir("/workspace/src")
-    |> @conventions.add(@browser.workspace(@conventions.app_dirs("acme"), project))
+    |> @conventions.add(
+      @browser.workspace(@conventions.app_dirs("acme"), project),
+    )
   let config = @browser.load(builder, [defaults, project])
   let server : Server = @config.bind(config, "server")
-  let origin = config.origins(@config.KeyPath::parse("server.host"))[0].location.unwrap_or("none")
+  let origin = config.origins(@config.KeyPath::parse("server.host"))[0].location.unwrap_or(
+    "none",
+  )
   "\{server.host}:\{server.port} from \{origin}"
 }
 
@@ -88,7 +112,9 @@ async fn directory(handle : @browser.DirectoryHandle, base : String) -> String {
 extern "js" fn expose(
   load : (String) -> @js_async.Promise[String],
   load_selected : (FileList, String) -> @js_async.Promise[String],
-  load_directory : (@browser.DirectoryHandle, String) -> @js_async.Promise[String],
+  load_directory : (@browser.DirectoryHandle, String) -> @js_async.Promise[
+    String,
+  ],
 ) -> Unit =
   #|(load, loadSelected, loadDirectory) => {
   #|  globalThis.loadHostedServer = load;
@@ -109,6 +135,8 @@ fn main {
   expose(
     base => @js_async.Promise::from_async(() => hosted(base)),
     (files, base) => @js_async.Promise::from_async(() => selected(files, base)),
-    (handle, base) => @js_async.Promise::from_async(() => directory(handle, base)),
+    (handle, base) => {
+      @js_async.Promise::from_async(() => directory(handle, base))
+    },
   )
 }

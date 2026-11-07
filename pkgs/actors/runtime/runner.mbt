@@ -1,7 +1,7 @@
 ///|
 /// A live runner checks the clock after this many messages taken without a
 /// wait.
-const BATCH_CHECK : Int = 64
+const BATCH_CHECK : Int32 = 64
 
 ///|
 /// A live runner lets other tasks run when its batch has taken at least this
@@ -46,14 +46,18 @@ priv struct Runner[M] {
   expire : Bool
   frames : Array[Entry[M]]
   /// The messages taken since the runner last waited or yielded.
-  mut batch : Int
+  mut batch : Int32
   /// The time at which the batch started.
   mut batch_start : Int64
 }
 
 ///|
-fn[M] Runner::new(mailbox : Mailbox[M], live~ : Bool, expire~ : Bool) -> Runner[M] {
-  { mailbox, live, expire, frames: [], batch: 0, batch_start: 0L }
+fn[M] Runner::new(
+  mailbox : Mailbox[M],
+  live~ : Bool,
+  expire~ : Bool,
+) -> Runner[M] {
+  { mailbox, live, expire, frames: [], batch: 0, batch_start: 0L, }
 }
 
 ///|
@@ -70,7 +74,7 @@ async fn[M] Runner::run(self : Runner[M], first : Step[M]) -> RunEnd {
           Deadline(limit, _) => limit.to_millis().to_int64()
           Recover(_) | OnClosed(_) => 0L
         }
-        self.frames.push({ frame, left })
+        self.frames.push({ frame, left, })
         step = body()
       }
       Leave(next) => {
@@ -119,7 +123,7 @@ fn[M] Runner::closed(self : Runner[M]) -> Turn[M] {
 ///|
 /// The index of the time limit with the least wait time left, the outer one
 /// of equal limits.
-fn[M] Runner::first_deadline(self : Runner[M]) -> Int? {
+fn[M] Runner::first_deadline(self : Runner[M]) -> Int32? {
   let mut first = None
   for index, entry in self.frames {
     guard entry.frame is Deadline(_, _) else { continue }
@@ -143,7 +147,7 @@ fn[M] Runner::spend(self : Runner[M], elapsed : Int64) -> Unit {
 
 ///|
 /// Unwind to the time limit at `index` and continue with its `on_timeout`.
-fn[M] Runner::expire_at(self : Runner[M], index : Int) -> Step[M] {
+fn[M] Runner::expire_at(self : Runner[M], index : Int32) -> Step[M] {
   guard self.frames[index].frame is Deadline(_, on_timeout) else {
     abort("not a time limit")
   }
@@ -320,7 +324,7 @@ pub fn[M, R] TestRun::remaining(self : TestRun[M, R]) -> Array[M] {
 pub async fn[M, R] run_test(
   receive : Receive[M, R],
   messages : Array[M],
-  at_end? : TestEnd = Wait,
+  at_end~ : TestEnd = Wait,
 ) -> TestRun[M, R] {
   let mailbox = Mailbox::fixed(messages.copy(), admitting=!(at_end is Close))
   let runner = Runner::new(mailbox, live=false, expire=at_end is Expire)
@@ -337,7 +341,7 @@ pub async fn[M, R] run_test(
     (Finished, None) => abort("a receive finished without a result")
     (ReceiveClosed, _) => MailboxClosed
   }
-  { outcome, remaining: mailbox.queue.iter().collect() }
+  { outcome, remaining: mailbox.queue.iter().collect(), }
 }
 
 ///|

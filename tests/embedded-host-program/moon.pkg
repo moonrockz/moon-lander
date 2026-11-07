@@ -5,6 +5,7 @@ import {
 }
 
 // `run_embedded` exists only on wasm and wasm-gc.
+
 supported_targets = "wasm+wasm-gc"
 
-options("is-main": true)
+pkgtype(kind: "executable")

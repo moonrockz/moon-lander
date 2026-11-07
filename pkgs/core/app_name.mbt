@@ -1,5 +1,6 @@
 ///|
 /// The rule of an application name that a text breaks.
+#derive(Eq, Debug)
 pub enum AppNameRule {
   /// The name is empty.
   Empty
@@ -8,7 +9,7 @@ pub enum AppNameRule {
   /// The name holds a character that is not an ASCII letter, an ASCII digit,
   /// `-` or `_`.
   CharNotAllowed(Char)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend AppNameRule with Eq::{equal, not_equal}
@@ -19,10 +20,11 @@ pub extend AppNameRule with @debug.Debug::{to_repr}
 ///|
 /// A text that is not a valid application name. Callers can match the cases,
 /// but only `AppName::parse` makes them.
+#derive(Debug)
 pub suberror AppNameError {
   /// The text `text` breaks the rule `rule`.
   InvalidAppName(text~ : String, rule~ : AppNameRule)
-} derive(Debug)
+}
 
 ///|
 pub extend AppNameError with @debug.Debug::{to_repr}
@@ -44,9 +46,10 @@ pub fn AppNameError::message(self : AppNameError) -> String {
 /// The name of an application. It starts with an ASCII letter, and holds only
 /// ASCII letters, digits, `-` and `_`. So it is safe in file and directory
 /// names, and it gives a valid environment-variable prefix.
+#derive(Eq, Hash, Debug)
 pub struct AppName {
   priv text : String
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend AppName with Eq::{equal, not_equal}
@@ -76,7 +79,7 @@ pub fn AppName::parse(text : String) -> AppName raise AppNameError {
 
 ///|
 /// The name as text, which `AppName::parse` reads back to an equal name.
-pub impl Show for AppName with output(self, logger) {
+pub impl Show for AppName with fn output(self, logger) {
   logger.write_string(self.text)
 }
 
@@ -91,5 +94,8 @@ fn is_ascii_letter(char : Char) -> Bool {
 ///|
 /// An ASCII letter, an ASCII digit, `-` or `_`.
 fn is_name_char(char : Char) -> Bool {
-  is_ascii_letter(char) || (char >= '0' && char <= '9') || char == '-' || char == '_'
+  is_ascii_letter(char) ||
+  (char >= '0' && char <= '9') ||
+  char == '-' ||
+  char == '_'
 }

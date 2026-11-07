@@ -10,7 +10,9 @@ async fn main {
   }
   @runtime.run(command) catch {
     @model.Invalid(problems) => {
-      for problem in problems { eprintln("error: \{problem.render()}") }
+      for problem in problems {
+        eprintln("error: \{problem.render()}")
+      }
       @sys.exit(1)
     }
     error => {

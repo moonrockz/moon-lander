@@ -30,16 +30,13 @@ fn Conventions::machine_sources(
     if !options.isolated {
       notes.push(
         note(
-          self,
-          "discovery has no platform, so it skips the system and global user directories",
+          self, "discovery has no platform, so it skips the system and global user directories",
         ),
       )
     }
     return roles.map(role => {
-      {
-        source: @config.ConfigSource::skipped(File(role), name=self.display),
-        candidates: [],
-      }
+      source: @config.ConfigSource::skipped(File(role), name=self.display),
+      candidates: [],
     })
   }
   let vars : DirVars = {

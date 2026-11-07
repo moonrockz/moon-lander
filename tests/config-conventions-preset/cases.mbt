@@ -31,8 +31,7 @@ pub fn cases() -> Array[Case] {
       "Show an explicitly selected configuration",
       [
         (
-          "configs/project.yaml",
-          "project:\n  name: explicit-project\n  version: 2.0.0\n",
+          "configs/project.yaml", "project:\n  name: explicit-project\n  version: 2.0.0\n",
         ),
         ("elsewhere/readme.txt", ""),
       ],
@@ -89,8 +88,7 @@ pub fn cases() -> Array[Case] {
     ]),
     Case::new("Member user overrides win after workspace user overrides", [
       (
-        "morphir.toml",
-        "[workspace]\nmembers = [\"members/alpha\"]\ndefault_member = \"members/alpha\"\n\n[ui]\ntheme = \"workspace\"\n",
+        "morphir.toml", "[workspace]\nmembers = [\"members/alpha\"]\ndefault_member = \"members/alpha\"\n\n[ui]\ntheme = \"workspace\"\n",
       ),
       ("members/alpha/morphir.toml", "[ui]\ntheme = \"member\"\n"),
       ("morphir.user.toml", "[ui]\ntheme = \"workspace-user\"\n"),
@@ -122,34 +120,31 @@ pub fn cases() -> Array[Case] {
     ]),
     Case::new(
       "Operational variables are not keys",
-      [("morphir.toml", ""), ("/tmp/mh/morphir.toml", "[ui]\ntheme = \"home\"\n")],
+      [
+        ("morphir.toml", ""),
+        ("/tmp/mh/morphir.toml", "[ui]\ntheme = \"home\"\n"),
+      ],
       env_vars=[
         ("HOME", "/home/user"),
         ("MORPHIR_HOME", "/tmp/mh"),
         ("MORPHIR_LOG_DIR", "/tmp/logs"),
       ],
     ),
-    Case::new(
-      "Relative XDG_CONFIG_HOME is ignored",
-      [("morphir.toml", "")],
-      env_vars=[("HOME", "/home/alice"), ("XDG_CONFIG_HOME", "config")],
-    ),
+    Case::new("Relative XDG_CONFIG_HOME is ignored", [("morphir.toml", "")], env_vars=[
+      ("HOME", "/home/alice"),
+      ("XDG_CONFIG_HOME", "config"),
+    ]),
     Case::new(
       "macOS user configuration directory",
       [("morphir.toml", "")],
       platform=MacOs,
       env_vars=[("HOME", "/Users/Alice")],
     ),
-    Case::new(
-      "Windows directories",
-      [("morphir.toml", "")],
-      platform=Windows,
-      env_vars=[
-        ("APPDATA", "D:\\Profiles\\Alice\\Roaming"),
-        ("USERPROFILE", "C:\\Users\\Alice"),
-        ("PROGRAMDATA", "E:\\Data"),
-      ],
-    ),
+    Case::new("Windows directories", [("morphir.toml", "")], platform=Windows, env_vars=[
+      ("APPDATA", "D:\\Profiles\\Alice\\Roaming"),
+      ("USERPROFILE", "C:\\Users\\Alice"),
+      ("PROGRAMDATA", "E:\\Data"),
+    ]),
     Case::new(
       "Windows system directory fallback",
       [("morphir.toml", "")],
@@ -172,7 +167,9 @@ pub fn cases() -> Array[Case] {
     Case::new(
       "Member entries stay in the workspace",
       [
-        ("morphir.toml", "[workspace]\nmembers = [\"../outside\", \"packages/*\"]\n"),
+        (
+          "morphir.toml", "[workspace]\nmembers = [\"../outside\", \"packages/*\"]\n",
+        ),
         ("packages/orders/morphir.toml", "[project]\nname = \"orders\"\n"),
       ],
       isolated=true,
@@ -181,8 +178,7 @@ pub fn cases() -> Array[Case] {
       "A member cannot relocate the workspace output",
       [
         (
-          "morphir.toml",
-          "[workspace]\nmembers = [\"packages/*\"]\nout_dir = \"build\"\n",
+          "morphir.toml", "[workspace]\nmembers = [\"packages/*\"]\nout_dir = \"build\"\n",
         ),
         ("packages/orders/morphir.toml", "[workspace]\nout_dir = \"mine\"\n"),
       ],
@@ -204,8 +200,7 @@ pub fn cases() -> Array[Case] {
       "The member does not inherit the workspace project table",
       [
         (
-          "morphir.toml",
-          "[workspace]\nmembers = [\"packages/*\"]\n\n[project]\nname = \"root\"\n\n[ui]\ntheme = \"dark\"\n",
+          "morphir.toml", "[workspace]\nmembers = [\"packages/*\"]\n\n[project]\nname = \"root\"\n\n[ui]\ntheme = \"dark\"\n",
         ),
         ("packages/orders/morphir.toml", "[ir]\nformat_version = 3\n"),
       ],

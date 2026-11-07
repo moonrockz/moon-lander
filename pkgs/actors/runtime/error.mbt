@@ -1,5 +1,6 @@
 ///|
 /// A fault of an actor operation.
+#derive(Debug)
 pub suberror ActorError {
   /// The scope has ended. It cannot start another actor.
   ScopeClosed
@@ -23,7 +24,7 @@ pub suberror ActorError {
   /// The cleanup did not end within `limit`; `primary` is the actor's own
   /// failure.
   CleanupTimedOut(primary~ : Error?, limit~ : @lander_core.TimeLimit)
-} derive(Debug)
+}
 
 ///|
 pub extend ActorError with @debug.Debug::{to_repr}

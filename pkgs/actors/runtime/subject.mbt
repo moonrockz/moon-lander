@@ -22,7 +22,10 @@ pub async fn[M] Subject::send(self : Subject[M], message : M) -> Unit {
 
 ///|
 /// Admit `message` without waiting.
-pub fn[M] Subject::try_send(self : Subject[M], message : M) -> @policy.Admission {
+pub fn[M] Subject::try_send(
+  self : Subject[M],
+  message : M,
+) -> @policy.Admission {
   (self.offer)(message)
 }
 
@@ -53,7 +56,7 @@ pub fn[M, N] Subject::contramap(self : Subject[M], f : (N) -> M) -> Subject[N] {
 pub fn[M] ActorRef::to_subject(self : ActorRef[M]) -> Subject[M] {
   {
     admit: (message, discard) => {
-      self.mailbox.put(self.life.address, message, discard?=discard)
+      self.mailbox.put(self.life.address, message, discard?)
     },
     offer: message => self.mailbox.offer(message),
     offer_quietly: message => self.mailbox.admit(message, None),
@@ -109,12 +112,13 @@ pub fn[M] Subject::from_queue(queue : @aio.Queue[M]) -> Subject[M] {
 
 ///|
 /// The result of a waiting send of a custom destination.
+#derive(Eq, Debug)
 pub(all) enum SendOutcome {
   /// The destination admitted the message.
   Admitted
   /// The destination admits no more messages.
   Rejected
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SendOutcome with Eq::{equal, not_equal}
@@ -150,7 +154,7 @@ pub fn[M] Subject::new(
 pub async fn[M, R] Subject::ask(
   self : Subject[M],
   build : (Reply[R]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> R {
   answer_or_timeout(self.try_ask(build, timeout~), timeout)
 }
@@ -160,7 +164,7 @@ pub async fn[M, R] Subject::ask(
 pub async fn[M, R] Subject::try_ask(
   self : Subject[M],
   build : (Reply[R]) -> M,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> R? {
   ask_through(build, timeout, self.admit, self.life, self.closed)
 }

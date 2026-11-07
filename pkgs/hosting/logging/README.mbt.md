@@ -111,14 +111,14 @@ async fn ordered_logging_main(
     session => {
       @hosting.builder(@lander_core.AppName::parse("acme"), [])
       |> @hosting.service("telemetry", stop=_ => flush_telemetry())
-      |> @hosting.service("diagnostic", stop=_ => {
-        ignore(session.close())
-      })
+      |> @hosting.service("diagnostic", stop=_ => ignore(session.close()))
       |> @hosting.build(_ => session.logger())
     },
     ctx => {
       (ctx.services : &@lander_logging.Logger).info("ready", [])
-      while !ctx.cancelled() { @async.sleep(100) }
+      while !ctx.cancelled() {
+        @async.sleep(100)
+      }
     },
     signals~,
   )
@@ -172,15 +172,22 @@ and behavior. The embedded driver is unchanged and already returns its outcome.
 ///|
 async fn report_an_unstarted_command() -> Unit {
   let entered = Ref(false)
-  @hosting_logging.run_with_session(@sinks.SessionSettings::standard(), _ => {
-    @hosting.builder(@lander_core.AppName::parse("acme"), [])
-    |> @hosting.build(_ => ())
-  }, _ => entered.val = true, completed=(outcome, selected) => {
-    if !entered.val && selected != @hosting.ExitCode::success() {
-      println("Application stopped before command entry: \{selected.to_int()}")
-    }
-    ignore(outcome.stop_reason())
-  })
+  @hosting_logging.run_with_session(
+    @sinks.SessionSettings::standard(),
+    _ => {
+      @hosting.builder(@lander_core.AppName::parse("acme"), [])
+      |> @hosting.build(_ => ())
+    },
+    _ => entered.val = true,
+    completed=(outcome, selected) => {
+      if !entered.val && selected != @hosting.ExitCode::success() {
+        println(
+          "Application stopped before command entry: \{selected.to_int()}",
+        )
+      }
+      ignore(outcome.stop_reason())
+    },
+  )
 }
 
 ///|

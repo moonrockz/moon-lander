@@ -69,7 +69,9 @@ fn[N : @notebooks.Node + Eq] paths_resolve(root : N) -> Bool {
 }
 
 ///|
-fn[N : @notebooks.Node] metadata_title(root : N) -> Json? raise @notebooks.MetadataError {
+fn[N : @notebooks.Node] metadata_title(
+  root : N,
+) -> Json? raise @notebooks.MetadataError {
   match root.metadata() {
     Some(metadata) => metadata.get_json("title")
     None => None
@@ -110,7 +112,9 @@ impl @moonspec.World for NotebookWorld with fn configure(self, setup) {
       Dib(book) => book.metadata()
       Jupyter(book) => book.metadata()
     }
-    guard metadata.get(key) is Some(value) else { fail("missing metadata field") }
+    guard metadata.get(key) is Some(value) else {
+      fail("missing metadata field")
+    }
     @expect.expect(value.ion_type().to_text()).to_equal(expected)
   })
   setup.then1("the common cell kinds are {string}", (expected : String) => {

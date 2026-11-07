@@ -99,9 +99,12 @@ test "a value keeps its JSON type and text renders as the message does" {
   assert_true(segments[4] is Value(value=Null, ..))
   assert_true(segments[6] is Value(value=Array(_), ..))
   assert_true(segments[8] is Value(value=Object(_), ..))
-  inspect(segments.map(segment => segment.text()).join("|"), content=(
-    #|text| |true| |null| |[1,2]| |{"id":1}
-  ))
+  inspect(
+    segments.map(segment => segment.text()).join("|"),
+    content=(
+      #|text| |true| |null| |[1,2]| |{"id":1}
+    ),
+  )
 }
 
 ///|

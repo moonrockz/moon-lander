@@ -1,7 +1,7 @@
 ///|
 fn env_config(
   vars : Map[String, String],
-  reserved? : Array[String] = [],
+  reserved~ : Array[String] = [],
 ) -> @config.Config raise @config.ConfigError {
   @config.build([
     @config.ConfigSource::env(
@@ -37,7 +37,9 @@ test "Leading underscores after the prefix" {
 ///|
 test "Prefix in any case" {
   let config = env_config({ "morphir_ui__color": "false" })
-  @expect.expect(config.get(key("ui.color"))).to_equal(Some(@config.bool(false)))
+  @expect.expect(config.get(key("ui.color"))).to_equal(
+    Some(@config.bool(false)),
+  )
 }
 
 ///|
@@ -73,7 +75,9 @@ test "Reserved helper variables" {
     reserved=["MORPHIR_HOME", "MORPHIR_LOG_DIR"],
   )
   @expect.expect(config.value()).to_equal(
-    @config.fields([("ir", @config.fields([("layout", @config.string("tree"))]))]),
+    @config.fields([
+      ("ir", @config.fields([("layout", @config.string("tree"))])),
+    ]),
   )
 }
 
@@ -110,7 +114,9 @@ test "JSON list value" {
 ///|
 test "Invalid JSON stays text" {
   let config = env_config({ "MORPHIR_A": "[not json" })
-  @expect.expect(config.get(key("a"))).to_equal(Some(@config.string("[not json")))
+  @expect.expect(config.get(key("a"))).to_equal(
+    Some(@config.string("[not json")),
+  )
 }
 
 ///|
@@ -152,10 +158,11 @@ test "Shorter struct merges over nested values" {
 
 ///|
 test "Shorter scalar replaces nested values" {
-  for vars in [
-    [("MORPHIR_IR", "x"), ("MORPHIR_IR__STRICT_MODE", "true")],
-    [("MORPHIR_IR__STRICT_MODE", "true"), ("MORPHIR_IR", "x")],
-  ] {
+  for
+    vars in [
+      [("MORPHIR_IR", "x"), ("MORPHIR_IR__STRICT_MODE", "true")],
+      [("MORPHIR_IR__STRICT_MODE", "true"), ("MORPHIR_IR", "x")],
+    ] {
     let config = env_config(Map::from_array(vars))
     @expect.expect(config.value()).to_equal(
       @config.fields([("ir", @config.string("x"))]),
@@ -211,7 +218,9 @@ test "Discover environment reads the builder variable set" {
     |> @config.env(prefix="APP")
     |> @config.load(@config.FileTree::new(complete=true))
     |> done
-  @expect.expect(config.get(key("server.port"))).to_equal(Some(@config.int(9000)))
+  @expect.expect(config.get(key("server.port"))).to_equal(
+    Some(@config.int(9000)),
+  )
 }
 
 ///|
@@ -228,15 +237,18 @@ test "Skip a source with the environment selection" {
 ///|
 test "Overrides beat the environment" {
   let config = @config.builder()
-    |> @config.env(prefix="APP", selection=Explicit({ "APP_IR__LAYOUT": "tree" }))
+    |> @config.env(
+      prefix="APP",
+      selection=Explicit({ "APP_IR__LAYOUT": "tree" }),
+    )
     |> @config.overrides([("ir.layout", @config.string("single-file"))])
     |> @config.load(@config.FileTree::new(complete=true))
     |> done
   @expect.expect(@config.get_text(config, "ir.layout")).to_equal("single-file")
   let origin = config.origins(key("ir.layout"))[0]
-  @expect.expect((origin.kind, origin.kind.report_name(), origin.priority)).to_equal((
-    Overrides, "overrides", 700,
-  ))
+  @expect.expect((origin.kind, origin.kind.report_name(), origin.priority)).to_equal(
+    (Overrides, "overrides", 700),
+  )
 }
 
 ///|

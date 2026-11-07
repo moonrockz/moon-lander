@@ -7,7 +7,7 @@ struct AppLogger {
 }
 
 ///|
-impl @logging.Logger for AppLogger with enabled(self, level) {
+impl @logging.Logger for AppLogger with fn enabled(self, level) {
   match self.minimum {
     Some(minimum) => level >= minimum
     None => true
@@ -15,7 +15,7 @@ impl @logging.Logger for AppLogger with enabled(self, level) {
 }
 
 ///|
-impl @logging.Logger for AppLogger with log(self, event) {
+impl @logging.Logger for AppLogger with fn log(self, event) {
   self.received.push(event)
 }
 
@@ -27,7 +27,7 @@ struct LogOnly {
 }
 
 ///|
-impl @logging.Logger for LogOnly with log(self, event) {
+impl @logging.Logger for LogOnly with fn log(self, event) {
   self.received.push(event)
 }
 
@@ -37,7 +37,7 @@ suberror AcceptanceError {
 }
 
 ///|
-impl Show for AcceptanceError with output(self, logger) {
+impl Show for AcceptanceError with fn output(self, logger) {
   let AcceptanceError(text) = self
   logger.write_string(text)
 }
@@ -126,31 +126,28 @@ fn write_each_level(logger : &@logging.Logger) -> Unit {
 ///|
 impl @moonspec.World for LoggingWorld with fn configure(self, setup) {
   setup.given0("an application logger that implements only log", () => {
-    let log_only = LogOnly::{ received: [] }
+    let log_only = LogOnly::{ received: [], }
     self.log_only = Some(log_only)
     self.logger = Some(log_only)
   })
-  setup.given1(
-    "an application logger that enables {word} and higher",
-    (name : String) => {
-      let app = AppLogger::{ minimum: Some(level_of(name)), received: [] }
-      self.app = Some(app)
-      self.logger = Some(app)
-    },
-  )
-  setup.given1(
-    "the in-memory logger behind the minimum level {word}",
-    (name : String) => {
-      self.logger = Some(@logging.min_level(self.memory, level_of(name)))
-    },
-  )
-  setup.given1(
-    "the application logger behind the minimum level {word}",
-    (name : String) => {
-      guard self.app is Some(app) else { fail("make the application logger first") }
-      self.logger = Some(@logging.min_level(app, level_of(name)))
-    },
-  )
+  setup.given1("an application logger that enables {word} and higher", (
+    name : String,
+  ) => {
+    let app = AppLogger::{ minimum: Some(level_of(name)), received: [], }
+    self.app = Some(app)
+    self.logger = Some(app)
+  })
+  setup.given1("the in-memory logger behind the minimum level {word}", (
+    name : String,
+  ) => self.logger = Some(@logging.min_level(self.memory, level_of(name))))
+  setup.given1("the application logger behind the minimum level {word}", (
+    name : String,
+  ) => {
+    guard self.app is Some(app) else {
+      fail("make the application logger first")
+    }
+    self.logger = Some(@logging.min_level(app, level_of(name)))
+  })
   setup.given1(
     "a fan-out over the in-memory logger and a second logger behind {word}",
     (name : String) => {
@@ -162,40 +159,39 @@ impl @moonspec.World for LoggingWorld with fn configure(self, setup) {
       )
     },
   )
-  setup.given1(
-    "the in-memory logger with the category {string}",
-    (category : String) => {
-      self.logger = Some(@logging.with_category(self.memory, category))
-    },
-  )
+  setup.given1("the in-memory logger with the category {string}", (
+    category : String,
+  ) => self.logger = Some(@logging.with_category(self.memory, category)))
   setup.given0("the null logger", () => {
     self.logger = Some(@logging.null_logger())
   })
   setup.when0("code writes one event at each level", () => {
     write_each_level(self.target())
   })
-  setup.when2(
-    "code writes {string} at {word}",
-    (template : String, name : String) => {
-      self.target().write(level_of(name), template, [])
-    },
-  )
-  setup.when3(
-    "code writes {string} at {word} with the arguments {string}",
-    (template : String, name : String, args : String) => {
-      guard @json.parse(args) is Array(values) else {
-        fail("the arguments are not a JSON array: \{args}")
-      }
-      self.target().write(level_of(name), template, values)
-    },
-  )
-  setup.when3(
-    "code writes {string} at {word} with the error {string}",
-    (template : String, name : String, text : String) => {
-      self.target().write(level_of(name), template, [], error=AcceptanceError(text))
-    },
-  )
-  setup.then1("the application logger receives {int} events", (count : Int) => {
+  setup.when2("code writes {string} at {word}", (
+    template : String,
+    name : String,
+  ) => self.target().write(level_of(name), template, []))
+  setup.when3("code writes {string} at {word} with the arguments {string}", (
+    template : String,
+    name : String,
+    args : String,
+  ) => {
+    guard @json.parse(args) is Array(values) else {
+      fail("the arguments are not a JSON array: \{args}")
+    }
+    self.target().write(level_of(name), template, values)
+  })
+  setup.when3("code writes {string} at {word} with the error {string}", (
+    template : String,
+    name : String,
+    text : String,
+  ) => {
+    self
+    .target()
+    .write(level_of(name), template, [], error=AcceptanceError(text))
+  })
+  setup.then1("the application logger receives {int} events", (count : Int32) => {
     let received = match (self.app, self.log_only) {
       (Some(app), _) => app.received
       (_, Some(log_only)) => log_only.received
@@ -211,7 +207,9 @@ impl @moonspec.World for LoggingWorld with fn configure(self, setup) {
   })
   setup.then1("the event properties are {string}", (expected : String) => {
     let event = self.last_event()
-    let shown = event.properties().map(entry => "\{entry.0}=\{entry.1.stringify()}")
+    let shown = event
+      .properties()
+      .map(entry => "\{entry.0}=\{entry.1.stringify()}")
     @expect.expect(shown.join(", ")).to_equal(expected)
   })
   setup.then1("the message is {string}", (expected : String) => {
@@ -232,7 +230,9 @@ impl @moonspec.World for LoggingWorld with fn configure(self, setup) {
     @expect.expect(self.last_event().level).to_equal(level_of(name))
   })
   setup.then0("the null logger enables no level", () => {
-    guard self.logger is Some(logger) else { fail("choose the null logger first") }
+    guard self.logger is Some(logger) else {
+      fail("choose the null logger first")
+    }
     @expect.expect(logger.enabled(Critical)).to_be_false()
   })
 }

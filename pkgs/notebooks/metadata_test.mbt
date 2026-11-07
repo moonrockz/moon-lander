@@ -25,7 +25,9 @@ test "metadata rejects non-objects and isolates nested JSON aliases" {
   guard metadata.to_json() is Object(output) else { fail("expected object") }
   output.clear()
   @expect.expect_all(s => {
-    s.expect(metadata.get_json("vendor")).to_equal(Some({ "items": ["original"] }))
+    s
+    .expect(metadata.get_json("vendor"))
+    .to_equal(Some({ "items": ["original"] }))
     s.expect(metadata.get_json("null")).to_equal(Some(null))
     s.expect(metadata.get_json("missing")).to_equal(None)
     s.expect(metadata.keys().length()).to_equal(2)

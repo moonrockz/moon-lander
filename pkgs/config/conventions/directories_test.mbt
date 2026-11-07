@@ -26,11 +26,9 @@ test "Linux system file" {
     env_vars={},
   )
   let report = system_report(config)
-  @expect.expect((report.priority, report.path, report.status)).to_equal((
-    100,
-    Some("/etc/acme/acme.toml"),
-    Loaded,
-  ))
+  @expect.expect((report.priority, report.path, report.status)).to_equal(
+    (100, Some("/etc/acme/acme.toml"), Loaded),
+  )
   @expect.expect(@config.get_text(config, "machine")).to_equal("true")
 }
 
@@ -77,13 +75,10 @@ test "Absolute XDG directory used" {
 
 ///|
 test "Relative XDG directory ignored" {
-  let config = discover_in(
-    "/w",
-    [],
-    formats=[yaml_only()],
-    platform=Linux,
-    env_vars={ "HOME": "/home/alice", "XDG_CONFIG_HOME": "config" },
-  )
+  let config = discover_in("/w", [], formats=[yaml_only()], platform=Linux, env_vars={
+    "HOME": "/home/alice",
+    "XDG_CONFIG_HOME": "config",
+  })
   @expect.expect(global_report(config).candidates[0]).to_equal(
     "/home/alice/.config/acme/acme.yaml",
   )
@@ -91,13 +86,9 @@ test "Relative XDG directory ignored" {
 
 ///|
 test "macOS default directory" {
-  let config = discover_in(
-    "/w",
-    [],
-    formats=[yaml_only()],
-    platform=MacOs,
-    env_vars={ "HOME": "/Users/Alice" },
-  )
+  let config = discover_in("/w", [], formats=[yaml_only()], platform=MacOs, env_vars={
+    "HOME": "/Users/Alice",
+  })
   @expect.expect(global_report(config).candidates[0]).to_equal(
     "/Users/Alice/Library/Application Support/acme/acme.yaml",
   )
@@ -225,11 +216,13 @@ test "Not-found global source lists candidates" {
     "HOME": "/home/alice",
   })
   let report = global_report(config)
-  @expect.expect((report.priority, report.status, report.candidates)).to_equal((
-    200,
-    NotFound,
-    ["/home/alice/.config/acme/acme.toml", "/home/alice/.acme/acme.toml"],
-  ))
+  @expect.expect((report.priority, report.status, report.candidates)).to_equal(
+    (
+      200,
+      NotFound,
+      ["/home/alice/.config/acme/acme.toml", "/home/alice/.acme/acme.toml"],
+    ),
+  )
 }
 
 ///|
@@ -240,10 +233,9 @@ test "a global file loads below the project primary" {
     platform=Linux,
     env_vars={ "HOME": "/home/alice" },
   )
-  @expect.expect((
-    @config.get_text(config, "a"),
-    @config.get_text(config, "b"),
-  )).to_equal(("2", "1"))
+  @expect.expect((@config.get_text(config, "a"), @config.get_text(config, "b"))).to_equal(
+    ("2", "1"),
+  )
 }
 
 ///|
@@ -255,9 +247,9 @@ test "isolated mode skips the system and global sources" {
     platform=Linux,
     env_vars={ "HOME": "/home/alice" },
   )
-  @expect.expect((system_report(config).status, global_report(config).status)).to_equal((
-    Skipped, Skipped,
-  ))
+  @expect.expect((system_report(config).status, global_report(config).status)).to_equal(
+    (Skipped, Skipped),
+  )
   @expect.expect(config.warnings()).to_equal([])
 }
 

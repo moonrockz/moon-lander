@@ -2,7 +2,7 @@
 /// The counter protocol of the actors README.
 enum Counter {
   Increment
-  Read(@actors.Reply[Int])
+  Read(@actors.Reply[Int32])
 }
 
 ///|

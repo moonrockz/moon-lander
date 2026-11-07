@@ -5,9 +5,10 @@ struct Login {
 }
 
 ///|
+#derive(Debug)
 suberror LoginError {
   Locked(String)
-} derive(Debug)
+}
 
 ///|
 test "a validation middleware raises Rejected and the handler does not run" {
@@ -81,7 +82,11 @@ test "one sender passes MediatorError and an application error out unchanged" {
 
 ///|
 test "the publish message gives the count and position of one failure" {
-  let error = @mediator.MediatorError::from_publish_errors([None, Some(Locked("ann")), None]).unwrap()
+  let error = @mediator.MediatorError::from_publish_errors([
+    None,
+    Some(Locked("ann")),
+    None,
+  ]).unwrap()
   assert_eq(
     error.message(),
     "Publish failed: 1 of 3 handlers raised an error (position 2)",
@@ -90,7 +95,11 @@ test "the publish message gives the count and position of one failure" {
 
 ///|
 test "the publish message gives the count and positions of two failures" {
-  let error = @mediator.MediatorError::from_publish_errors([None, Some(Locked("ann")), Some(Locked("bo"))]).unwrap()
+  let error = @mediator.MediatorError::from_publish_errors([
+    None,
+    Some(Locked("ann")),
+    Some(Locked("bo")),
+  ]).unwrap()
   assert_eq(
     error.message(),
     "Publish failed: 2 of 3 handlers raised an error (positions 2, 3)",
@@ -129,7 +138,9 @@ test "the publish message holds no event value and no handler error text" {
 
 ///|
 test "the timeout message gives the limit and nothing else" {
-  let error = @mediator.MediatorError::timed_out(@lander_core.TimeLimit::millis(50))
+  let error = @mediator.MediatorError::timed_out(
+    @lander_core.TimeLimit::millis(50),
+  )
   assert_eq(error.message(), "Request timed out after 50 ms")
 }
 
@@ -137,12 +148,18 @@ test "the timeout message gives the limit and nothing else" {
 test "empty and all-success outcomes cannot make PublishFailed" {
   assert_true(@mediator.MediatorError::from_publish_errors([]) is None)
   assert_true(@mediator.MediatorError::from_publish_errors([None]) is None)
-  assert_true(@mediator.MediatorError::from_publish_errors([None, None]) is None)
+  assert_true(
+    @mediator.MediatorError::from_publish_errors([None, None]) is None,
+  )
 }
 
 ///|
 test "derived failures include first and last positions with safe access" {
-  let outcomes : Array[Error?] = [Some(Locked("first")), None, Some(Locked("last"))]
+  let outcomes : Array[Error?] = [
+    Some(Locked("first")),
+    None,
+    Some(Locked("last")),
+  ]
   guard @mediator.MediatorError::from_publish_errors(outcomes) is Some(error) else {
     fail("expected a publish error")
   }
@@ -159,7 +176,10 @@ test "derived failures include first and last positions with safe access" {
   assert_eq(last.position, 3)
   assert_true(first.error is Locked("first"))
   assert_true(last.error is Locked("last"))
-  assert_eq(error.message(), "Publish failed: 2 of 3 handlers raised an error (positions 1, 3)")
+  assert_eq(
+    error.message(),
+    "Publish failed: 2 of 3 handlers raised an error (positions 1, 3)",
+  )
 }
 
 ///|
@@ -188,23 +208,30 @@ test "a one-handler failure has position one and independent storage" {
 test "middleware cannot clear a failure report before it re-raises" {
   let guarded : @mediator.Topic[Unit, Unit] = @mediator.topic((_, _) => {
     raise Locked("only")
-  }).use_(@mediator.middleware((next, ctx, ev) => {
-    next(ctx, ev) catch {
-      @mediator.PublishFailed(failures~, ..) as error => {
-        failures.to_array().clear()
-        raise error
+  }).use_(
+    @mediator.middleware((next, ctx, ev) => {
+      next(ctx, ev) catch {
+        @mediator.PublishFailed(failures~, ..) as error => {
+          failures.to_array().clear()
+          raise error
+        }
+        other => raise other
       }
-      other => raise other
-    }
-  }))
+    }),
+  )
   try guarded.publish((), ()) catch {
     @mediator.PublishFailed(handlers~, failures~) as error => {
       assert_eq(handlers, 1)
       assert_eq(failures.length(), 1)
-      assert_eq(error.message(), "Publish failed: 1 of 1 handlers raised an error (position 1)")
+      assert_eq(
+        error.message(),
+        "Publish failed: 1 of 1 handlers raised an error (position 1)",
+      )
     }
     other => fail("unexpected error: \{other}")
-  } noraise { _ => fail("expected a failure") }
+  } noraise {
+    _ => fail("expected a failure")
+  }
 }
 
 ///|

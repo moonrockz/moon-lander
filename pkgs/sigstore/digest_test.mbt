@@ -33,7 +33,10 @@ test "ArtifactDigest: sha256 and 32 bytes of hex" {
   assert_eq(digest_rule(":" + hex), Some("unsupported "))
   assert_eq(digest_rule("sha512:" + hex), Some("unsupported sha512"))
   assert_eq(digest_rule("SHA256:" + hex), Some("unsupported SHA256"))
-  assert_eq(digest_rule("sha256:" + hex[:62].to_owned() + "zz"), Some("not hex"))
+  assert_eq(
+    digest_rule("sha256:" + hex[:62].to_owned() + "zz"),
+    Some("not hex"),
+  )
   assert_eq(digest_rule("sha256:" + hex[:63].to_owned()), Some("not hex"))
   assert_eq(digest_rule("sha256:"), Some("length 0"))
   assert_eq(digest_rule("sha256:" + hex[:62].to_owned()), Some("length 31"))
@@ -42,7 +45,9 @@ test "ArtifactDigest: sha256 and 32 bytes of hex" {
 
 ///|
 test "ArtifactDigest: upper-case hex reads back as lower-case" {
-  let upper = @sigstore.ArtifactDigest::parse(morphir_digest.to_upper().replace(old="SHA256", new="sha256"))
+  let upper = @sigstore.ArtifactDigest::parse(
+    morphir_digest.to_upper().replace(old="SHA256", new="sha256"),
+  )
   let lower = @sigstore.ArtifactDigest::parse(morphir_digest)
   assert_eq(upper, lower)
   assert_eq(upper.to_string(), morphir_digest)

@@ -6,11 +6,15 @@ struct SpyResolver {
 
 ///|
 fn SpyResolver::SpyResolver(vars : Map[String, String]) -> SpyResolver {
-  { calls: Ref([]), inner: @config.env_resolver(vars) }
+  { calls: Ref([]), inner: @config.env_resolver(vars), }
 }
 
 ///|
-impl @config.SecretResolver for SpyResolver with resolve(self, reference, origin) {
+impl @config.SecretResolver for SpyResolver with fn resolve(
+  self,
+  reference,
+  origin,
+) {
   self.calls.val.push((reference, origin))
   self.inner.resolve(reference, origin)
 }
@@ -22,11 +26,11 @@ struct FileSpy {
 
 ///|
 fn FileSpy::FileSpy() -> FileSpy {
-  { calls: Ref([]) }
+  { calls: Ref([]), }
 }
 
 ///|
-impl @config.SecretResolver for FileSpy with resolve(self, reference, origin) {
+impl @config.SecretResolver for FileSpy with fn resolve(self, reference, origin) {
   self.calls.val.push((reference, origin))
   raise @config.InvalidSecretValue(reason="file spy does not read")
 }
@@ -96,9 +100,7 @@ test "Resolve an environment reference" {
 ///|
 test "Plain string is a literal secret" {
   let spy = SpyResolver::SpyResolver({ "TOKEN": "abc" })
-  let config = @config.build([
-    named({ "registry": { "token": "abc" } }, "base"),
-  ])
+  let config = @config.build([named({ "registry": { "token": "abc" } }, "base")])
   let secret = config.secret("registry.token", spy)
   @expect.expect(secret.expose()).to_equal("abc")
   @expect.expect(spy.calls.val.length()).to_equal(0)
@@ -163,10 +165,9 @@ test "Resolver gets the origin" {
 test "SecretSyntax none does not resolve a one-field env table" {
   let builder = @config.builder()
     |> @config.secret_syntax(@config.SecretSyntax::none())
-    |> @config.add(
-      named({ "deploy": { "env": "prod" } }, "base"),
-    )
-  let config = match @config.load(builder, @config.FileTree::new(complete=true)) {
+    |> @config.add(named({ "deploy": { "env": "prod" } }, "base"))
+  let config = match
+    @config.load(builder, @config.FileTree::new(complete=true)) {
     Done(config) => config
     Need(_) => abort("complete tree")
   }

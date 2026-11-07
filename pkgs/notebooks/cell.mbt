@@ -12,7 +12,7 @@ pub(open) trait CellView {
   /// Some means MIME lookup is supported, even if no representations exist.
   /// None means unsupported. The default is None; supporting formats must
   /// explicitly return a MimeTyped implementation for this cell.
-  fn mime_capability(Self) -> Option[&MimeTyped] = _
+  fn mime_capability(Self) -> &MimeTyped? = _
 }
 
 ///|

@@ -2,9 +2,10 @@
 struct Greet(String)
 
 ///|
+#derive(Debug)
 suberror GreetError {
   Refused(String)
-} derive(Debug)
+}
 
 ///|
 /// A sender whose handler waits, records `handler` and gives `Hi <name>`.

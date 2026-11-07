@@ -9,15 +9,24 @@ priv enum ConventionStep {
 /// unless app_dirs() has supplied its standard parts. Steps compose in order;
 /// a later app_dirs() replaces earlier parts. The final set receives the run's
 /// standard flags and resolved environment name.
-pub fn[S] conventions(builder : HostBuilder[S], transform : (@conventions.Conventions) -> @conventions.Conventions) -> HostBuilder[S] {
-  { ..builder, convention_steps: builder.convention_steps + [Transform(transform)] }
+pub fn[S] conventions(
+  builder : HostBuilder[S],
+  transform : (@conventions.Conventions) -> @conventions.Conventions,
+) -> HostBuilder[S] {
+  {
+    ..builder,
+    convention_steps: builder.convention_steps + [Transform(transform)],
+  }
 }
 
 ///|
 /// Enable configuration profiles on the host-owned conventions set. This
 /// step adds no discovery parts; use `app_dirs` to discover primary files.
 /// A later `app_dirs` replaces earlier convention steps, including this policy.
-pub fn[S] profiles(builder : HostBuilder[S], policy : @profiles.Policy) -> HostBuilder[S] {
+pub fn[S] profiles(
+  builder : HostBuilder[S],
+  policy : @profiles.Policy,
+) -> HostBuilder[S] {
   builder |> conventions(c => c |> @conventions.profiles(policy))
 }
 
@@ -36,8 +45,11 @@ pub fn[S] profiles(builder : HostBuilder[S], policy : @profiles.Policy) -> HostB
 /// The run's variable set and working directory replace values that a callback
 /// sets; use env_vars or working_dir on the host builder.
 /// A callback error ends the run before the factory or any hook.
-pub fn[S] configure(builder : HostBuilder[S], sources : (@config.ConfigBuilder) -> @config.ConfigBuilder raise) -> HostBuilder[S] {
-  { ..builder, configure_sources: builder.configure_sources + [sources] }
+pub fn[S] configure(
+  builder : HostBuilder[S],
+  sources : (@config.ConfigBuilder) -> @config.ConfigBuilder raise,
+) -> HostBuilder[S] {
+  { ..builder, configure_sources: builder.configure_sources + [sources], }
 }
 
 ///|
@@ -45,8 +57,11 @@ pub fn[S] configure(builder : HostBuilder[S], sources : (@config.ConfigBuilder) 
 /// snapshot ends configuration loading with usage code 2 and the requested
 /// paths in its error message. Native and js ignore this snapshot and read
 /// disk through the config host adapter.
-pub fn[S] files(builder : HostBuilder[S], tree : @config.FileTree) -> HostBuilder[S] {
-  { ..builder, file_tree: tree }
+pub fn[S] files(
+  builder : HostBuilder[S],
+  tree : @config.FileTree,
+) -> HostBuilder[S] {
+  { ..builder, file_tree: tree, }
 }
 
 ///|
@@ -54,8 +69,11 @@ pub fn[S] files(builder : HostBuilder[S], tree : @config.FileTree) -> HostBuilde
 /// Its TimeLimit value overrides shutdown_timeout; an absent value keeps
 /// the builder limit, which defaults to 30 seconds. A bad value is a
 /// configuration error and no factory or hook runs.
-pub fn[S] shutdown_timeout_key(builder : HostBuilder[S], key : @config.KeyPath) -> HostBuilder[S] {
-  { ..builder, timeout_key: Some(key) }
+pub fn[S] shutdown_timeout_key(
+  builder : HostBuilder[S],
+  key : @config.KeyPath,
+) -> HostBuilder[S] {
+  { ..builder, timeout_key: Some(key), }
 }
 
 ///|
@@ -67,17 +85,24 @@ priv struct ConfigurationInputs {
 }
 
 ///|
-fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory) -> ConfigurationInputs raise {
+fn[S] configuration_inputs(
+  host : Host[S],
+  read_directory~ : () -> @lander_core.AbsolutePath raise WorkingDirectoryError = process_directory,
+) -> ConfigurationInputs raise {
   let settings = resolve_settings(host, read_directory~)
   let parsed = parse_arguments(host, env=settings.variables)
-  let environment = resolve_environment(host, settings, parsed.discovery_options)
+  let environment = resolve_environment(
+    host,
+    settings,
+    parsed.discovery_options,
+  )
   let options = environment_options(host, parsed.discovery_options, environment)
   let sources = configuration_builder(host, settings, options)
   let sources = match parsed.overrides {
     Some(source) => sources |> @config.add(source)
     None => sources
   }
-  { settings, parsed, environment, sources }
+  { settings, parsed, environment, sources, }
 }
 
 ///|
@@ -85,7 +110,10 @@ fn[S] configuration_inputs(host : Host[S], read_directory? : () -> @lander_core.
 // Native and js read disk through `@host.load` and do not call this. Remove the
 // override when the build system can limit a function to targets.
 #warnings("-1")
-fn configuration_from_tree(sources : @config.ConfigBuilder, tree : @config.FileTree) -> @config.Config raise {
+fn configuration_from_tree(
+  sources : @config.ConfigBuilder,
+  tree : @config.FileTree,
+) -> @config.Config raise {
   match @config.load(sources, tree) {
     Done(config) => config
     Need(requests) => raise IncompleteFileTree(requests~)
@@ -102,31 +130,67 @@ priv struct ConfiguredRun[S] {
 }
 
 ///|
-fn[S] finish_configuration(host : Host[S], inputs : ConfigurationInputs, config : @config.Config) -> ConfiguredRun[S] raise {
+fn[S] finish_configuration(
+  host : Host[S],
+  inputs : ConfigurationInputs,
+  config : @config.Config,
+) -> ConfiguredRun[S] raise {
   let shutdown_timeout = match host.timeout_key {
     Some(key) => {
       // Core has no bind by KeyPath yet; follow-up lander-4us.44.
-      let limit : @lander_core.TimeLimit? = @config.bind_with(config, key.to_string())
+      let limit : @lander_core.TimeLimit? = @config.bind_with(
+        config,
+        key.to_string(),
+      )
       limit.unwrap_or(host.shutdown_timeout)
     }
     None => host.shutdown_timeout
   }
-  let context : BuildContext = { config, environment: inputs.environment, args: inputs.parsed.matches,
-    env_vars: inputs.settings.variables, working_dir: inputs.settings.directory }
+  let context : BuildContext = {
+    config,
+    environment: inputs.environment,
+    args: inputs.parsed.matches,
+    env_vars: inputs.settings.variables,
+    working_dir: inputs.settings.directory,
+  }
   let services = (host.factory)(context)
-  { context: { services, config, environment: context.environment, args: context.args,
-      env_vars: context.env_vars, working_dir: context.working_dir, lifetime: Lifetime::new() }, shutdown_timeout }
+  {
+    context: {
+      services,
+      config,
+      environment: context.environment,
+      args: context.args,
+      env_vars: context.env_vars,
+      working_dir: context.working_dir,
+      lifetime: Lifetime::new(),
+    },
+    shutdown_timeout,
+  }
 }
 
 ///|
 /// A run that ends before the first hook without a failure: a help or version
 /// request of the argument parse, or a factory that raises `StopRequested`.
 fn requested_outcome() -> RunOutcome {
-  { exit_code: ExitCode::success(), timed_out: false, failures: [], reason: Requested, requested_code: None, signal: None }
+  {
+    exit_code: ExitCode::success(),
+    timed_out: false,
+    failures: [],
+    reason: Requested,
+    requested_code: None,
+    signal: None,
+  }
 }
 
 ///|
 /// A configuration or factory failure before the engine starts.
 fn outcome(error : Error) -> RunOutcome {
-  { exit_code: select_exit_code(None, [error], false, None), timed_out: false, failures: [error], reason: StartFailed(error), requested_code: None, signal: None }
+  {
+    exit_code: select_exit_code(None, [error], false, None),
+    timed_out: false,
+    failures: [error],
+    reason: StartFailed(error),
+    requested_code: None,
+    signal: None,
+  }
 }

@@ -1,32 +1,35 @@
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct Tagged {
   name : String
   tag : String?
-  labels : Map[String, Int]
-} derive(FromJson, ToJson, Debug, Eq)
+  labels : Map[String, Int32]
+}
 
 ///|
 fn tagged_default() -> Tagged {
-  { name: "app", tag: None, labels: {} }
+  { name: "app", tag: None, labels: {}, }
 }
 
 ///|
 /// A server whose decoder accepts `port` as an alias of `endpoint`, but whose
 /// encoder writes only `endpoint`. A configured alias wins over the default.
+#derive(ToJson, Debug, Eq)
 struct Endpoint {
-  endpoint : Int
-} derive(ToJson, Debug, Eq)
+  endpoint : Int32
+}
 
 ///|
-impl FromJson for Endpoint with from_json(json, path) {
+impl FromJson for Endpoint with fn from_json(json, path) {
   guard json is Object(fields) else {
     raise @json.JsonDecodeError((path, "Expected object"))
   }
   let value = match (fields.get("port"), fields.get("endpoint")) {
     (Some(value), _) | (None, Some(value)) => value
-    (None, None) => raise @json.JsonDecodeError((path, "Missing field endpoint"))
+    (None, None) =>
+      raise @json.JsonDecodeError((path, "Missing field endpoint"))
   }
-  { endpoint: @json.from_json(value) }
+  { endpoint: @json.from_json(value), }
 }
 
 ///|
@@ -46,8 +49,11 @@ test "Unknown key ignored by default" {
     ),
   ])
   let ir = config
-    |> @config.bind_or("ir", ({ layout: "single-file", strict_mode: false } : IrOptions))
-  @expect.expect(ir).to_equal({ layout: "tree", strict_mode: false })
+    |> @config.bind_or(
+      "ir",
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
+    )
+  @expect.expect(ir).to_equal({ layout: "tree", strict_mode: false, })
 }
 
 ///|
@@ -63,7 +69,7 @@ test "Unknown key rejected" {
     config
     |> @config.bind_or(
       "ir",
-      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
       unknown=Reject,
     )
     |> ignore
@@ -90,7 +96,7 @@ test "all unknown keys go into one error, a table once" {
   let (failures, text) = unknown_key_failures(() => {
     config.bind_or(
       "ir",
-      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
       unknown=Reject,
     )
     |> ignore
@@ -123,9 +129,9 @@ test "a None field and map keys are known" {
   // The default leaves `tag` as `None`, which `ToJson` does not write; an
   // unset `tag` is not a configured key, so the check has nothing to report.
   let plain = load_files([("/repo/morphir.toml", Workspace, "svc.name = \"x\"")])
-  @expect.expect(
-    plain.bind_or("svc", tagged_default(), unknown=Reject).tag,
-  ).to_equal(None)
+  @expect.expect(plain.bind_or("svc", tagged_default(), unknown=Reject).tag).to_equal(
+    None,
+  )
 }
 
 ///|
@@ -135,17 +141,17 @@ test "Accepted alias listed" {
   ])
   let (failures, _) = unknown_key_failures(() => {
     config
-    |> @config.bind_or("server", ({ endpoint: 80 } : Endpoint), unknown=Reject)
+    |> @config.bind_or("server", ({ endpoint: 80, } : Endpoint), unknown=Reject)
     |> ignore
   })
   @expect.expect(failures.map(paths)).to_equal([["server.port"]])
   let server = config
     |> @config.bind_or(
       "server",
-      ({ endpoint: 80 } : Endpoint),
+      ({ endpoint: 80, } : Endpoint),
       unknown=RejectExcept(["port"]),
     )
-  @expect.expect(server).to_equal({ endpoint: 8080 })
+  @expect.expect(server).to_equal({ endpoint: 8080, })
 }
 
 ///|
@@ -160,7 +166,7 @@ test "a listed key accepts the keys below it" {
   let ir = config
     |> @config.bind_or(
       "ir",
-      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
       unknown=RejectExcept(["legacy"]),
     )
   @expect.expect(ir.layout).to_equal("tree")
@@ -184,15 +190,12 @@ test "a listed nested key works when the encoder leaves out its table" {
     config
     |> @config.bind_or(
       "ir",
-      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
       unknown=RejectExcept(["legacy.port", "old.value"]),
     )
     |> ignore
   })
-  @expect.expect(failures.map(paths)).to_equal([
-    ["ir.legacy.host"],
-    ["ir.old"],
-  ])
+  @expect.expect(failures.map(paths)).to_equal([["ir.legacy.host"], ["ir.old"]])
 }
 
 ///|
@@ -218,15 +221,18 @@ test "the check goes into list items" {
 }
 
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct Item {
   name : String
-  level : Int
-} derive(FromJson, ToJson, Debug, Eq)
+  level : Int32
+}
 
 ///|
 test "an absent section and a scalar section pass the check" {
   let config = load_files([("/repo/morphir.toml", Workspace, "mode = \"fast\"")])
-  @expect.expect(config.bind_or("mode", "safe", unknown=Reject)).to_equal("fast")
+  @expect.expect(config.bind_or("mode", "safe", unknown=Reject)).to_equal(
+    "fast",
+  )
   @expect.expect(config.bind_or("other", "safe", unknown=Reject)).to_equal(
     "safe",
   )
@@ -234,16 +240,18 @@ test "an absent section and a scalar section pass the check" {
 
 ///|
 test "a listed key path that does not parse raises the key path error" {
-  let config = load_files([("/repo/morphir.toml", Workspace, "ir.layout = \"x\"")])
-  try {
+  let config = load_files([
+    ("/repo/morphir.toml", Workspace, "ir.layout = \"x\""),
+  ])
+  try
     config
     |> @config.bind_or(
       "ir",
-      ({ layout: "single-file", strict_mode: false } : IrOptions),
+      ({ layout: "single-file", strict_mode: false, } : IrOptions),
       unknown=RejectExcept([""]),
     )
     |> ignore
-  } catch {
+  catch {
     InvalidKeyPath(..) => ()
     error => fail("expected InvalidKeyPath, got \{error.message()}")
   } noraise {

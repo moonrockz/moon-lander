@@ -10,7 +10,13 @@ async test "a real foreign callback polls an idle hosted lifetime" {
   let outcome = builder(@lander_core.AppName::parse("foreign-probe"), [])
     |> build(_ => ())
     |> run(ctx => {
-      assert_false(foreign_probe(() => ctx.stop_requested() || ctx.lifetime.stop_requested() || ctx.lifetime.stop_token().stop_requested()).wait())
+      assert_false(
+        foreign_probe(() => {
+          ctx.stop_requested() ||
+          ctx.lifetime.stop_requested() ||
+          ctx.lifetime.stop_token().stop_requested()
+        }).wait(),
+      )
     })
   assert_true(outcome.stop_reason() is Completed)
 }
@@ -22,14 +28,16 @@ async test "a foreign callback polls a parent signal without yielding" {
   let outcome = builder(@lander_core.AppName::parse("foreign-signal"), [])
     |> build(_ => ())
     |> run(signals=SignalProbe::new(() => signal.val), ctx => {
-      ignore(foreign_probe(() => {
-        // The watcher cannot run between publication and these synchronous reads.
-        signal.val = Some(Terminate)
-        observed.push(ctx.stop_requested())
-        observed.push(ctx.lifetime.stop_requested())
-        observed.push(ctx.lifetime.stop_token().stop_requested())
-        true
-      }).wait())
+      ignore(
+        foreign_probe(() => {
+          // The watcher cannot run between publication and these synchronous reads.
+          signal.val = Some(Terminate)
+          observed.push(ctx.stop_requested())
+          observed.push(ctx.lifetime.stop_requested())
+          observed.push(ctx.lifetime.stop_token().stop_requested())
+          true
+        }).wait(),
+      )
     })
   assert_eq(observed, [true, true, true])
   assert_true(outcome.stop_reason() is Signal(Terminate))
@@ -46,14 +54,18 @@ async test "a foreign callback keeps a request reason and observes later signal 
     let outcome = builder(@lander_core.AppName::parse("foreign-request"), [])
       |> build(_ => ())
       |> run(signals=SignalProbe::new(() => signal.val), ctx => {
-        ignore(foreign_probe(() => {
-          ctx.lifetime.stop_application(exit_code=code)
-          observed.push(ctx.stop_requested())
-          if with_signal { signal.val = Some(Interrupt) }
-          observed.push(ctx.lifetime.stop_requested())
-          observed.push(ctx.lifetime.stop_token().stop_requested())
-          true
-        }).wait())
+        ignore(
+          foreign_probe(() => {
+            ctx.lifetime.stop_application(exit_code=code)
+            observed.push(ctx.stop_requested())
+            if with_signal {
+              signal.val = Some(Interrupt)
+            }
+            observed.push(ctx.lifetime.stop_requested())
+            observed.push(ctx.lifetime.stop_token().stop_requested())
+            true
+          }).wait(),
+        )
       })
     assert_eq(observed, [true, true, true])
     assert_true(outcome.stop_reason() is Requested)

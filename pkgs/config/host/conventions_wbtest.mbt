@@ -12,7 +12,9 @@ fn project_report(config : @config.Config) -> @config.SourceReport? {
 ///|
 async test "the adapter reads the project file that discovery finds" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "project.name = \"on-disk\"")
   let config = @config.builder()
     |> @config.working_dir(dir)
@@ -28,10 +30,9 @@ async test "the adapter reads the project file that discovery finds" {
   guard project_report(config) is Some(report) else {
     fail("expected a project report")
   }
-  @expect.expect((report.status, report.path)).to_equal((
-    Loaded,
-    Some("\{dir}/acme.toml"),
-  ))
+  @expect.expect((report.status, report.path)).to_equal(
+    (Loaded, Some("\{dir}/acme.toml")),
+  )
   @expect.expect(@config.get_text(config, "project.name")).to_equal("on-disk")
   // On Windows the adapter gives `/` paths, so no report shows `\`.
   for each in config.reports() {
@@ -45,7 +46,9 @@ async test "the adapter reads the project file that discovery finds" {
 ///|
 async test "the adapter answers the workspace requests of discovery" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write(
     "\{dir}/acme.toml",
     "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",

@@ -10,12 +10,12 @@ fn yaml_stub() -> @config.Format {
 
 ///|
 fn files(names : Array[String]) -> Array[@config.DirEntry] {
-  names.map(name => { name, kind: File })
+  names.map(name => { name, kind: File, })
 }
 
 ///|
 fn dirs(names : Array[String]) -> Array[@config.DirEntry] {
-  names.map(name => { name, kind: Directory })
+  names.map(name => { name, kind: Directory, })
 }
 
 ///|
@@ -66,12 +66,9 @@ test "Configuration found from a nested directory" {
     .with_file(p("/w/acme.toml"), "project.name = \"root\"")
   let config = acme("/w/src/nested") |> @config.load(tree) |> done
   let report = project(config)
-  @expect.expect((report.kind, report.priority, report.path, report.status)).to_equal((
-    File(Workspace),
-    300,
-    Some("/w/acme.toml"),
-    Loaded,
-  ))
+  @expect.expect((report.kind, report.priority, report.path, report.status)).to_equal(
+    (File(Workspace), 300, Some("/w/acme.toml"), Loaded),
+  )
   @expect.expect(@config.get_text(config, "project.name")).to_equal("root")
 }
 
@@ -93,8 +90,8 @@ test "Nearest configuration wins" {
 fn load_from(
   builder : @config.ConfigBuilder,
   disk : Map[String, String],
-  rounds? : Ref[Int] = Ref(0),
-  tree? : @config.FileTree = @config.FileTree::new(),
+  rounds~ : Ref[Int32] = Ref(0),
+  tree~ : @config.FileTree = @config.FileTree::new(),
 ) -> @config.Config raise @config.ConfigError {
   match @config.load(builder, tree) {
     Done(config) => config
@@ -114,9 +111,9 @@ fn load_from(
               guard path != dir && path.is_within(dir) else { continue }
               let below = path.names()[dir.names().length():]
               let entry : @config.DirEntry = if below.length() > 1 {
-                { name: below[0], kind: Directory }
+                { name: below[0], kind: Directory, }
               } else {
-                { name: below[0], kind: File }
+                { name: below[0], kind: File, }
               }
               if !entries.contains(entry) {
                 entries.push(entry)
@@ -158,10 +155,14 @@ test "the first request lists the layout directories of the start directory" {
 test "no primary reports not-found at the start directory" {
   let config = load_from(acme("/w/src"), { "/w/src/main.mbt": "" })
   let report = project(config)
-  @expect.expect((report.status, report.candidates)).to_equal((
-    NotFound,
-    ["/w/src/acme.toml", "/w/src/.acme/acme.toml", "/w/src/.config/acme/config.toml"],
-  ))
+  @expect.expect((report.status, report.candidates)).to_equal(
+    (
+      NotFound,
+      [
+        "/w/src/acme.toml", "/w/src/.acme/acme.toml", "/w/src/.config/acme/config.toml",
+      ],
+    ),
+  )
 }
 
 ///|
@@ -175,7 +176,9 @@ test "two primaries in the nearest directory are ambiguous" {
   try load_from(builder, disk) catch {
     Ambiguous(display~, location~, candidates~) => {
       @expect.expect((display, location)).to_equal(("acme", "/w/sub"))
-      @expect.expect(candidates).to_equal(["/w/sub/acme.toml", "/w/sub/acme.yaml"])
+      @expect.expect(candidates).to_equal([
+        "/w/sub/acme.toml", "/w/sub/acme.yaml",
+      ])
     }
     _ => fail("expected an ambiguity error")
   } noraise {
@@ -220,13 +223,17 @@ test "a base convention set searches no file" {
 ///|
 test "the prefix and display name have defaults" {
   let conventions = @conventions.base("my-app")
-  @expect.expect((conventions.prefix(), conventions.display())).to_equal((
-    "MY_APP", "my-app",
-  ))
-  let named = @conventions.app_dirs("morphir", prefix="MORPHIR", display="Morphir")
-  @expect.expect((named.name(), named.prefix(), named.display())).to_equal((
-    "morphir", "MORPHIR", "Morphir",
-  ))
+  @expect.expect((conventions.prefix(), conventions.display())).to_equal(
+    ("MY_APP", "my-app"),
+  )
+  let named = @conventions.app_dirs(
+    "morphir",
+    prefix="MORPHIR",
+    display="Morphir",
+  )
+  @expect.expect((named.name(), named.prefix(), named.display())).to_equal(
+    ("morphir", "MORPHIR", "Morphir"),
+  )
 }
 
 ///|
@@ -243,7 +250,7 @@ test "discovery options default to not given" {
 ///|
 test "discovery needs an absolute working directory" {
   let tree = @config.FileTree::new(complete=true)
-    .with_listing(p("repo/sub"), [{ name: "acme.toml", kind: File }])
+    .with_listing(p("repo/sub"), [{ name: "acme.toml", kind: File, }])
     .with_file(p("repo/sub/acme.toml"), "a = 1")
   let config = acme("repo/sub") |> @config.load(tree) |> done
   @expect.expect(project(config).status).to_equal(Skipped)

@@ -200,9 +200,11 @@ impl @moonspec.World for MorphirWorld with fn configure(self, setup) {
       .result()
       .warnings()
       .iter()
-      .any(warning => match warning {
-        Note(message~, ..) => message.contains(text)
-        KeyRemoved(key, _) => key.to_string().contains(text)
+      .any(warning => {
+        match warning {
+          Note(message~, ..) => message.contains(text)
+          KeyRemoved(key, _) => key.to_string().contains(text)
+        }
       }),
     ).to_be_true()
   })

@@ -1,4 +1,5 @@
 ///|
+#derive(Debug)
 pub struct Components {
   value : @exact.Value
   schemas : Array[(ComponentKey, @schema.Schema)]?
@@ -9,7 +10,7 @@ pub struct Components {
   tags : Array[(ComponentKey, Tag)]?
   example_pairings : Array[(ComponentKey, ExamplePairing)]?
   example_pairing_objects : Array[(ComponentKey, ExamplePairing)]?
-} derive(Debug)
+}
 
 ///|
 pub fn Components::to_json(self : Components) -> @exact.Value {

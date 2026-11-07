@@ -110,11 +110,15 @@ async fn console_with_owner(probe : @hosting.SignalProbe) -> Unit {
     |> @lander_core.AppName::parse
     |> @hosting.builder([])
     |> @hosting.build(_ => ())
-  @console.run(host, ctx => {
-    while !ctx.cancelled() {
-      @async.pause()
-    }
-  }, signals=probe)
+  @console.run(
+    host,
+    ctx => {
+      while !ctx.cancelled() {
+        @async.pause()
+      }
+    },
+    signals=probe,
+  )
 }
 
 ///|

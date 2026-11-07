@@ -169,6 +169,7 @@ let islands_limit : Int32 = 27 * 1024
 
 ///|
 /// What one step does.
+#derive(Eq, Debug)
 enum Action {
   /// Run the command with the arguments.
   Run(String, Array[String])
@@ -177,7 +178,7 @@ enum Action {
   /// Serve `_site/` on the port with `serve-site.mbtx --no-watch`, run the browser smoke test against
   /// the tree at the path below the base path (`""` for the whole site), and stop the server.
   BrowserTest(BrowserPort, String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// The port of the preview server during the browser smoke test (design D16).
@@ -185,9 +186,10 @@ let browser_test_port : BrowserPort = { value: 4174, }
 
 ///|
 /// A validated loopback port for a browser acceptance run.
+#derive(Eq, Debug)
 struct BrowserPort {
   value : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 suberror BrowserPortError {
@@ -224,10 +226,11 @@ fn site_base(text : String) -> String raise Failure {
 
 ///|
 /// One step of a site task.
+#derive(Eq, Debug)
 struct Step {
   name : String
   action : Action
-} derive(Eq, Debug)
+}
 
 ///|
 fn run(name : String, command : String, args : Array[String]) -> Step {
@@ -396,13 +399,14 @@ fn test_steps(
 
 ///|
 /// The result of the islands size rule.
+#derive(Eq, Debug)
 enum Budget {
   Within
   /// Above the target: the message names the size and the target.
   Warn(String)
   /// Above the limit: the message names the size and the limit.
   Fail(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Check the gzip size `size` of `file` against the islands budget: a warning above 25 KB, a failure

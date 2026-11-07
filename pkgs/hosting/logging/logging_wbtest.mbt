@@ -6,7 +6,10 @@ async test "session-aware factory failure still closes and drains its real sessi
       @sinks.SessionSettings::standard(),
       session => {
         captured.val = Some(session)
-        (session.logger() : &@lander_logging.Logger).info("before factory failure", [])
+        (session.logger() : &@lander_logging.Logger).info(
+          "before factory failure",
+          [],
+        )
         fail("factory failed")
       },
       (_ : @hosting.Context[Unit]) => (),
@@ -49,7 +52,10 @@ fn report(failed~ : Bool) -> @sinks.SessionReport raise {
 test "a delivery failure turns only a success into exit code 1" {
   let success = @hosting.ExitCode::success()
   assert_eq(final_code(success, report(failed=false)), success)
-  assert_eq(final_code(success, report(failed=true)), @hosting.ExitCode::failure())
+  assert_eq(
+    final_code(success, report(failed=true)),
+    @hosting.ExitCode::failure(),
+  )
   for code in [1, 2, 130, 143, 131, 7] {
     let selected = @hosting.ExitCode::from_int(code)
     assert_eq(final_code(selected, report(failed=true)), selected)
@@ -116,7 +122,10 @@ async test "the report writer logs each default report line as an error" {
   assert_eq(events.length(), 1)
   assert_eq(events[0].level, Error)
   assert_eq(events[0].message(), "acme: bad option")
-  assert_eq(events[0].property("Failure"), Some(Json::string("acme: bad option")))
+  assert_eq(
+    events[0].property("Failure"),
+    Some(Json::string("acme: bad option")),
+  )
 }
 
 ///|

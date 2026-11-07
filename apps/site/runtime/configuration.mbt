@@ -11,7 +11,9 @@ let local_git_vars : Array[String] = [
 fn git_env() -> Map[String, String] {
   let result : Map[String, String] = Map([])
   for name, value in @env.get_env_vars() {
-    if !local_git_vars.contains(name.to_upper()) { result[name] = value }
+    if !local_git_vars.contains(name.to_upper()) {
+      result[name] = value
+    }
   }
   result
 }
@@ -19,38 +21,60 @@ fn git_env() -> Map[String, String] {
 ///|
 async fn git(root : String, args : Array[String]) -> String {
   let (code, stdout, stderr) = @process.collect_output(
-    "git", args, cwd=root, extra_env=git_env(), inherit_env=false,
+    "git",
+    args,
+    cwd=root,
+    extra_env=git_env(),
+    inherit_env=false,
   )
   guard code == 0 else {
-    raise @model.Invalid([@model.problem(root, "git \{args.join(" ")}: \{stderr.text()}")])
+    raise @model.Invalid([
+      @model.problem(root, "git \{args.join(" ")}: \{stderr.text()}"),
+    ])
   }
   stdout.text()
 }
 
 ///|
 /// Add only repository policy to the shared host configuration.
-async fn effective_configuration(root : String, tree : @policy.TreePrefix) -> String {
+async fn effective_configuration(
+  root : String,
+  tree : @policy.TreePrefix,
+) -> String {
   let file = "\{root}/site/site.json"
   let text = @fs.read_file(file).text()
   let parsed = @model.SiteConfig::parse(file, text)
   for dir in parsed.api {
     guard dir.has_prefix("pkgs/") && dir.split("/").count() == 2 else {
-      raise @model.Invalid([@model.problem(file, "api: \{dir} is not a published pkgs module")])
+      raise @model.Invalid([
+        @model.problem(file, "api: \{dir} is not a published pkgs module"),
+      ])
     }
   }
-  let plans = git(root, ["ls-files", "--cached", "--others", "--exclude-standard", "--", "docs/superpowers"])
+  let plans = git(root, [
+    "ls-files", "--cached", "--others", "--exclude-standard", "--", "docs/superpowers",
+  ])
   guard plans.trim().is_empty() else {
-    raise @model.Invalid([@model.problem("docs/superpowers/", "agent plans must be excluded from the site: \{plans.trim()}")])
+    raise @model.Invalid([
+      @model.problem(
+        "docs/superpowers/",
+        "agent plans must be excluded from the site: \{plans.trim()}",
+      ),
+    ])
   }
   let ignored = git(root, [
     "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z",
     "--", "docs", "site", "pkgs", "tests",
   ])
   let excluded = parsed.exclude.copy()
-  if !excluded.contains("docs/assets") { excluded.push("docs/assets") }
+  if !excluded.contains("docs/assets") {
+    excluded.push("docs/assets")
+  }
   for path in ignored.split("\u{0}") {
     let path = path.trim_end(chars="/").to_owned()
-    if path != "" { excluded.push(path) }
+    if path != "" {
+      excluded.push(path)
+    }
   }
   let value = @json.parse(text)
   guard value is Object(fields) else { abort("SiteConfig parsed a non-object") }

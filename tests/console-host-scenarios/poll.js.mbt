@@ -1,6 +1,9 @@
 ///|
 /// The parent stays responsive while this real foreign callback never yields.
-extern "js" fn poll_foreign(read : () -> Bool, stopped : () -> Unit) -> @js_async.Promise[Unit] =
+extern "js" fn poll_foreign(
+  read : () -> Bool,
+  stopped : () -> Unit,
+) -> @js_async.Promise[Unit] =
   #|(read, stopped) => new Promise((resolve, reject) => setTimeout(() => {
   #|  try {
   #|    const ready = globalThis.landerWorkerReady;

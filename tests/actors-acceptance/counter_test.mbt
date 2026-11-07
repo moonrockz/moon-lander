@@ -2,14 +2,14 @@
 /// The counter of the requirement "Start an anonymous typed actor".
 enum Counter {
   Increment
-  Read(@actors.Reply[Int])
+  Read(@actors.Reply[Int32])
 }
 
 ///|
 /// The counter handler. It waits at `gate` when one is given.
 fn counter(
   gate? : @aio.Queue[Unit],
-) -> async (Int, Counter) -> @actors.Next[Int] {
+) -> async (Int32, Counter) -> @actors.Next[Int32] {
   (state, message) => {
     match message {
       Increment => {

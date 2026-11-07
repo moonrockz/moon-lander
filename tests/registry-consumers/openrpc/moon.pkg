@@ -1,2 +1,5 @@
-import { "moonrockz/openrpc" @library }
+import {
+  "moonrockz/openrpc" @library,
+}
+
 pkgtype(kind: "executable")

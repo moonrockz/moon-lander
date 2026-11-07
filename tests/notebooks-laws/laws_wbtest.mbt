@@ -1,8 +1,9 @@
 ///|
+#derive(Debug)
 priv struct NotebookCase {
   choices : ReadOnlyArray[UInt32]
   style : UInt32
-} derive(Debug)
+}
 
 ///|
 impl @quickcheck.Arbitrary for NotebookCase with fn arbitrary(size, state) {
@@ -261,12 +262,24 @@ test "law: native Ion metadata survives DIB output without down-conversion" {
     (input : NotebookCase) => {
       let (_, dib) = input.pair()
       let value = @ion.Ion::from_fields([
-        @ion.field("choices", @ion.Ion::list(input.choices.iter().map(choice => {
-          @ion.Ion::int(choice.reinterpret_as_int())
-        }).collect()).with_annotation(@ion.symbol("generated"))),
+        @ion.field(
+          "choices",
+          @ion.Ion::list(
+            input.choices
+            .iter()
+            .map(choice => @ion.Ion::int(choice.reinterpret_as_int()))
+            .collect(),
+          ).with_annotation(@ion.symbol("generated")),
+        ),
         @ion.field("typed", @ion.Ion::typed_null(@ion.IonType::Int)),
-        @ion.field("decimal", @ion.Ion::decimal(@ion.Decimal::parse("\{input.style}.50"))),
-        @ion.field("timestamp", @ion.Ion::timestamp(@ion.Timestamp::parse("2026-10-19T12:30:00Z"))),
+        @ion.field(
+          "decimal",
+          @ion.Ion::decimal(@ion.Decimal::parse("\{input.style}.50")),
+        ),
+        @ion.field(
+          "timestamp",
+          @ion.Ion::timestamp(@ion.Timestamp::parse("2026-10-19T12:30:00Z")),
+        ),
       ])
       let metadata = @notebooks.Metadata::from_ion(value)
       let book = @dib.Notebook::Notebook(dib.cells(), metadata~)

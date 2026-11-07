@@ -54,7 +54,9 @@ fn github_cases() -> Array[GitHubCase] raise {
 
 ///|
 /// A time after every fixture was made.
-let later : @sigstore.Instant = @sigstore.Instant::from_unix_seconds(1793000000L)
+let later : @sigstore.Instant = @sigstore.Instant::from_unix_seconds(
+  1793000000L,
+)
 
 ///|
 fn case_policy(case : GitHubCase) -> @sigstore.Policy raise {
@@ -68,7 +70,7 @@ fn case_policy(case : GitHubCase) -> @sigstore.Policy raise {
 fn verify_case(
   case : GitHubCase,
   policy : @sigstore.Policy,
-  root? : @sigstore.TrustedRoot = @sigstore.TrustedRoot::public_good(),
+  root~ : @sigstore.TrustedRoot = @sigstore.TrustedRoot::public_good(),
 ) -> @sigstore.Verdict raise {
   @sigstore.verify(
     @sigstore.Bundle::parse(fixture(@fixtures.github, case.bundle)),
@@ -85,14 +87,22 @@ test "real GitHub attestations verify with the public-good root" {
     match verify_case(case, case_policy(case)) {
       Verified(facts) => {
         assert_eq(facts.times[0].time.unix_seconds(), case.integrated_time)
-        guard facts.times[0].source is Log(log_index~, ..) else { fail("not a log time") }
+        guard facts.times[0].source is Log(log_index~, ..) else {
+          fail("not a log time")
+        }
         assert_eq(log_index, case.log_index)
         assert_eq(facts.claims.subject_names, [case.san])
-        assert_eq(facts.claims.issuer, Some("https://token.actions.githubusercontent.com"))
+        assert_eq(
+          facts.claims.issuer,
+          Some("https://token.actions.githubusercontent.com"),
+        )
         assert_eq(facts.claims.runner_environment, Some("github-hosted"))
         assert_eq(facts.claims.source_repository_ref, Some(case.git_ref))
         guard facts.statement is Some(statement) else { fail("no statement") }
-        assert_eq(statement.predicate_type, @sigstore.PredicateType::slsa_provenance_v1())
+        assert_eq(
+          statement.predicate_type,
+          @sigstore.PredicateType::slsa_provenance_v1(),
+        )
       }
       Rejected(reason) => fail("\{case.bundle}: \{reason.message()}")
     }

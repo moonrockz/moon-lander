@@ -4,11 +4,9 @@ test "a builder with one service builds a Host[Unit]" {
       @lander_core.AppName::parse("acme"),
       ["build"],
     )
-    |> @hosting.service(
-      @hosting.ServiceName::parse("db"),
-      start=_ => (),
-      stop=_ => (),
-    )
+    |> @hosting.service(@hosting.ServiceName::parse("db"), start=_ => (), stop=_ => {
+      ()
+    })
     |> @hosting.build(_ => ())
   ignore(host)
 }
@@ -19,10 +17,9 @@ test "the factory fixes the services type" {
       @lander_core.AppName::parse("acme"),
       [],
     )
-    |> @hosting.service(
-      @hosting.ServiceName::parse("log"),
-      stop=ctx => ctx.services.push("flushed"),
-    )
+    |> @hosting.service(@hosting.ServiceName::parse("log"), stop=ctx => {
+      ctx.services.push("flushed")
+    })
     |> @hosting.build(_ => [])
   ignore(host)
 }
@@ -35,9 +32,9 @@ test "a second service with the same name is a fault" {
       [],
     )
     |> @hosting.service(db)
-  let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
-    Ok(builder |> @hosting.service(db))
-  catch {
+  let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = Ok(
+    builder |> @hosting.service(db),
+  ) catch {
     err => Err(err)
   }
   guard result is Err(@hosting.DuplicateService(name~, existing~) as err) else {
@@ -59,9 +56,9 @@ test "service names that differ only in letter case are duplicates" {
     |> @hosting.service(@hosting.ServiceName::parse("Données"))
   for text in ["données", "DONNÉES"] {
     let name = @hosting.ServiceName::parse(text)
-    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
-      Ok(builder |> @hosting.service(name))
-    catch {
+    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = Ok(
+      builder |> @hosting.service(name),
+    ) catch {
       err => Err(err)
     }
     guard result is Err(@hosting.DuplicateService(name=got, existing~) as err) else {
@@ -91,9 +88,9 @@ test "case pairs that are not symmetric are duplicates" {
         [],
       )
       |> @hosting.service(@hosting.ServiceName::parse(first))
-    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
-      Ok(builder |> @hosting.service(@hosting.ServiceName::parse(second)))
-    catch {
+    let result : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = Ok(
+      builder |> @hosting.service(@hosting.ServiceName::parse(second)),
+    ) catch {
       err => Err(err)
     }
     guard result is Err(@hosting.DuplicateService(..)) else {
@@ -109,18 +106,18 @@ test "service takes a String and parses it at the step" {
     |> @hosting.builder([])
     |> @hosting.service("db")
     |> @hosting.service(@hosting.ServiceName::parse("cache"))
-  let bad : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
-    Ok(builder |> @hosting.service("my db"))
-  catch {
+  let bad : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = Ok(
+    builder |> @hosting.service("my db"),
+  ) catch {
     err => Err(err)
   }
   guard bad is Err(@hosting.InvalidServiceName(text~, ..)) else {
     fail("expected InvalidServiceName")
   }
   @expect.expect(text).to_equal("my db")
-  let dup : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = try
-    Ok(builder |> @hosting.service("DB"))
-  catch {
+  let dup : Result[@hosting.HostBuilder[Unit], @hosting.HostError] = Ok(
+    builder |> @hosting.service("DB"),
+  ) catch {
     err => Err(err)
   }
   guard dup is Err(@hosting.DuplicateService(name~, existing~)) else {

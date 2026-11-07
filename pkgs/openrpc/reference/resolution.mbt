@@ -2,11 +2,12 @@
 /// An owned resolved target: the owning resource's retrieval URI (None for
 /// an unnamed input document), the pointer within it, and the immutable value
 /// found there.
+#derive(Debug)
 pub struct Location {
   resource : UriReference?
   pointer : JsonPointer
   target : @json.Value
-} derive(Debug)
+}
 
 ///|
 pub extend Location with @debug.Debug::{to_repr}
@@ -39,11 +40,12 @@ pub fn Location::identity(self : Location) -> String {
 ///|
 /// One reference in a chain: where it appeared (None for the initial input),
 /// its source text, and its absolute form when a base was available.
+#derive(Debug)
 pub struct ReferenceStep {
   site : Location?
   reference : Reference
   resolved : UriReference?
-} derive(Debug)
+}
 
 ///|
 pub extend ReferenceStep with @debug.Debug::{to_repr}
@@ -67,12 +69,13 @@ pub fn ReferenceStep::resolved(self : ReferenceStep) -> UriReference? {
 /// A resolution result. `complete` is false when the answer depends on input
 /// that was not supplied or on work beyond the limits; a broken pointer or a
 /// cycle is a complete failure.
+#derive(Debug)
 pub struct Resolution {
   target : Location?
   priv chain : Array[ReferenceStep]
   priv diagnostics : Array[@json.Diagnostic]
   complete : Bool
-} derive(Debug)
+}
 
 ///|
 pub extend Resolution with @debug.Debug::{to_repr}

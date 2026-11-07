@@ -1,18 +1,19 @@
 ///|
 struct Store {
-  mut items : Int
+  mut items : Int32
 }
 
 ///|
+#derive(Debug)
 suberror Denied {
   Denied
-} derive(Debug)
+}
 
 ///|
 async test "Heterogeneous return types: an Int and a String from one service" {
   @actors.scope(scope => {
-    let store = scope.create({ items: 2 })
-    let count : Int = store.ask(s => s.items)
+    let store = scope.create({ items: 2, })
+    let count : Int32 = store.ask(s => s.items)
     let text : String = store.ask(s => "\{s.items} items")
     assert_eq((count, text), (2, "2 items"))
   })
@@ -21,7 +22,7 @@ async test "Heterogeneous return types: an Int and a String from one service" {
 ///|
 async test "Ask error permits later calls: the next call sees the change" {
   @actors.scope(scope => {
-    let store = scope.create({ items: 2 })
+    let store = scope.create({ items: 2, })
     let outcome = try {
       store.ask(s => {
         s.items = 0
@@ -43,7 +44,7 @@ async test "Tell failure reaches owner: the service ends, cleans up and fails th
   let never : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let outcome = try {
     @actors.scope(scope => {
-      let store = scope.create({ items: 0 }, on_stop=() => log.push("cleanup"))
+      let store = scope.create({ items: 0, }, on_stop=() => log.push("cleanup"))
       store.tell(_ => raise Denied)
       never.get()
     })
@@ -60,7 +61,7 @@ async test "Close a service with queued calls: the queued caller wakes with clos
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let outcomes = @actors.scope(scope => {
-    let store = scope.create({ items: 0 })
+    let store = scope.create({ items: 0, })
     @aio.with_task_group(group => {
       let running = group.spawn(() => {
         store.ask(s => {
@@ -101,7 +102,7 @@ async test "No explicit reply plumbing: a doubling responder answers 42" {
 ///|
 async test "Expected rejection: an error value goes to the caller and the next request works" {
   @actors.scope(scope => {
-    let checker = scope.respond((value : Int) => {
+    let checker = scope.respond((value : Int32) => {
       if value < 0 {
         Err("negative")
       } else {

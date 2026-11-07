@@ -32,8 +32,10 @@ fn member_text(object : Map[String, Json], name : String) -> String raise {
 }
 
 ///|
-fn member_int(object : Map[String, Json], name : String) -> Int raise {
-  guard object.get(name) is Some(Number(value, ..)) else { fail("no number \{name}") }
+fn member_int(object : Map[String, Json], name : String) -> Int32 raise {
+  guard object.get(name) is Some(Number(value, ..)) else {
+    fail("no number \{name}")
+  }
   value.to_int()
 }
 
@@ -64,11 +66,12 @@ fn key_outcome(spki : BytesView) -> String {
 ///|
 /// One Wycheproof test file: the counts of valid, invalid and acceptable
 /// cases. Every case must give its expected result.
+#derive(Debug)
 struct WycheproofCount {
-  valid : Int
-  invalid : Int
-  acceptable : Int
-} derive(Debug)
+  valid : Int32
+  invalid : Int32
+  acceptable : Int32
+}
 
 ///|
 fn run_wycheproof(path : String, p1363 : Bool) -> WycheproofCount raise {
@@ -112,7 +115,7 @@ fn run_wycheproof(path : String, p1363 : Bool) -> WycheproofCount raise {
     }
   }
   assert_eq(valid + invalid + acceptable, member_int(root, "numberOfTests"))
-  { valid, invalid, acceptable }
+  { valid, invalid, acceptable, }
 }
 
 ///|
@@ -209,19 +212,19 @@ test "DER signatures that are not strict DER are refused" {
     // A length in the long form when the short form fits.
     "308106020101020102",
     // A leading zero before a byte without the high bit.
-    "300702020001020102", "300702010102020002",
+     "300702020001020102", "300702010102020002",
     // Negative values.
-    "3006020180020102", "3006020101020180",
+     "3006020180020102", "3006020101020180",
     // An empty INTEGER.
-    "30050200020102",
+     "30050200020102",
     // Trailing bytes after the SEQUENCE and inside it.
-    "300602010102010200", "3009020101020102020103",
+     "300602010102010200", "3009020101020102020103",
     // Only one INTEGER.
-    "3003020101",
+     "3003020101",
     // The wrong outer tag, and the wrong inner tag.
-    "3106020101020102", "3006020101040102",
+     "3106020101020102", "3006020101040102",
     // A truncated SEQUENCE.
-    "3007020101020102", "",
+     "3007020101020102", "",
   ]
   for text in refused {
     assert_eq(
@@ -312,7 +315,9 @@ test "points must be uncompressed, in the field and on the curve" {
   assert_eq(key_outcome(p256_spki(hex(p256_x + p256_y))), shape)
   // A P-384-sized point for a P-256 key.
   assert_eq(
-    key_outcome(p256_spki(hex("04" + "00".repeat(16) + p256_x + "00".repeat(16) + p256_y))),
+    key_outcome(
+      p256_spki(hex("04" + "00".repeat(16) + p256_x + "00".repeat(16) + p256_y)),
+    ),
     shape,
   )
   // A coordinate equal to the prime is refused before the curve check;
@@ -390,18 +395,11 @@ test "malformed key DER is a bad key" {
     )
   }
   // An ECDSA key with NULL parameters has no named curve.
-  let no_curve = hex(
-    "3051300b06072a8648ce3d0201050003420004" + p256_x + p256_y,
-  )
+  let no_curve = hex("3051300b06072a8648ce3d0201050003420004" + p256_x + p256_y)
   assert_eq(key_outcome(no_curve), "BadKey(ECDSA key without a named curve)")
   // Parameters of another type.
-  let other = hex(
-    "3052300c06072a8648ce3d020102010103420004" + p256_x + p256_y,
-  )
-  assert_eq(
-    key_outcome(other),
-    "BadKey(malformed DER: unknown key parameters)",
-  )
+  let other = hex("3052300c06072a8648ce3d020102010103420004" + p256_x + p256_y)
+  assert_eq(key_outcome(other), "BadKey(malformed DER: unknown key parameters)")
 }
 
 ///|
@@ -420,18 +418,18 @@ test "the hash comes from the key kind unless given" {
   assert_false(key.verify(message, signature, hash=Sha256))
   assert_true(key.verify(message, signature, hash=Sha384))
   assert_false(key.verify(message, signature, hash=Sha512))
-  assert_true(
-    key.verify_digest(@signature.digest(Sha384, message), signature),
-  )
+  assert_true(key.verify_digest(@signature.digest(Sha384, message), signature))
   // The same check through the fixed-width form.
   guard @signature.der_signature_to_raw(signature, 32) is Some(raw) else {
     fail("the signature is strict DER")
   }
-  assert_true(
-    key.verify_digest_raw(@signature.digest(Sha384, message), raw),
+  assert_true(key.verify_digest_raw(@signature.digest(Sha384, message), raw))
+  assert_false(
+    key.verify_digest_raw(@signature.digest(Sha384, message), signature),
   )
-  assert_false(key.verify_digest_raw(@signature.digest(Sha384, message), signature))
-  assert_false(key.verify_digest_raw(@signature.digest(Sha384, message), raw[1:]))
+  assert_false(
+    key.verify_digest_raw(@signature.digest(Sha384, message), raw[1:]),
+  )
   // A changed message fails.
   assert_false(key.verify(b"hash overridE", signature, hash=Sha384))
 }

@@ -5,7 +5,7 @@ suberror SampleError {
 }
 
 ///|
-impl Show for SampleError with output(self, logger) {
+impl Show for SampleError with fn output(self, logger) {
   let SampleError(text) = self
   logger.write_string(text)
 }
@@ -22,7 +22,7 @@ let compiler_error : String =
 fn sample(
   write : (&@logging.Logger) -> Unit,
   category? : String,
-  millis? : Int64 = 0L,
+  millis~ : Int64 = 0L,
 ) -> @formatting.LogRecord raise {
   let memory = @logging.MemoryLogger::new()
   let logger : &@logging.Logger = match category {
@@ -46,9 +46,9 @@ fn console_examples() -> Array[@formatting.LogRecord] raise {
       millis=12L,
     ),
     sample(
-      logger => logger.debug("Selected environment {Environment}", [
-        "Development",
-      ]),
+      logger => {
+        logger.debug("Selected environment {Environment}", ["Development"])
+      },
       category="config.loader",
       millis=18L,
     ),
@@ -58,18 +58,20 @@ fn console_examples() -> Array[@formatting.LogRecord] raise {
       millis=24L,
     ),
     sample(
-      logger => logger.warn("Configuration file {File} was not found", [
-        "optional.toml",
-      ]),
+      logger => {
+        logger.warn("Configuration file {File} was not found", ["optional.toml"])
+      },
       category="config.loader",
       millis=35L,
     ),
     sample(
-      logger => logger.error(
-        "Compilation failed for {File}",
-        ["app.mbt"],
-        error=SampleError(compiler_error),
-      ),
+      logger => {
+        logger.error(
+          "Compilation failed for {File}",
+          ["app.mbt"],
+          error=SampleError(compiler_error),
+        )
+      },
       category="build.compiler",
       millis=41L,
     ),
@@ -133,17 +135,20 @@ test "plain console output matches the examples byte for byte" {
   let output = console_examples()
     .map(record => @formatting.format_console(record, Plain))
     .join("")
-  inspect(output, content=(
-    #|[14:23:07.012Z TRC] workspace.discovery: Inspecting /work/acme/src
-    #|[14:23:07.018Z DBG] config.loader: Selected environment Development
-    #|[14:23:07.024Z INF] workspace.loader: Loaded 3 files from src
-    #|[14:23:07.035Z WRN] config.loader: Configuration file optional.toml was not found
-    #|[14:23:07.041Z ERR] build.compiler: Compilation failed for app.mbt
-    #|    CompilerError: Unknown identifier calculate_total
-    #|      at app.mbt:42
-    #|[14:23:07.049Z CRT] app: Startup failed; shutting down
-    #|
-  ))
+  inspect(
+    output,
+    content=(
+      #|[14:23:07.012Z TRC] workspace.discovery: Inspecting /work/acme/src
+      #|[14:23:07.018Z DBG] config.loader: Selected environment Development
+      #|[14:23:07.024Z INF] workspace.loader: Loaded 3 files from src
+      #|[14:23:07.035Z WRN] config.loader: Configuration file optional.toml was not found
+      #|[14:23:07.041Z ERR] build.compiler: Compilation failed for app.mbt
+      #|    CompilerError: Unknown identifier calculate_total
+      #|      at app.mbt:42
+      #|[14:23:07.049Z CRT] app: Startup failed; shutting down
+      #|
+    ),
+  )
 }
 
 ///|
@@ -152,14 +157,20 @@ test "a console event without a category has no category separator" {
     logger => logger.info("Loaded {Count} files from {Path}", [3, "src"]),
     millis=24L,
   )
-  inspect(@formatting.format_console(record, Plain), content=(
-    #|[14:23:07.024Z INF] Loaded 3 files from src
-    #|
-  ))
-  inspect(@formatting.format_text(record), content=(
-    #|2026-10-27T14:23:07.024Z [INF] Loaded 3 files from src
-    #|
-  ))
+  inspect(
+    @formatting.format_console(record, Plain),
+    content=(
+      #|[14:23:07.024Z INF] Loaded 3 files from src
+      #|
+    ),
+  )
+  inspect(
+    @formatting.format_text(record),
+    content=(
+      #|2026-10-27T14:23:07.024Z [INF] Loaded 3 files from src
+      #|
+    ),
+  )
 }
 
 ///|
@@ -167,41 +178,51 @@ test "text file output matches the examples byte for byte" {
   let records = console_examples()[2:5].to_owned()
   records.push(
     sample(
-      logger => logger.info(
-        "Build summary:\nCompiled {Modules} modules\nCompleted in {Millis} ms",
-        [12, 840],
-      ),
+      logger => {
+        logger.info(
+          "Build summary:\nCompiled {Modules} modules\nCompleted in {Millis} ms",
+          [12, 840],
+        )
+      },
       category="build.summary",
       millis=1100L,
     ),
   )
-  inspect(records.map(@formatting.format_text).join(""), content=(
-    #|2026-10-27T14:23:07.024Z [INF] workspace.loader: Loaded 3 files from src
-    #|2026-10-27T14:23:07.035Z [WRN] config.loader: Configuration file optional.toml was not found
-    #|2026-10-27T14:23:07.041Z [ERR] build.compiler: Compilation failed for app.mbt
-    #|    CompilerError: Unknown identifier calculate_total
-    #|      at app.mbt:42
-    #|2026-10-27T14:23:08.100Z [INF] build.summary: Build summary:
-    #|    Compiled 12 modules
-    #|    Completed in 840 ms
-    #|
-  ))
+  inspect(
+    records.map(@formatting.format_text).join(""),
+    content=(
+      #|2026-10-27T14:23:07.024Z [INF] workspace.loader: Loaded 3 files from src
+      #|2026-10-27T14:23:07.035Z [WRN] config.loader: Configuration file optional.toml was not found
+      #|2026-10-27T14:23:07.041Z [ERR] build.compiler: Compilation failed for app.mbt
+      #|    CompilerError: Unknown identifier calculate_total
+      #|      at app.mbt:42
+      #|2026-10-27T14:23:08.100Z [INF] build.summary: Build summary:
+      #|    Compiled 12 modules
+      #|    Completed in 840 ms
+      #|
+    ),
+  )
 }
 
 ///|
 test "control characters become visible text before any style" {
   let record = sample(
-    logger => logger.warn("Value {Input}\r\nnext\tline\u{7f}", [
-      "\u{1b}[2Jcleared\u{9b}31m\u{0}",
-    ]),
+    logger => {
+      logger.warn("Value {Input}\r\nnext\tline\u{7f}", [
+        "\u{1b}[2Jcleared\u{9b}31m\u{0}",
+      ])
+    },
     category="cat\u{1b}]0;title\u{7}",
   )
   let plain = @formatting.format_console(record, Plain)
-  inspect(plain, content=(
-    #|[14:23:07.000Z WRN] cat\x1b]0;title\x07: Value \x1b[2Jcleared\x9b31m\x00\x0d
-    #|    next	line\x7f
-    #|
-  ))
+  inspect(
+    plain,
+    content=(
+      #|[14:23:07.000Z WRN] cat\x1b]0;title\x07: Value \x1b[2Jcleared\x9b31m\x00\x0d
+      #|    next	line\x7f
+      #|
+    ),
+  )
   assert_false(plain.contains("\u{1b}"))
   let literate = @formatting.format_console(record, Literate)
   assert_eq(strip_styles(literate), plain)
@@ -213,15 +234,18 @@ test "control characters become visible text before any style" {
 
 ///|
 test "an error with CR LF line ends shows the CR and indents each line" {
-  let record = sample(logger => logger.error("Failed", [], error=SampleError(
-    "first\r\nsecond",
-  )))
-  inspect(@formatting.format_text(record), content=(
-    #|2026-10-27T14:23:07.000Z [ERR] Failed
-    #|    first\x0d
-    #|    second
-    #|
-  ))
+  let record = sample(logger => {
+    logger.error("Failed", [], error=SampleError("first\r\nsecond"))
+  })
+  inspect(
+    @formatting.format_text(record),
+    content=(
+      #|2026-10-27T14:23:07.000Z [ERR] Failed
+      #|    first\x0d
+      #|    second
+      #|
+    ),
+  )
 }
 
 ///|
@@ -237,15 +261,17 @@ test "literate output styles each part and plain output has none" {
 
 ///|
 test "each JSON type of a value has its own style" {
-  let record = sample(logger => logger.info("{N}{S}{T}{F}{Z}{A}{O}", [
-    1.5,
-    "s",
-    true,
-    false,
-    Json::null(),
-    [1],
-    { "k": 1 },
-  ]))
+  let record = sample(logger => {
+    logger.info("{N}{S}{T}{F}{Z}{A}{O}", [
+      1.5,
+      "s",
+      true,
+      false,
+      Json::null(),
+      [1],
+      { "k": 1 },
+    ])
+  })
   let literate = @formatting.format_console(record, Literate)
   assert_true(literate.contains("\u{1b}[95m1.5\u{1b}[0m"))
   assert_true(literate.contains("\u{1b}[96ms\u{1b}[0m"))
@@ -298,11 +324,14 @@ test "a value with a line break continues on an indented line" {
     logger => logger.info("Multi\nline {Value}\n", ["a\nb"]),
     category="c",
   )
-  inspect(@formatting.format_console(record, Plain), content=(
-    #|[14:23:07.000Z INF] c: Multi
-    #|    line a
-    #|    b
-    #|    
-    #|
-  ))
+  inspect(
+    @formatting.format_console(record, Plain),
+    content=(
+      #|[14:23:07.000Z INF] c: Multi
+      #|    line a
+      #|    b
+      #|    
+      #|
+    ),
+  )
 }

@@ -19,9 +19,9 @@ pub struct ServiceRef[S] {
 pub fn[S] Scope::create(
   self : Scope,
   service : S,
-  mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
+  mailbox~ : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
-  cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
+  cleanup_limit~ : @lander_core.TimeLimit = default_cleanup_limit(),
 ) -> ServiceRef[S] raise ActorError {
   let actor = self.start(
     (),
@@ -45,7 +45,7 @@ pub fn[S] Scope::create(
 pub async fn[S, R] ServiceRef::ask(
   self : ServiceRef[S],
   operation : async (S) -> R,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> R {
   let outcome : Result[R, Error] = self.actor.ask(
     reply => {
@@ -73,7 +73,7 @@ pub async fn[S] ServiceRef::tell(
   self : ServiceRef[S],
   operation : async (S) -> Unit,
 ) -> Unit raise ActorError {
-  self.actor.send({ run: operation })
+  self.actor.send({ run: operation, })
 }
 
 ///|

@@ -19,10 +19,11 @@ struct Toolchain {
 }
 
 ///|
+#derive(Eq)
 enum Platform {
   Unix
   Windows
-} derive(Eq)
+}
 
 ///|
 suberror ToolchainError {

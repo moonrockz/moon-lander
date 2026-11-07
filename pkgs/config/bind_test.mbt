@@ -1,30 +1,35 @@
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct IrOptions {
   layout : String
   strict_mode : Bool
-} derive(FromJson, ToJson, Debug, Eq)
+}
 
 ///|
+#derive(FromJson, Debug, Eq)
 struct Pipeline {
   target : String
-} derive(FromJson, Debug, Eq)
+}
 
 ///|
+#derive(FromJson, Debug, Eq)
 struct AppConfig {
   ir : IrOptions
   pipeline : Pipeline
-} derive(FromJson, Debug, Eq)
+}
 
 ///|
+#derive(FromJson, Debug, Eq)
 struct Target {
   name : String
-  level : Int
-} derive(FromJson, Debug, Eq)
+  level : Int32
+}
 
 ///|
+#derive(FromJson, Debug, Eq)
 struct Server {
-  port : Int
-} derive(FromJson, Debug, Eq)
+  port : Int32
+}
 
 ///|
 /// Load TOML files over a complete tree. Each file is a path, a role, and text.
@@ -65,7 +70,7 @@ test "Section decodes into a record" {
     ]),
   ])
   let ir : IrOptions = config |> @config.bind("ir")
-  @expect.expect(ir).to_equal({ layout: "single-file", strict_mode: true })
+  @expect.expect(ir).to_equal({ layout: "single-file", strict_mode: true, })
   let same : IrOptions = config.bind("ir")
   @expect.expect(same).to_equal(ir)
 }
@@ -91,7 +96,10 @@ test "Map type receives each child key" {
     }),
   ])
   let backends : Map[String, Server] = config |> @config.bind("backends")
-  @expect.expect(backends).to_equal({ "ts": { port: 1 }, "scala": { port: 2 } })
+  @expect.expect(backends).to_equal({
+    "ts": { port: 1, },
+    "scala": { port: 2, },
+  })
 }
 
 ///|
@@ -111,8 +119,8 @@ test "Root binding fills each top-level table" {
   ])
   let app : AppConfig = config |> @config.bind_root()
   @expect.expect(app).to_equal({
-    ir: { layout: "tree", strict_mode: false },
-    pipeline: { target: "js" },
+    ir: { layout: "tree", strict_mode: false, },
+    pipeline: { target: "js", },
   })
 }
 
@@ -159,13 +167,19 @@ test "Required target with no section" {
 ///|
 test "Wrong type in a file" {
   let config = load_files([
-    ("/repo/morphir.toml", Workspace, "ir.layout = \"tree\"\nir.strict_mode = \"yes\""),
+    (
+      "/repo/morphir.toml",
+      Workspace,
+      "ir.layout = \"tree\"\nir.strict_mode = \"yes\"",
+    ),
   ])
   let (failure, _) = decode_failure(() => {
     let _ : IrOptions = config |> @config.bind("ir")
   })
   @expect.expect(failure.at[0].path.to_string()).to_equal("ir.strict_mode")
-  guard failure.at[0].blame is Set([origin]) else { fail("expected one origin") }
+  guard failure.at[0].blame is Set([origin]) else {
+    fail("expected one origin")
+  }
   @expect.expect(origin.location).to_equal(Some("/repo/morphir.toml"))
 }
 
@@ -208,7 +222,7 @@ test "table blame lists its sources in merge order" {
 test "Unset scalar key" {
   let config = @config.build([])
   let (_, message) = decode_failure(() => {
-    let _ : Int = config |> @config.bind("server.port")
+    let _ : Int32 = config |> @config.bind("server.port")
   })
   @expect.expect(message).to_equal(
     "server.port: Int::from_json: expected number (not set by any source)",
@@ -232,7 +246,11 @@ test "File role name in the error" {
 ///|
 test "Windows path uses forward slashes" {
   let config = load_files([
-    ("C:/repo/morphir.toml", Workspace, "ir.layout = \"tree\"\nir.strict_mode = \"yes\""),
+    (
+      "C:/repo/morphir.toml",
+      Workspace,
+      "ir.layout = \"tree\"\nir.strict_mode = \"yes\"",
+    ),
   ])
   let (_, message) = decode_failure(() => {
     let _ : IrOptions = config |> @config.bind("ir")
@@ -265,15 +283,13 @@ test "decode paths keep keys with slash, tilde, and dot" {
 
 ///|
 test "a root error in a list has no key" {
-  let config = @config.build([
-    @config.ConfigSource::defaults({ "a": 1 }),
-  ])
+  let config = @config.build([@config.ConfigSource::defaults({ "a": 1 })])
   let (failure, _) = decode_failure(() => {
-    let _ : Array[Int] = config |> @config.bind_root()
+    let _ : Array[Int32] = config |> @config.bind_root()
   })
   @expect.expect(failure.at[0].path.to_string()).to_equal("(root)")
   @expect.expect(failure.at[0].blame).to_equal(
-    Table([{ kind: Defaults, source: "defaults", priority: 0, location: None }]),
+    Table([{ kind: Defaults, source: "defaults", priority: 0, location: None, }]),
   )
 }
 
@@ -302,20 +318,24 @@ test "Required field with no value" {
 }
 
 ///|
+#derive(FromJson, ToJson, Debug, Eq)
 struct PipelineOptions {
   components : Array[String]
-  timeout : Int?
-} derive(FromJson, ToJson, Debug, Eq)
+  timeout : Int32?
+}
 
 ///|
 test "Unset keys keep default values" {
   let config = @config.build([
     @config.in_memory_pairs([("ir.strict_mode", @config.bool(true))]),
   ])
-  let default : IrOptions = { layout: "single-file", strict_mode: false }
+  let default : IrOptions = { layout: "single-file", strict_mode: false, }
   let ir = config |> @config.bind_or("ir", default)
-  @expect.expect(ir).to_equal({ layout: "single-file", strict_mode: true })
-  @expect.expect(default).to_equal({ layout: "single-file", strict_mode: false })
+  @expect.expect(ir).to_equal({ layout: "single-file", strict_mode: true, })
+  @expect.expect(default).to_equal({
+    layout: "single-file",
+    strict_mode: false,
+  })
 }
 
 ///|
@@ -340,7 +360,10 @@ test "Configured list replaces default list" {
       components: ["parse", "typecheck"],
       timeout: Some(30),
     })
-  @expect.expect(pipeline).to_equal({ components: ["parse"], timeout: Some(30) })
+  @expect.expect(pipeline).to_equal({
+    components: ["parse"],
+    timeout: Some(30),
+  })
 }
 
 ///|
@@ -352,7 +375,7 @@ test "List default" {
 ///|
 test "No section uses the full default" {
   let config = @config.build([])
-  let default : IrOptions = { layout: "tree", strict_mode: true }
+  let default : IrOptions = { layout: "tree", strict_mode: true, }
   @expect.expect(config |> @config.bind_or("ir", default)).to_equal(default)
 }
 
@@ -361,7 +384,7 @@ test "a null overlay keeps the default" {
   let config = @config.build([
     @config.ConfigSource::defaults({ "ir": { "layout": null } }),
   ])
-  let default : IrOptions = { layout: "tree", strict_mode: true }
+  let default : IrOptions = { layout: "tree", strict_mode: true, }
   @expect.expect(config |> @config.bind_or("ir", default)).to_equal(default)
 }
 
@@ -371,31 +394,33 @@ test "a None field of the default takes the configured value" {
     @config.in_memory_pairs([("pipeline.timeout", @config.int(5))]),
   ])
   let pipeline = config
-    |> @config.bind_or("pipeline", { components: [], timeout: None })
+    |> @config.bind_or("pipeline", { components: [], timeout: None, })
   @expect.expect(pipeline.timeout).to_equal(Some(5))
 }
 
 ///|
+#derive(FromJson, Debug)
 struct Mode {
-  level : Int
-} derive(FromJson, Debug)
+  level : Int32
+}
 
 ///|
 /// A default whose JSON form does not decode as `Mode`.
+#derive(ToJson)
 struct BadMode {
   level : String
-} derive(ToJson)
+}
 
 ///|
-impl ToJson for Mode with to_json(_) {
-  ToJson::to_json(BadMode::{ level: "high" })
+impl ToJson for Mode with fn to_json(_) {
+  ToJson::to_json(BadMode::{ level: "high", })
 }
 
 ///|
 test "Bad default value" {
   let config = @config.build([])
   let (failure, message) = decode_failure(() => {
-    config |> @config.bind_or("mode", ({ level: 1 } : Mode)) |> ignore
+    config |> @config.bind_or("mode", ({ level: 1, } : Mode)) |> ignore
   })
   @expect.expect(failure.at[0].blame).to_equal(Default)
   @expect.expect(message).to_equal(
@@ -410,7 +435,10 @@ test "a configured value over a default keeps the source blame" {
   ])
   let (failure, message) = decode_failure(() => {
     config
-    |> @config.bind_or("ir", ({ layout: "tree", strict_mode: false } : IrOptions))
+    |> @config.bind_or(
+      "ir",
+      ({ layout: "tree", strict_mode: false, } : IrOptions),
+    )
     |> ignore
   })
   @expect.expect(failure.at[0].path.to_string()).to_equal("ir.strict_mode")

@@ -1,11 +1,12 @@
 ///|
 /// A bundle text that cannot be read.
+#derive(Debug)
 pub suberror BundleError {
   /// The media type is not a bundle version that the library reads.
   UnsupportedBundleMediaType(String)
   /// The field at `field` (a dotted JSON path) breaks `rule`.
   InvalidBundle(field~ : String, rule~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend BundleError with @debug.Debug::{to_repr}
@@ -27,11 +28,12 @@ pub fn BundleError::message(self : BundleError) -> String {
 
 ///|
 /// The bundle format version.
+#derive(Eq, Compare, Debug)
 pub enum BundleVersion {
   V0_1
   V0_2
   V0_3
-} derive(Eq, Compare, Debug)
+}
 
 ///|
 pub extend BundleVersion with Eq::{equal, not_equal}
@@ -148,7 +150,7 @@ pub fn Bundle::version(self : Bundle) -> BundleVersion {
 
 ///|
 /// The most tlog entries and timestamps that a bundle can hold, as in sigstore-go.
-let max_entries : Int = 32
+let max_entries : Int32 = 32
 
 ///|
 let hash_algorithm_names : Array[String] = [
@@ -205,38 +207,66 @@ fn parse_bundle(text : StringView) -> Bundle raise {
     "publicKey", "x509CertificateChain", "certificate", "tlogEntries", "timestampVerificationData",
   ])
   let content = match (root.has("dsseEnvelope"), root.has("messageSignature")) {
-    (true, false) => Dsse(read_envelope(root.require_object("dsseEnvelope", ["payload", "payloadType", "signatures"])))
-    (false, true) => read_message(root.require_object("messageSignature", ["messageDigest", "signature"]))
-    _ => raise Shape("", "exactly one of dsseEnvelope and messageSignature is required")
+    (true, false) =>
+      Dsse(
+        read_envelope(
+          root.require_object("dsseEnvelope", [
+            "payload", "payloadType", "signatures",
+          ]),
+        ),
+      )
+    (false, true) =>
+      read_message(
+        root.require_object("messageSignature", ["messageDigest", "signature"]),
+      )
+    _ =>
+      raise Shape(
+        "", "exactly one of dsseEnvelope and messageSignature is required",
+      )
   }
   let key_material = read_material(material, version)
   let entries = material
     .array("tlogEntries")
-    .mapi((index, json) => read_entry(json, "\{material.at("tlogEntries")}[\{index}]", version))
+    .mapi((index, json) => {
+      read_entry(json, "\{material.at("tlogEntries")}[\{index}]", version)
+    })
   guard entries.length() <= max_entries else {
     raise Shape(material.at("tlogEntries"), "more than \{max_entries} entries")
   }
-  let timestamps = match material.object("timestampVerificationData", ["rfc3161Timestamps"]) {
-    Some(data) => {
+  let timestamps = match
+    material.object("timestampVerificationData", ["rfc3161Timestamps"]) {
+    Some(data) =>
       data
       .array("rfc3161Timestamps")
-      .mapi((index, item) => fields(item, "\{data.at("rfc3161Timestamps")}[\{index}]", [
+      .mapi((index, item) => {
+        fields(item, "\{data.at("rfc3161Timestamps")}[\{index}]", [
           "signedTimestamp",
-        ]).require_bytes("signedTimestamp"))
-    }
+        ]).require_bytes("signedTimestamp")
+      })
     None => []
   }
   guard timestamps.length() <= max_entries else {
-    raise Shape(material.at("timestampVerificationData"), "more than \{max_entries} timestamps")
+    raise Shape(
+      material.at("timestampVerificationData"),
+      "more than \{max_entries} timestamps",
+    )
   }
-  { version, material: key_material, content, entries, timestamps }
+  { version, material: key_material, content, entries, timestamps, }
 }
 
 ///|
-fn read_material(material : Fields, version : BundleVersion) -> Material raise Shape {
-  let present = ["publicKey", "x509CertificateChain", "certificate"].filter(name => material.has(name))
+fn read_material(
+  material : Fields,
+  version : BundleVersion,
+) -> Material raise Shape {
+  let present = ["publicKey", "x509CertificateChain", "certificate"].filter(name => {
+    material.has(name)
+  })
   guard present.length() == 1 else {
-    raise Shape(material.path, "exactly one of publicKey, x509CertificateChain and certificate is required")
+    raise Shape(
+      material.path,
+      "exactly one of publicKey, x509CertificateChain and certificate is required",
+    )
   }
   match present[0] {
     "publicKey" => {
@@ -245,12 +275,21 @@ fn read_material(material : Fields, version : BundleVersion) -> Material raise S
     }
     "x509CertificateChain" => {
       guard version != V0_3 else {
-        raise Shape(material.at("x509CertificateChain"), "a v0.3 bundle must use certificate")
+        raise Shape(
+          material.at("x509CertificateChain"),
+          "a v0.3 bundle must use certificate",
+        )
       }
-      let chain = material.require_object("x509CertificateChain", ["certificates"])
+      let chain = material.require_object("x509CertificateChain", [
+        "certificates",
+      ])
       let certificates = chain
         .array("certificates")
-        .mapi((index, json) => fields(json, "\{chain.at("certificates")}[\{index}]", ["rawBytes"]).require_bytes("rawBytes"))
+        .mapi((index, json) => {
+          fields(json, "\{chain.at("certificates")}[\{index}]", ["rawBytes"]).require_bytes(
+            "rawBytes",
+          )
+        })
       guard !certificates.is_empty() else {
         raise Shape(chain.at("certificates"), "the chain is empty")
       }
@@ -267,7 +306,11 @@ fn read_material(material : Fields, version : BundleVersion) -> Material raise S
 fn read_envelope(envelope : Fields) -> Envelope raise Shape {
   let signatures = envelope
     .array("signatures")
-    .mapi((index, json) => fields(json, "\{envelope.at("signatures")}[\{index}]", ["sig", "keyid"]).require_bytes("sig"))
+    .mapi((index, json) => {
+      fields(json, "\{envelope.at("signatures")}[\{index}]", ["sig", "keyid"]).require_bytes(
+        "sig",
+      )
+    })
   {
     payload: envelope.require_bytes("payload"),
     payload_type: envelope.require_string("payloadType"),
@@ -290,30 +333,49 @@ fn read_message(message : Fields) -> Content raise Shape {
 }
 
 ///|
-fn read_entry(json : Json, path : String, version : BundleVersion) -> LogEntry raise Shape {
+fn read_entry(
+  json : Json,
+  path : String,
+  version : BundleVersion,
+) -> LogEntry raise Shape {
   let entry = fields(json, path, [
     "logIndex", "logId", "kindVersion", "integratedTime", "inclusionPromise", "inclusionProof",
     "canonicalizedBody",
   ])
   let log_index = entry.int64("logIndex")
-  guard log_index >= 0L else { raise Shape(entry.at("logIndex"), "negative log index") }
+  guard log_index >= 0L else {
+    raise Shape(entry.at("logIndex"), "negative log index")
+  }
   let log_id = entry.require_object("logId", ["keyId"]).require_bytes("keyId")
   let kind_version = entry.require_object("kindVersion", ["kind", "version"])
-  let promise = match entry.object("inclusionPromise", ["signedEntryTimestamp"]) {
+  let promise = match
+    entry.object("inclusionPromise", ["signedEntryTimestamp"]) {
     Some(promise) => Some(promise.require_bytes("signedEntryTimestamp"))
     None => None
   }
-  let proof = match entry.object("inclusionProof", ["logIndex", "rootHash", "treeSize", "hashes", "checkpoint"]) {
+  let proof = match
+    entry.object("inclusionProof", [
+      "logIndex", "rootHash", "treeSize", "hashes", "checkpoint",
+    ]) {
     Some(proof) => {
-      let checkpoint = proof.require_object("checkpoint", ["envelope"]).require_string("envelope")
+      let checkpoint = proof
+        .require_object("checkpoint", ["envelope"])
+        .require_string("envelope")
       let hashes = proof
         .array("hashes")
-        .mapi((index, item) => match item {
-          String(text) =>
-            @encoding.decode_base64(text) catch {
-              _ => raise Shape("\{proof.at("hashes")}[\{index}]", "not base64")
-            }
-          _ => raise Shape("\{proof.at("hashes")}[\{index}]", "expected a string")
+        .mapi((index, item) => {
+          match item {
+            String(text) =>
+              @encoding.decode_base64(text) catch {
+                _ =>
+                  raise Shape("\{proof.at("hashes")}[\{index}]", "not base64")
+              }
+            _ =>
+              raise Shape(
+                "\{proof.at("hashes")}[\{index}]",
+                "expected a string",
+              )
+          }
         })
       Some({
         log_index: proof.int64("logIndex"),
@@ -327,11 +389,17 @@ fn read_entry(json : Json, path : String, version : BundleVersion) -> LogEntry r
   }
   if version == V0_1 {
     guard promise is Some(_) else {
-      raise Shape(entry.at("inclusionPromise"), "a v0.1 bundle requires an inclusion promise")
+      raise Shape(
+        entry.at("inclusionPromise"),
+        "a v0.1 bundle requires an inclusion promise",
+      )
     }
   } else {
     guard proof is Some(_) else {
-      raise Shape(entry.at("inclusionProof"), "a v0.2 or later bundle requires an inclusion proof")
+      raise Shape(
+        entry.at("inclusionProof"),
+        "a v0.2 or later bundle requires an inclusion proof",
+      )
     }
   }
   {

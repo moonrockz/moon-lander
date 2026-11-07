@@ -11,7 +11,10 @@ pub async fn run(command : @policy.Command) -> Unit {
     }
     Check(root, out, base) => {
       let config = @host.configuration("\{root.text()}/site/site.json")
-      let problems = @host.check(out.text(), base.map(b => b.text()).unwrap_or(config.base_path))
+      let problems = @host.check(
+        out.text(),
+        base.map(b => b.text()).unwrap_or(config.base_path),
+      )
       guard problems.is_empty() else { raise @model.Invalid(problems) }
       println("check: \{out.text()} is valid")
     }

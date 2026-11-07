@@ -1,6 +1,8 @@
 ///|
 /// The input and rule of a failed count constructor, or `None` when it succeeds.
-fn count_failure(make : () -> Unit raise @policy.CountError) -> (Int, String)? {
+fn count_failure(
+  make : () -> Unit raise @policy.CountError,
+) -> (Int32, String)? {
   try {
     make()
     None
@@ -62,11 +64,16 @@ test "valid names keep their spelling" {
 ///|
 test "invalid names give the input and the rule" {
   assert_true(name_failure("") is Some(("", Empty)))
-  assert_true(name_failure("9counter") is Some(("9counter", FirstNotLetter('9'))))
   assert_true(
-    name_failure("counter/total") is Some(("counter/total", InvalidCharacter('/'))),
+    name_failure("9counter") is Some(("9counter", FirstNotLetter('9'))),
   )
-  assert_true(name_failure("zähler") is Some(("zähler", InvalidCharacter('ä'))))
+  assert_true(
+    name_failure("counter/total")
+    is Some(("counter/total", InvalidCharacter('/'))),
+  )
+  assert_true(
+    name_failure("zähler") is Some(("zähler", InvalidCharacter('ä'))),
+  )
   assert_true(
     name_failure("two words") is Some(("two words", InvalidCharacter(' '))),
   )

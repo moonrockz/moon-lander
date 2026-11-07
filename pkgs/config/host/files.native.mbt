@@ -4,7 +4,7 @@ async fn answer(
   tree : @config.FileTree,
   request : @config.FileRequest,
   platform : @config.Platform,
-) -> @config.FileTree raise {
+) -> @config.FileTree {
   answer_with(tree, request, platform, native => {
     @fs.kind(native, follow_symlink=true)
   })
@@ -17,8 +17,8 @@ async fn answer_with(
   tree : @config.FileTree,
   request : @config.FileRequest,
   platform : @config.Platform,
-  inspect : async (String) -> @fs.FileKind raise,
-) -> @config.FileTree raise {
+  inspect : async (String) -> @fs.FileKind,
+) -> @config.FileTree {
   match request {
     ReadFile(path) => {
       let native = path.to_native(platform)
@@ -38,7 +38,7 @@ async fn answer_with(
         // has to form a file-tree path, so an odd unrelated name is no error.
         let path = native_join(native, name, platform)
         if entry_kind(path, inspect) is Some(kind) {
-          entries.push({ name, kind })
+          entries.push({ name, kind, })
         }
       }
       tree.with_listing(dir, entries)
@@ -53,8 +53,8 @@ async fn answer_with(
 /// inaccessible file is never reported as absent.
 async fn kind_of(
   native : String,
-  inspect : async (String) -> @fs.FileKind raise,
-) -> @fs.FileKind? raise {
+  inspect : async (String) -> @fs.FileKind,
+) -> @fs.FileKind? {
   Some(inspect(native)) catch {
     @os_error.OSError(_) as error if error.is_ENOENT() || error.is_ENOTDIR() =>
       None
@@ -69,8 +69,8 @@ async fn kind_of(
 /// reads it only when it is a candidate, and that read reports the error.
 async fn entry_kind(
   native : String,
-  inspect : async (String) -> @fs.FileKind raise,
-) -> @config.EntryKind? raise {
+  inspect : async (String) -> @fs.FileKind,
+) -> @config.EntryKind? {
   let kind = kind_of(native, inspect) catch {
     @os_error.OSError(_) => return Some(Inaccessible)
     error => raise error
@@ -95,7 +95,11 @@ fn running_platform() -> @config.Platform {
 
 ///|
 /// The native path of the entry `name` in the native directory `dir`.
-fn native_join(dir : String, name : String, platform : @config.Platform) -> String {
+fn native_join(
+  dir : String,
+  name : String,
+  platform : @config.Platform,
+) -> String {
   let separator = match platform {
     Windows => "\\"
     Linux | MacOs => "/"

@@ -14,7 +14,7 @@ fn member_report(config : @config.Config) -> @config.SourceReport? {
 /// The kind, priority, path and status of each project-tier report.
 fn report_rows(
   config : @config.Config,
-) -> Array[(@config.SourceKind, Int, String?, @config.SourceStatus)] {
+) -> Array[(@config.SourceKind, Int32, String?, @config.SourceStatus)] {
   config
   .reports()
   .filter(report => !(report.kind is File(System | Global)))
@@ -36,8 +36,8 @@ fn note_messages(config : @config.Config) -> Array[String] {
 fn workspace_in(
   start : String,
   files : Array[(String, String)],
-  conventions? : @conventions.Conventions = acme_workspace(),
-  options? : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
+  conventions~ : @conventions.Conventions = acme_workspace(),
+  options~ : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
 ) -> @config.Config raise @config.ConfigError {
   discover_in(start, files, conventions~, options~)
 }
@@ -102,8 +102,7 @@ test "an ancestor that is not a workspace is passed over" {
 test "Excluded member stays standalone" {
   let config = workspace_in("/w/packages/legacy", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"packages/*\"]\nworkspace.exclude = [\"packages/legacy\"]",
+      "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.exclude = [\"packages/legacy\"]",
     ),
     ("/w/packages/legacy/acme.toml", "a = 1"),
   ])
@@ -161,8 +160,7 @@ test "Listed member is missing" {
     "/w",
     [
       (
-        "/w/acme.toml",
-        "workspace.members = [\"members/alpha\"]\nworkspace.default_member = \"members/alpha\"",
+        "/w/acme.toml", "workspace.members = [\"members/alpha\"]\nworkspace.default_member = \"members/alpha\"",
       ),
     ],
     conventions=acme_workspace(),
@@ -171,14 +169,16 @@ test "Listed member is missing" {
   guard member_report(config) is Some(report) else {
     fail("expected a member report")
   }
-  @expect.expect((report.status, report.candidates)).to_equal((
-    NotFound,
-    [
-      "/w/members/alpha/acme.toml", "/w/members/alpha/acme.yaml", "/w/members/alpha/.acme/acme.toml",
-      "/w/members/alpha/.acme/acme.yaml", "/w/members/alpha/.config/acme/config.toml",
-      "/w/members/alpha/.config/acme/config.yaml",
-    ],
-  ))
+  @expect.expect((report.status, report.candidates)).to_equal(
+    (
+      NotFound,
+      [
+        "/w/members/alpha/acme.toml", "/w/members/alpha/acme.yaml", "/w/members/alpha/.acme/acme.toml",
+        "/w/members/alpha/.acme/acme.yaml", "/w/members/alpha/.config/acme/config.toml",
+        "/w/members/alpha/.config/acme/config.yaml",
+      ],
+    ),
+  )
 }
 
 ///|
@@ -200,8 +200,7 @@ test "Escaping entry skipped" {
 test "an exclude entry outside the workspace is skipped" {
   let config = workspace_in("/w", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"packages/*\"]\nworkspace.exclude = [\"/packages/billing\"]",
+      "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.exclude = [\"/packages/billing\"]",
     ),
     ("/w/packages/billing/acme.toml", "a = 1"),
   ])
@@ -234,7 +233,9 @@ test "Backslash member entry rejected" {
 
 ///|
 test "Root is not its own member" {
-  let alone = workspace_in("/w", [("/w/acme.toml", "workspace.members = [\"**\"]")])
+  let alone = workspace_in("/w", [
+    ("/w/acme.toml", "workspace.members = [\"**\"]"),
+  ])
   @expect.expect(member_report(alone)).to_equal(None)
   let config = workspace_in("/w", [
     ("/w/acme.toml", "workspace.members = [\"**\"]"),
@@ -258,8 +259,7 @@ test "a wildcard never enters a hidden directory" {
 test "Default member selected" {
   let config = workspace_in("/w", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"packages/*\"]\nworkspace.default_member = \"packages/billing\"",
+      "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.default_member = \"packages/billing\"",
     ),
     ("/w/packages/billing/acme.toml", "a = 1"),
     ("/w/packages/orders/acme.toml", "b = 1"),
@@ -295,8 +295,7 @@ test "Several members and no default" {
 test "Default member names the root" {
   let config = workspace_in("/w", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"packages/*\"]\nworkspace.default_member = \".\"",
+      "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.default_member = \".\"",
     ),
     ("/w/packages/orders/acme.toml", "a = 1"),
   ])
@@ -307,8 +306,7 @@ test "Default member names the root" {
 test "a default member outside the workspace gives a warning and no member" {
   let config = workspace_in("/w", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"packages/*\"]\nworkspace.default_member = \"../other\"",
+      "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.default_member = \"../other\"",
     ),
     ("/w/packages/orders/acme.toml", "a = 1"),
   ])
@@ -322,8 +320,7 @@ test "a default member outside the workspace gives a warning and no member" {
 test "a member that holds the start directory is selected first" {
   let config = workspace_in("/w/members/alpha/src", [
     (
-      "/w/acme.toml",
-      "workspace.members = [\"members/alpha\", \"members/beta\"]\nworkspace.default_member = \"members/beta\"",
+      "/w/acme.toml", "workspace.members = [\"members/alpha\", \"members/beta\"]\nworkspace.default_member = \"members/beta\"",
     ),
     ("/w/members/alpha/src/main.mbt", ""),
     ("/w/members/beta/acme.toml", "a = 1"),
@@ -331,9 +328,9 @@ test "a member that holds the start directory is selected first" {
   guard member_report(config) is Some(report) else {
     fail("expected a member report")
   }
-  @expect.expect((report.status, report.candidates[0])).to_equal((
-    NotFound, "/w/members/alpha/acme.toml",
-  ))
+  @expect.expect((report.status, report.candidates[0])).to_equal(
+    (NotFound, "/w/members/alpha/acme.toml"),
+  )
 }
 
 ///|
@@ -341,7 +338,9 @@ test "the workspace keys come from the global file and the primary" {
   let config = discover_in(
     "/w",
     [
-      ("/home/alice/.acme/acme.toml", "workspace.default_member = \"packages/orders\""),
+      (
+        "/home/alice/.acme/acme.toml", "workspace.default_member = \"packages/orders\"",
+      ),
       ("/w/acme.toml", "workspace.members = [\"packages/*\"]"),
       ("/w/packages/billing/acme.toml", "a = 1"),
       ("/w/packages/orders/acme.toml", "b = 1"),
@@ -395,7 +394,9 @@ test "the key paths of the workspace come from the application" {
 /// A workspace with two members that set the project names `billing` and
 /// `orders`.
 let two_members : Array[(String, String)] = [
-  ("/w/acme.toml", "workspace.members = [\"packages/*\"]\nproject.name = \"root\""),
+  (
+    "/w/acme.toml", "workspace.members = [\"packages/*\"]\nproject.name = \"root\"",
+  ),
   ("/w/packages/billing/acme.toml", "project.name = \"billing\""),
   ("/w/packages/orders/acme.toml", "project.name = \"orders\""),
 ]
@@ -403,8 +404,8 @@ let two_members : Array[(String, String)] = [
 ///|
 fn select_project(
   selector : String,
-  files? : Array[(String, String)] = two_members,
-  start? : String = "/w",
+  files~ : Array[(String, String)] = two_members,
+  start~ : String = "/w",
 ) -> @config.Config raise @config.ConfigError {
   workspace_in(
     start,
@@ -460,10 +461,9 @@ test "Ambiguous name" {
   ]
   try select_project("orders", files~) catch {
     AmbiguousProject(selector~, matches~) as error => {
-      @expect.expect((selector, matches)).to_equal((
-        "orders",
-        ["packages/a", "packages/b"],
-      ))
+      @expect.expect((selector, matches)).to_equal(
+        ("orders", ["packages/a", "packages/b"]),
+      )
       @expect.expect(error.message()).to_equal(
         "More than one project matches orders: packages/a, packages/b; select a member by its path",
       )
@@ -501,14 +501,13 @@ test "a selector with no project file is an unknown project" {
 /// `files` adds.
 fn layered(
   extra : Array[(String, String)],
-  conventions? : @conventions.Conventions = acme_workspace(),
+  conventions~ : @conventions.Conventions = acme_workspace(),
 ) -> @config.Config raise @config.ConfigError {
   workspace_in(
     "/w/packages/billing",
     [
       (
-        "/w/acme.toml",
-        "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",
+        "/w/acme.toml", "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",
       ),
       ("/w/packages/billing/acme.toml", "ui.theme = \"member\""),
       ..extra,
@@ -532,10 +531,9 @@ test "Member local override order" {
     ("/w/acme.local.toml", "ui.theme = \"workspace-local\""),
     ("/w/packages/billing/acme.local.toml", "ui.theme = \"member-local\""),
   ]
-  let config = layered([
-    ..locals,
-    ("/w/acme.user.toml", "ui.theme = \"workspace-user\""),
-  ])
+  let config = layered(
+    [..locals, ("/w/acme.user.toml", "ui.theme = \"workspace-user\"")],
+  )
   @expect.expect(@config.get_text(config, "ui.theme")).to_equal(
     "workspace-user",
   )
@@ -561,7 +559,8 @@ test "the project tier loads in the documented order" {
       ("/w/acme.user.toml", "e = 1"),
       ("/w/packages/billing/acme.user.toml", "f = 1"),
     ],
-    conventions=acme_workspace() |> @conventions.environments(default="Production"),
+    conventions=acme_workspace()
+      |> @conventions.environments(default="Production"),
   )
   @expect.expect(report_rows(config)).to_equal([
     (File(Workspace), 300, Some("/w/acme.toml"), Loaded),
@@ -581,7 +580,12 @@ test "the project tier loads in the documented order" {
       Loaded,
     ),
     (File(UserOverride), 400, Some("/w/acme.user.toml"), Loaded),
-    (File(UserOverride), 400, Some("/w/packages/billing/acme.user.toml"), Loaded),
+    (
+      File(UserOverride),
+      400,
+      Some("/w/packages/billing/acme.user.toml"),
+      Loaded,
+    ),
   ])
 }
 
@@ -596,9 +600,12 @@ test "Reports in merge order" {
     |> @config.env(prefix="ACME")
     |> @config.load(disk([("/w/acme.toml", "a = 2")]))
     |> done
-  @expect.expect(
-    config.reports().map(report => (report.kind, report.priority)),
-  ).to_equal([(Defaults, 0), (File(Workspace), 300), (Environment, 600)])
+  @expect.expect(config.reports().map(report => (report.kind, report.priority))).to_equal([
+      (Defaults, 0),
+      (File(Workspace), 300),
+      (Environment, 600),
+    ],
+  )
 }
 
 ///|
@@ -687,8 +694,7 @@ test "Member cannot set a workspace key" {
     "/w/packages/billing",
     [
       (
-        "/w/acme.toml",
-        "workspace.members = [\"packages/*\"]\nworkspace.out_dir = \"out\"",
+        "/w/acme.toml", "workspace.members = [\"packages/*\"]\nworkspace.out_dir = \"out\"",
       ),
       ("/w/packages/billing/acme.toml", "workspace.out_dir = \"mine\"\na = 1"),
     ],
@@ -701,11 +707,9 @@ test "Member cannot set a workspace key" {
   guard report.warnings is [KeyRemoved(key, origin)] else {
     fail("expected one KeyRemoved warning")
   }
-  @expect.expect((key.to_string(), origin.kind, origin.location)).to_equal((
-    "workspace.out_dir",
-    File(Member),
-    Some("/w/packages/billing/acme.toml"),
-  ))
+  @expect.expect((key.to_string(), origin.kind, origin.location)).to_equal(
+    ("workspace.out_dir", File(Member), Some("/w/packages/billing/acme.toml")),
+  )
   @expect.expect(
     config
     .origins(@config.KeyPath::parse("workspace.out_dir"))
@@ -736,8 +740,7 @@ test "Workspace project table not inherited" {
     "/w/packages/billing",
     [
       (
-        "/w/acme.toml",
-        "workspace.members = [\"packages/*\"]\nproject.name = \"root\"",
+        "/w/acme.toml", "workspace.members = [\"packages/*\"]\nproject.name = \"root\"",
       ),
       ("/w/packages/billing/acme.toml", "a = 1"),
     ],
@@ -754,7 +757,9 @@ test "Shared table inherited" {
   let config = workspace_in(
     "/w/packages/billing",
     [
-      ("/w/acme.toml", "workspace.members = [\"packages/*\"]\nui.theme = \"dark\""),
+      (
+        "/w/acme.toml", "workspace.members = [\"packages/*\"]\nui.theme = \"dark\"",
+      ),
       ("/w/packages/billing/acme.toml", "project.name = \"billing\""),
     ],
     conventions=inherited(),

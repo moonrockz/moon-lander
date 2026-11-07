@@ -8,13 +8,15 @@ import {
 // Values
 
 // Errors
+#derive(@debug.Debug)
 pub suberror ArgumentError {
   InvalidArgument(String, ArgumentRule)
-} derive(@debug.Debug)
+}
 pub fn ArgumentError::message(Self) -> String
 pub fn ArgumentError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(@debug.Debug)
 pub enum ArgumentRule {
   PathSyntax
   PortDigits
@@ -24,7 +26,7 @@ pub enum ArgumentRule {
   CommandExpected
   OptionValue
   UnknownOption
-} derive(@debug.Debug)
+}
 pub fn ArgumentRule::to_repr(Self) -> @debug.Repr
 
 pub struct BasePath {

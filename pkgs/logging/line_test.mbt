@@ -18,7 +18,7 @@ suberror NotFound {
 }
 
 ///|
-impl Show for NotFound with output(_self, logger) {
+impl Show for NotFound with fn output(_self, logger) {
   logger.write_string("NotFound")
 }
 
@@ -29,7 +29,7 @@ suberror TokenRejected {
 }
 
 ///|
-impl Show for TokenRejected with output(_self, logger) {
+impl Show for TokenRejected with fn output(_self, logger) {
   logger.write_string("TokenRejected(token=<redacted>)")
 }
 
@@ -50,11 +50,9 @@ test "a line without a category" {
 
 ///|
 test "a line with an error" {
-  let event = first_event(logger => logger.error(
-    "Load failed",
-    [],
-    error=NotFound,
-  ))
+  let event = first_event(logger => {
+    logger.error("Load failed", [], error=NotFound)
+  })
   assert_eq(event.to_line(), "[ERR] Load failed\n  error: NotFound")
 }
 
@@ -75,11 +73,9 @@ test "the six level codes" {
 
 ///|
 test "the error line uses the Show text of the error" {
-  let event = first_event(logger => logger.error(
-    "Sign-in failed",
-    [],
-    error=TokenRejected(token="s3cr3t"),
-  ))
+  let event = first_event(logger => {
+    logger.error("Sign-in failed", [], error=TokenRejected(token="s3cr3t"))
+  })
   let line = event.to_line()
   assert_eq(
     line, "[ERR] Sign-in failed\n  error: TokenRejected(token=<redacted>)",

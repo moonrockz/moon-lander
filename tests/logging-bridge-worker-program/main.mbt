@@ -1,6 +1,6 @@
 ///|
 /// Consume the parent's shared signal once, to verify retention through close.
-extern "js" fn take_signal() -> Int =
+extern "js" fn take_signal() -> Int32 =
   #|() => Atomics.exchange(globalThis.landerSignals, 0, 0)
 
 ///|

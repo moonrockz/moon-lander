@@ -25,10 +25,10 @@ let in_toto_statement_types : Array[String] = [
 
 ///|
 /// The most subjects of a statement, and digests of a subject, as in sigstore-go.
-let max_subjects : Int = 1024
+let max_subjects : Int32 = 1024
 
 ///|
-let max_subject_digests : Int = 32
+let max_subject_digests : Int32 = 32
 
 ///|
 /// Verify a Sigstore bundle for an artifact.
@@ -46,7 +46,7 @@ pub fn verify(
   root : TrustedRoot,
   policy : Policy,
   now~ : Instant,
-  alternatives? : Array[Policy] = [],
+  alternatives~ : Array[Policy] = [],
 ) -> Verdict {
   try run(bundle, artifact, root, [policy, ..alternatives], now) catch {
     Stop(rejection) => Rejected(rejection)
@@ -75,16 +75,21 @@ fn run(
     KeyHint => raise unsupported(PublicKeyMaterial)
   }
   if bundle.content is Dsse(envelope) && envelope.signatures.length() != 1 {
-    raise invalid(BundleShape("a DSSE envelope must have exactly one signature"))
+    raise invalid(
+      BundleShape("a DSSE envelope must have exactly one signature"),
+    )
   }
   let leaf = read_leaf(raw_leaf)
   // Every time source must verify (design TIME-2).
   let times : Array[VerifiedTime] = []
   // The source roots of the logs of the verified entries.
-  let entry_sources : Array[Int] = []
+  let entry_sources : Array[Int32] = []
   for entry in bundle.entries {
     let (time, sources) = check_entry(entry, root, now)
-    times.push({ time, source: Log(log_id=entry.log_id, log_index=entry.log_index) })
+    times.push({
+      time,
+      source: Log(log_id=entry.log_id, log_index=entry.log_index),
+    })
     for source in sources {
       entry_sources.push(source)
     }
@@ -98,10 +103,12 @@ fn run(
   }
   guard !times.is_empty() else {
     raise invalid(
-      TransparencyLog("the bundle has no transparency log entry and no timestamp"),
+      TransparencyLog(
+        "the bundle has no transparency log entry and no timestamp",
+      ),
     )
   }
-  let issuing_sources : Array[Int] = []
+  let issuing_sources : Array[Int32] = []
   for verified in times {
     for source in check_certificate(leaf, root, verified.time) {
       if !issuing_sources.contains(source) {
@@ -132,13 +139,7 @@ fn run(
   let reasons = []
   for index, policy in policies {
     match policy.mismatch(claims, statement) {
-      None =>
-        return {
-          statement,
-          policy_index: index,
-          claims,
-          times,
-        }
+      None => return { statement, policy_index: index, claims, times, }
       Some(reason) => reasons.push(reason)
     }
   }
@@ -152,9 +153,10 @@ fn read_leaf(raw : Bytes) -> Leaf raise Stop {
   }
   let key = @signature.PublicKey::from_spki(certificate.spki) catch {
     UnsupportedKey(kind) => raise unsupported(KeyType(kind))
-    BadKey(rule) => raise invalid(Certificate(Unreadable("bad public key: \{rule}")))
+    BadKey(rule) =>
+      raise invalid(Certificate(Unreadable("bad public key: \{rule}")))
   }
-  { certificate, key }
+  { certificate, key, }
 }
 
 ///|
@@ -165,7 +167,7 @@ fn check_entry(
   entry : LogEntry,
   root : TrustedRoot,
   now : Instant,
-) -> (Instant, Array[Int]) raise Stop {
+) -> (Instant, Array[Int32]) raise Stop {
   match (entry.kind, entry.version) {
     ("dsse", "0.0.1") | ("hashedrekord", "0.0.1") | ("intoto", "0.0.2") => ()
     ("dsse", "0.0.2") | ("hashedrekord", "0.0.2") => raise unsupported(RekorV2)
@@ -186,7 +188,10 @@ fn check_entry(
   let mut verified_time = Instant::from_unix_seconds(entry.integrated_time)
   for log in logs {
     try check_entry_with(entry, log, now) catch {
-      Stop(_) as failure => if first_failure is None { first_failure = Some(failure) }
+      Stop(_) as failure =>
+        if first_failure is None {
+          first_failure = Some(failure)
+        }
     } noraise {
       time => {
         verified_time = time
@@ -201,7 +206,11 @@ fn check_entry(
 ///|
 /// Check one Rekor v1 entry against one trusted log: its signed entry
 /// timestamp, its time and its inclusion proof. Give the integrated time.
-fn check_entry_with(entry : LogEntry, log : TrustedLog, now : Instant) -> Instant raise Stop {
+fn check_entry_with(
+  entry : LogEntry,
+  log : TrustedLog,
+  now : Instant,
+) -> Instant raise Stop {
   let key = match log.key {
     Usable(key) => key
     Unusable(kind) => raise unsupported(KeyType(kind))
@@ -241,7 +250,9 @@ fn check_inclusion(
     proof.hashes,
   )
   guard computed is Some(hash) else {
-    raise invalid(InclusionProof("the proof does not fit the index and tree size"))
+    raise invalid(
+      InclusionProof("the proof does not fit the index and tree size"),
+    )
   }
   guard hash == proof.root_hash else {
     raise invalid(InclusionProof("the proof gives another root hash"))
@@ -297,19 +308,19 @@ fn body_base64(json : Json?, name : String) -> Bytes raise Stop {
 ///|
 /// True when the PEM text holds exactly the leaf certificate.
 fn same_certificate(pem : Bytes, leaf : Leaf) -> Bool {
-  let text = @utf8.decode(pem) catch {
-    _ => return false
-  }
-  let certificates = @x509.decode_pem(text) catch {
-    _ => return false
-  }
+  let text = @utf8.decode(pem) catch { _ => return false }
+  let certificates = @x509.decode_pem(text) catch { _ => return false }
   certificates.length() == 1 && certificates[0] == leaf.certificate.raw
 }
 
 ///|
 /// Check that the logged body is for this bundle's signature, certificate and
 /// content.
-fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop {
+fn check_body(
+  bundle : Bundle,
+  entry : LogEntry,
+  leaf : Leaf,
+) -> Unit raise Stop {
   let text = @utf8.decode(entry.body) catch {
     _ => raise invalid(TransparencyLogBody("the body is not UTF-8"))
   }
@@ -320,58 +331,99 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
     kind == entry.kind &&
     json_field(body, "apiVersion") is Some(String(version)) &&
     version == entry.version else {
-    raise invalid(TransparencyLogBody("the body kind or version differs from the entry"))
+    raise invalid(
+      TransparencyLogBody("the body kind or version differs from the entry"),
+    )
   }
   let spec = body_object(json_field(body, "spec"), "spec")
   match (entry.kind, bundle.content) {
     ("dsse", Dsse(envelope)) => {
-      let payload_hash = body_object(json_field(spec, "payloadHash"), "payloadHash")
-      guard body_string(json_field(payload_hash, "algorithm"), "payloadHash.algorithm") ==
+      let payload_hash = body_object(
+        json_field(spec, "payloadHash"),
+        "payloadHash",
+      )
+      guard body_string(
+          json_field(payload_hash, "algorithm"),
+          "payloadHash.algorithm",
+        ) ==
         "sha256" &&
         body_string(json_field(payload_hash, "value"), "payloadHash.value").to_lower() ==
         @encoding.encode_hex(@signature.sha256(envelope.payload)) else {
-        raise invalid(TransparencyLogBody("the payload hash differs from the payload"))
+        raise invalid(
+          TransparencyLogBody("the payload hash differs from the payload"),
+        )
       }
       guard json_field(spec, "signatures") is Some(Array(signatures)) &&
         signatures.length() == 1 else {
-        raise invalid(TransparencyLogBody("the body does not have one signature"))
+        raise invalid(
+          TransparencyLogBody("the body does not have one signature"),
+        )
       }
       let logged = signatures[0]
       guard body_base64(json_field(logged, "signature"), "signature") ==
         envelope.signatures[0] else {
-        raise invalid(TransparencyLogBody("the logged signature differs from the envelope"))
+        raise invalid(
+          TransparencyLogBody("the logged signature differs from the envelope"),
+        )
       }
-      guard same_certificate(body_base64(json_field(logged, "verifier"), "verifier"), leaf) else {
-        raise invalid(TransparencyLogBody("the logged certificate differs from the leaf"))
+      guard same_certificate(
+        body_base64(json_field(logged, "verifier"), "verifier"),
+        leaf,
+      ) else {
+        raise invalid(
+          TransparencyLogBody("the logged certificate differs from the leaf"),
+        )
       }
     }
     ("intoto", Dsse(envelope)) => {
       // Rekor stores the envelope with the signature and payload base64 twice.
       let content = body_object(json_field(spec, "content"), "content")
-      let logged_envelope = body_object(json_field(content, "envelope"), "content.envelope")
-      let payload_hash = body_object(json_field(content, "payloadHash"), "content.payloadHash")
-      guard body_string(json_field(payload_hash, "algorithm"), "payloadHash.algorithm") ==
+      let logged_envelope = body_object(
+        json_field(content, "envelope"),
+        "content.envelope",
+      )
+      let payload_hash = body_object(
+        json_field(content, "payloadHash"),
+        "content.payloadHash",
+      )
+      guard body_string(
+          json_field(payload_hash, "algorithm"),
+          "payloadHash.algorithm",
+        ) ==
         "sha256" &&
         body_string(json_field(payload_hash, "value"), "payloadHash.value").to_lower() ==
         @encoding.encode_hex(@signature.sha256(envelope.payload)) else {
-        raise invalid(TransparencyLogBody("the payload hash differs from the payload"))
+        raise invalid(
+          TransparencyLogBody("the payload hash differs from the payload"),
+        )
       }
       guard json_field(logged_envelope, "signatures") is Some(Array(signatures)) &&
         signatures.length() == 1 else {
-        raise invalid(TransparencyLogBody("the body does not have one signature"))
+        raise invalid(
+          TransparencyLogBody("the body does not have one signature"),
+        )
       }
       let logged = signatures[0]
-      let signature_text = @utf8.decode(body_base64(json_field(logged, "sig"), "sig")) catch {
+      let signature_text = @utf8.decode(
+        body_base64(json_field(logged, "sig"), "sig"),
+      ) catch {
         _ => raise invalid(TransparencyLogBody("sig is not text"))
       }
       let logged_signature = @encoding.decode_base64(signature_text) catch {
         _ => raise invalid(TransparencyLogBody("sig is not base64 twice"))
       }
       guard logged_signature == envelope.signatures[0] else {
-        raise invalid(TransparencyLogBody("the logged signature differs from the envelope"))
+        raise invalid(
+          TransparencyLogBody("the logged signature differs from the envelope"),
+        )
       }
-      guard same_certificate(body_base64(json_field(logged, "publicKey"), "publicKey"), leaf) else {
-        raise invalid(TransparencyLogBody("the logged certificate differs from the leaf"))
+      guard same_certificate(
+        body_base64(json_field(logged, "publicKey"), "publicKey"),
+        leaf,
+      ) else {
+        raise invalid(
+          TransparencyLogBody("the logged certificate differs from the leaf"),
+        )
       }
     }
     ("hashedrekord", Message(algorithm~, digest~, signature~)) => {
@@ -379,23 +431,43 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
         json_field(body_object(json_field(spec, "data"), "data"), "hash"),
         "data.hash",
       )
-      let logged_algorithm = body_string(json_field(hash, "algorithm"), "data.hash.algorithm")
+      let logged_algorithm = body_string(
+        json_field(hash, "algorithm"),
+        "data.hash.algorithm",
+      )
       guard logged_algorithm == algorithm.rekor_name() &&
         body_string(json_field(hash, "value"), "data.hash.value").to_lower() ==
         @encoding.encode_hex(digest) else {
-        raise invalid(TransparencyLogBody("the logged digest differs from the message digest"))
+        raise invalid(
+          TransparencyLogBody(
+            "the logged digest differs from the message digest",
+          ),
+        )
       }
       let logged = body_object(json_field(spec, "signature"), "signature")
-      guard body_base64(json_field(logged, "content"), "signature.content") == signature else {
-        raise invalid(TransparencyLogBody("the logged signature differs from the bundle"))
+      guard body_base64(json_field(logged, "content"), "signature.content") ==
+        signature else {
+        raise invalid(
+          TransparencyLogBody("the logged signature differs from the bundle"),
+        )
       }
-      let key = body_object(json_field(logged, "publicKey"), "signature.publicKey")
-      guard same_certificate(body_base64(json_field(key, "content"), "signature.publicKey.content"), leaf) else {
-        raise invalid(TransparencyLogBody("the logged certificate differs from the leaf"))
+      let key = body_object(
+        json_field(logged, "publicKey"),
+        "signature.publicKey",
+      )
+      guard same_certificate(
+        body_base64(json_field(key, "content"), "signature.publicKey.content"),
+        leaf,
+      ) else {
+        raise invalid(
+          TransparencyLogBody("the logged certificate differs from the leaf"),
+        )
       }
     }
     _ =>
-      raise invalid(TransparencyLogBody("the entry kind does not match the bundle content"))
+      raise invalid(
+        TransparencyLogBody("the entry kind does not match the bundle content"),
+      )
   }
 }
 
@@ -403,7 +475,11 @@ fn check_body(bundle : Bundle, entry : LogEntry, leaf : Leaf) -> Unit raise Stop
 /// Check the leaf and its chain at `time` to each trusted certificate
 /// authority whose validity holds `time`, and the SCT rule. Give the source
 /// roots of the authorities that issued the leaf.
-fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Array[Int] raise Stop {
+fn check_certificate(
+  leaf : Leaf,
+  root : TrustedRoot,
+  time : Instant,
+) -> Array[Int32] raise Stop {
   let certificate = leaf.certificate
   guard valid_at(certificate, time) else {
     raise invalid(
@@ -431,10 +507,11 @@ fn check_certificate(leaf : Leaf, root : TrustedRoot, time : Instant) -> Array[I
   let mut reason = "no trusted certificate authority issued the leaf"
   // Every authority that issued the leaf counts, so the result does not
   // depend on their order in a combined root.
-  let issuers : Array[(@x509.Certificate, Int)] = []
+  let issuers : Array[(@x509.Certificate, Int32)] = []
   for authority in root.authorities {
     guard authority.valid.contains(time) else { continue }
-    match chain_from(certificate, authority.chain, time, @x509.EKU_CODE_SIGNING) {
+    match
+      chain_from(certificate, authority.chain, time, @x509.EKU_CODE_SIGNING) {
       Ok(issuer) => issuers.push((issuer, authority.source))
       Err(text) => reason = text
     }
@@ -473,14 +550,16 @@ fn chain_from(
 /// extended key usage `usage`, or `None`.
 fn check_path(
   chain : ArrayView[@x509.Certificate],
-  start : Int,
+  start : Int32,
   time : Instant,
   usage : String,
 ) -> String? {
   for index in start..<chain.length() {
     let ca = chain[index]
     guard valid_at(ca, time) else {
-      return Some("a certificate authority certificate is not valid at that time")
+      return Some(
+        "a certificate authority certificate is not valid at that time",
+      )
     }
     guard ca.basic_constraints is Some(constraints) && constraints.is_ca else {
       return Some("an issuer is not a certificate authority")
@@ -516,8 +595,13 @@ fn check_path(
 fn valid_at(certificate : @x509.Certificate, time : Instant) -> Bool {
   let seconds = time.unix_seconds()
   certificate.not_before <= seconds &&
-  (seconds < certificate.not_after ||
-  (seconds == certificate.not_after && time == Instant::from_unix_seconds(seconds)))
+  (
+    seconds < certificate.not_after ||
+    (
+      seconds == certificate.not_after &&
+      time == Instant::from_unix_seconds(seconds)
+    )
+  )
 }
 
 ///|
@@ -534,7 +618,9 @@ fn check_timestamp(
     UnsupportedTimestamp(name) => raise unsupported(TimestampAlgorithm(name))
   }
   guard @signature.digest(token.imprint_hash, signature) == token.imprint else {
-    raise invalid(Timestamp("the message imprint is not the hash of the bundle signature"))
+    raise invalid(
+      Timestamp("the message imprint is not the hash of the bundle signature"),
+    )
   }
   let time = Instant::from_parts(token.seconds, token.nanos)
   guard time <= now else { raise invalid(TimestampTime(time~, now~)) }
@@ -548,7 +634,7 @@ fn check_timestamp(
       continue
     }
     match timestamp_signer(token, authority, time) {
-      None => return { time, source: Authority(uri=authority.uri) }
+      None => return { time, source: Authority(uri=authority.uri), }
       Some(text) => if reason is None { reason = Some(text) }
     }
   }
@@ -556,8 +642,10 @@ fn check_timestamp(
     TimestampAuthority(
       match reason {
         Some(text) => text
-        None if outside => "the timestamp time is outside the validity of the authority"
-        None => "no timestamp authority of the trusted root signed the timestamp"
+        None if outside =>
+          "the timestamp time is outside the validity of the authority"
+        None =>
+          "no timestamp authority of the trusted root signed the timestamp"
       },
     ),
   )
@@ -571,9 +659,10 @@ fn timestamp_signer(
   time : Instant,
 ) -> String? raise Stop {
   let chain = authority.chain
-  let names_signer = (certificate : @x509.Certificate) => certificate.issuer ==
-    token.signer_issuer &&
+  let names_signer = (certificate : @x509.Certificate) => {
+    certificate.issuer == token.signer_issuer &&
     certificate.serial == token.signer_serial
+  }
   // A listed leaf is the only signer; an embedded certificate can never take
   // its place (design TSA-2).
   let first_is_leaf = !(chain[0].basic_constraints is Some({ is_ca: true, .. }))
@@ -585,14 +674,16 @@ fn timestamp_signer(
   } else {
     let embedded = token.certificates
       .iter()
-      .filter_map(raw => try Some(@x509.parse(raw)) catch { _ => None })
+      .filter_map(raw => Some(@x509.parse(raw)) catch { _ => None })
     guard embedded.find_first(names_signer) is Some(signer) else {
       return Some("the token has no certificate for its signer")
     }
     (signer, chain[:])
   }
   guard valid_at(signer, time) else {
-    return Some("the timestamp authority certificate is not valid at the timestamp time")
+    return Some(
+      "the timestamp authority certificate is not valid at the timestamp time",
+    )
   }
   if signer.timestamp_signer_problem() is Some(problem) {
     return Some(problem)
@@ -609,12 +700,15 @@ fn timestamp_signer(
   }
   // The chain comes before the key, so a certificate that does not chain
   // gives an invalid verdict, not "not supported".
-  guard !issuers.is_empty() else { return Some("the authority has no issuer certificate") }
+  guard !issuers.is_empty() else {
+    return Some("the authority has no issuer certificate")
+  }
   if chain_from(signer, issuers, time, @x509.EKU_TIME_STAMPING) is Err(text) {
     return Some(text)
   }
   let key = @signature.PublicKey::from_spki(signer.spki) catch {
-    UnsupportedKey(kind) => raise unsupported(TimestampAlgorithm("\{kind} keys"))
+    UnsupportedKey(kind) =>
+      raise unsupported(TimestampAlgorithm("\{kind} keys"))
     BadKey(rule) => return Some("bad signer key: \{rule}")
   }
   guard token.verify_signature(key) else {
@@ -629,7 +723,7 @@ fn timestamp_signer(
 /// one of the issuing authorities in `issuers`.
 fn check_sct(
   leaf : Leaf,
-  issuers : Array[(@x509.Certificate, Int)],
+  issuers : Array[(@x509.Certificate, Int32)],
   root : TrustedRoot,
 ) -> Unit raise Stop {
   guard leaf.certificate.extension(@x509.SCT_LIST_OID) is Some(extension) else {
@@ -682,7 +776,10 @@ fn pae(payload_type : String, payload : Bytes) -> Bytes {
 /// SHA-256, as sigstore-go does for bundles up to v0.3.
 fn verify_with_leaf(leaf : Leaf, message : Bytes, signature : Bytes) -> Bool {
   leaf.key.verify(message, signature) ||
-  (leaf.key.kind is EcdsaP384 && leaf.key.verify(message, signature, hash=Sha256))
+  (
+    leaf.key.kind is EcdsaP384 &&
+    leaf.key.verify(message, signature, hash=Sha256)
+  )
 }
 
 ///|
@@ -698,14 +795,16 @@ fn check_content(
         raise invalid(PayloadType(envelope.payload_type))
       }
       guard verify_with_leaf(
-          leaf,
-          pae(envelope.payload_type, envelope.payload),
-          envelope.signatures[0],
-        ) else {
+        leaf,
+        pae(envelope.payload_type, envelope.payload),
+        envelope.signatures[0],
+      ) else {
         raise invalid(ContentSignature)
       }
       let statement = read_statement(envelope.payload)
-      guard statement.subjects.iter().any(subject => subject.sha256 == Some(artifact)) else {
+      guard statement.subjects
+        .iter()
+        .any(subject => subject.sha256 == Some(artifact)) else {
         raise invalid(ArtifactDigestMismatch(artifact))
       }
       Some(statement)
@@ -737,7 +836,10 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
   // Duplicate keys are refused, as protobuf JSON refuses them, so that no
   // other reader can see another subject list in the same signed payload.
   let json = @json.parse(text, reject_duplicate_keys=true) catch {
-    _ => raise invalid(Statement("the payload is not JSON, or has a duplicate key"))
+    _ =>
+      raise invalid(
+        Statement("the payload is not JSON, or has a duplicate key"),
+      )
   }
   guard json_field(json, "_type") is Some(String(statement_type)) &&
     in_toto_statement_types.contains(statement_type) else {
@@ -749,13 +851,23 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
   let predicate_type = PredicateType::parse(predicate_text) catch {
     err => raise invalid(Statement(err.message()))
   }
-  guard json_field(json, "subject") is Some(Array(items)) && items.length() <= max_subjects else {
-    raise invalid(Statement("the statement has no subject list, or more than \{max_subjects}"))
+  guard json_field(json, "subject") is Some(Array(items)) &&
+    items.length() <= max_subjects else {
+    raise invalid(
+      Statement(
+        "the statement has no subject list, or more than \{max_subjects}",
+      ),
+    )
   }
   let subjects = []
   for item in items {
-    guard json_field(item, "digest") is Some(Object(digests)) && digests.length() <= max_subject_digests else {
-      raise invalid(Statement("a subject has no digest map, or more than \{max_subject_digests}"))
+    guard json_field(item, "digest") is Some(Object(digests)) &&
+      digests.length() <= max_subject_digests else {
+      raise invalid(
+        Statement(
+          "a subject has no digest map, or more than \{max_subject_digests}",
+        ),
+      )
     }
     let sha256 = match digests.get("sha256") {
       Some(String(hex)) => {
@@ -763,7 +875,9 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
           _ => raise invalid(Statement("a subject digest is not hex"))
         }
         guard bytes.length() == 32 else {
-          raise invalid(Statement("a subject sha256 digest does not have 32 bytes"))
+          raise invalid(
+            Statement("a subject sha256 digest does not have 32 bytes"),
+          )
         }
         Some(ArtifactDigest::{ bytes, })
       }
@@ -774,8 +888,8 @@ fn read_statement(payload : Bytes) -> Statement raise Stop {
       Some(String(name)) => name
       _ => ""
     }
-    subjects.push({ name, sha256 })
+    subjects.push({ name, sha256, })
   }
   let predicate = json_field(json, "predicate").unwrap_or(Json::null())
-  { predicate_type, predicate, subjects, payload }
+  { predicate_type, predicate, subjects, payload, }
 }

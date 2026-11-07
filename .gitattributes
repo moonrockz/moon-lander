@@ -1,0 +1,2 @@
+# The tools CLI compares the managed OpenSpec files byte for byte, so keep LF on every OS.
+openspec/schemas/html-design/** text eol=lf

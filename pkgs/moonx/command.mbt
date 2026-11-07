@@ -1,9 +1,10 @@
 ///|
 /// A rule that executable text can break.
+#derive(Eq, Debug)
 pub enum ExecutableRule {
   Empty
   ContainsNul
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ExecutableRule with Eq::{equal, not_equal}
@@ -13,18 +14,20 @@ pub extend ExecutableRule with @debug.Debug::{to_repr}
 
 ///|
 /// Invalid executable text, retained with its rule.
+#derive(Debug)
 pub suberror ExecutableError {
   InvalidExecutable(input~ : String, rule~ : ExecutableRule)
-} derive(Debug)
+}
 
 ///|
 pub extend ExecutableError with @debug.Debug::{to_repr}
 
 ///|
 /// An executable path or PATH lookup name. It is nonempty and has no NUL.
+#derive(Debug)
 pub struct Executable {
   priv text : String
-} derive(Debug)
+}
 
 ///|
 pub extend Executable with @debug.Debug::{to_repr}
@@ -36,22 +39,27 @@ pub fn Executable::parse(input : String) -> Executable raise ExecutableError {
   guard !input.contains("\u{0}") else {
     raise InvalidExecutable(input~, rule=ContainsNul)
   }
-  { text: input }
+  { text: input, }
 }
 
 ///|
 /// Look up Node through the caller's PATH.
-pub fn Executable::node() -> Executable { { text: "node" } }
+pub fn Executable::node() -> Executable {
+  { text: "node", }
+}
 
 ///|
 /// The original executable text.
-pub fn Executable::to_string(self : Executable) -> String { self.text }
+pub fn Executable::to_string(self : Executable) -> String {
+  self.text
+}
 
 ///|
 /// An argument that an OS process cannot represent.
+#derive(Debug)
 pub suberror ArgumentsError {
-  ArgumentContainsNul(input~ : String, index~ : Int)
-} derive(Debug)
+  ArgumentContainsNul(input~ : String, index~ : Int32)
+}
 
 ///|
 pub extend ArgumentsError with @debug.Debug::{to_repr}
@@ -64,26 +72,34 @@ pub struct Arguments {
 
 ///|
 /// Parse NUL-free arguments and retain a separate immutable array value.
-pub fn Arguments::parse(inputs : Array[String]) -> Arguments raise ArgumentsError {
+pub fn Arguments::parse(
+  inputs : Array[String],
+) -> Arguments raise ArgumentsError {
   for index, input in inputs {
-    guard !input.contains("\u{0}") else { raise ArgumentContainsNul(input~, index~) }
+    guard !input.contains("\u{0}") else {
+      raise ArgumentContainsNul(input~, index~)
+    }
   }
-  { values: inputs.copy() }
+  { values: inputs.copy(), }
 }
 
 ///|
 /// A valid empty argument list.
-pub fn Arguments::empty() -> Arguments { { values: [] } }
+pub fn Arguments::empty() -> Arguments {
+  { values: [], }
+}
 
 ///|
 /// A fresh array. Mutating it cannot change these arguments.
-pub fn Arguments::to_array(self : Arguments) -> Array[String] { self.values.copy() }
+pub fn Arguments::to_array(self : Arguments) -> Array[String] {
+  self.values.copy()
+}
 
 ///|
 /// Derive a valid argument list from two already parsed lists, without parsing
 /// their elements again or sharing a mutable array.
 pub fn Arguments::concat(self : Arguments, other : Arguments) -> Arguments {
-  { values: self.values + other.values }
+  { values: self.values + other.values, }
 }
 
 ///|
@@ -96,22 +112,27 @@ pub struct Command {
 ///|
 /// Construct an invocation from already parsed process inputs.
 pub fn Command::new(program : Executable, args : Arguments) -> Command {
-  { program, args }
+  { program, args, }
 }
 
 ///|
 /// The selected executable.
-pub fn Command::executable(self : Command) -> Executable { self.program }
+pub fn Command::executable(self : Command) -> Executable {
+  self.program
+}
 
 ///|
 /// The immutable application argument list.
-pub fn Command::arguments(self : Command) -> Arguments { self.args }
+pub fn Command::arguments(self : Command) -> Arguments {
+  self.args
+}
 
 ///|
 /// A graceful-stop deadline must be positive and fit the runtime millisecond count.
+#derive(Debug)
 pub suberror ShutdownGraceError {
-  NonPositiveShutdownGrace(milliseconds~ : Int)
-} derive(Debug)
+  NonPositiveShutdownGrace(milliseconds~ : Int32)
+}
 
 ///|
 pub extend ShutdownGraceError with @debug.Debug::{to_repr}
@@ -119,13 +140,13 @@ pub extend ShutdownGraceError with @debug.Debug::{to_repr}
 ///|
 /// A positive grace period before forced child termination.
 pub struct ShutdownGrace {
-  priv milliseconds : Int
+  priv milliseconds : Int32
 }
 
 ///|
 /// Parse a positive runtime millisecond count.
 pub fn ShutdownGrace::from_milliseconds(
-  milliseconds : Int,
+  milliseconds : Int32,
 ) -> ShutdownGrace raise ShutdownGraceError {
   guard milliseconds > 0 else { raise NonPositiveShutdownGrace(milliseconds~) }
   { milliseconds, }
@@ -133,11 +154,15 @@ pub fn ShutdownGrace::from_milliseconds(
 
 ///|
 /// The standard five-second child grace period.
-pub fn ShutdownGrace::standard() -> ShutdownGrace { { milliseconds: 5000 } }
+pub fn ShutdownGrace::standard() -> ShutdownGrace {
+  { milliseconds: 5000, }
+}
 
 ///|
 /// The validated runtime millisecond count.
-pub fn ShutdownGrace::milliseconds(self : ShutdownGrace) -> Int { self.milliseconds }
+pub fn ShutdownGrace::milliseconds(self : ShutdownGrace) -> Int32 {
+  self.milliseconds
+}
 
 ///|
 /// Work for the optional process driver. Every case contains valid immutable values.

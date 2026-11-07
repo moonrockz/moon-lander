@@ -13,6 +13,7 @@ fn release_line(
 fn tags(releases : Array[Release]) -> Array[String] {
   releases.map(release => release.tag)
 }
+
 ///|
 async test "the retained v0.7.3 archive assembles without changing its browser assets" {
   let dir = @fs.tmpdir(prefix="lander-retained-site")
@@ -21,16 +22,33 @@ async test "the retained v0.7.3 archive assembles without changing its browser a
   let js = @fs.read_file(dir + "/v/0.7/assets/islands.js").binary()
   let search = @fs.read_file(dir + "/v/0.7/search-index.json").binary()
   assert_eq(@host.check(dir + "/v/0.7", "/moon-lander/v/0.7/"), [])
-  write_text(dir + "/next/index.html",
-    tree_page("/moon-lander/next/", "").replace_all(old="data-site-root=\"/m/\"", new="data-site-root=\"/moon-lander/\""))
+  write_text(
+    dir + "/next/index.html",
+    tree_page("/moon-lander/next/", "").replace_all(
+      old="data-site-root=\"/m/\"",
+      new="data-site-root=\"/moon-lander/\"",
+    ),
+  )
   write_text(dir + "/next/assets/site.css", "a{}")
   write_text(dir + "/next/search-index.json", "[]")
-  assemble_site(dir, { base: "/moon-lander/", site_url: "https://moonrockz.github.io/moon-lander/", lines: ["0.7"] })
+  assemble_site(dir, {
+    base: "/moon-lander/",
+    site_url: "https://moonrockz.github.io/moon-lander/",
+    lines: ["0.7"],
+  })
   assert_eq(@host.check(dir, "/moon-lander/"), [])
   for tree in ["", "latest/", "v/0.7/"] {
-    assert_eq(@fs.read_file(dir + "/" + tree + "assets/islands.js").binary(), js)
-    assert_eq(@fs.read_file(dir + "/" + tree + "search-index.json").binary(), search)
-    let api = @fs.read_file(dir + "/" + tree + "api/moonrockz/notebooks/index.html").text()
+    assert_eq(
+      @fs.read_file(dir + "/" + tree + "assets/islands.js").binary(),
+      js,
+    )
+    assert_eq(
+      @fs.read_file(dir + "/" + tree + "search-index.json").binary(),
+      search,
+    )
+    let api = @fs.read_file(
+      dir + "/" + tree + "api/moonrockz/notebooks/index.html",
+    ).text()
     assert_true(api.contains("id=\"CellKind\""))
     let home = @fs.read_file(dir + "/" + tree + "index.html").text()
     assert_true(home.contains("data-base=\"/moon-lander/\{tree}\""))
@@ -155,7 +173,11 @@ fn tree_page(base : String, link : String) -> String {
 
 ///|
 /// Write a tree below `dir` at `path` with the base path `/m/<path>` and the pages `routes`.
-async fn write_tree(dir : String, path : String, routes : Array[String]) -> Unit {
+async fn write_tree(
+  dir : String,
+  path : String,
+  routes : Array[String],
+) -> Unit {
   let base = "/m/\{path}"
   for route in routes {
     write_text("\{dir}/\{path}\{route}index.html", tree_page(base, route))
@@ -168,7 +190,7 @@ async fn write_tree(dir : String, path : String, routes : Array[String]) -> Unit
 async test "No release" {
   let dir = test_dir("no-release")
   write_tree(dir, "next/", ["", "docs/"])
-  assemble_site(dir, { base: "/m/", site_url: "https://e.org/m/", lines: [] })
+  assemble_site(dir, { base: "/m/", site_url: "https://e.org/m/", lines: [], })
   let root = @fs.read_file("\{dir}/index.html").text()
   assert_true(root.contains("data-base=\"/m/\""))
   assert_true(root.contains("href=\"/m/assets/site.css\""))

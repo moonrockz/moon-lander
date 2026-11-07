@@ -1,7 +1,8 @@
 ///|
+#derive(Debug)
 priv suberror SchemaRead {
   SchemaRead(@json.Diagnostic)
-} derive(Debug)
+}
 
 ///|
 fn invalid(message : String, path~ : Array[String] = []) -> @json.Diagnostic {
@@ -155,10 +156,11 @@ fn simple_types(value : @json.Value) -> Array[SimpleType] raise SchemaRead {
     let decoded = simple_type(item) catch {
       SchemaRead(d) =>
         raise SchemaRead(
-          @json.Diagnostic::new(d.code(), d.message(), path=[
-            i.to_string(),
-            ..d.path(),
-          ]),
+          @json.Diagnostic::new(
+            d.code(),
+            d.message(),
+            path=[i.to_string(), ..d.path()],
+          ),
         )
     }
     types.push(decoded)

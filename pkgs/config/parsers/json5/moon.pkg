@@ -1,7 +1,7 @@
 import {
   "moonrockz/moon-lander-config" @config,
   "moonbitlang/x/json5" @json5_lib,
-  "moonrockz/ion/ion" @ion,
+  "moonrockz/ion/ion",
   "moonbitlang/core/bigint",
 }
 

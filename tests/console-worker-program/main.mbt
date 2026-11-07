@@ -1,7 +1,7 @@
 ///|
 /// Test-only shared memory supplied by the parent launcher. Consume the first
 /// value to exercise the driver's latch throughout cleanup and finalization.
-extern "js" fn take_signal() -> Int =
+extern "js" fn take_signal() -> Int32 =
   #|() => Atomics.exchange(globalThis.landerSignals, 0, 0)
 
 ///|

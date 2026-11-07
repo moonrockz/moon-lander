@@ -8,7 +8,7 @@ pub struct MemoryLogger {
 ///|
 /// A new in-memory logger with no events.
 pub fn MemoryLogger::new() -> MemoryLogger {
-  { kept: [] }
+  { kept: [], }
 }
 
 ///|
@@ -19,7 +19,7 @@ pub fn MemoryLogger::events(self : MemoryLogger) -> Array[LogEvent] {
 
 ///|
 /// Keep `event` after the events that the logger already holds.
-pub impl Logger for MemoryLogger with log(self, event) {
+pub impl Logger for MemoryLogger with fn log(self, event) {
   self.kept.push(event)
 }
 

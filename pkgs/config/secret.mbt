@@ -1,10 +1,11 @@
 ///|
 /// Whether the load and the merge treat one-field `env` / `file` / `command` /
 /// `keyring` structs as secret references.
+#derive(Eq, Debug)
 pub(all) enum SecretSyntax {
   Standard
   None
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SecretSyntax with Eq::{equal, not_equal}
@@ -27,12 +28,13 @@ pub fn SecretSyntax::none() -> SecretSyntax {
 
 ///|
 /// A secret reference leaf: one of the Morphir shapes.
+#derive(Eq, Debug)
 pub(all) enum SecretRef {
   Env(String)
   File(String)
   Command(Array[String])
   Keyring(service~ : String, account~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SecretRef with Eq::{equal, not_equal}
@@ -53,7 +55,7 @@ pub fn Secret::expose(self : Secret) -> String {
 }
 
 ///|
-pub impl Show for Secret with output(_self, logger) {
+pub impl Show for Secret with fn output(_self, logger) {
   logger.write_string("<redacted>")
 }
 
@@ -63,6 +65,7 @@ pub extend Secret with Show::{output, to_string}
 ///|
 /// A failure while resolving a secret. Messages never hold the secret or the
 /// backend output.
+#derive(Eq, Debug)
 pub(all) suberror SecretError {
   MissingConfigKey(key~ : KeyPath)
   EmptyEnvironment(variable~ : String)
@@ -70,7 +73,7 @@ pub(all) suberror SecretError {
   InvalidSecretValue(reason~ : String)
   CommandFailed(reason~ : String)
   KeyringLookupFailed(reason~ : String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SecretError with Eq::{equal, not_equal}
@@ -82,7 +85,8 @@ pub extend SecretError with @debug.Debug::{to_repr}
 /// Text for people that names the failure class and never holds a secret.
 pub fn SecretError::message(self : SecretError) -> String {
   match self {
-    MissingConfigKey(key~) => "missing-config-key: configuration key \{key} is missing"
+    MissingConfigKey(key~) =>
+      "missing-config-key: configuration key \{key} is missing"
     EmptyEnvironment(variable~) =>
       "empty-environment: environment variable \{variable} is empty or unset"
     FileRead(path~, reason~) => "file-read: cannot read \{path}: \{reason}"
@@ -96,7 +100,7 @@ pub fn SecretError::message(self : SecretError) -> String {
 /// Resolves a secret reference. The origin lets a file resolver anchor a
 /// relative path to the directory of the declaring file.
 pub(open) trait SecretResolver {
-  resolve(Self, SecretRef, Origin) -> Secret raise SecretError
+  fn resolve(Self, SecretRef, Origin) -> Secret raise SecretError
 }
 
 ///|
@@ -109,11 +113,15 @@ pub struct EnvResolver {
 /// A resolver over `vars`. File, command, and keyring references raise
 /// `InvalidSecretValue`.
 pub fn env_resolver(vars : Map[String, String]) -> EnvResolver {
-  { vars: vars.copy() }
+  { vars: vars.copy(), }
 }
 
 ///|
-pub impl SecretResolver for EnvResolver with resolve(self, reference, _origin) {
+pub impl SecretResolver for EnvResolver with fn resolve(
+  self,
+  reference,
+  _origin,
+) {
   match reference {
     Env(variable) => {
       guard self.vars.get(variable) is Some(text) && !text.is_empty() else {
@@ -121,7 +129,8 @@ pub impl SecretResolver for EnvResolver with resolve(self, reference, _origin) {
       }
       { text, }
     }
-    File(_) => raise InvalidSecretValue(reason="env_resolver does not read files")
+    File(_) =>
+      raise InvalidSecretValue(reason="env_resolver does not read files")
     Command(_) =>
       raise InvalidSecretValue(reason="env_resolver does not run commands")
     Keyring(..) =>
@@ -223,9 +232,9 @@ fn check_secret_payloads(
           if !nested_table {
             guard secret_ref_of(value) is Some(_) else {
               let key = if path.is_empty() {
-                KeyPath::{ names: ["(root)"] }
+                KeyPath::{ names: ["(root)"], }
               } else {
-                { names: path.copy() }
+                { names: path.copy(), }
               }
               raise InvalidSecret(
                 key~,
@@ -240,7 +249,7 @@ fn check_secret_payloads(
       for field in fields {
         guard field.name().text() is Some(name) else { continue }
         check_secret_payloads(
-          { ion: field.value() },
+          { ion: field.value(), },
           origin,
           syntax,
           path=[..path, name],
@@ -249,7 +258,7 @@ fn check_secret_payloads(
     }
     List(items) | Sexp(items) =>
       for item in items {
-        check_secret_payloads({ ion: item }, origin, syntax, path~)
+        check_secret_payloads({ ion: item, }, origin, syntax, path~)
       }
     _ => ()
   }

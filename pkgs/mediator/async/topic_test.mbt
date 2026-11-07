@@ -2,9 +2,10 @@
 struct Entered(String)
 
 ///|
+#derive(Debug)
 suberror JoinError {
   Full(String)
-} derive(Debug)
+}
 
 ///|
 /// An async handler that checks the event, records its start, waits
@@ -12,7 +13,7 @@ suberror JoinError {
 fn step(
   log : Array[String],
   name : String,
-  wait_ms~ : Int = 10,
+  wait_ms~ : Int32 = 10,
   fails~ : Bool = false,
 ) -> async (Unit, Entered) -> Unit {
   (_, ev) => {
@@ -32,19 +33,21 @@ fn step(
 /// failures are `Full` errors with the given positions and names.
 fn expect_publish_failed(
   error : Error,
-  handlers~ : Int,
-  failures~ : Array[(Int, String)],
+  handlers~ : Int32,
+  failures~ : Array[(Int32, String)],
 ) -> Unit raise {
   guard error is @mediator.PublishFailed(handlers=count, failures=got) else {
     fail("publish raised another error: \{error}")
   }
   assert_eq(count, handlers)
-  let seen = got.to_array().map(failure => {
-    guard failure.error is Full(name) else {
-      fail("a failure holds another error: \{failure.error}")
-    }
-    (failure.position, name)
-  })
+  let seen = got
+    .to_array()
+    .map(failure => {
+      guard failure.error is Full(name) else {
+        fail("a failure holds another error: \{failure.error}")
+      }
+      (failure.position, name)
+    })
   assert_eq(seen, failures)
 }
 
@@ -80,7 +83,7 @@ async test "publish runs every handler after the second of three raises" {
 async test "publish with no failing handler finishes with no error" {
   let log = []
   let all = @mediator_async.topic(step(log, "one")).add(step(log, "two"))
-  try all.publish((), Entered("Ann")) catch {
+  all.publish((), Entered("Ann")) catch {
     error => fail("publish raised an error: \{error}")
   }
   assert_eq(log, ["one start", "one end", "two start", "two end"])
@@ -120,7 +123,7 @@ async test "publish_concurrent lists failures in add order, not end order" {
 async test "publish_concurrent with no failing handler finishes with no error" {
   let log = []
   let all = @mediator_async.topic(step(log, "one")).add(step(log, "two"))
-  try all.publish_concurrent((), Entered("Ann")) catch {
+  all.publish_concurrent((), Entered("Ann")) catch {
     error => fail("publish raised an error: \{error}")
   }
   assert_eq(log.length(), 4)

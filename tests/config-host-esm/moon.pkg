@@ -6,4 +6,8 @@ import {
 
 supported_targets = "js"
 
-options("is-main": true, link: { "js": { "format": "esm" } })
+pkgtype(kind: "executable")
+
+options(
+  link: { "js": { "format": "esm" } },
+)

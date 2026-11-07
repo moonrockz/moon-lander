@@ -1,12 +1,13 @@
 ///|
 /// One GitHub release, as the deploy reads it: the tag, its version, and the names of its assets.
+#derive(Eq, Debug)
 struct Release {
   tag : String
-  version : (Int, Int, Int)
+  version : (Int32, Int32, Int32)
   draft : Bool
   prerelease : Bool
   assets : Array[String]
-} derive(Eq, Debug)
+}
 
 ///|
 /// The `jq` filter that `gh api --paginate` applies to each page of releases. It writes one release
@@ -16,7 +17,7 @@ let releases_filter : String = ".[] | [.tag_name, .draft, .prerelease, ([.assets
 
 ///|
 /// The value of the decimal digits `digits`.
-fn number(digits : String) -> Int {
+fn number(digits : String) -> Int32 {
   let mut n = 0
   for c in digits {
     n = n * 10 + (c.to_int() - '0'.to_int())
@@ -26,7 +27,7 @@ fn number(digits : String) -> Int {
 
 ///|
 /// The version of the tag `vX.Y.Z`, or `None` for any other tag.
-fn tag_version(tag : String) -> (Int, Int, Int)? {
+fn tag_version(tag : String) -> (Int32, Int32, Int32)? {
   guard tag.has_prefix("v") else { return None }
   let parts = tag[1:].split(".").collect()
   guard parts.length() == 3 else { return None }
@@ -42,13 +43,13 @@ fn tag_version(tag : String) -> (Int, Int, Int)? {
 
 ///|
 /// The minor line `X.Y` of a version.
-fn minor_of(version : (Int, Int, Int)) -> String {
+fn minor_of(version : (Int32, Int32, Int32)) -> String {
   "\{version.0}.\{version.1}"
 }
 
 ///|
 /// The minor line `X.Y` as numbers, or `None` when `line` is not a minor line.
-fn line_numbers(line : String) -> (Int, Int)? {
+fn line_numbers(line : String) -> (Int32, Int32)? {
   guard @model.is_minor_line(line) else { return None }
   let parts = line.split(".").collect()
   Some((number(parts[0].to_owned()), number(parts[1].to_owned())))
@@ -69,7 +70,11 @@ fn parse_releases(text : String) -> Array[Release] {
       version,
       draft: fields[1] == "true",
       prerelease: fields[2] == "true",
-      assets: fields[3].split(",").map(name => name.to_owned()).filter(name => name != "").collect(),
+      assets: fields[3]
+      .split(",")
+      .map(name => name.to_owned())
+      .filter(name => name != "")
+      .collect(),
     })
   }
   found
@@ -83,7 +88,10 @@ fn asset_name(line : String) -> String {
 
 ///|
 /// Compare two versions: negative, zero or positive.
-fn compare_versions(a : (Int, Int, Int), b : (Int, Int, Int)) -> Int {
+fn compare_versions(
+  a : (Int32, Int32, Int32),
+  b : (Int32, Int32, Int32),
+) -> Int32 {
   if a.0 != b.0 {
     a.0 - b.0
   } else if a.1 != b.1 {
@@ -124,7 +132,9 @@ fn missing_assets(selected : Array[Release]) -> Array[@model.Problem] {
     if release.assets.contains(name) {
       None
     } else {
-      Some(@model.problem(release.tag, "the release has no site asset `\{name}`"))
+      Some(
+        @model.problem(release.tag, "the release has no site asset `\{name}`"),
+      )
     }
   })
 }
@@ -134,7 +144,10 @@ fn missing_assets(selected : Array[Release]) -> Array[@model.Problem] {
 /// assets.
 fn versions_since(text : String) -> String raise @model.Invalid {
   let json = @json.parse(text) catch {
-    error => raise @model.Invalid([@model.problem("site/site.json", "not valid JSON: \{error}")])
+    error =>
+      raise @model.Invalid([
+        @model.problem("site/site.json", "not valid JSON: \{error}"),
+      ])
   }
   guard json is Object(fields) &&
     fields.get("versions") is Some(Object(versions)) &&
@@ -142,8 +155,7 @@ fn versions_since(text : String) -> String raise @model.Invalid {
     @model.is_minor_line(since) else {
     raise @model.Invalid([
       @model.problem(
-        "site/site.json",
-        "`versions.since` must be a minor line, such as \"0.3\"",
+        "site/site.json", "`versions.since` must be a minor line, such as \"0.3\"",
       ),
     ])
   }

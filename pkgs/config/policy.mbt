@@ -1,11 +1,12 @@
 ///|
 /// How two lists merge at one key path. The default is `Replace`. A key-path
 /// policy beats the source policy.
+#derive(Eq, Debug)
 pub(all) enum MergePolicy {
   Replace
   Append
   MergeByKey(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend MergePolicy with Eq::{equal, not_equal}
@@ -14,7 +15,7 @@ pub extend MergePolicy with Eq::{equal, not_equal}
 pub extend MergePolicy with @debug.Debug::{to_repr}
 
 ///|
-pub impl Show for MergePolicy with output(self, logger) {
+pub impl Show for MergePolicy with fn output(self, logger) {
   match self {
     Replace => logger.write_string("Replace")
     Append => logger.write_string("Append")

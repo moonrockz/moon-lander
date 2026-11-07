@@ -14,19 +14,21 @@ pub fn walk(Node, (Node) -> @notebooks.Control, leave? : (Node) -> Unit) -> Unit
 pub fn walk_cursor(Node, (@notebooks.Cursor[Node]) -> @notebooks.Control, leave? : (@notebooks.Cursor[Node]) -> Unit) -> Unit
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror FormatError {
   InvalidMetadata(line~ : Int32, message~ : String)
   InvalidKernelName(String)
   DuplicateKernelName(String)
   UnknownKernel(String)
   UnrepresentableSource(cell~ : Int32, line~ : Int32)
-} derive(Eq, @debug.Debug)
+}
 pub fn FormatError::equal(Self, Self) -> Bool
 pub fn FormatError::not_equal(Self, Self) -> Bool
 pub fn FormatError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-type Cell derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Cell
 pub fn Cell::Cell(String, kernel~ : KernelName, source_mode? : SourceMode) -> Self
 pub fn Cell::directives(Self) -> ReadOnlyArray[Directive]
 pub fn Cell::equal(Self, Self) -> Bool
@@ -50,7 +52,8 @@ pub fn Codec::source_mode(Self) -> SourceMode
 pub fn Codec::with_kernel(Self, &KernelDescriptor) -> Self raise FormatError
 pub fn Codec::write(Self, Notebook) -> String raise FormatError
 
-type Directive derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Directive
 pub fn Directive::arguments(Self) -> String
 pub fn Directive::equal(Self, Self) -> Bool
 pub fn Directive::line(Self) -> Int32
@@ -59,7 +62,8 @@ pub fn Directive::not_equal(Self, Self) -> Bool
 pub fn Directive::text(Self) -> String
 pub fn Directive::to_repr(Self) -> @debug.Repr
 
-type KernelInfo derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type KernelInfo
 pub fn KernelInfo::KernelInfo(KernelName, aliases? : ReadOnlyArray[KernelName], language? : String?) -> Self
 pub fn KernelInfo::aliases(Self) -> ReadOnlyArray[KernelName]
 pub fn KernelInfo::equal(Self, Self) -> Bool
@@ -70,14 +74,16 @@ pub fn KernelInfo::not_equal(Self, Self) -> Bool
 pub fn KernelInfo::to_repr(Self) -> @debug.Repr
 pub impl KernelDescriptor for KernelInfo
 
-type KernelName derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type KernelName
 pub fn KernelName::KernelName(String) -> Self raise FormatError
 pub fn KernelName::equal(Self, Self) -> Bool
 pub fn KernelName::not_equal(Self, Self) -> Bool
 pub fn KernelName::to_repr(Self) -> @debug.Repr
 pub fn KernelName::to_string(Self) -> String
 
-type KernelRegistry derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type KernelRegistry
 pub fn KernelRegistry::KernelRegistry(ReadOnlyArray[KernelInfo], default_kernel~ : KernelName) -> Self raise FormatError
 pub fn KernelRegistry::default_kernel(Self) -> KernelName
 pub fn KernelRegistry::equal(Self, Self) -> Bool
@@ -87,20 +93,22 @@ pub fn KernelRegistry::resolve(Self, String) -> KernelName?
 pub fn KernelRegistry::standard() -> Self
 pub fn KernelRegistry::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum MetadataOutput {
   Auto
   Json
   Ion
-} derive(Eq, @debug.Debug)
+}
 pub fn MetadataOutput::equal(Self, Self) -> Bool
 pub fn MetadataOutput::not_equal(Self, Self) -> Bool
 pub fn MetadataOutput::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Node {
   Notebook(Notebook)
   Cell(Cell)
   Directive(Directive)
-} derive(Eq, @debug.Debug)
+}
 pub fn Node::at(Self, @notebooks.NodePath) -> Self?
 pub fn Node::children(Self) -> ReadOnlyArray[Self]
 pub fn Node::cursor(Self) -> @notebooks.Cursor[Self]
@@ -112,7 +120,8 @@ pub fn Node::source(Self) -> String?
 pub fn Node::to_repr(Self) -> @debug.Repr
 pub impl @notebooks.Node for Node
 
-type Notebook derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Notebook
 pub fn Notebook::Notebook(ReadOnlyArray[Cell], metadata? : @notebooks.Metadata, registry? : KernelRegistry) -> Self raise FormatError
 pub fn Notebook::cell(Self, Int32) -> Cell?
 pub fn Notebook::cells(Self) -> ReadOnlyArray[Cell]
@@ -127,10 +136,11 @@ pub fn Notebook::root(Self) -> Node
 pub fn Notebook::to_repr(Self) -> @debug.Repr
 pub fn Notebook::to_string(Self, metadata_output? : MetadataOutput, source_mode? : SourceMode) -> String raise FormatError
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SourceMode {
   Normalized
   Lossless
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceMode::equal(Self, Self) -> Bool
 pub fn SourceMode::not_equal(Self, Self) -> Bool
 pub fn SourceMode::to_repr(Self) -> @debug.Repr

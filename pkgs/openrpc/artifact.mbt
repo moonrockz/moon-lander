@@ -52,7 +52,7 @@ fn type_matches(name : String, value : @exact.Value) -> Bool {
 }
 
 ///|
-fn code_points(text : String) -> Int {
+fn code_points(text : String) -> Int32 {
   let mut count = 0
   for _ in text {
     count += 1
@@ -74,7 +74,7 @@ fn evaluate(
   let stack = [(schema, value, path)]
   while stack.pop() is Some((schema, value, path)) {
     let fail = (code, message, expected) => {
-      out.push({ code, message, path, expected })
+      out.push({ code, message, path, expected, })
     }
     match schema.kind() {
       @exact.Boolean(true) => continue
@@ -111,10 +111,15 @@ fn evaluate(
         continue
       }
     }
-    if schema.get("enum") is Some(allowed) && allowed.kind() is @exact.Array(items) {
+    if schema.get("enum") is Some(allowed) &&
+      allowed.kind() is @exact.Array(items) {
       let limits = @exact.Limits::unlimited()
       if !items.iter().any(item => item.equals(value, limits~) is Ok(true)) {
-        fail(@exact.InvalidValue, "Value is not one of the allowed values", None)
+        fail(
+          @exact.InvalidValue,
+          "Value is not one of the allowed values",
+          None,
+        )
       }
     }
     if value.text() is Some(text) {
@@ -124,9 +129,15 @@ fn evaluate(
       }
       if schema.get("minLength") is Some(minimum) &&
         minimum.kind() is @exact.Numeric(n) &&
-        n.numeric_compare(@exact.Number::parse(code_points(text).to_string()).unwrap()) >
+        n.numeric_compare(
+          @exact.Number::parse(code_points(text).to_string()).unwrap(),
+        ) >
         0 {
-        fail(@exact.InvalidValue, "Value is shorter than the minimum length", None)
+        fail(
+          @exact.InvalidValue,
+          "Value is shorter than the minimum length",
+          None,
+        )
       }
     }
     if schema.get("oneOf") is Some(branches) &&
@@ -134,7 +145,11 @@ fn evaluate(
       let results = branches.map(branch => evaluate(root, branch, value, path))
       let passed = results.filter(r => r.is_empty()).length()
       if passed > 1 {
-        fail(@exact.InvalidValue, "Value matches more than one alternative", None)
+        fail(
+          @exact.InvalidValue,
+          "Value matches more than one alternative",
+          None,
+        )
       } else if passed == 0 {
         // Report the alternative the value was written as: a reference when
         // it has `$ref`, otherwise the object alternative.
@@ -156,12 +171,17 @@ fn evaluate(
           required.kind() is @exact.Array(names) {
           for name in names {
             if name.text() is Some(name) && value.get(name) is None {
-              fail(@exact.MissingField, "Missing required field " + name, Some(name))
+              fail(
+                @exact.MissingField,
+                "Missing required field " + name,
+                Some(name),
+              )
             }
           }
         }
         let properties = schema.get("properties")
-        let patterns = match schema.get("patternProperties").map(p => p.kind()) {
+        let patterns = match
+          schema.get("patternProperties").map(p => p.kind()) {
           Some(@exact.Object(entries)) => entries
           _ => []
         }

@@ -1,6 +1,6 @@
 import {
   "moonrockz/moon-lander-config" @config,
-  "moonrockz/moon-lander-config/profiles" @profiles,
+  "moonrockz/moon-lander-config/profiles",
   "moonbitlang/core/debug",
   "moonbitlang/core/hashset",
 }

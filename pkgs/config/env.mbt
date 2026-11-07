@@ -13,10 +13,10 @@
 /// string. The origin of each value names its variable.
 pub fn ConfigSource::env(
   prefix~ : String,
-  reserved? : Array[String] = [],
-  selection? : SourceSelection[Map[String, String]] = Discover,
-  name? : String = "environment",
-  priority? : Int,
+  reserved~ : Array[String] = [],
+  selection~ : SourceSelection[Map[String, String]] = Discover,
+  name~ : String = "environment",
+  priority? : Int32,
 ) -> ConfigSource {
   let selection = match selection {
     Explicit(vars) => SourceSelection::Explicit(vars.copy())
@@ -38,8 +38,8 @@ pub fn ConfigSource::env(
 pub fn env(
   builder : ConfigBuilder,
   prefix~ : String,
-  reserved? : Array[String] = [],
-  selection? : SourceSelection[Map[String, String]] = Discover,
+  reserved~ : Array[String] = [],
+  selection~ : SourceSelection[Map[String, String]] = Discover,
 ) -> ConfigBuilder {
   add(builder, ConfigSource::env(prefix~, reserved~, selection~))
 }
@@ -49,20 +49,20 @@ pub fn env(
 /// It has the kind `Overrides` and the default priority 700.
 pub fn ConfigSource::overrides(
   pairs : Array[(String, ConfigValue)],
-  name? : String = "overrides",
-  priority? : Int,
+  name~ : String = "overrides",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
-  { ..in_memory_pairs(pairs, name~, priority?), kind: Overrides }
+  { ..in_memory_pairs(pairs, name~, priority?), kind: Overrides, }
 }
 
 ///|
 /// An overrides source from a value tree. The root must be a struct.
 pub fn ConfigSource::overrides_value(
   value : ConfigValue,
-  name? : String = "overrides",
-  priority? : Int,
+  name~ : String = "overrides",
+  priority? : Int32,
 ) -> ConfigSource raise ConfigError {
-  { ..in_memory(value, name~, priority?), kind: Overrides }
+  { ..in_memory(value, name~, priority?), kind: Overrides, }
 }
 
 ///|
@@ -93,7 +93,10 @@ fn env_pieces(
     while rest.has_prefix("_") {
       rest = rest[1:].to_owned()
     }
-    let names = rest.split("__").map(name => name.to_owned().to_lower()).collect()
+    let names = rest
+      .split("__")
+      .map(name => name.to_owned().to_lower())
+      .collect()
     if names.iter().any(name => name.is_empty()) {
       raise InvalidEnvKey(variable~)
     }
@@ -110,7 +113,7 @@ fn env_pieces(
     }
     a.1.compare(b.1)
   })
-  keys.map(key => (nest({ names: key.0 }, env_value(key.2)), Some(key.1)))
+  keys.map(key => (nest({ names: key.0, }, env_value(key.2)), Some(key.1)))
 }
 
 ///|
@@ -127,7 +130,7 @@ fn env_value(text : String) -> ConfigValue {
   if text.has_prefix("[") || text.has_prefix("{") {
     let json = @json.parse(text) catch { _ => return string(text) }
     if json is (Array(_) | Object(_)) {
-      return { ion: @ion.Ion::Ion(json) }
+      return { ion: @ion.Ion::Ion(json), }
     }
   }
   string(text)

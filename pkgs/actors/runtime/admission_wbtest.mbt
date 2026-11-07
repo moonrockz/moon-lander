@@ -6,7 +6,7 @@ async test "ADM-1: a producer cancelled while it waits for space leaves no waite
   let log = []
   scope(scope => {
     let one = @policy.MailboxCapacity::from_int(1)
-    let worker = scope.start((), mailbox=Bounded(one), (_, value : Int) => {
+    let worker = scope.start((), mailbox=Bounded(one), (_, value : Int32) => {
       if value == 0 {
         started.put(())
         gate.get()
@@ -52,7 +52,7 @@ async test "ADM-1: blocked producers wake on close and leave no waiter" {
   let outcomes = []
   scope(scope => {
     let one = @policy.MailboxCapacity::from_int(1)
-    let worker = scope.start((), mailbox=Bounded(one), (_, value : Int) => {
+    let worker = scope.start((), mailbox=Bounded(one), (_, value : Int32) => {
       if value == 0 {
         started.put(())
         gate.get()

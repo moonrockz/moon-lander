@@ -5,7 +5,7 @@ suberror ChangingError {
 }
 
 ///|
-impl Show for ChangingError with output(self, logger) {
+impl Show for ChangingError with fn output(self, logger) {
   let ChangingError(text) = self
   logger.write_string(text.val)
 }
@@ -62,11 +62,17 @@ test "a change to read segments or properties does not change the record" {
   again.clear()
   record.segments().clear()
   assert_eq(record.properties(), [("Order", { "items": [1, 2] })])
-  assert_eq(record.segments()[1], Value(name="Order", value={ "items": [1, 2] }))
-  inspect(@formatting.format_json_line(record), content=(
-    #|{"schemaVersion":1,"timestamp":"1970-01-01T00:00:00.000Z","level":"Information","category":null,"messageTemplate":"Saved {Order}","message":"Saved {\"items\":[1,2]}","properties":[{"name":"Order","value":{"items":[1,2]}}],"error":null}
-    #|
-  ))
+  assert_eq(
+    record.segments()[1],
+    Value(name="Order", value={ "items": [1, 2] }),
+  )
+  inspect(
+    @formatting.format_json_line(record),
+    content=(
+      #|{"schemaVersion":1,"timestamp":"1970-01-01T00:00:00.000Z","level":"Information","category":null,"messageTemplate":"Saved {Order}","message":"Saved {\"items\":[1,2]}","properties":[{"name":"Order","value":{"items":[1,2]}}],"error":null}
+      #|
+    ),
+  )
 }
 
 ///|

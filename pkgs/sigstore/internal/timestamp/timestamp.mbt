@@ -1,12 +1,13 @@
 ///|
 /// An RFC 3161 timestamp that cannot be used.
+#derive(Debug)
 pub(all) suberror TimestampError {
   /// The token breaks the rule that the text names.
   BadTimestamp(String)
   /// The token is valid but uses an algorithm that the verifier does not
   /// support; the text names it.
   UnsupportedTimestamp(String)
-} derive(Debug)
+}
 
 ///|
 pub extend TimestampError with @debug.Debug::{to_repr}
@@ -32,7 +33,7 @@ pub struct SigningCertificate {
 pub struct Timestamp {
   /// The time of the timestamp: seconds since 1970 and nanoseconds.
   seconds : Int64
-  nanos : Int
+  nanos : Int32
   imprint_hash : @signature.HashAlgorithm
   imprint : Bytes
   /// The DER bytes of the TSTInfo, which the message digest covers.
@@ -84,7 +85,9 @@ fn digest_algorithm(element : @der.Element) -> @signature.HashAlgorithm raise {
 ///|
 /// The hash that a signature AlgorithmIdentifier names: `Some` for
 /// ecdsa-with-SHA*, `None` for id-ecPublicKey (the digest algorithm applies).
-fn signature_algorithm(element : @der.Element) -> @signature.HashAlgorithm? raise {
+fn signature_algorithm(
+  element : @der.Element,
+) -> @signature.HashAlgorithm? raise {
   let reader = element.children()
   let oid = reader.expect(@der.OID).oid()
   if reader.optional(@der.NULL) is Some(_) && oid.has_prefix("1.2.840.10045.") {
@@ -96,8 +99,10 @@ fn signature_algorithm(element : @der.Element) -> @signature.HashAlgorithm? rais
     "1.2.840.10045.4.3.3" => Some(Sha384)
     "1.2.840.10045.4.3.4" => Some(Sha512)
     "1.2.840.10045.2.1" => None
-    "1.2.840.113549.1.1.1" | "1.2.840.113549.1.1.11" | "1.2.840.113549.1.1.12" | "1.2.840.113549.1.1.13" =>
-      raise UnsupportedTimestamp("RSA signature")
+    "1.2.840.113549.1.1.1"
+    | "1.2.840.113549.1.1.11"
+    | "1.2.840.113549.1.1.12"
+    | "1.2.840.113549.1.1.13" => raise UnsupportedTimestamp("RSA signature")
     other => raise UnsupportedTimestamp("signature algorithm \{other}")
   }
 }
@@ -119,7 +124,9 @@ fn parse_response(bytes : BytesView) -> Timestamp raise {
   let status = response.expect(@der.SEQUENCE).children()
   let code = status.expect(@der.INTEGER).small_int()
   guard code == 0 else { raise bad("the status is \{code}, not granted") }
-  guard response.peek_tag() is Some(_) else { raise bad("the response has no token") }
+  guard response.peek_tag() is Some(_) else {
+    raise bad("the response has no token")
+  }
   let content_info = response.expect(@der.SEQUENCE).children()
   response.finish()
   guard content_info.expect(@der.OID).oid() == SIGNED_DATA else {
@@ -150,7 +157,9 @@ fn parse_response(bytes : BytesView) -> Timestamp raise {
   let signer_infos = signed_data.expect(@der.SET).children()
   signed_data.finish()
   let signer = signer_infos.expect(@der.SEQUENCE).children()
-  guard signer_infos.is_empty() else { raise bad("the token has more than one signer") }
+  guard signer_infos.is_empty() else {
+    raise bad("the token has more than one signer")
+  }
   guard signer.expect(@der.INTEGER).small_int() == 1 else {
     raise bad("the signer is not named by issuer and serial number")
   }
@@ -178,20 +187,27 @@ fn parse_response(bytes : BytesView) -> Timestamp raise {
   while !list.is_empty() {
     let attribute = list.expect(@der.SEQUENCE).children()
     let oid = attribute.expect(@der.OID).oid()
-    guard !seen.contains(oid) else { raise bad("the attribute \{oid} is repeated") }
+    guard !seen.contains(oid) else {
+      raise bad("the attribute \{oid} is repeated")
+    }
     seen.push(oid)
     let values = attribute.expect(@der.SET).children()
     attribute.finish()
     let value = values.next()
-    guard values.is_empty() else { raise bad("the attribute \{oid} has more than one value") }
+    guard values.is_empty() else {
+      raise bad("the attribute \{oid} has more than one value")
+    }
     match oid {
       "1.2.840.113549.1.9.3" => content_type = value.oid()
       "1.2.840.113549.1.9.4" => {
-        guard value.tag == @der.OCTET_STRING else { raise bad("bad message digest") }
+        guard value.tag == @der.OCTET_STRING else {
+          raise bad("bad message digest")
+        }
         message_digest = Some(value.content.to_owned())
       }
       "1.2.840.113549.1.9.5" => signing_time = Some(value.time())
-      "1.2.840.113549.1.9.16.2.47" => signing_certificate = Some(read_signing_certificate(value))
+      "1.2.840.113549.1.9.16.2.47" =>
+        signing_certificate = Some(read_signing_certificate(value))
       _ => ()
     }
   }
@@ -231,13 +247,17 @@ fn read_signing_certificate(value : @der.Element) -> SigningCertificate raise {
     _ => Sha256
   }
   let cert_hash = first.expect(@der.OCTET_STRING).content.to_owned()
-  { hash, cert_hash }
+  { hash, cert_hash, }
 }
 
 ///|
-fn read_tst_info(bytes : BytesView) -> (Int64, Int, @signature.HashAlgorithm, Bytes) raise {
+fn read_tst_info(
+  bytes : BytesView,
+) -> (Int64, Int32, @signature.HashAlgorithm, Bytes) raise {
   let info = @der.parse_tag(bytes, @der.SEQUENCE).children()
-  guard info.expect(@der.INTEGER).small_int() == 1 else { raise bad("the TSTInfo version is not 1") }
+  guard info.expect(@der.INTEGER).small_int() == 1 else {
+    raise bad("the TSTInfo version is not 1")
+  }
   ignore(info.expect(@der.OID))
   let imprint_reader = info.expect(@der.SEQUENCE).children()
   let imprint_hash = digest_algorithm(imprint_reader.expect(@der.SEQUENCE))
@@ -264,7 +284,8 @@ pub fn Timestamp::verify_signature(
   self : Timestamp,
   key : @signature.PublicKey,
 ) -> Bool {
-  guard @signature.digest(self.digest_hash, self.tst_info) == self.message_digest else {
+  guard @signature.digest(self.digest_hash, self.tst_info) ==
+    self.message_digest else {
     return false
   }
   let hash = self.signature_hash.unwrap_or(self.digest_hash)

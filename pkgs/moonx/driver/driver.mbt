@@ -34,22 +34,31 @@ pub fn run(
         owned.cleanup() catch {
           error => {
             failures.push(PayloadCleanup(error))
-            if status.val.is_success() { status.val = @moonx.ProcessStatus::failure() }
+            if status.val.is_success() {
+              status.val = @moonx.ProcessStatus::failure()
+            }
           }
         }
       }
       finalize() catch {
         error => {
           failures.push(Finalizer(error))
-          if status.val.is_success() { status.val = @moonx.ProcessStatus::failure() }
+          if status.val.is_success() {
+            status.val = @moonx.ProcessStatus::failure()
+          }
         }
       }
       status.val = selected_status(status.val)
-      let outcome = @moonx.LaunchOutcome::new(result.val.unwrap(), status.val, failures)
+      let outcome = @moonx.LaunchOutcome::new(
+        result.val.unwrap(),
+        status.val,
+        failures,
+      )
       completed(outcome) catch {
-        _ => {
-          if status.val.is_success() { status.val = @moonx.ProcessStatus::failure() }
-        }
+        _ =>
+          if status.val.is_success() {
+            status.val = @moonx.ProcessStatus::failure()
+          }
       }
       status.val = selected_status(status.val)
     })
@@ -57,13 +66,17 @@ pub fn run(
       match plan {
         Process(command) => launch(command, Direct, grace, result, status)
         Node(node) => {
-          let command = materialize(node, payload) catch {
+          let command = try materialize(node, payload) catch {
             error => {
               result.val = Some(NotStarted(Failed(Materialization(error))))
               None
             }
-          } noraise { command => Some(command) }
-          if command is Some(command) { launch(command, Node, grace, result, status) }
+          } noraise {
+            command => Some(command)
+          }
+          if command is Some(command) {
+            launch(command, Node, grace, result, status)
+          }
         }
       }
     })
@@ -72,8 +85,12 @@ pub fn run(
 }
 
 ///|
-fn process_status(raw : Int) -> @moonx.ProcessStatus {
-  let normalized = if @runtime.platform is Windows || raw >= 0 { raw } else { 128 - raw }
+fn process_status(raw : Int32) -> @moonx.ProcessStatus {
+  let normalized = if @runtime.platform is Windows || raw >= 0 {
+    raw
+  } else {
+    128 - raw
+  }
   @moonx.ProcessStatus::from_bits(normalized.reinterpret_as_uint())
 }
 
@@ -99,15 +116,16 @@ fn cancellation_cause() -> @moonx.CancellationCause {
 fn selected_status(finite : @moonx.ProcessStatus) -> @moonx.ProcessStatus {
   match @signal.exit_cancellation_signal() {
     None => finite
-    Some(signal) => {
+    Some(signal) =>
       // Stock native async and Moonrun both select STATUS_CONTROL_C_EXIT for
       // Windows console cancellation. Do not treat this as a POSIX signal code.
       if @runtime.platform is Windows {
         @moonx.ProcessStatus::from_bits(0xc000013aU)
       } else {
-        @moonx.ProcessStatus::from_bits((128 + signal.to_int()).reinterpret_as_uint())
+        @moonx.ProcessStatus::from_bits(
+          (128 + signal.to_int()).reinterpret_as_uint(),
+        )
       }
-    }
   }
 }
 
@@ -122,20 +140,26 @@ async fn launch(
   let started = Ref(false)
   let stopped = Ref(false)
   let forced = Ref(false)
-  let raw_status : Ref[Int?] = Ref(None)
+  let raw_status : Ref[Int32?] = Ref(None)
   @runtime.with_task_group(group => {
     let child = @process.spawn(
-      group, command.executable().to_string(), command.arguments().to_array(),
-      stdin=@stdio.stdin, stdout=@stdio.stdout, stderr=@stdio.stderr,
+      group,
+      command.executable().to_string(),
+      command.arguments().to_array(),
+      stdin=@stdio.stdin,
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
       cancel_handler=@process.CancellationHandler(pid => {
         stopped.val = true
         let handler = match @signal.received_cancellation_signal() {
-          Some(signal) => @process.graceful_cancel(
-            timeout=grace.milliseconds(), signal~, on_force=() => forced.val = true,
-          )
-          None => @process.graceful_cancel(
-            timeout=grace.milliseconds(), on_force=() => forced.val = true,
-          )
+          Some(signal) =>
+            @process.graceful_cancel(timeout=grace.milliseconds(), signal~, on_force=() => {
+              forced.val = true
+            })
+          None =>
+            @process.graceful_cancel(timeout=grace.milliseconds(), on_force=() => {
+              forced.val = true
+            })
         }
         let @process.CancellationHandler(cancel) = handler
         cancel(pid)
@@ -150,17 +174,31 @@ async fn launch(
       if raw_status.val is Some(raw) {
         let child_status = process_status(raw)
         status.val = child_status
-        result.val = Some(Started(if stopped.val {
-          Stopped(cause=cancellation_cause(), status=child_status, force_requested=forced.val)
-        } else { Exited(child_status) }))
+        result.val = Some(
+          Started(
+            if stopped.val {
+              Stopped(
+                cause=cancellation_cause(),
+                status=child_status,
+                force_requested=forced.val,
+              )
+            } else {
+              Exited(child_status)
+            },
+          ),
+        )
       }
     })
     let _ = child.wait()
   }) catch {
     error => {
-      result.val = Some(if started.val {
-        Started(Failed(error))
-      } else { NotStarted(Failed(startup_failure(command, kind, error))) })
+      result.val = Some(
+        if started.val {
+          Started(Failed(error))
+        } else {
+          NotStarted(Failed(startup_failure(command, kind, error)))
+        },
+      )
       status.val = @moonx.ProcessStatus::failure()
     }
   }

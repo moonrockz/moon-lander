@@ -19,8 +19,8 @@ priv struct FakeFs {
   fail_open : Map[String, String]
   fail_remove : Map[String, String]
   /// The bytes that writes can still add before the disk is full.
-  mut write_budget : Int?
-  mut write_calls : Int
+  mut write_budget : Int32?
+  mut write_calls : Int32
 }
 
 ///|
@@ -36,10 +36,15 @@ fn FakeFs::new() -> FakeFs {
 }
 
 ///|
-fn FakeFs::add(self : FakeFs, path : String, kind : FakeKind, text? : String = "") -> Unit {
+fn FakeFs::add(
+  self : FakeFs,
+  path : String,
+  kind : FakeKind,
+  text~ : String = "",
+) -> Unit {
   let content = StringBuilder()
   content.write_string(text)
-  self.entries[path] = { kind, content }
+  self.entries[path] = { kind, content, }
 }
 
 ///|
@@ -61,7 +66,7 @@ fn FakeFs::names(self : FakeFs, dir : String) -> Array[String] {
 }
 
 ///|
-fn lexical(a : String, b : String) -> Int {
+fn lexical(a : String, b : String) -> Int32 {
   let left = a.to_array()
   let right = b.to_array()
   for i in 0..<@cmp.minimum(left.length(), right.length()) {
@@ -122,7 +127,7 @@ fn FakeFs::io(self : FakeFs) -> FileIo {
           self.write_calls += 1
           match self.write_budget {
             Some(budget) if budget < text.length() => {
-              entry.content.write_string(text.view(end_offset=budget).to_owned())
+              entry.content.write_string(text.exact_view(end=budget).to_owned())
               self.write_budget = Some(0)
               Some("ENOSPC: no space left on device (after \{budget} bytes)")
             }
@@ -181,19 +186,23 @@ async fn[X] with_files(
   fs : FakeFs,
   files : Array[@sinks.FileSink],
   body : async (Session) -> X,
-  clock? : () -> @formatting.LogTimestamp = sample_time,
+  clock~ : () -> @formatting.LogTimestamp = sample_time,
 ) -> X {
   let settings = @sinks.SessionSettings::new(files~)
   run_session(
     settings,
-    (settings, clock, warn) => settings
+    (settings, clock, warn) => {
+      settings
       .files()
-      .mapi((index, file) => file_destination(
-        file,
-        clock,
-        failure => warn(index, failure),
-        io=fs.io(),
-      )),
+      .mapi((index, file) => {
+        file_destination(
+          file,
+          clock,
+          failure => warn(index, failure),
+          io=fs.io(),
+        )
+      })
+    },
     clock,
     None,
     body,
@@ -264,7 +273,10 @@ async test "a restart appends to the newest file of the period and keeps its byt
       session.close()
     }),
   )
-  assert_eq(fs.text("/logs/acme-20261027.log"), Some("old line\n" + line("new")))
+  assert_eq(
+    fs.text("/logs/acme-20261027.log"),
+    Some("old line\n" + line("new")),
+  )
 }
 
 ///|
@@ -275,7 +287,7 @@ fn limit(bytes : Int64) -> @rolling.FileByteLimit {
 }
 
 ///|
-fn keep(count : Int) -> @rolling.Retention {
+fn keep(count : Int32) -> @rolling.Retention {
   KeepNewest(
     @rolling.RetainedFileCount::count(count) catch {
       _ => abort("a valid count")
@@ -287,7 +299,11 @@ fn keep(count : Int) -> @rolling.Retention {
 async test "a size roll writes whole records, exact fits stay, and one byte more rolls" {
   let fs = FakeFs::new()
   // line("aa") is 34 bytes, so two records fit 68 bytes exactly.
-  let sink = @sinks.FileSink::new(logs(), acme(), policy=DailyAndSize(limit(68L)))
+  let sink = @sinks.FileSink::new(
+    logs(),
+    acme(),
+    policy=DailyAndSize(limit(68L)),
+  )
   ignore(
     with_files(fs, [sink], session => {
       let logger : &@logging.Logger = session.logger()
@@ -423,10 +439,11 @@ async test "retention leaves links, directories, unrelated files and other sets"
   fs.add("/logs", Folder)
   fs.add("/logs/acme-20261001.log", Link)
   fs.add("/logs/acme-20261002.log", Folder)
-  for name in [
-    "acme-old.log", "acmex-20261003.log", "acme-20261004.jsonl", "acme-20261005.log.bak",
-    "acme-20261006.log", "acme-20261007.log",
-  ] {
+  for
+    name in [
+      "acme-old.log", "acmex-20261003.log", "acme-20261004.jsonl", "acme-20261005.log.bak",
+      "acme-20261006.log", "acme-20261007.log",
+    ] {
     fs.add("/logs/" + name, Regular, text="old\n")
   }
   ignore(

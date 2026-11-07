@@ -2,7 +2,7 @@
 /// The protocol of the ACT-2 counter. Two cases reply with different types.
 enum CounterMessage {
   Increment
-  Read(@actors.Reply[Int])
+  Read(@actors.Reply[Int32])
   Describe(@actors.Reply[String])
   Halt
 }
@@ -13,9 +13,9 @@ enum CounterMessage {
 /// `unused_async` warning off.
 #warnings("-unused_async")
 async fn handle_counter(
-  state : Int,
+  state : Int32,
   message : CounterMessage,
-) -> @actors.Next[Int] {
+) -> @actors.Next[Int32] {
   match message {
     Increment => @actors.Continue(state + 1)
     Read(reply) => {
@@ -32,9 +32,9 @@ async fn handle_counter(
 
 ///|
 /// The ACT-2 counter example in the pipeline form.
-async fn counter_example() -> Int {
+async fn counter_example() -> Int32 {
   @actors.scope <| scope => {
-    let counter = scope.start(0) <| (state, message) => {
+    let counter = scope.start(0) <| ((state, message) => {
       match message {
         Increment => @actors.Continue(state + 1)
         Read(reply) => {
@@ -43,7 +43,7 @@ async fn counter_example() -> Int {
         }
         Describe(_) | Halt => @actors.Continue(state)
       }
-    }
+    })
     counter.send(Increment)
     counter.ask(reply => Read(reply))
   }
@@ -60,7 +60,7 @@ async test "ACT-2: one protocol replies with an Int and a String" {
     let counter = scope.start(0, handle_counter)
     counter.send(Increment)
     counter.send(Increment)
-    let count : Int = counter.ask(reply => Read(reply))
+    let count : Int32 = counter.ask(reply => Read(reply))
     let text : String = counter.ask(reply => Describe(reply))
     assert_eq(count, 2)
     assert_eq(text, "count 2")
@@ -106,7 +106,7 @@ async test "ACT-1: with concurrent producers, a handler ends before the next one
 async test "ACT-1: a second actor makes progress while the first one waits" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(scope => {
-    let waiting = scope.start((), (_, _ : Int) => {
+    let waiting = scope.start((), (_, _ : Int32) => {
       gate.get()
       Continue(())
     })
@@ -134,7 +134,7 @@ async test "RECV-1: a finite actor gives its total and admits no more messages" 
     let three = @actors.MessageCount::from_int(3)
     let summing = scope.spawn(_ => {
       let total = Ref(0)
-      @actors.receive_n(three, (value : Int) => total.val += value).map(_ => {
+      @actors.receive_n(three, (value : Int32) => total.val += value).map(_ => {
         total.val
       })
     })
@@ -210,9 +210,7 @@ async test "ADM-1: reenqueue to a full own mailbox gives Full without waiting" {
         gate.get()
         let admission = context.reenqueue("again")
         let queued = context.queued_count()
-        @actors.receive().map(second => {
-          (first, second, admission, queued)
-        })
+        @actors.receive().map(second => (first, second, admission, queued))
       })
     })
     actor.send("A")

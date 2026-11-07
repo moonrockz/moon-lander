@@ -81,9 +81,12 @@ test "a merged struct keeps the overlay annotations when it has some" {
     ]),
   )
   @expect.expect(annotation_texts(leaf(@config.merge(base, overlay)))).to_equal([
-    Some("overlay"),
-  ])
+      Some("overlay"),
+    ],
+  )
   @expect.expect(
-    annotation_texts(leaf(@config.merge(base, @config.fields([("t", @config.fields([]))])))),
+    annotation_texts(
+      leaf(@config.merge(base, @config.fields([("t", @config.fields([]))]))),
+    ),
   ).to_equal([Some("base")])
 }

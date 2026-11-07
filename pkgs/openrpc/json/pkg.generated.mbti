@@ -6,17 +6,18 @@ import {
 }
 
 // Values
-pub fn from_core_json(Json, limits? : Limits) -> Result[Value, Diagnostic]
+pub fn from_core_json(@moonbitlang/core/json.Json, limits? : Limits) -> Result[Value, Diagnostic]
 
 pub fn parse(String, source_id? : String?, limits? : Limits) -> Result[CstDocument, Diagnostic]
 
-pub fn to_core_json(Value, limits? : Limits) -> Result[Json, Diagnostic]
+pub fn to_core_json(Value, limits? : Limits) -> Result[@moonbitlang/core/json.Json, Diagnostic]
 
 pub fn write(Value, format? : Format, limits? : Limits) -> Result[String, Diagnostic]
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum Code {
   Syntax
   DuplicateKey
@@ -41,17 +42,18 @@ pub(all) enum Code {
   UnknownField
   InvalidValue
   StaleNode
-} derive(Eq, @debug.Debug)
+}
 pub fn Code::equal(Self, Self) -> Bool
 pub fn Code::not_equal(Self, Self) -> Bool
 pub fn Code::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct CstDocument {
   source : String
   source_id : String?
   nodes : Array[Node]
   limits : Limits
-} derive(@debug.Debug)
+}
 pub fn CstDocument::limits(Self) -> Limits
 pub fn CstDocument::lower(Self) -> Result[Value, Array[Diagnostic]]
 pub fn CstDocument::node_at(Self, Array[String]) -> NodeId?
@@ -67,13 +69,14 @@ pub fn CstDocument::span_at(Self, Array[String]) -> Span?
 pub fn CstDocument::to_repr(Self) -> @debug.Repr
 pub fn CstDocument::tokens(Self) -> Array[Token]
 
+#derive(@debug.Debug)
 pub struct Diagnostic {
   code : Code
   message : String
   path : Array[String]
   span : Span?
   related : Array[Span]
-} derive(@debug.Debug)
+}
 pub fn Diagnostic::code(Self) -> Code
 pub fn Diagnostic::message(Self) -> String
 pub fn Diagnostic::new(Code, String, path? : Array[String], span? : Span?, related? : Array[Span]) -> Self
@@ -82,14 +85,16 @@ pub fn Diagnostic::related(Self) -> Array[Span]
 pub fn Diagnostic::span(Self) -> Span?
 pub fn Diagnostic::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Format {
   Compact
   Pretty
-} derive(Eq, @debug.Debug)
+}
 pub fn Format::equal(Self, Self) -> Bool
 pub fn Format::not_equal(Self, Self) -> Bool
 pub fn Format::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub(all) enum Kind {
   Null
   Boolean(Bool)
@@ -97,16 +102,17 @@ pub(all) enum Kind {
   Numeric(Number)
   Array(Array[Value])
   Object(Array[(String, Value)])
-} derive(@debug.Debug)
+}
 pub fn Kind::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Limits {
   max_depth : Int32
   max_nodes : Int32
   max_source : Int32
   max_number : Int32
   max_findings : Int32
-} derive(@debug.Debug)
+}
 pub fn Limits::max_depth(Self) -> Int32
 pub fn Limits::max_findings(Self) -> Int32
 pub fn Limits::max_nodes(Self) -> Int32
@@ -116,13 +122,14 @@ pub fn Limits::new(max_depth? : Int32, max_nodes? : Int32, max_source? : Int32, 
 pub fn Limits::to_repr(Self) -> @debug.Repr
 pub fn Limits::unlimited() -> Self
 
+#derive(@debug.Debug)
 pub struct Location {
   source_id : String?
   node_index : Int32
   value_span : Span
   key_span : Span?
   // private fields
-} derive(@debug.Debug)
+}
 pub fn Location::key_span(Self) -> Span?
 pub fn Location::node(Self) -> NodeId
 pub fn Location::node_index(Self) -> Int32
@@ -130,6 +137,7 @@ pub fn Location::source_id(Self) -> String?
 pub fn Location::to_repr(Self) -> @debug.Repr
 pub fn Location::value_span(Self) -> Span
 
+#derive(@debug.Debug)
 pub struct Node {
   kind : NodeKind
   span : Span
@@ -139,7 +147,7 @@ pub struct Node {
   scalar : Value?
   parent : Int32?
   ordinal : Int32
-} derive(@debug.Debug)
+}
 pub fn Node::children(Self) -> Array[Int32]
 pub fn Node::key(Self) -> String?
 pub fn Node::key_span(Self) -> Span?
@@ -154,18 +162,20 @@ pub fn NodeId::index(Self) -> Int32
 pub fn NodeId::to_repr(Self) -> @debug.Repr
 pub impl @debug.Debug for NodeId
 
+#derive(Eq, @debug.Debug)
 pub(all) enum NodeKind {
   Scalar
   ArrayNode
   ObjectNode
-} derive(Eq, @debug.Debug)
+}
 pub fn NodeKind::equal(Self, Self) -> Bool
 pub fn NodeKind::not_equal(Self, Self) -> Bool
 pub fn NodeKind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct Number {
   token : String
-} derive(Eq, @debug.Debug)
+}
 pub fn Number::equal(Self, Self) -> Bool
 pub fn Number::is_integer(Self) -> Bool
 pub fn Number::not_equal(Self, Self) -> Bool
@@ -176,28 +186,31 @@ pub fn Number::parse(String) -> Result[Self, Diagnostic]
 pub fn Number::to_repr(Self) -> @debug.Repr
 pub fn Number::token(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub struct Position {
   line : Int32
   column : Int32
-} derive(Eq, @debug.Debug)
+}
 pub fn Position::column(Self) -> Int32
 pub fn Position::equal(Self, Self) -> Bool
 pub fn Position::line(Self) -> Int32
 pub fn Position::not_equal(Self, Self) -> Bool
 pub fn Position::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct SourceMap {
   cst : CstDocument
   line_starts : Array[Int32]
-} derive(@debug.Debug)
+}
 pub fn SourceMap::locations(Self, Array[String]) -> Array[Location]
 pub fn SourceMap::position(Self, Int32) -> Position?
 pub fn SourceMap::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct Span {
   start : Int32
   end : Int32
-} derive(Eq, @debug.Debug)
+}
 pub fn Span::end(Self) -> Int32
 pub fn Span::equal(Self, Self) -> Bool
 pub fn Span::new(Int32, Int32) -> Self?
@@ -205,16 +218,18 @@ pub fn Span::not_equal(Self, Self) -> Bool
 pub fn Span::start(Self) -> Int32
 pub fn Span::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Token {
   kind : TokenKind
   span : Span
   text : String
-} derive(@debug.Debug)
+}
 pub fn Token::kind(Self) -> TokenKind
 pub fn Token::span(Self) -> Span
 pub fn Token::text(Self) -> String
 pub fn Token::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum TokenKind {
   Whitespace
   OpenObject
@@ -228,14 +243,15 @@ pub(all) enum TokenKind {
   TrueToken
   FalseToken
   NullToken
-} derive(Eq, @debug.Debug)
+}
 pub fn TokenKind::equal(Self, Self) -> Bool
 pub fn TokenKind::not_equal(Self, Self) -> Bool
 pub fn TokenKind::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Value {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn Value::array(Array[Self]) -> Self
 pub fn Value::array_item(Self, Int32) -> Self?
 pub fn Value::array_length(Self) -> Int32?

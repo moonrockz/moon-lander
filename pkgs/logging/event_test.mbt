@@ -23,7 +23,9 @@ test "a change to a nested value does not change the event" {
     fail("no order object")
   }
   order["items"] = Json::null()
-  guard event.properties()[0].1 is Object(again) else { fail("no order object") }
+  guard event.properties()[0].1 is Object(again) else {
+    fail("no order object")
+  }
   again.clear()
   assert_eq(memory.events()[0].property("Order"), Some({ "items": [1, 2] }))
 }

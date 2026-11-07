@@ -14,7 +14,7 @@ pub fn add(ConfigBuilder, ConfigSource) -> ConfigBuilder
 
 pub fn[T : @json.FromJson] bind(Config, String) -> T raise ConfigError
 
-pub fn[T : @json.FromJson + ToJson] bind_or(Config, String, T, unknown? : UnknownKeys) -> T raise ConfigError
+pub fn[T : @json.FromJson + @json.ToJson] bind_or(Config, String, T, unknown? : UnknownKeys) -> T raise ConfigError
 
 pub fn[T : @json.FromJson] bind_root(Config) -> T raise ConfigError
 
@@ -28,7 +28,7 @@ pub fn builder() -> ConfigBuilder
 
 pub fn default_redact_fragments() -> Array[String]
 
-pub fn defaults(ConfigBuilder, Json) -> ConfigBuilder raise ConfigError
+pub fn defaults(ConfigBuilder, @json.Json) -> ConfigBuilder raise ConfigError
 
 pub fn env(ConfigBuilder, prefix~ : String, reserved? : Array[String], selection? : SourceSelection[Map[String, String]]) -> ConfigBuilder
 
@@ -46,7 +46,7 @@ pub fn float(Double) -> ConfigValue
 
 pub fn format(ConfigBuilder, Format) -> ConfigBuilder
 
-pub fn get_json(Config, String) -> Json raise ConfigError
+pub fn get_json(Config, String) -> @json.Json raise ConfigError
 
 pub fn get_text(Config, String) -> String raise ConfigError
 
@@ -72,7 +72,7 @@ pub fn overrides(ConfigBuilder, Array[(String, ConfigValue)]) -> ConfigBuilder r
 
 pub fn parse_file(Array[Format], String, String) -> ConfigValue raise ConfigError
 
-pub fn path_json(Array[SourceReport]) -> Json
+pub fn path_json(Array[SourceReport]) -> @json.Json
 
 pub fn path_text(Array[SourceReport]) -> String
 
@@ -95,6 +95,7 @@ pub fn violation(Array[String], String) -> Violation
 pub fn working_dir(ConfigBuilder, String) -> ConfigBuilder
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror ConfigError {
   Profile(failure~ : ProfileFailure)
   Parse(format~ : String, origin~ : String, message~ : String, line~ : Int32?, column~ : Int32?)
@@ -119,12 +120,13 @@ pub(all) suberror ConfigError {
   AmbiguousProject(selector~ : String, matches~ : Array[String])
   Decode(failure~ : BindFailure)
   Validation(failures~ : Array[BindFailure])
-} derive(Eq, @debug.Debug)
+}
 pub fn ConfigError::equal(Self, Self) -> Bool
 pub fn ConfigError::message(Self) -> String
 pub fn ConfigError::not_equal(Self, Self) -> Bool
 pub fn ConfigError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SecretError {
   MissingConfigKey(key~ : KeyPath)
   EmptyEnvironment(variable~ : String)
@@ -132,27 +134,29 @@ pub(all) suberror SecretError {
   InvalidSecretValue(reason~ : String)
   CommandFailed(reason~ : String)
   KeyringLookupFailed(reason~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SecretError::equal(Self, Self) -> Bool
 pub fn SecretError::message(Self) -> String
 pub fn SecretError::not_equal(Self, Self) -> Bool
 pub fn SecretError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct BindFailure {
   at : Array[Located]
   detail : String
-} derive(Eq, @debug.Debug)
+}
 pub fn BindFailure::equal(Self, Self) -> Bool
 pub fn BindFailure::not_equal(Self, Self) -> Bool
 pub fn BindFailure::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Blame {
   Set(Array[Origin])
   Table(Array[Origin])
   Default
   Unset
-} derive(Eq, @debug.Debug)
+}
 pub fn Blame::equal(Self, Self) -> Bool
 pub fn Blame::not_equal(Self, Self) -> Bool
 pub fn Blame::to_repr(Self) -> @debug.Repr
@@ -161,7 +165,7 @@ pub struct Config {
   // private fields
 }
 pub fn[T : @json.FromJson] Config::bind(Self, String) -> T raise ConfigError
-pub fn[T : @json.FromJson + ToJson] Config::bind_or(Self, String, T, unknown? : UnknownKeys) -> T raise ConfigError
+pub fn[T : @json.FromJson + @json.ToJson] Config::bind_or(Self, String, T, unknown? : UnknownKeys) -> T raise ConfigError
 pub fn Config::get(Self, KeyPath) -> ConfigValue?
 pub fn Config::origins(Self, KeyPath) -> Array[Origin]
 pub fn Config::profiles(Self) -> ProfileState
@@ -197,7 +201,7 @@ pub struct ConfigSource {
   // private fields
 }
 pub fn ConfigSource::candidates(Array[String], display~ : String, role? : FileRole, name? : String, priority? : Int32) -> Self
-pub fn ConfigSource::defaults(Json, name? : String, priority? : Int32) -> Self raise ConfigError
+pub fn ConfigSource::defaults(@json.Json, name? : String, priority? : Int32) -> Self raise ConfigError
 pub fn ConfigSource::defaults_value(ConfigValue, name? : String, priority? : Int32) -> Self raise ConfigError
 pub fn ConfigSource::env(prefix~ : String, reserved? : Array[String], selection? : SourceSelection[Map[String, String]], name? : String, priority? : Int32) -> Self
 pub fn ConfigSource::exclude(Self, Array[KeyPath], warn~ : Bool) -> Self
@@ -211,26 +215,29 @@ pub fn ConfigSource::skipped(SourceKind, name? : String, priority? : Int32) -> S
 pub fn ConfigSource::with_key_policy(Self, KeyPath, MergePolicy) -> Self
 pub fn ConfigSource::with_policy(Self, MergePolicy) -> Self
 
+#derive(@debug.Debug)
 pub struct ConfigValue {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn ConfigValue::equal(Self, Self) -> Bool
 pub fn ConfigValue::from_ion(@ion.Ion, origin? : String) -> Self raise ConfigError
-pub fn ConfigValue::from_json(Json, origin? : String) -> Self raise ConfigError
+pub fn ConfigValue::from_json(@json.Json, origin? : String) -> Self raise ConfigError
 pub fn ConfigValue::not_equal(Self, Self) -> Bool
 pub fn ConfigValue::to_ion(Self) -> @ion.Ion
 pub fn ConfigValue::to_repr(Self) -> @debug.Repr
 pub fn ConfigValue::type_name(Self) -> String
 pub impl Eq for ConfigValue
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ConfigWarning {
   KeyRemoved(KeyPath, Origin)
   Note(source~ : String, message~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ConfigWarning::equal(Self, Self) -> Bool
 pub fn ConfigWarning::not_equal(Self, Self) -> Bool
 pub fn ConfigWarning::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ConventionRule {
   EmptyExtension
   ExtensionCharacters
@@ -242,15 +249,16 @@ pub(all) enum ConventionRule {
   SupplementalExtension
   SupplementalOutsideGroup
   SupplementalPrimaryCollision
-} derive(Eq, @debug.Debug)
+}
 pub fn ConventionRule::equal(Self, Self) -> Bool
 pub fn ConventionRule::not_equal(Self, Self) -> Bool
 pub fn ConventionRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct DecodePath {
   key : KeyPath?
   suffix : Array[DecodeStep]
-} derive(Eq, @debug.Debug)
+}
 pub fn DecodePath::equal(Self, Self) -> Bool
 pub fn DecodePath::not_equal(Self, Self) -> Bool
 pub fn DecodePath::output(Self, &Logger) -> Unit
@@ -258,28 +266,31 @@ pub fn DecodePath::to_repr(Self) -> @debug.Repr
 pub fn DecodePath::to_string(Self) -> String
 pub impl Show for DecodePath
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DecodeStep {
   Field(String)
   Index(Int32)
-} derive(Eq, @debug.Debug)
+}
 pub fn DecodeStep::equal(Self, Self) -> Bool
 pub fn DecodeStep::not_equal(Self, Self) -> Bool
 pub fn DecodeStep::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct DirEntry {
   name : String
   kind : EntryKind
-} derive(Eq, @debug.Debug)
+}
 pub fn DirEntry::equal(Self, Self) -> Bool
 pub fn DirEntry::not_equal(Self, Self) -> Bool
 pub fn DirEntry::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum EntryKind {
   File
   Directory
   Other
   Inaccessible
-} derive(Eq, @debug.Debug)
+}
 pub fn EntryKind::equal(Self, Self) -> Bool
 pub fn EntryKind::not_equal(Self, Self) -> Bool
 pub fn EntryKind::to_repr(Self) -> @debug.Repr
@@ -298,6 +309,7 @@ pub fn Expansion::profiles(Self) -> ProfileResolution?
 pub fn Expansion::sources(Self) -> Array[ConfigSource]
 pub fn Expansion::warnings(Self) -> Array[ConfigWarning]
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FilePathRule {
   Empty
   Nul
@@ -305,22 +317,24 @@ pub(all) enum FilePathRule {
   DriveRelative
   IncompleteUnc
   NotAName
-} derive(Eq, @debug.Debug)
+}
 pub fn FilePathRule::describe(Self) -> String
 pub fn FilePathRule::equal(Self, Self) -> Bool
 pub fn FilePathRule::not_equal(Self, Self) -> Bool
 pub fn FilePathRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, Hash, @debug.Debug)
 pub(all) enum FileRequest {
   ListDir(FileTreePath)
   ReadFile(FileTreePath)
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn FileRequest::equal(Self, Self) -> Bool
 pub fn FileRequest::hash(Self) -> Int32
 pub fn FileRequest::hash_combine(Self, Hasher) -> Unit
 pub fn FileRequest::not_equal(Self, Self) -> Bool
 pub fn FileRequest::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FileRole {
   Explicit
   System
@@ -332,7 +346,7 @@ pub(all) enum FileRole {
   LocalOverride
   UserOverride
   Legacy
-} derive(Eq, @debug.Debug)
+}
 pub fn FileRole::equal(Self, Self) -> Bool
 pub fn FileRole::not_equal(Self, Self) -> Bool
 pub fn FileRole::to_repr(Self) -> @debug.Repr
@@ -350,9 +364,10 @@ pub fn FileTree::with_file(Self, FileTreePath, String) -> Self
 pub fn FileTree::with_listing(Self, FileTreePath, Array[DirEntry]) -> Self
 pub fn FileTree::with_missing(Self, FileTreePath) -> Self
 
+#derive(Eq, Hash)
 pub struct FileTreePath {
   // private fields
-} derive(Eq, Hash)
+}
 pub fn FileTreePath::child(Self, String) -> Self raise ConfigError
 pub fn FileTreePath::common_dir(Array[Self]) -> Self?
 pub fn FileTreePath::compare(Self, Self) -> Int32
@@ -390,9 +405,10 @@ pub(all) struct Format {
   parse : (String, String) -> ConfigValue raise ConfigError
 }
 
+#derive(Eq, Hash, @debug.Debug)
 pub struct KeyPath {
   // private fields
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn KeyPath::equal(Self, Self) -> Bool
 pub fn KeyPath::from_names(Array[String]) -> Self raise ConfigError
 pub fn KeyPath::hash(Self) -> Int32
@@ -413,36 +429,40 @@ pub(all) struct LoadContext {
   formats : Array[Format]
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum LoadStep[T] {
   Need(Array[FileRequest])
   Done(T)
-} derive(Eq, @debug.Debug)
+}
 pub fn[T : Eq] LoadStep::equal(Self[T], Self[T]) -> Bool
 pub fn[T : Eq] LoadStep::not_equal(Self[T], Self[T]) -> Bool
 pub fn[T : @debug.Debug] LoadStep::to_repr(Self[T]) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Located {
   path : DecodePath
   blame : Blame
-} derive(Eq, @debug.Debug)
+}
 pub fn Located::equal(Self, Self) -> Bool
 pub fn Located::not_equal(Self, Self) -> Bool
 pub fn Located::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Lookup[T] {
   Found(T)
   Missing
   Unknown
-} derive(Eq, @debug.Debug)
+}
 pub fn[T : Eq] Lookup::equal(Self[T], Self[T]) -> Bool
 pub fn[T : Eq] Lookup::not_equal(Self[T], Self[T]) -> Bool
 pub fn[T : @debug.Debug] Lookup::to_repr(Self[T]) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum MergePolicy {
   Replace
   Append
   MergeByKey(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn MergePolicy::equal(Self, Self) -> Bool
 pub fn MergePolicy::not_equal(Self, Self) -> Bool
 pub fn MergePolicy::output(Self, &Logger) -> Unit
@@ -462,28 +482,31 @@ pub struct Options[T] {
   name : String?
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Origin {
   kind : SourceKind
   source : String
   priority : Int32
   location : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn Origin::equal(Self, Self) -> Bool
 pub fn Origin::not_equal(Self, Self) -> Bool
 pub fn Origin::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Platform {
   Linux
   MacOs
   Windows
-} derive(Eq, @debug.Debug)
+}
 pub fn Platform::equal(Self, Self) -> Bool
 pub fn Platform::not_equal(Self, Self) -> Bool
 pub fn Platform::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct ProfileFailure {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileFailure::cycle(Self) -> ProfileNames
 pub fn ProfileFailure::equal(Self, Self) -> Bool
 pub fn ProfileFailure::input(Self) -> String
@@ -494,9 +517,10 @@ pub fn ProfileFailure::origin(Self) -> ProfileOrigin
 pub fn ProfileFailure::rule(Self) -> ProfileRule
 pub fn ProfileFailure::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, Hash, @debug.Debug)
 pub struct ProfileName {
   // private fields
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn ProfileName::equal(Self, Self) -> Bool
 pub fn ProfileName::hash(Self) -> Int32
 pub fn ProfileName::hash_combine(Self, Hasher) -> Unit
@@ -507,9 +531,10 @@ pub fn ProfileName::to_repr(Self) -> @debug.Repr
 pub fn ProfileName::to_string(Self) -> String
 pub impl Show for ProfileName
 
+#derive(Eq, @debug.Debug)
 pub struct ProfileNames {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileNames::contains(Self, ProfileName) -> Bool
 pub fn ProfileNames::equal(Self, Self) -> Bool
 pub fn ProfileNames::names(Self) -> Array[ProfileName]
@@ -518,28 +543,31 @@ pub fn ProfileNames::not_equal(Self, Self) -> Bool
 pub fn ProfileNames::parse_csv(String, origin? : ProfileOrigin) -> Self raise ConfigError
 pub fn ProfileNames::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileOrigin {
   Policy
   Discovery
   Variable(String)
   Control(Origin, KeyPath)
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileOrigin::equal(Self, Self) -> Bool
 pub fn ProfileOrigin::not_equal(Self, Self) -> Bool
 pub fn ProfileOrigin::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileReason {
   Root(ProfileName, ProfileOrigin)
   Include(ProfileName, ProfileOrigin)
   GroupMember(ProfileName, ProfileName, ProfileOrigin)
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileReason::equal(Self, Self) -> Bool
 pub fn ProfileReason::not_equal(Self, Self) -> Bool
 pub fn ProfileReason::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct ProfileResolution {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileResolution::active(Self) -> ProfileNames
 pub fn ProfileResolution::contains(Self, ProfileName) -> Bool
 pub fn ProfileResolution::controls(Self) -> Array[ProfileOrigin]
@@ -554,6 +582,7 @@ pub fn ProfileResolution::selector(Self) -> ProfileSelector
 pub fn ProfileResolution::to_repr(Self) -> @debug.Repr
 pub fn ProfileResolution::with_control_authority(Self, Origin) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileRule {
   NameLength(Int32)
   NameStart
@@ -571,36 +600,39 @@ pub(all) enum ProfileRule {
   DepthLimit(Int32)
   ActiveLimit(Int32)
   CompetingProviders(String, String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileRule::equal(Self, Self) -> Bool
 pub fn ProfileRule::not_equal(Self, Self) -> Bool
 pub fn ProfileRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileSelection {
   Unspecified
   Selected(ProfileNames)
   Disabled
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileSelection::equal(Self, Self) -> Bool
 pub fn ProfileSelection::from_variable(String, variable~ : String) -> Self raise ConfigError
 pub fn ProfileSelection::not_equal(Self, Self) -> Bool
 pub fn ProfileSelection::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileSelector {
   Discovery
   Variable(String)
   BaseActive(Origin)
   BaseDefault(Origin)
   Fallback
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileSelector::equal(Self, Self) -> Bool
 pub fn ProfileSelector::not_equal(Self, Self) -> Bool
 pub fn ProfileSelector::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProfileState {
   Off
   Resolved(ProfileResolution)
-} derive(Eq, @debug.Debug)
+}
 pub fn ProfileState::contains(Self, ProfileName) -> Bool
 pub fn ProfileState::equal(Self, Self) -> Bool
 pub fn ProfileState::not_equal(Self, Self) -> Bool
@@ -614,44 +646,48 @@ pub fn Secret::output(Self, &Logger) -> Unit
 pub fn Secret::to_string(Self) -> String
 pub impl Show for Secret
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SecretRef {
   Env(String)
   File(String)
   Command(Array[String])
   Keyring(service~ : String, account~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SecretRef::equal(Self, Self) -> Bool
 pub fn SecretRef::from_config(ConfigNode) -> Self raise ConfigError
 pub fn SecretRef::not_equal(Self, Self) -> Bool
 pub fn SecretRef::to_repr(Self) -> @debug.Repr
 pub impl FromConfig for SecretRef
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SecretSyntax {
   Standard
   None
-} derive(Eq, @debug.Debug)
+}
 pub fn SecretSyntax::equal(Self, Self) -> Bool
 pub fn SecretSyntax::none() -> Self
 pub fn SecretSyntax::not_equal(Self, Self) -> Bool
 pub fn SecretSyntax::standard() -> Self
 pub fn SecretSyntax::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ShowFormat {
   Toml
   Json
   Ion
-} derive(Eq, @debug.Debug)
+}
 pub fn ShowFormat::equal(Self, Self) -> Bool
 pub fn ShowFormat::not_equal(Self, Self) -> Bool
 pub fn ShowFormat::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SourceKind {
   Defaults
   InMemory
   File(FileRole)
   Environment
   Overrides
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceKind::equal(Self, Self) -> Bool
 pub fn SourceKind::not_equal(Self, Self) -> Bool
 pub fn SourceKind::report_name(Self) -> String
@@ -662,6 +698,7 @@ pub(all) struct SourceProvider {
   expand : (LoadContext) -> LoadStep[Expansion] raise ConfigError
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) struct SourceReport {
   kind : SourceKind
   name : String
@@ -670,52 +707,57 @@ pub(all) struct SourceReport {
   candidates : Array[String]
   status : SourceStatus
   warnings : Array[ConfigWarning]
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceReport::equal(Self, Self) -> Bool
 pub fn SourceReport::not_equal(Self, Self) -> Bool
 pub fn SourceReport::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SourceSelection[T] {
   Discover
   Explicit(T)
   Skip
-} derive(Eq, @debug.Debug)
+}
 pub fn[T : Eq] SourceSelection::equal(Self[T], Self[T]) -> Bool
 pub fn[T : Eq] SourceSelection::not_equal(Self[T], Self[T]) -> Bool
 pub fn[T : @debug.Debug] SourceSelection::to_repr(Self[T]) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SourceStatus {
   Loaded
   NotFound
   Skipped
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceStatus::equal(Self, Self) -> Bool
 pub fn SourceStatus::not_equal(Self, Self) -> Bool
 pub fn SourceStatus::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct Sourced[T] {
   value : T
   blame : Blame
-} derive(Eq, @debug.Debug)
+}
 pub fn[T : Eq] Sourced::equal(Self[T], Self[T]) -> Bool
 pub fn[T : FromConfig] Sourced::from_config(ConfigNode) -> Self[T] raise ConfigError
 pub fn[T : Eq] Sourced::not_equal(Self[T], Self[T]) -> Bool
 pub fn[T : @debug.Debug] Sourced::to_repr(Self[T]) -> @debug.Repr
 pub impl[T : FromConfig] FromConfig for Sourced[T]
 
+#derive(Eq, @debug.Debug)
 pub(all) enum UnknownKeys {
   Allow
   Reject
   RejectExcept(Array[String])
-} derive(Eq, @debug.Debug)
+}
 pub fn UnknownKeys::equal(Self, Self) -> Bool
 pub fn UnknownKeys::not_equal(Self, Self) -> Bool
 pub fn UnknownKeys::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Violation {
   at : Array[Array[DecodeStep]]
   detail : String
-} derive(Eq, @debug.Debug)
+}
 pub fn Violation::equal(Self, Self) -> Bool
 pub fn Violation::not_equal(Self, Self) -> Bool
 pub fn Violation::to_repr(Self) -> @debug.Repr

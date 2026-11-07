@@ -22,10 +22,10 @@ pub struct RequestActor[Req, Res] {
 pub fn[Req, Res] Scope::respond(
   self : Scope,
   handler : async (Req) -> Res,
-  mailbox? : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
+  mailbox~ : @policy.MailboxPolicy = @policy.MailboxPolicy::default(),
   on_stop? : async () -> Unit,
-  cleanup_limit? : @lander_core.TimeLimit = default_cleanup_limit(),
-  payload? : @policy.PayloadPolicy[Req] = @policy.PayloadPolicy::default(),
+  cleanup_limit~ : @lander_core.TimeLimit = default_cleanup_limit(),
+  payload~ : @policy.PayloadPolicy[Req] = @policy.PayloadPolicy::default(),
 ) -> RequestActor[Req, Res] raise ActorError {
   let actor = self.start_encoded(
     (),
@@ -48,9 +48,9 @@ pub fn[Req, Res] Scope::respond(
 pub async fn[Req, Res] RequestActor::ask(
   self : RequestActor[Req, Res],
   request : Req,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> Res {
-  self.actor.ask(reply => { request, reply }, timeout~)
+  self.actor.ask(reply => { request, reply, }, timeout~)
 }
 
 ///|
@@ -58,14 +58,16 @@ pub async fn[Req, Res] RequestActor::ask(
 pub async fn[Req, Res] RequestActor::try_ask(
   self : RequestActor[Req, Res],
   request : Req,
-  timeout? : WaitPolicy = WaitPolicy::default(),
+  timeout~ : WaitPolicy = WaitPolicy::default(),
 ) -> Res? {
-  self.actor.try_ask(reply => { request, reply }, timeout~)
+  self.actor.try_ask(reply => { request, reply, }, timeout~)
 }
 
 ///|
 /// The address of the actor.
-pub fn[Req, Res] RequestActor::address(self : RequestActor[Req, Res]) -> ActorAddress {
+pub fn[Req, Res] RequestActor::address(
+  self : RequestActor[Req, Res],
+) -> ActorAddress {
   self.actor.address()
 }
 
@@ -86,7 +88,9 @@ pub fn[Req, Res] RequestActor::close(self : RequestActor[Req, Res]) -> Unit {
 ///|
 /// Reject new requests, answer the queued ones and wait for the end. See
 /// `Actor::drain`.
-pub async fn[Req, Res] RequestActor::drain(self : RequestActor[Req, Res]) -> Unit {
+pub async fn[Req, Res] RequestActor::drain(
+  self : RequestActor[Req, Res],
+) -> Unit {
   self.actor.drain()
 }
 
@@ -98,6 +102,8 @@ pub fn[Req, Res] RequestActor::cancel(self : RequestActor[Req, Res]) -> Unit {
 
 ///|
 /// Wait until the actor ends. See `Actor::join`.
-pub async fn[Req, Res] RequestActor::join(self : RequestActor[Req, Res]) -> Unit {
+pub async fn[Req, Res] RequestActor::join(
+  self : RequestActor[Req, Res],
+) -> Unit {
   self.actor.join()
 }

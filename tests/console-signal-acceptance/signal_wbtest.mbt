@@ -19,7 +19,7 @@ let js_runtimes_var : String = "LANDER_CONSOLE_JS_RUNTIMES"
 ///|
 /// Send the stop signal `kind` (1 Interrupt, 2 Terminate, 3 Quit) to the
 /// process `pid` through `send.c`. Gives 0 on success.
-extern "C" fn send_signal(pid : Int, kind : Int) -> Int = "lander_test_send_signal"
+extern "C" fn send_signal(pid : Int32, kind : Int32) -> Int32 = "lander_test_send_signal"
 
 ///|
 /// Index 0 of this file: the body of a native child process.
@@ -52,29 +52,34 @@ fn Child::label(self : Child) -> String {
 /// One step of the parent: wait for a line of the child, or send a signal.
 priv enum Step {
   Await(String)
-  Send(Int)
+  Send(Int32)
   /// Send the signal again every 100 ms until the child ends. Two pending
   /// POSIX signals of one kind merge into one, and a child that never yields
   /// cannot write a line after the first signal, so one more send is not
   /// enough proof that the child got two signals.
-  SendUntilExit(Int)
+  SendUntilExit(Int32)
 }
 
 ///|
 /// The phase retained if a bounded child wait times out.
+#derive(Debug)
 priv enum ChildPhase {
   Starting
   Awaiting(String)
-  Signalling(Int)
+  Signalling(Int32)
   ReadingOutput
   WaitingForExit
-} derive(Debug)
+}
 
 ///|
 /// Start `child` in `scenario`, do the steps in order, read the rest of the
 /// output, and give the exit code and the full output. Every wait is bounded,
 /// and the task group ends the child when a step fails.
-async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (Int, String) {
+async fn run_child(
+  child : Child,
+  scenario : String,
+  steps : Array[Step],
+) -> (Int32, String) {
   let (command, args) = match child {
     Native => {
       let args = @env.args()
@@ -87,14 +92,15 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
     // Windows per-drive entries (`=D:`). Node.js then cannot find the real path
     // of a main script on that drive (`lstat 'D:'`), so it keeps the path as
     // given. The flag has no other effect on this one-file program.
-    Js(runtime="node", program~) => ("node", ["--preserve-symlinks-main", program])
+    Js(runtime="node", program~) =>
+      ("node", ["--preserve-symlinks-main", program])
     Js(runtime~, program~) => (runtime, [program])
     Worker(launcher~, program~) =>
       ("node", ["--preserve-symlinks-main", launcher, program])
   }
   let output = StringBuilder()
   let phase = Ref(ChildPhase::Starting)
-  try @async.with_timeout(20000, () => {
+  @async.with_timeout(20000, () => {
     @async.with_task_group(group => {
       let (reader, writer) = @process.read_from_process()
       let process = @process.spawn(
@@ -114,7 +120,7 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
         }
         received.put(None)
       })
-      let mut exit_code : Int? = None
+      let mut exit_code : Int32? = None
       for step in steps {
         match step {
           Await(line) => {
@@ -123,14 +129,19 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
               match received.get() {
                 Some(actual) if actual.has_suffix(line) => break
                 Some(_) => ()
-                None => fail("\{child.label()} \{scenario}: no line \{line} in\n\{output}")
+                None =>
+                  fail(
+                    "\{child.label()} \{scenario}: no line \{line} in\n\{output}",
+                  )
               }
             }
           }
           Send(kind) => {
             phase.val = Signalling(kind)
             let sent = send_signal(process.pid, kind)
-            guard sent == 0 else { fail("sending kind \{kind} failed: \{sent}") }
+            guard sent == 0 else {
+              fail("sending kind \{kind} failed: \{sent}")
+            }
           }
           SendUntilExit(kind) =>
             while exit_code is None {
@@ -152,7 +163,10 @@ async fn run_child(child : Child, scenario : String, steps : Array[Step]) -> (In
       (code, output.to_string().replace_all(old="\r\n", new="\n"))
     })
   }) catch {
-    @async.TimeoutError => fail("\{child.label()} \{scenario} timed out in \{@debug.to_string(phase.val)}; captured stdout:\n\{output}")
+    @async.TimeoutError =>
+      fail(
+        "\{child.label()} \{scenario} timed out in \{@debug.to_string(phase.val)}; captured stdout:\n\{output}",
+      )
     other => raise other
   }
 }
@@ -197,7 +211,7 @@ let stop_hooks : Array[String] = [
 /// The kinds that this platform can send to one child process, with the
 /// reason text and the exit code. Windows sends only `CTRL_BREAK_EVENT` to one
 /// process group (spike lander-4us.5.1).
-fn sendable_kinds() -> Array[(Int, String, Int)] {
+fn sendable_kinds() -> Array[(Int32, String, Int32)] {
   match @async.platform {
     Windows => [(3, "Quit", 131)]
     _ => [(1, "Interrupt", 130), (2, "Terminate", 143), (3, "Quit", 131)]
@@ -209,7 +223,9 @@ fn sendable_kinds() -> Array[(Int, String, Int)] {
 /// child for each runtime.
 fn children(native~ : Bool) -> Array[Child] {
   let children = if native { [Native] } else { [] }
-  guard @env.get_env_var(js_program_var) is Some(program) else { return children }
+  guard @env.get_env_var(js_program_var) is Some(program) else {
+    return children
+  }
   let runtimes = @env.get_env_var(js_runtimes_var).unwrap_or("node")
   for runtime in runtimes.split(",") {
     children.push(Js(runtime=runtime.to_owned(), program~))
@@ -230,19 +246,32 @@ async test "a clean run runs all hooks and ends with 0" {
 ///|
 async test "parent signals stop a non-yielding worker and drain once with true signal codes" {
   guard !(@async.platform is Windows) else { return }
-  guard @env.get_env_var("LANDER_CONSOLE_WORKER_LAUNCHER") is Some(launcher) else { return }
-  guard @env.get_env_var("LANDER_CONSOLE_WORKER_PROGRAM") is Some(program) else { fail("missing worker program") }
+  guard @env.get_env_var("LANDER_CONSOLE_WORKER_LAUNCHER") is Some(launcher) else {
+    return
+  }
+  guard @env.get_env_var("LANDER_CONSOLE_WORKER_PROGRAM") is Some(program) else {
+    fail("missing worker program")
+  }
   for (kind, name, expected) in [(1, "Interrupt", 130), (2, "Terminate", 143)] {
-    let (code, output) = run_child(Worker(launcher~, program~), "poll", [Await("ready"), Send(kind)])
+    let (code, output) = run_child(Worker(launcher~, program~), "poll", [
+      Await("ready"),
+      Send(kind),
+    ])
     assert_eq(code, expected, msg=output)
     // Readiness uses a control channel; buffered worker stdout can arrive later.
     assert_true(output.contains("worker-stdout-pending"), msg=output)
     assert_eq(output.split("ready\n").count() - 1, 1, msg=output)
-    assert_in_order(output, start_hooks + stop_hooks + [
-      "finalizer=begin", "drained=true", "finalizer=end", "owner-listeners=intact",
-    ])
+    assert_in_order(
+      output,
+      start_hooks +
+      stop_hooks +
+      [
+        "finalizer=begin", "drained=true", "finalizer=end", "owner-listeners=intact",
+      ],
+    )
     assert_in_order(output, ["reason=Signal(\{name})", "polled=true"])
-    for line in stop_hooks + ["finalizer=begin", "drained=true", "finalizer=end"] {
+    for
+      line in stop_hooks + ["finalizer=begin", "drained=true", "finalizer=end"] {
       assert_eq(output.split(line + "\n").count() - 1, 1, msg=output)
     }
   }
@@ -251,10 +280,18 @@ async test "parent signals stop a non-yielding worker and drain once with true s
 ///|
 async test "help and version end the process with 0 before any hook" {
   for child in children(native=true) {
-    for (scenario, text) in [("help", "Usage: console-host"), ("version", "1.2.3")] {
+    for
+      (scenario, text) in [
+        ("help", "Usage: console-host"),
+        ("version", "1.2.3"),
+      ] {
       let (code, output) = run_child(child, scenario, [])
       assert_eq(code, 0, msg="\{child.label()} \{scenario}\n\{output}")
-      assert_eq(output.split(text).count() - 1, 1, msg="\{child.label()} \{scenario}\n\{output}")
+      assert_eq(
+        output.split(text).count() - 1,
+        1,
+        msg="\{child.label()} \{scenario}\n\{output}",
+      )
       assert_false(output.contains("hook="), msg=output)
       assert_false(output.contains("command"), msg=output)
     }
@@ -289,10 +326,16 @@ async test "a second signal during a slow stop hook ends the process at once" {
         Send(kind),
       ])
       assert_in_order(output, [
-        "hook=b.stopping", "hook=a.stopping", "reason=Signal(\{name})", "hook=b.stop",
+        "hook=b.stopping",
+        "hook=a.stopping",
+        "reason=Signal(\{name})",
+        "hook=b.stop",
         "slow",
       ])
-      for line in ["b.stop.end", "hook=a.stop", "hook=b.stopped", "hook=a.stopped"] {
+      for
+        line in [
+          "b.stop.end", "hook=a.stop", "hook=b.stopped", "hook=a.stopped",
+        ] {
         assert_absent(output, line)
       }
       assert_eq(code, exit_code, msg="\{child.label()} \{name}\n\{output}")
@@ -324,7 +367,11 @@ async test "a synchronous native loop that polls sees the first signal" {
     let (kind, name, exit_code) = case
     let (code, output) = run_child(Native, "poll", [Await("ready"), Send(kind)])
     assert_in_order(output, [
-      "ready", "hook=b.stopping", "hook=a.stopping", "reason=Signal(\{name})", "polled=true",
+      "ready",
+      "hook=b.stopping",
+      "hook=a.stopping",
+      "reason=Signal(\{name})",
+      "polled=true",
       "hook=a.stopped",
     ])
     assert_eq(code, exit_code, msg="\{name}\n\{output}")
@@ -354,8 +401,14 @@ async test "piped output is complete after a clean run and after a graceful sign
     assert_in_order(output, lines + ["end"] + stop_hooks)
     assert_eq(code, 0, msg=child.label())
     let (kind, _, exit_code) = sendable_kinds()[0]
-    let (code, output) = run_child(child, "output-after-signal", [Await("ready"), Send(kind)])
-    assert_in_order(output, ["hook=a.stop"] + lines + ["end", "hook=b.stopped", "hook=a.stopped"])
+    let (code, output) = run_child(child, "output-after-signal", [
+      Await("ready"),
+      Send(kind),
+    ])
+    assert_in_order(
+      output,
+      ["hook=a.stop"] + lines + ["end", "hook=b.stopped", "hook=a.stopped"],
+    )
     assert_eq(code, exit_code, msg=child.label())
   }
 }

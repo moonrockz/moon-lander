@@ -12,7 +12,8 @@ import {
 // Types and methods
 type Plan
 
-type Release derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type Release
 
 // Type aliases
 

@@ -7,6 +7,9 @@ import {
 }
 
 description = "Optional isolated Moonx process launcher and private Node payload lifetime"
+
 repository = "https://github.com/moonrockz/moon-lander"
+
 license = "Apache-2.0"
+
 readme = "README.mbt.md"

@@ -1,6 +1,8 @@
 ///|
 /// The error of `make`, or `None` when it succeeds.
-fn[T] attempt(make : () -> T raise @sinks.SettingsError) -> @sinks.SettingsError? {
+fn[T] attempt(
+  make : () -> T raise @sinks.SettingsError,
+) -> @sinks.SettingsError? {
   try {
     ignore(make())
     None
@@ -34,10 +36,12 @@ test "queue and record byte limits accept 1 and more, and reject 0 and less" {
   assert_eq(@sinks.RecordByteLimit::default().to_int64(), 1048576L)
   for bytes in [0L, -1L] {
     assert_true(
-      attempt(() => @sinks.QueueByteLimit::bytes(bytes)) is Some(InvalidQueueByteLimit(..)),
+      attempt(() => @sinks.QueueByteLimit::bytes(bytes))
+      is Some(InvalidQueueByteLimit(..)),
     )
     assert_true(
-      attempt(() => @sinks.RecordByteLimit::bytes(bytes)) is Some(InvalidRecordByteLimit(..)),
+      attempt(() => @sinks.RecordByteLimit::bytes(bytes))
+      is Some(InvalidRecordByteLimit(..)),
     )
   }
 }
@@ -50,10 +54,12 @@ test "a record limit equal to the queue limit is accepted and one byte more is r
     record_limit=@sinks.RecordByteLimit::bytes(100L),
   )
   assert_eq(settings.record_limit().to_int64(), 100L)
-  let result = attempt(() => @sinks.SessionSettings::new(
-    byte_limit=queue,
-    record_limit=@sinks.RecordByteLimit::bytes(101L),
-  ))
+  let result = attempt(() => {
+    @sinks.SessionSettings::new(
+      byte_limit=queue,
+      record_limit=@sinks.RecordByteLimit::bytes(101L),
+    )
+  })
   guard result is Some(RecordLimitAboveQueueLimit(record=101L, queue=100L)) else {
     fail("accepted a record limit above the queue limit")
   }
@@ -73,8 +79,9 @@ test "a log directory consumes an absolute path and rejects a NUL character" {
   assert_eq(directory.file(first), "/var/log/acme/acme.log")
   assert_eq(directory.marker(set), "/var/log/acme/acme.log.lock")
   assert_eq(
-    @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/"))
-    .file(first),
+    @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/")).file(
+      first,
+    ),
     "/acme.log",
   )
   let windows = @sinks.LogDirectory::from_absolute(
@@ -125,11 +132,16 @@ test "the standard settings write Information to standard error with Literate Au
 ///|
 test "the file defaults are text, daily and 10 MiB, and the newest 31 files" {
   let file = @sinks.FileSink::new(
-    @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/logs")),
+    @sinks.LogDirectory::from_absolute(
+      @lander_core.AbsolutePath::parse("/logs"),
+    ),
     @rolling.LogFileStem::parse("acme"),
   )
   assert_eq(file.files().format(), Text)
-  assert_eq(file.files().policy(), DailyAndSize(@rolling.FileByteLimit::default()))
+  assert_eq(
+    file.files().policy(),
+    DailyAndSize(@rolling.FileByteLimit::default()),
+  )
   assert_eq(@rolling.FileByteLimit::default().to_int64(), 10485760L)
   assert_eq(file.retention(), @rolling.Retention::default())
   assert_eq(file.minimum(), Information)
@@ -140,7 +152,12 @@ test "the file defaults are text, daily and 10 MiB, and the newest 31 files" {
 test "Auto colors need a color terminal, no NO_COLOR and a terminal that is not dumb" {
   let none = @sinks.ColorHints::none()
   assert_true(@sinks.ColorMode::Auto.styles(ColorTerminal, none))
-  for capability in [@sinks.TerminalCapability::PlainTerminal, Redirected, Unknown] {
+  for
+    capability in [
+      @sinks.TerminalCapability::PlainTerminal,
+      Redirected,
+      Unknown,
+    ] {
     assert_false(@sinks.ColorMode::Auto.styles(capability, none))
     assert_true(@sinks.ColorMode::Always.styles(capability, none))
   }
@@ -180,11 +197,7 @@ test "reports count drops and delivery failures, and name each failure" {
     failure.message(),
     content="logging: write failed for files /logs/acme.log.lock (acme-20261027.log): disk full",
   )
-  let retention = @sinks.SinkFailure::new(
-    DeleteOldFile,
-    files_target(),
-    "busy",
-  )
+  let retention = @sinks.SinkFailure::new(DeleteOldFile, files_target(), "busy")
   let clean = @sinks.SessionReport::new(
     accepted=3L,
     dropped=@sinks.DropCounts::new(
@@ -272,24 +285,35 @@ test "a report keeps a copy of its destinations" {
 /// The target of the file set `acme` in `/logs`.
 fn files_target() -> @sinks.SinkTarget raise {
   @sinks.FileSink::new(
-    @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/logs")),
+    @sinks.LogDirectory::from_absolute(
+      @lander_core.AbsolutePath::parse("/logs"),
+    ),
     @rolling.LogFileStem::parse("acme"),
   ).target()
 }
 
 ///|
 test "JSON policies share file ownership and default to the ordered array" {
-  let directory = @sinks.LogDirectory::from_absolute(@lander_core.AbsolutePath::parse("/logs"))
+  let directory = @sinks.LogDirectory::from_absolute(
+    @lander_core.AbsolutePath::parse("/logs"),
+  )
   let stem = @rolling.LogFileStem::parse("diagnostics")
   let legacy = @sinks.FileSink::new(directory, stem, format=JsonLines)
-  let named = @sinks.FileSink::new(directory, stem, format=JsonLines, json_properties=NamedObject)
+  let named = @sinks.FileSink::new(
+    directory,
+    stem,
+    format=JsonLines,
+    json_properties=NamedObject,
+  )
   assert_true(legacy.json_properties() is OrderedArray)
   assert_true(named.json_properties() is NamedObject)
   assert_eq(legacy.marker_path(), named.marker_path())
   let duplicate : @sinks.SettingsError? = try {
     ignore(@sinks.SessionSettings::new(files=[legacy, named]))
     None
-  } catch { error => Some(error) }
+  } catch {
+    error => Some(error)
+  }
   assert_true(duplicate is Some(DuplicateFileSet(..)))
 }
 
@@ -315,7 +339,11 @@ test "report constructors reject negative counts and a timeout of an open sessio
     inspect(error.message(), content="Invalid count -1: it must be 0 or more")
   }
   assert_eq(
-    @sinks.DestinationReport::new(Console(StandardError), written=0L, undelivered=0L).written(),
+    @sinks.DestinationReport::new(
+      Console(StandardError),
+      written=0L,
+      undelivered=0L,
+    ).written(),
     0L,
   )
   let zero = @sinks.DropCounts::new(

@@ -27,13 +27,20 @@ fn id(text : String) -> @sigstore.GitHubId raise {
 ///|
 /// The signer workflow policy of morphir-rust, at any ref.
 fn rust_signer() -> @sigstore.Policy raise {
-  @sigstore.Policy::signer_workflow(repository("finos/morphir-rust"), workflow(morphir_workflow))
+  @sigstore.Policy::signer_workflow(
+    repository("finos/morphir-rust"),
+    workflow(morphir_workflow),
+  )
 }
 
 ///|
 /// The policy mismatches of a rejected verdict.
-fn mismatches(verdict : @sigstore.Verdict) -> Array[@sigstore.PolicyMismatch] raise {
-  guard verdict is Rejected(Invalid(Policy(reasons))) else { fail(outcome(verdict)) }
+fn mismatches(
+  verdict : @sigstore.Verdict,
+) -> Array[@sigstore.PolicyMismatch] raise {
+  guard verdict is Rejected(Invalid(Policy(reasons))) else {
+    fail(outcome(verdict))
+  }
   reasons
 }
 
@@ -67,7 +74,9 @@ test "a signer workflow at another ref does not match" {
     git_ref=git_ref("refs/heads/main"),
   )
   let reasons = mismatches(verify_morphir(other))
-  guard reasons is [IdentityMismatch(expected~, actual~)] else { fail("\{reasons.length()}") }
+  guard reasons is [IdentityMismatch(expected~, actual~)] else {
+    fail("\{reasons.length()}")
+  }
   assert_eq(
     expected, "https://github.com/finos/morphir-rust/.github/workflows/release-provider-snapshot.yml@refs/heads/main",
   )
@@ -81,8 +90,12 @@ test "scenario: other workflow file" {
     workflow(".github/workflows/release.yml"),
   )
   let reasons = mismatches(verify_morphir(policy))
-  guard reasons is [IdentityMismatch(expected~, actual~)] else { fail("\{reasons.length()}") }
-  assert_eq(expected, "https://github.com/finos/morphir-rust/.github/workflows/release.yml@*")
+  guard reasons is [IdentityMismatch(expected~, actual~)] else {
+    fail("\{reasons.length()}")
+  }
+  assert_eq(
+    expected, "https://github.com/finos/morphir-rust/.github/workflows/release.yml@*",
+  )
   assert_eq(actual, [morphir_san])
 }
 
@@ -105,20 +118,29 @@ test "owner and repository match without case; path and ref match exactly" {
     git_ref=git_ref("refs/tags/Provider-Snapshot/v0.2.0"),
   )
   assert_true(mismatches(verify_morphir(ref_case)) is [IdentityMismatch(..)])
-  let ref_source = rust_signer().source_ref(git_ref("refs/tags/Provider-Snapshot/v0.2.0"))
-  assert_true(mismatches(verify_morphir(ref_source)) is [ClaimMismatch(claim=SourceRef, ..)])
+  let ref_source = rust_signer().source_ref(
+    git_ref("refs/tags/Provider-Snapshot/v0.2.0"),
+  )
+  assert_true(
+    mismatches(verify_morphir(ref_source))
+    is [ClaimMismatch(claim=SourceRef, ..)],
+  )
 }
 
 ///|
 test "an exact subject name matches only the exact SAN" {
-  let exact = @sigstore.Policy::subject_name(@sigstore.SubjectName::parse(morphir_san))
+  let exact = @sigstore.Policy::subject_name(
+    @sigstore.SubjectName::parse(morphir_san),
+  )
   assert_eq(outcome(verify_morphir(exact)), "pass")
   let upper = @sigstore.Policy::subject_name(
     @sigstore.SubjectName::parse(morphir_san.replace(old="finos", new="FINOS")),
   )
   assert_true(mismatches(verify_morphir(upper)) is [IdentityMismatch(..)])
   let prefix = @sigstore.Policy::subject_name(
-    @sigstore.SubjectName::parse(morphir_san[:morphir_san.length() - 1].to_owned()),
+    @sigstore.SubjectName::parse(
+      morphir_san[:morphir_san.length() - 1].to_owned(),
+    ),
   )
   assert_true(mismatches(verify_morphir(prefix)) is [IdentityMismatch(..)])
 }
@@ -130,7 +152,9 @@ test "the policy issuer must equal the certificate issuer" {
     issuer=@sigstore.Issuer::parse("https://accounts.google.com"),
   )
   let reasons = mismatches(verify_morphir(google))
-  guard reasons is [IssuerMismatch(expected~, actual~)] else { fail("\{reasons.length()}") }
+  guard reasons is [IssuerMismatch(expected~, actual~)] else {
+    fail("\{reasons.length()}")
+  }
   assert_eq(expected, "https://accounts.google.com")
   assert_eq(actual, Some("https://token.actions.githubusercontent.com"))
 }
@@ -165,12 +189,16 @@ test "repository ID, owner ID and owner claims" {
   assert_eq(expected, "999")
   assert_eq(actual, Some("513894754"))
   assert_true(
-    mismatches(verify_morphir(rust_signer().owner_id(id("35377815")))) is
-    [ClaimMismatch(claim=OwnerId, ..)],
+    mismatches(verify_morphir(rust_signer().owner_id(id("35377815"))))
+    is [ClaimMismatch(claim=OwnerId, ..)],
   )
   assert_true(
-    mismatches(verify_morphir(rust_signer().source_owner(@sigstore.GitHubOwner::parse("cli")))) is
-    [ClaimMismatch(claim=SourceOwner, ..)],
+    mismatches(
+      verify_morphir(
+        rust_signer().source_owner(@sigstore.GitHubOwner::parse("cli")),
+      ),
+    )
+    is [ClaimMismatch(claim=SourceOwner, ..)],
   )
 }
 
@@ -192,7 +220,10 @@ test "scenario: source ref" {
 
 ///|
 test "scenario: GitHub-hosted runner" {
-  assert_eq(outcome(verify_morphir(rust_signer().hosted_runners_only())), "pass")
+  assert_eq(
+    outcome(verify_morphir(rust_signer().hosted_runners_only())),
+    "pass",
+  )
   // github_workflow refuses self-hosted runners unless told not to.
   assert_eq(outcome(verify_morphir(morphir_policy())), "pass")
   let any_runner = @sigstore.Policy::github_workflow(
@@ -230,7 +261,12 @@ test "a failed verdict gives the reason of each policy" {
   )
   let wrong_ref = rust_signer().source_ref(git_ref("refs/heads/main"))
   let reasons = mismatches(verify_morphir(python, alternatives=[ui, wrong_ref]))
-  guard reasons is [IdentityMismatch(expected=first, ..), IdentityMismatch(expected=second, ..), ClaimMismatch(claim=SourceRef, ..)] else {
+  guard reasons
+    is [
+      IdentityMismatch(expected=first, ..),
+      IdentityMismatch(expected=second, ..),
+      ClaimMismatch(claim=SourceRef, ..),
+    ] else {
     fail("\{reasons.length()}")
   }
   assert_true(first.contains("finos/morphir-python"))
@@ -245,7 +281,10 @@ test "the cli/cli bundles match only their own repository" {
         repository("finos/morphir-rust"),
         workflow=workflow(case.workflow),
       )
-      assert_true(mismatches(verify_case(case, other)) is [IdentityMismatch(..)], msg=case.bundle)
+      assert_true(
+        mismatches(verify_case(case, other)) is [IdentityMismatch(..)],
+        msg=case.bundle,
+      )
       let pinned = @sigstore.Policy::github_workflow(
         repository(case.repository),
         workflow=workflow(case.workflow),
@@ -262,7 +301,9 @@ test "a provenance bundle does not pass a policy for another predicate type" {
   let policy = @sigstore.Policy::github_workflow(
     @sigstore.GitHubRepository::parse(case.repository),
     workflow=@sigstore.WorkflowPath::parse(case.workflow),
-    predicate_type=@sigstore.PredicateType::parse("https://spdx.dev/Document/v2.3"),
+    predicate_type=@sigstore.PredicateType::parse(
+      "https://spdx.dev/Document/v2.3",
+    ),
   )
   guard verify_case(case, policy)
     is Rejected(Invalid(Policy([PredicateTypeMismatch(expected~, actual~)]))) else {

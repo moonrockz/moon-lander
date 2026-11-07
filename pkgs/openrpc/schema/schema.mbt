@@ -1,8 +1,9 @@
 ///|
 /// A schema retains exact JSON with checked typed keyword forms.
+#derive(Debug)
 pub struct Schema {
   value : @json.Value
-} derive(Debug)
+}
 
 ///|
 pub extend Schema with @debug.Debug::{to_repr}
@@ -51,13 +52,14 @@ pub fn Schema::to_json(self : Schema) -> @json.Value {
 ///|
 /// Completeness means all requested schema-document checks were performed.
 /// It does not mean that the diagnostics contain no failures.
+#derive(Debug)
 pub struct Report {
   priv findings : Array[@json.Diagnostic]
   complete : Bool
   references_complete : Bool
   priv resolutions : Array[@reference.Resolution]
   priv owners : Array[@reference.UriReference?]
-} derive(Debug)
+}
 
 ///|
 pub extend Report with @debug.Debug::{to_repr}

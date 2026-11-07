@@ -66,13 +66,14 @@ struct Ping(String)
 #cfg(not(target="wasm-gc"))
 async test "send a ping to a handler that waits" {
   let ping : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
-    _,
-    req,
-  ) => {
-    @aio.sleep(10)
-    let Ping(text) = req
-    "Pong: " + text
-  })
+      _,
+      req,
+    ) => {
+      @aio.sleep(10)
+      let Ping(text) = req
+      "Pong: " + text
+    },
+  )
   assert_eq(ping.send((), Ping("Hello")), "Pong: Hello")
 }
 ```
@@ -107,14 +108,15 @@ sender, because its `next` step is sync.
 async test "log middleware around an async send" {
   let log = []
   let ping : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
-    _,
-    req,
-  ) => {
-    @aio.sleep(10)
-    log.push("handler")
-    let Ping(text) = req
-    "Pong: " + text
-  })
+      _,
+      req,
+    ) => {
+      @aio.sleep(10)
+      log.push("handler")
+      let Ping(text) = req
+      "Pong: " + text
+    },
+  )
   let logged = ping
     .use_(
       @mediator_async.middleware((next, ctx, req) => {
@@ -247,15 +249,18 @@ at the call to `moonbitlang/async`.
 async test "a timeout stops a slow send, and a caller cancellation is not an error" {
   let log = []
   let slow : @mediator_async.Sender[Unit, Ping, String] = @mediator_async.sender((
-    _,
-    req,
-  ) => {
-    @aio.sleep(1000)
-    log.push("handler ended")
-    let Ping(text) = req
-    "Pong: " + text
-  })
-  let limited = slow.use_(@mediator_async.timeout(@lander_core.TimeLimit::millis(50)))
+      _,
+      req,
+    ) => {
+      @aio.sleep(1000)
+      log.push("handler ended")
+      let Ping(text) = req
+      "Pong: " + text
+    },
+  )
+  let limited = slow.use_(
+    @mediator_async.timeout(@lander_core.TimeLimit::millis(50)),
+  )
   try limited.send((), Ping("Hello")) catch {
     @mediator.TimedOut(_) as error =>
       assert_eq(error.message(), "Request timed out after 50 ms")
@@ -321,24 +326,27 @@ fn greet(services : Services, req : Register) -> String {
 #cfg(not(target="wasm-gc"))
 async test "a service registers a user and greets through the core sender" {
   let greeter : @mediator.Sender[Services, Register, String] = @mediator.sender((
-    services,
-    req,
-  ) => greet(services, req))
+      services,
+      req,
+    ) => greet(services, req),
+  )
   let greet_async = @mediator_async.Sender::from_sync(greeter)
   let register : @mediator_async.Sender[Services, Register, String] = @mediator_async.sender((
-    services,
-    req,
-  ) => {
-    @aio.sleep(10)
-    let Register(name) = req
-    services.store.users.push(name)
-    greet_async.send(services, req)
-  })
+      services,
+      req,
+    ) => {
+      @aio.sleep(10)
+      let Register(name) = req
+      services.store.users.push(name)
+      greet_async.send(services, req)
+    },
+  )
   let direct : @mediator_async.Sender[Services, Register, String] = @mediator_async.sender((
-    services,
-    req,
-  ) => greet(services, req))
-  let services = { store: { users: [] }, greeting: "Welcome" }
+      services,
+      req,
+    ) => greet(services, req),
+  )
+  let services = { store: { users: [], }, greeting: "Welcome", }
   assert_eq(register.send(services, Register("Ann")), "Welcome Ann")
   assert_eq(direct.send(services, Register("Bo")), "Welcome Bo")
   assert_eq(services.store.users, ["Ann"])

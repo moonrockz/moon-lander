@@ -35,7 +35,9 @@ test "S01 1.3.2 documents keep their own version and draft-07 schemas" {
 
 ///|
 test "S02 exact values cross the core Json boundary explicitly" {
-  let value = @exact.parse("{\"n\":9007199254740993,\"d\":0.10000000000000000001}")
+  let value = @exact.parse(
+      "{\"n\":9007199254740993,\"d\":0.10000000000000000001}",
+    )
     .unwrap()
     .lower()
     .unwrap()
@@ -59,7 +61,9 @@ test "S03 parameter structures and descriptor order are retained" {
     let text = written(d)
     assert_true(text.contains("\"paramStructure\":\"" + structure + "\""))
     assert_true(
-      text.contains("\"params\":[{\"name\":\"z\",\"schema\":true},{\"name\":\"a\""),
+      text.contains(
+        "\"params\":[{\"name\":\"z\",\"schema\":true},{\"name\":\"a\"",
+      ),
     )
   }
 }
@@ -212,7 +216,9 @@ test "S12 pairings keep results and add no standard error field in 1.3.2" {
     .unwrap()
     .array_item(0)
     .unwrap()
-  guard pairing.kind() is Object(fields) else { fail("pairing is not an object") }
+  guard pairing.kind() is Object(fields) else {
+    fail("pairing is not an object")
+  }
   assert_eq(fields.map(f => f.0), ["name", "params", "result"])
   assert_true(text.contains("\"x-smithy-error-examples\""))
 }

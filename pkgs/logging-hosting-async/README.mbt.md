@@ -44,7 +44,10 @@ test "settings for a console and two file formats" {
     ],
     event_limit=@sinks.QueueEventLimit::count(4096),
   )
-  inspect(settings.files()[1].marker_path(), content="/var/log/acme/acme.jsonl.lock")
+  inspect(
+    settings.files()[1].marker_path(),
+    content="/var/log/acme/acme.jsonl.lock",
+  )
 }
 ```
 
@@ -81,8 +84,10 @@ test "select named properties for a rolling JSON file" {
     |> @lander_core.AbsolutePath::parse
     |> @sinks.LogDirectory::from_absolute
   let file = @sinks.FileSink::new(
-    logs, @rolling.LogFileStem::parse("diagnostics"),
-    format=JsonLines, json_properties=NamedObject,
+    logs,
+    @rolling.LogFileStem::parse("diagnostics"),
+    format=JsonLines,
+    json_properties=NamedObject,
   )
   assert_true(file.json_properties() is NamedObject)
   assert_true(file.files().format() is JsonLines)

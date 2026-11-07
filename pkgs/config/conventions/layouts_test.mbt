@@ -22,7 +22,7 @@ fn disk(files : Array[(String, String)]) -> @config.FileTree {
       } else {
         Directory
       }
-      add_entry(dir, { name: part, kind })
+      add_entry(dir, { name: part, kind, })
       dir = if dir == "/" { "/\{part}" } else { "\{dir}/\{part}" }
     }
   }
@@ -35,16 +35,16 @@ fn disk(files : Array[(String, String)]) -> @config.FileTree {
 ///|
 /// A YAML stand-in limited to `.yaml`.
 fn yaml_only() -> @config.Format {
-  { ..yaml_stub(), extensions: ["yaml"] }
+  { ..yaml_stub(), extensions: ["yaml"], }
 }
 
 ///|
 fn discover_in(
   start : String,
   files : Array[(String, String)],
-  conventions? : @conventions.Conventions = @conventions.app_dirs("acme"),
-  formats? : Array[@config.Format] = [@toml.format()],
-  options? : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
+  conventions~ : @conventions.Conventions = @conventions.app_dirs("acme"),
+  formats~ : Array[@config.Format] = [@toml.format()],
+  options~ : @conventions.DiscoveryOptions = @conventions.DiscoveryOptions::new(),
   platform? : @config.Platform,
   env_vars? : Map[String, String],
 ) -> @config.Config raise @config.ConfigError {
@@ -65,7 +65,9 @@ fn discover_in(
 }
 
 ///|
-fn ambiguity(run : () -> Unit raise @config.ConfigError) -> (String, Array[String]) {
+fn ambiguity(
+  run : () -> Unit raise @config.ConfigError,
+) -> (String, Array[String]) {
   try run() catch {
     Ambiguous(location~, candidates~, ..) => (location, candidates)
     error => abort("expected an ambiguity error, got \{error.message()}")
@@ -132,10 +134,9 @@ test "Two serializations of one layout" {
     ])
     |> ignore
   })
-  @expect.expect((location, candidates)).to_equal((
-    "/w",
-    ["/w/acme.toml", "/w/acme.yaml"],
-  ))
+  @expect.expect((location, candidates)).to_equal(
+    ("/w", ["/w/acme.toml", "/w/acme.yaml"]),
+  )
 }
 
 ///|
@@ -144,10 +145,9 @@ test "Primaries in two layouts" {
     discover_in("/w", [("/w/acme.toml", ""), ("/w/.acme/acme.toml", "")])
     |> ignore
   })
-  @expect.expect((location, candidates)).to_equal((
-    "/w",
-    ["/w/acme.toml", "/w/.acme/acme.toml"],
-  ))
+  @expect.expect((location, candidates)).to_equal(
+    ("/w", ["/w/acme.toml", "/w/.acme/acme.toml"]),
+  )
 }
 
 ///|
@@ -181,13 +181,15 @@ fn with_legacy() -> @conventions.Conventions {
 
 ///|
 test "Legacy file used when no primary exists" {
-  let config = discover_in("/w/src", [("/w/acme.json", "{}")], conventions=with_legacy())
+  let config = discover_in(
+    "/w/src",
+    [("/w/acme.json", "{}")],
+    conventions=with_legacy(),
+  )
   let report = project(config)
-  @expect.expect((report.kind, report.path, report.status)).to_equal((
-    File(Legacy),
-    Some("/w/acme.json"),
-    Loaded,
-  ))
+  @expect.expect((report.kind, report.path, report.status)).to_equal(
+    (File(Legacy), Some("/w/acme.json"), Loaded),
+  )
   @expect.expect(@config.get_text(config, "legacy.text")).to_equal("{}")
   @expect.expect(
     config.origins(@config.KeyPath::parse("legacy.text"))[0].location,
@@ -207,7 +209,11 @@ test "Primary wins over legacy file" {
 
 ///|
 test "the legacy format adds no searched extension" {
-  let config = discover_in("/w", [("/w/main.mbt", "")], conventions=with_legacy())
+  let config = discover_in(
+    "/w",
+    [("/w/main.mbt", "")],
+    conventions=with_legacy(),
+  )
   @expect.expect(project(config).candidates).to_equal([
     "/w/acme.toml", "/w/.acme/acme.toml", "/w/.config/acme/config.toml",
   ])
@@ -218,7 +224,8 @@ test "Ancestor configuration above the boundary is ignored" {
   let config = discover_in(
     "/tmp/case/src",
     [("/tmp/acme.toml", "a = 1"), ("/tmp/case/src/main.mbt", "")],
-    conventions=@conventions.app_dirs("acme") |> @conventions.boundary("/tmp/case"),
+    conventions=@conventions.app_dirs("acme")
+      |> @conventions.boundary("/tmp/case"),
   )
   @expect.expect(project(config).status).to_equal(NotFound)
 }
@@ -228,7 +235,8 @@ test "Configuration at the boundary is found" {
   let config = discover_in(
     "/tmp/case/src",
     [("/tmp/case/acme.toml", "a = 1"), ("/tmp/case/src/main.mbt", "")],
-    conventions=@conventions.app_dirs("acme") |> @conventions.boundary("/tmp/case/"),
+    conventions=@conventions.app_dirs("acme")
+      |> @conventions.boundary("/tmp/case/"),
   )
   @expect.expect(primary_path(config)).to_equal(Some("/tmp/case/acme.toml"))
 }
@@ -239,7 +247,8 @@ test "Start directory outside the boundary" {
     discover_in(
       "/srv/other",
       [],
-      conventions=@conventions.app_dirs("acme") |> @conventions.boundary("/tmp/case"),
+      conventions=@conventions.app_dirs("acme")
+        |> @conventions.boundary("/tmp/case"),
     )
   catch {
     error =>
@@ -270,7 +279,10 @@ test "Isolated mode keeps environment variables" {
       @conventions.app_dirs("acme"),
       options=@conventions.DiscoveryOptions::new(isolated=true),
     )
-    |> @config.env(prefix="ACME", selection=Explicit({ "ACME_IR__FORMAT_VERSION": "4" }))
+    |> @config.env(
+      prefix="ACME",
+      selection=Explicit({ "ACME_IR__FORMAT_VERSION": "4" }),
+    )
   let config = builder
     |> @config.load(disk([("/w/acme.toml", "ir.format_version = 3")]))
     |> done

@@ -18,10 +18,9 @@ fn expect_error(
 ///|
 test "a JSON root that is not a struct raises an invalid-root error" {
   let json : Json = [1, 2]
-  let error = expect_error(() => @config.ConfigValue::from_json(
-    json,
-    origin="numbers.json",
-  ))
+  let error = expect_error(() => {
+    @config.ConfigValue::from_json(json, origin="numbers.json")
+  })
   @expect.expect(error).to_equal(
     InvalidRoot(origin="numbers.json", found="list"),
   )
@@ -33,9 +32,10 @@ test "a JSON object gives a struct with the fields in order" {
   let value = @config.ConfigValue::from_json(json)
   @expect.expect(field_names(value)).to_equal(["b", "a", "c"])
   guard value.to_ion().kind() is Struct(fields) else { fail("not a struct") }
-  @expect.expect(
-    field_names(@config.ConfigValue::from_ion(fields[1].value())),
-  ).to_equal(["y", "x"])
+  @expect.expect(field_names(@config.ConfigValue::from_ion(fields[1].value()))).to_equal([
+      "y", "x",
+    ],
+  )
 }
 
 ///|
@@ -52,10 +52,9 @@ test "a repeated field name raises a duplicate-key error" {
     @ion.field("a", @ion.Ion::bool(true)),
     @ion.field("a", @ion.Ion::bool(false)),
   ])
-  let error = expect_error(() => @config.ConfigValue::from_ion(
-    ion,
-    origin="app.ion",
-  ))
+  let error = expect_error(() => {
+    @config.ConfigValue::from_ion(ion, origin="app.ion")
+  })
   @expect.expect(error).to_equal(
     DuplicateKey(origin="app.ion", key=@config.KeyPath::parse("a")),
   )

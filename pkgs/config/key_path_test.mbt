@@ -97,13 +97,14 @@ test "from_names takes non-empty names" {
 ///|
 /// Generation choices for a key path. Each choice list gives one name over a
 /// small alphabet with the characters that need quotes and escapes.
+#derive(Debug)
 priv struct NamesCase {
-  choices : Array[Array[UInt]]
-} derive(Debug)
+  choices : Array[Array[UInt32]]
+}
 
 ///|
 impl @quickcheck.Arbitrary for NamesCase with fn arbitrary(size, state) {
-  { choices: @quickcheck.Arbitrary::arbitrary(size, state) }
+  { choices: @quickcheck.Arbitrary::arbitrary(size, state), }
 }
 
 ///|
@@ -118,7 +119,9 @@ fn NamesCase::names(self : NamesCase) -> Array[String] {
   let names = self.choices.map(choice => {
     let name = StringBuilder()
     for index in choice {
-      name.write_char(alphabet[(index % alphabet.length().reinterpret_as_uint()).reinterpret_as_int()])
+      name.write_char(
+        alphabet[(index % alphabet.length().reinterpret_as_uint()).reinterpret_as_int()],
+      )
     }
     if name.is_empty() {
       "x"

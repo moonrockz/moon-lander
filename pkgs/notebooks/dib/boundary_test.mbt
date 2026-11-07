@@ -57,7 +57,9 @@ test "notebook construction canonicalizes aliases and copies metadata imports" {
   fields.clear()
   @expect.expect_all(s => {
     s.expect(book.cells()[0].kernel().to_string()).to_equal("markdown")
-    s.expect(book.metadata().get_json("vendor")).to_equal(Some({ "values": [1] }))
+    s
+    .expect(book.metadata().get_json("vendor"))
+    .to_equal(Some({ "values": [1] }))
     s.expect(@dib.parse(book.to_string())).to_equal(book)
   })
 }

@@ -6,7 +6,9 @@ test "events raised twice and nested late handlers still run one time" {
     log.push("started")
     lifetime.on_started(() => log.push("late"))
   })
-  for _ in 0..<2 { lifetime.raise_event(Started) }
+  for _ in 0..<2 {
+    lifetime.raise_event(Started)
+  }
   lifetime.on_started(() => log.push("after"))
   @expect.expect(log).to_equal(["started", "late", "after"])
 }
@@ -27,7 +29,13 @@ test "stop probes and repeated requests preserve first request and optional code
   for code in [None, Some(ExitCode::from_int(4))] {
     let lifetime = Lifetime::new()
     let flag = Ref(false)
-    lifetime.register_stop_probe(() => if flag.val { Some(Requested) } else { None })
+    lifetime.register_stop_probe(() => {
+      if flag.val {
+        Some(Requested)
+      } else {
+        None
+      }
+    })
     let token = lifetime.stop_token()
     @expect.expect(token.cancelled()).to_be_false()
     lifetime.stop_application(exit_code?=code)
@@ -38,7 +46,9 @@ test "stop probes and repeated requests preserve first request and optional code
     @expect.expect(lifetime.stop_reason() is Some(Requested)).to_be_true()
     try token.check_cancelled() catch {
       StopRequested => ()
-    } noraise { _ => fail("expected StopRequested") }
+    } noraise {
+      _ => fail("expected StopRequested")
+    }
   }
 }
 
@@ -46,7 +56,13 @@ test "stop probes and repeated requests preserve first request and optional code
 test "a registered probe alone requests stop on all targets" {
   let lifetime = Lifetime::new()
   let flag = Ref(false)
-  lifetime.register_stop_probe(() => if flag.val { Some(Requested) } else { None })
+  lifetime.register_stop_probe(() => {
+    if flag.val {
+      Some(Requested)
+    } else {
+      None
+    }
+  })
   let token = lifetime.stop_token()
   @expect.expect(token.cancelled()).to_be_false()
   flag.val = true

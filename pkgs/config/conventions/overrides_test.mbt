@@ -6,11 +6,9 @@ test "Adjacent override wins" {
   ])
   @expect.expect(@config.get_text(config, "ui.theme")).to_equal("personal")
   let report = report_of(config, UserOverride).unwrap()
-  @expect.expect((report.priority, report.path, report.kind.report_name())).to_equal((
-    400,
-    Some("/w/acme.user.toml"),
-    "user-override",
-  ))
+  @expect.expect((report.priority, report.path, report.kind.report_name())).to_equal(
+    (400, Some("/w/acme.user.toml"), "user-override"),
+  )
 }
 
 ///|
@@ -36,15 +34,18 @@ test "Sibling override serializations" {
   let (location, candidates) = ambiguity(() => {
     discover_in(
       "/w",
-      [("/w/acme.toml", ""), ("/w/acme.user.toml", ""), ("/w/acme.user.yaml", "")],
+      [
+        ("/w/acme.toml", ""),
+        ("/w/acme.user.toml", ""),
+        ("/w/acme.user.yaml", ""),
+      ],
       formats=[@toml.format(), yaml_only()],
     )
     |> ignore
   })
-  @expect.expect((location, candidates)).to_equal((
-    "/w",
-    ["/w/acme.user.toml", "/w/acme.user.yaml"],
-  ))
+  @expect.expect((location, candidates)).to_equal(
+    ("/w", ["/w/acme.user.toml", "/w/acme.user.yaml"]),
+  )
 }
 
 ///|
@@ -67,9 +68,9 @@ test "Local file loads below the user override" {
   let config = discover_in("/w", files)
   @expect.expect(@config.get_text(config, "ui.theme")).to_equal("mine")
   let report = report_of(config, LocalOverride).unwrap()
-  @expect.expect((report.kind.report_name(), report.priority)).to_equal((
-    "local-override", 390,
-  ))
+  @expect.expect((report.kind.report_name(), report.priority)).to_equal(
+    ("local-override", 390),
+  )
   let without_user = discover_in("/w", files[:2].to_owned())
   @expect.expect(@config.get_text(without_user, "ui.theme")).to_equal("local")
 }
@@ -88,12 +89,18 @@ test "Sibling local override serializations" {
   let (_, candidates) = ambiguity(() => {
     discover_in(
       "/w",
-      [("/w/acme.toml", ""), ("/w/acme.local.toml", ""), ("/w/acme.local.yaml", "")],
+      [
+        ("/w/acme.toml", ""),
+        ("/w/acme.local.toml", ""),
+        ("/w/acme.local.yaml", ""),
+      ],
       formats=[@toml.format(), yaml_only()],
     )
     |> ignore
   })
-  @expect.expect(candidates).to_equal(["/w/acme.local.toml", "/w/acme.local.yaml"])
+  @expect.expect(candidates).to_equal([
+    "/w/acme.local.toml", "/w/acme.local.yaml",
+  ])
 }
 
 ///|
@@ -103,10 +110,9 @@ test "Standard set loads a local file" {
     ("/w/acme.local.toml", "b = 1"),
   ])
   let report = report_of(config, LocalOverride).unwrap()
-  @expect.expect((report.path, report.status)).to_equal((
-    Some("/w/acme.local.toml"),
-    Loaded,
-  ))
+  @expect.expect((report.path, report.status)).to_equal(
+    (Some("/w/acme.local.toml"), Loaded),
+  )
 }
 
 ///|
@@ -139,10 +145,9 @@ test "without removes the local override part" {
 test "a primary with no overrides reports them not found" {
   let config = discover_in("/w", [("/w/acme.toml", "a = 1")])
   let report = report_of(config, UserOverride).unwrap()
-  @expect.expect((report.status, report.candidates)).to_equal((
-    NotFound,
-    ["/w/acme.user.toml"],
-  ))
+  @expect.expect((report.status, report.candidates)).to_equal(
+    (NotFound, ["/w/acme.user.toml"]),
+  )
 }
 
 ///|
@@ -212,12 +217,9 @@ test "Isolated mode skips user and machine files" {
 
 ///|
 test "convention sources are in merge order with rising priorities" {
-  let config = discover_in(
-    "/w",
-    [("/w/acme.toml", "a = 1")],
-    platform=Linux,
-    env_vars={ "HOME": "/home/alice" },
-  )
+  let config = discover_in("/w", [("/w/acme.toml", "a = 1")], platform=Linux, env_vars={
+    "HOME": "/home/alice",
+  })
   @expect.expect(
     config.reports().map(report => (report.kind.report_name(), report.priority)),
   ).to_equal([
@@ -240,11 +242,9 @@ test "Explicit file from another directory" {
     ),
   )
   let report = project(config)
-  @expect.expect((report.kind, report.path, report.status)).to_equal((
-    File(Explicit),
-    Some("/w/configs/project.yaml"),
-    Loaded,
-  ))
+  @expect.expect((report.kind, report.path, report.status)).to_equal(
+    (File(Explicit), Some("/w/configs/project.yaml"), Loaded),
+  )
   // The explicit file replaces the walk-up, so the nearer acme.toml stays out.
   @expect.expect(config.get(@config.KeyPath::parse("a"))).to_equal(None)
 }
@@ -314,8 +314,8 @@ test "a relative dot-config explicit file has its overrides" {
     |> @config.load(
       @config.FileTree::new(complete=true)
       .with_listing(p(".config/acme"), [
-        { name: "config.toml", kind: File },
-        { name: "config.user.toml", kind: File },
+        { name: "config.toml", kind: File, },
+        { name: "config.user.toml", kind: File, },
       ])
       .with_file(p(".config/acme/config.toml"), "ui.theme = \"shared\"")
       .with_file(p(".config/acme/config.user.toml"), "ui.theme = \"personal\""),
@@ -330,7 +330,9 @@ test "a missing explicit file is an error" {
     discover_in(
       "/w",
       [],
-      options=@conventions.DiscoveryOptions::new(config=Explicit("/w/nope.toml")),
+      options=@conventions.DiscoveryOptions::new(
+        config=Explicit("/w/nope.toml"),
+      ),
     )
   catch {
     FileNotFound(path~) => @expect.expect(path).to_equal("/w/nope.toml")

@@ -13,7 +13,10 @@ pub struct HostEnvironment {
 ///|
 /// Compare the environment name without regard to letter case. With no name,
 /// the result is false.
-pub fn HostEnvironment::is_environment(self : HostEnvironment, name : @conventions.EnvironmentName) -> Bool {
+pub fn HostEnvironment::is_environment(
+  self : HostEnvironment,
+  name : @conventions.EnvironmentName,
+) -> Bool {
   self.has_name(name.to_string())
 }
 
@@ -48,22 +51,32 @@ fn HostEnvironment::has_name(self : HostEnvironment, name : String) -> Bool {
 /// files need a primary part such as `app_dirs()`. The flag and the
 /// run's prefixed variable still take precedence. A later step replaces the
 /// default. Parse the name with `@conventions.EnvironmentName::parse`.
-pub fn[S] default_environment(builder : HostBuilder[S], name : @conventions.EnvironmentName) -> HostBuilder[S] {
-  { ..builder, environment: Some(name) }
+pub fn[S] default_environment(
+  builder : HostBuilder[S],
+  name : @conventions.EnvironmentName,
+) -> HostBuilder[S] {
+  { ..builder, environment: Some(name), }
 }
 
 ///|
 /// Set the content root to an absolute path. A later step replaces the value.
 /// Without this step, the host uses the working directory of the run.
-pub fn[S] content_root(builder : HostBuilder[S], path : @lander_core.AbsolutePath) -> HostBuilder[S] {
-  { ..builder, root: Some(path) }
+pub fn[S] content_root(
+  builder : HostBuilder[S],
+  path : @lander_core.AbsolutePath,
+) -> HostBuilder[S] {
+  { ..builder, root: Some(path), }
 }
 
 ///|
 /// Resolve after arguments and before configuration, even when environment
 /// files are off. Empty variables count as unset, as in conventions. A parsed
 /// builder default needs no second parse.
-fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @conventions.DiscoveryOptions) -> HostEnvironment raise @config.ConfigError {
+fn[S] resolve_environment(
+  host : Host[S],
+  settings : RunSettings,
+  options : @conventions.DiscoveryOptions,
+) -> HostEnvironment raise @config.ConfigError {
   let variable = "\{host.prefix}_ENVIRONMENT"
   let raw = match (options.environment, settings.variables.get(variable)) {
     (Some(name), _) => Some((name, "--environment"))
@@ -71,18 +84,29 @@ fn[S] resolve_environment(host : Host[S], settings : RunSettings, options : @con
     _ => None
   }
   let environment_name = match raw {
-    Some((text, source)) => Some(@conventions.EnvironmentName::parse(text, source~))
+    Some((text, source)) =>
+      Some(@conventions.EnvironmentName::parse(text, source~))
     None => host.environment
   }
-  { application_name: host.name, environment_name,
-    content_root: host.root.unwrap_or(settings.directory) }
+  {
+    application_name: host.name,
+    environment_name,
+    content_root: host.root.unwrap_or(settings.directory),
+  }
 }
 
 ///|
 /// Convert the resolved name to text only at the conventions input boundary.
-fn[S] environment_options(host : Host[S], options : @conventions.DiscoveryOptions, environment : HostEnvironment) -> @conventions.DiscoveryOptions {
+fn[S] environment_options(
+  host : Host[S],
+  options : @conventions.DiscoveryOptions,
+  environment : HostEnvironment,
+) -> @conventions.DiscoveryOptions {
   if host.environment is Some(_) {
-    { ..options, environment: environment.environment_name.map(name => name.to_string()) }
+    {
+      ..options,
+      environment: environment.environment_name.map(name => name.to_string()),
+    }
   } else {
     options
   }

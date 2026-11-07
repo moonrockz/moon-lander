@@ -13,14 +13,12 @@ fn service_name_result(text : String) -> String {
 test "service names accept Unicode letters, marks, digits, _, - and ." {
   for
     text in [
-      "a", "Z", "db", "db.primary", "telemetry-flush", "cache_2", "données",
-      "数据库", "डेटा", "Ωmega", "café", "console", "com10", "lpt", "con2",
-      "a\u{00B7}b", "a\u{203F}b", "a\u{FF3F}b", "a\u{30FB}b", "\u{216B}", "\u{2118}x",
+      "a", "Z", "db", "db.primary", "telemetry-flush", "cache_2", "données", "数据库",
+      "डेटा", "Ωmega", "café", "console", "com10", "lpt", "con2", "a\u{00B7}b",
+      "a\u{203F}b", "a\u{FF3F}b", "a\u{30FB}b", "\u{216B}", "\u{2118}x",
     ] {
     @expect.expect(service_name_result(text)).to_equal("ok")
-    @expect.expect(@hosting.ServiceName::parse(text).to_string()).to_equal(
-      text,
-    )
+    @expect.expect(@hosting.ServiceName::parse(text).to_string()).to_equal(text)
   }
 }
 
@@ -44,9 +42,9 @@ test "service names must start with a letter" {
 test "service names have no character that a path cannot hold" {
   for
     text in [
-      "a b", "a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b",
-      "db\u{00A0}", "db\u{3000}", "d\nb", "d\u{2028}b", "d\u{202E}b", "d\u{007F}",
-      "d\u{0000}b", "com\u{00B9}", "lpt\u{00B3}",
+      "a b", "a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "db\u{00A0}",
+      "db\u{3000}", "d\nb", "d\u{2028}b", "d\u{202E}b", "d\u{007F}", "d\u{0000}b",
+      "com\u{00B9}", "lpt\u{00B3}",
     ] {
     @expect.expect(service_name_result(text).contains("is not allowed")).to_equal(
       true,
@@ -66,8 +64,8 @@ test "service names do not end with a dot" {
 test "service names are not Windows device names" {
   for
     text in [
-      "con", "CON", "Prn", "aux", "nul", "NUL.log", "com0", "com9", "COM1",
-      "lpt0", "LPT9", "con.d.e",
+      "con", "CON", "Prn", "aux", "nul", "NUL.log", "com0", "com9", "COM1", "lpt0",
+      "LPT9", "con.d.e",
     ] {
     @expect.expect(service_name_result(text)).to_equal(
       "Invalid service name \{text.escape()}: the name is a Windows device name",
@@ -102,9 +100,9 @@ test "exit codes are in the range 0 to 255" {
   )
   @expect.expect(@hosting.ExitCode::from_int(255).to_int()).to_equal(255)
   for code in [-1, 256, 999] {
-    let result : Result[@hosting.ExitCode, @hosting.HostError] = try
-      Ok(@hosting.ExitCode::from_int(code))
-    catch {
+    let result : Result[@hosting.ExitCode, @hosting.HostError] = Ok(
+      @hosting.ExitCode::from_int(code),
+    ) catch {
       err => Err(err)
     }
     guard result is Err(@hosting.InvalidExitCode(code=got)) else {

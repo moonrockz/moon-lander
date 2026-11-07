@@ -11,7 +11,12 @@ pub(all) enum StopReason {
 
 ///|
 /// A signal whose identity the host knows.
-pub(all) enum SignalKind { Interrupt; Terminate; Quit } derive(Eq, Debug)
+#derive(Eq, Debug)
+pub(all) enum SignalKind {
+  Interrupt
+  Terminate
+  Quit
+}
 
 ///|
 pub extend SignalKind with Eq::{equal, not_equal}
@@ -31,7 +36,7 @@ pub struct SignalProbe {
 /// Make a probe from a read that gives the signal that asked the process to
 /// stop, or `None` before a signal.
 pub fn SignalProbe::new(read : () -> SignalKind?) -> SignalProbe {
-  { request: () => read().map(kind => StopRequest::Signal(kind)) }
+  { request: () => read().map(kind => StopRequest::Signal(kind)), }
 }
 
 ///|
@@ -55,20 +60,30 @@ priv struct EventHandlers {
 }
 
 ///|
-fn EventHandlers::new() -> EventHandlers { { raised: false, handlers: [] } }
+fn EventHandlers::new() -> EventHandlers {
+  { raised: false, handlers: [], }
+}
 
 ///|
 fn EventHandlers::register(self : EventHandlers, handler : () -> Unit) -> Unit {
-  if self.raised { handler() } else { self.handlers.push(handler) }
+  if self.raised {
+    handler()
+  } else {
+    self.handlers.push(handler)
+  }
 }
 
 ///|
 fn EventHandlers::raise_event(self : EventHandlers) -> Unit {
-  if self.raised { return }
+  if self.raised {
+    return
+  }
   self.raised = true
   let handlers = self.handlers.copy()
   self.handlers.clear()
-  for handler in handlers { handler() }
+  for handler in handlers {
+    handler()
+  }
 }
 
 ///|
@@ -89,21 +104,38 @@ pub struct Lifetime {
 
 ///|
 fn Lifetime::new() -> Lifetime {
-  { started: EventHandlers::new(), stopping: EventHandlers::new(), stopped: EventHandlers::new(),
-    reason: None, request: None, signal: None, requested_code: None, exit_code: None, probes: [], task_cancelled: Ref(() => false), cancel_command: Ref(None) }
+  {
+    started: EventHandlers::new(),
+    stopping: EventHandlers::new(),
+    stopped: EventHandlers::new(),
+    reason: None,
+    request: None,
+    signal: None,
+    requested_code: None,
+    exit_code: None,
+    probes: [],
+    task_cancelled: Ref(() => false),
+    cancel_command: Ref(None),
+  }
 }
 
 ///|
 /// Register a synchronous handler. After started, it runs at once, one time.
-pub fn Lifetime::on_started(self : Lifetime, handler : () -> Unit) -> Unit { self.started.register(handler) }
+pub fn Lifetime::on_started(self : Lifetime, handler : () -> Unit) -> Unit {
+  self.started.register(handler)
+}
 
 ///|
 /// Register a synchronous handler. After stopping, it runs at once, one time.
-pub fn Lifetime::on_stopping(self : Lifetime, handler : () -> Unit) -> Unit { self.stopping.register(handler) }
+pub fn Lifetime::on_stopping(self : Lifetime, handler : () -> Unit) -> Unit {
+  self.stopping.register(handler)
+}
 
 ///|
 /// Register a synchronous handler. After stopped, it runs at once, one time.
-pub fn Lifetime::on_stopped(self : Lifetime, handler : () -> Unit) -> Unit { self.stopped.register(handler) }
+pub fn Lifetime::on_stopped(self : Lifetime, handler : () -> Unit) -> Unit {
+  self.stopped.register(handler)
+}
 
 ///|
 fn Lifetime::raise_event(self : Lifetime, event : Event) -> Unit {
@@ -115,22 +147,41 @@ fn Lifetime::raise_event(self : Lifetime, event : Event) -> Unit {
 }
 
 ///|
-fn Lifetime::request_stop(self : Lifetime, request : StopRequest, code : ExitCode?) -> Unit {
+fn Lifetime::request_stop(
+  self : Lifetime,
+  request : StopRequest,
+  code : ExitCode?,
+) -> Unit {
   if self.request is None {
     self.request = Some(request)
     self.requested_code = code
-    if code is Some(_) { self.exit_code = code }
+    if code is Some(_) {
+      self.exit_code = code
+    }
     if self.reason is None {
-      self.reason = Some(match request { Requested => Requested; Signal(kind) => Signal(kind); Embedder => Embedder })
+      self.reason = Some(
+        match request {
+          Requested => Requested
+          Signal(kind) => Signal(kind)
+          Embedder => Embedder
+        },
+      )
     }
   }
-  if request is Signal(signal) { self.signal = Some(signal) }
-  if self.cancel_command.val is Some(cancel) { cancel() }
+  if request is Signal(signal) {
+    self.signal = Some(signal)
+  }
+  if self.cancel_command.val is Some(cancel) {
+    cancel()
+  }
 }
 
 ///|
 /// Ask the host to stop. The first request keeps its optional exit code.
-pub fn Lifetime::stop_application(self : Lifetime, exit_code? : ExitCode) -> Unit {
+pub fn Lifetime::stop_application(
+  self : Lifetime,
+  exit_code? : ExitCode,
+) -> Unit {
   self.request_stop(Requested, exit_code)
 }
 
@@ -138,55 +189,77 @@ pub fn Lifetime::stop_application(self : Lifetime, exit_code? : ExitCode) -> Uni
 /// Ask the host to stop from an enclosing embedder's shutdown callback.
 /// Use the existing cancellation and cleanup path with reason Embedder.
 /// An earlier run-ending event and the first request's optional code remain.
-pub fn Lifetime::stop_from_embedder(self : Lifetime, exit_code? : ExitCode) -> Unit {
+pub fn Lifetime::stop_from_embedder(
+  self : Lifetime,
+  exit_code? : ExitCode,
+) -> Unit {
   self.request_stop(Embedder, exit_code)
 }
 
 ///|
 /// Set the application exit code. Signals and failures take precedence.
 /// The last set code or first request's explicit code wins.
-pub fn Lifetime::set_exit_code(self : Lifetime, code : ExitCode) -> Unit { self.exit_code = Some(code) }
+pub fn Lifetime::set_exit_code(self : Lifetime, code : ExitCode) -> Unit {
+  self.exit_code = Some(code)
+}
 
 ///|
 /// The first event that ended the run, or None until an event ends it.
-pub fn Lifetime::stop_reason(self : Lifetime) -> StopReason? { self.reason }
+pub fn Lifetime::stop_reason(self : Lifetime) -> StopReason? {
+  self.reason
+}
 
 ///|
 /// Poll registered stop probes and read the retained host stop request.
 /// Safe in synchronous foreign callbacks on the host thread. This does not
 /// query current-task cancellation, yield or run shutdown. Probes must be
 /// cheap and must not raise, as for the task-aware cancellation checks.
-pub fn Lifetime::stop_requested(self : Lifetime) -> Bool { self.probe_stop() }
+pub fn Lifetime::stop_requested(self : Lifetime) -> Bool {
+  self.probe_stop()
+}
 
 ///|
 /// Poll this context's lifetime without querying current-task cancellation.
 /// Safe in synchronous foreign callbacks on the host thread.
-pub fn[S] Context::stop_requested(self : Context[S]) -> Bool { self.lifetime.stop_requested() }
+pub fn[S] Context::stop_requested(self : Context[S]) -> Bool {
+  self.lifetime.stop_requested()
+}
 
 ///|
 /// Poll the token's lifetime without querying current-task cancellation.
 /// Safe in synchronous foreign callbacks on the host thread.
-pub fn StopToken::stop_requested(self : StopToken) -> Bool { self.lifetime.stop_requested() }
+pub fn StopToken::stop_requested(self : StopToken) -> Bool {
+  self.lifetime.stop_requested()
+}
 
 ///|
 /// A handle with the same stop checks as its lifetime.
 /// During a run on native and js, use cancelled/check_cancelled inside an async
 /// task of the run. Use stop_requested in a synchronous foreign callback.
-pub struct StopToken { priv lifetime : Lifetime }
+pub struct StopToken {
+  priv lifetime : Lifetime
+}
 
 ///|
 /// Give a token for code that does not receive a Context.
-pub fn Lifetime::stop_token(self : Lifetime) -> StopToken { { lifetime: self } }
+pub fn Lifetime::stop_token(self : Lifetime) -> StopToken {
+  { lifetime: self, }
+}
 
 ///|
-fn Lifetime::register_stop_probe(self : Lifetime, probe : () -> StopRequest?) -> Unit {
+fn Lifetime::register_stop_probe(
+  self : Lifetime,
+  probe : () -> StopRequest?,
+) -> Unit {
   self.probes.push(probe)
 }
 
 ///|
 fn Lifetime::probe_stop(self : Lifetime) -> Bool {
   for probe in self.probes {
-    if probe() is Some(request) { self.request_stop(request, None) }
+    if probe() is Some(request) {
+      self.request_stop(request, None)
+    }
   }
   self.request is Some(_)
 }
@@ -194,18 +267,26 @@ fn Lifetime::probe_stop(self : Lifetime) -> Bool {
 ///|
 /// Raise StopRequested when this token reports cancellation.
 pub fn StopToken::check_cancelled(self : StopToken) -> Unit raise StopRequested {
-  if self.cancelled() { raise StopRequested }
+  if self.cancelled() {
+    raise StopRequested
+  }
 }
 
 ///|
 /// Read the lifetime's stop state and the current task's cancellation state.
 /// On native and js, read this check inside an async task of the run.
-pub fn[S] Context::cancelled(self : Context[S]) -> Bool { self.lifetime.cancelled() }
+pub fn[S] Context::cancelled(self : Context[S]) -> Bool {
+  self.lifetime.cancelled()
+}
 
 ///|
 /// Raise StopRequested after a stop request or task cancellation.
-pub fn[S] Context::check_cancelled(self : Context[S]) -> Unit raise StopRequested {
-  if self.cancelled() { raise StopRequested }
+pub fn[S] Context::check_cancelled(
+  self : Context[S],
+) -> Unit raise StopRequested {
+  if self.cancelled() {
+    raise StopRequested
+  }
 }
 
 ///|
@@ -224,13 +305,27 @@ fn Lifetime::cancelled(self : Lifetime) -> Bool {
 ///|
 /// The reply of a driver after one step: read the probes, then reply with the
 /// first stop request, the failure or done. Both drivers use this rule.
-fn Lifetime::reply(self : Lifetime, pending : Pending, result : ActionResult) -> Step {
+fn Lifetime::reply(
+  self : Lifetime,
+  pending : Pending,
+  result : ActionResult,
+) -> Step {
   ignore(self.probe_stop())
   let next = if self.request is Some(request) {
-    pending.stop_requested(request, self.requested_code, result~, observed_signal?=self.signal)
-  } else if result is Failed(error) { pending.failed(error) }
-  else { pending.done() }
-  if pending.engine.reason is Some(reason) { self.reason = Some(reason) }
+    pending.stop_requested(
+      request,
+      self.requested_code,
+      result~,
+      observed_signal?=self.signal,
+    )
+  } else if result is Failed(error) {
+    pending.failed(error)
+  } else {
+    pending.done()
+  }
+  if pending.engine.reason is Some(reason) {
+    self.reason = Some(reason)
+  }
   next
 }
 
@@ -240,9 +335,21 @@ fn Lifetime::reply(self : Lifetime, pending : Pending, result : ActionResult) ->
 /// reached no service: no service is started and no hook runs. The engine then
 /// starts without services, so it marks none started, and the reply to its first
 /// step goes to the stop events.
-fn[S] Lifetime::start_engine(self : Lifetime, services : Array[HostedService[S]]) -> Step {
-  guard self.probe_stop() && self.request is Some(request) else { return Engine::start(services) }
+fn[S] Lifetime::start_engine(
+  self : Lifetime,
+  services : Array[HostedService[S]],
+) -> Step {
+  guard self.probe_stop() && self.request is Some(request) else {
+    return Engine::start(services)
+  }
   let none : Array[HostedService[S]] = []
-  guard Engine::start(none) is Run(pending, _) else { abort("an engine without services raises Started first") }
-  pending.stop_requested(request, self.requested_code, result=Interrupted, observed_signal?=self.signal)
+  guard Engine::start(none) is Run(pending, _) else {
+    abort("an engine without services raises Started first")
+  }
+  pending.stop_requested(
+    request,
+    self.requested_code,
+    result=Interrupted,
+    observed_signal?=self.signal,
+  )
 }

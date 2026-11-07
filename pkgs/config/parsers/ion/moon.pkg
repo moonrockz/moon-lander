@@ -1,7 +1,7 @@
 import {
   "moonrockz/moon-lander-config" @config,
   "moonrockz/ion/ion" @ion_lib,
-  "moonrockz/ion/text" @text,
+  "moonrockz/ion/text",
 }
 
 import {

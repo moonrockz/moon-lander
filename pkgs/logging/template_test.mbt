@@ -66,14 +66,15 @@ test "a number stays a number" {
 }
 
 ///|
+#derive(ToJson)
 struct Order {
-  id : Int
+  id : Int32
   total : Double
-} derive(ToJson)
+}
 
 ///|
 test "a derived ToJson value stays an object" {
-  let order = { id: 1, total: 9.5 }
+  let order = { id: 1, total: 9.5, }
   let event = event_of("Saved {Order}", [Json(order)])
   assert_eq(event.property("Order"), Some({ "id": 1, "total": 9.5 }))
 }

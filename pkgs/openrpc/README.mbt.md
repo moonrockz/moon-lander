@@ -91,8 +91,7 @@ test {
   assert_eq(read.cst().unwrap().reproduce(), source)
   let compact = @openrpc.write(document).unwrap()
   assert_eq(
-    compact,
-    "{\"components\":{\"contentDescriptors\":{\"P\":{\"name\":\"p\",\"schema\":true}}},\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"b\",\"params\":[]},{\"name\":\"a\",\"params\":[{\"$ref\":\"#/components/contentDescriptors/P\"}]}],\"openrpc\":\"1.4.0\",\"x-n\":1.0}",
+    compact, "{\"components\":{\"contentDescriptors\":{\"P\":{\"name\":\"p\",\"schema\":true}}},\"info\":{\"title\":\"API\",\"version\":\"1\"},\"methods\":[{\"name\":\"b\",\"params\":[]},{\"name\":\"a\",\"params\":[{\"$ref\":\"#/components/contentDescriptors/P\"}]}],\"openrpc\":\"1.4.0\",\"x-n\":1.0}",
   )
   let pretty = @openrpc.write(document, format=@exact.Pretty).unwrap()
   assert_true(pretty.has_prefix("{\n  \"components\": {"))
@@ -270,7 +269,10 @@ test {
   let source = "{\"openrpc\":\"1.4.0\",\"info\":{\"title\":\"😀\",\"version\":\"1\"},\n\"methods\":[{\"name\":\"a\",\"params\":[]},{\"$ref\":\"#/x-copy\"}],\"x-copy\":{\"name\":\"a\",\"params\":[]}}"
   let read = @openrpc.read(source, source_id=Some("api.json"))
   let source_map = read.source_map().unwrap()
-  let report = @openrpc.validate(read.document().unwrap(), source_map=Some(source_map))
+  let report = @openrpc.validate(
+    read.document().unwrap(),
+    source_map=Some(source_map),
+  )
   let duplicate = report.findings()[0]
   assert_eq(duplicate.diagnostic().code(), @exact.DuplicateName)
   assert_eq(duplicate.location().path(), ["x-copy", "name"])
@@ -301,9 +303,7 @@ test {
   let report = @openrpc.validate(document, limits~)
   assert_eq(report.normative(), @openrpc.Failed)
   assert_true(
-    report
-    .findings()
-    .any(f => f.diagnostic().code() == @exact.LimitExceeded),
+    report.findings().any(f => f.diagnostic().code() == @exact.LimitExceeded),
   )
   assert_true(@openrpc.validate_closed(document, limits~).document() is None)
 }

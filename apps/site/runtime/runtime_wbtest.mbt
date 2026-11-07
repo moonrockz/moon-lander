@@ -27,13 +27,14 @@ async fn remove_fixture(root : String) -> Unit {
 ///|
 async fn fixture() -> String {
   let root = @fs.tmpdir(prefix="lander-telescope")
-  let config = (
+  let config =
     #|{"title":"Fixture","description":"A site","base_path":"/fixture/","site_url":"https://example.test/fixture/","repo_url":"https://example.test/repo","source_roots":["docs","site/pages","site/articles","pkgs"]}
-  )
   write(root, "site/site.json", config)
-  write(root, "site/pages/index.html", "<h1>Fixture</h1><a href=\"/docs/\">Docs</a>")
+  write(
+    root, "site/pages/index.html", "<h1>Fixture</h1><a href=\"/docs/\">Docs</a>",
+  )
   write(root, "docs/README.md", "# Docs\n\n[Guide](guide.md#install)\n")
-  let guide = (
+  let guide =
     #|---
     #|title: Guide
     #|status: proposed
@@ -58,10 +59,14 @@ async fn fixture() -> String {
     #|graph LR
     #|A --> B
     #|```
-  )
   write(root, "docs/guide.md", guide)
   ignore(git(root, ["init", "-q"]))
-  ignore(git(root, ["-c", "user.name=Site fixture", "-c", "user.email=site@example.test", "commit", "--allow-empty", "-qm", "fixture"]))
+  ignore(
+    git(root, [
+      "-c", "user.name=Site fixture", "-c", "user.email=site@example.test", "commit",
+      "--allow-empty", "-qm", "fixture",
+    ]),
+  )
   root
 }
 
@@ -70,7 +75,10 @@ async test "Git fixture cleanup removes read-only files" {
   let root = fixture()
   write(root, "readonly.bin", "fixture")
   if @async.platform is Windows {
-    fixture_attributes(["+R", root.replace_all(old="/", new="\\") + "\\readonly.bin"])
+    fixture_attributes([
+      "+R",
+      root.replace_all(old="/", new="\\") + "\\readonly.bin",
+    ])
   } else {
     @fs.chmod(root + "/readonly.bin", 0o400)
   }
@@ -81,7 +89,7 @@ async test "Git fixture cleanup removes read-only files" {
 ///|
 async test "source policy checks native canonical paths before rendering" {
   let root = fixture()
-  defer remove_fixture(root)
+  defer @async.protect_from_cancel(() => remove_fixture(root))
   let config = effective_configuration(root, @policy.TreePrefix::parse(""))
   check_source_policy(root, config, true) catch {
     @model.Invalid(problems) => fail(problems.map(p => p.render()).join("\n"))
@@ -92,7 +100,7 @@ async test "source policy checks native canonical paths before rendering" {
 ///|
 async test "source policy rejects a canonical path outside the project" {
   let root = fixture()
-  defer remove_fixture(root)
+  defer @async.protect_from_cancel(() => remove_fixture(root))
   let outside = @fs.tmpdir(prefix="lander-source-outside")
   defer @fs.rmdir(outside, recursive=true)
   write(outside, "external.md", "# External")
@@ -101,7 +109,10 @@ async test "source policy rejects a canonical path outside the project" {
   let problems = try {
     check_source_policy(root, config, true)
     []
-  } catch { @model.Invalid(problems) => problems; error => fail("unexpected: \{error}") }
+  } catch {
+    @model.Invalid(problems) => problems
+    error => fail("unexpected: \{error}")
+  }
   assert_eq(problems.length(), 1)
   assert_eq(problems[0].file, "docs/external.md")
 }
@@ -109,9 +120,12 @@ async test "source policy rejects a canonical path outside the project" {
 ///|
 async test "the shared host preserves content and active deployment bases" {
   let root = fixture()
-  defer remove_fixture(root)
+  defer @async.protect_from_cancel(() => remove_fixture(root))
   for suffix in ["", "next/"] {
-    let config = effective_configuration(root, @policy.TreePrefix::parse(suffix))
+    let config = effective_configuration(
+      root,
+      @policy.TreePrefix::parse(suffix),
+    )
     let out = "\{root}/out-\{suffix.replace_all(old="/", new="-")}"
     let warnings = build(root, config, out, main_build=true) catch {
       @model.Invalid(problems) => fail(problems.map(p => p.render()).join("\n"))
@@ -126,14 +140,18 @@ async test "the shared host preserves content and active deployment bases" {
     assert_true(html.contains("figure class=\"layer-stack\""))
     assert_true(html.contains("figure class=\"diagram\"><svg"))
     assert_true(html.contains("class=\"language-moonbit\""))
-    assert_true(@fs.read_file(out + "/index.html").text().contains("href=\"/fixture/\{suffix}docs/\""))
+    assert_true(
+      @fs.read_file(out + "/index.html")
+      .text()
+      .contains("href=\"/fixture/\{suffix}docs/\""),
+    )
   }
 }
 
 ///|
 async test "ignored pages and brand documentation are not discovered" {
   let root = fixture()
-  defer remove_fixture(root)
+  defer @async.protect_from_cancel(() => remove_fixture(root))
   write(root, ".git/info/exclude", "docs/ignored.md\ndocs/superpowers/\n")
   write(root, "docs/ignored.md", "# Ignored\n\n[bad](missing.md)")
   write(root, "docs/assets/brand/README.md", "# Brand\n\n[bad](missing.md)")
@@ -153,34 +171,43 @@ async test "ignored pages and brand documentation are not discovered" {
 ///|
 async test "a tracked or unexcluded scratch plan fails before rendering" {
   let root = fixture()
-  defer remove_fixture(root)
+  defer @async.protect_from_cancel(() => remove_fixture(root))
   write(root, "docs/superpowers/plan.md", "# Plan")
   let problems = try {
     ignore(effective_configuration(root, @policy.TreePrefix::parse("")))
     []
-  } catch { @model.Invalid(problems) => problems; error => fail("unexpected error: \{error}") }
+  } catch {
+    @model.Invalid(problems) => problems
+    error => fail("unexpected error: \{error}")
+  }
   assert_eq(problems.length(), 1)
   assert_eq(problems[0].file, "docs/superpowers/")
 }
 
 ///|
 async test "invalid prose and diagram inputs still fail with the source" {
-  for (file, body) in [
-    ("bad.md", "# Bad\n\n[broken](missing.md)"),
-    ("code.md", "# Bad\n\n" + "```moonbit\nlet x = 1\n```"),
-    ("diagram.md", "# Bad\n\n" + "```mermaid\ngantt\ntitle bad\n```"),
-    ("layers.md", "# Bad\n\n" + "```layers\nmissing separator\n```"),
-    ("draft.md", "---\ndraft: true\n---\n# Draft"),
-  ] {
+  for
+    (file, body) in [
+      ("bad.md", "# Bad\n\n[broken](missing.md)"),
+      ("code.md", "# Bad\n\n" + "```moonbit\nlet x = 1\n```"),
+      ("diagram.md", "# Bad\n\n" + "```mermaid\ngantt\ntitle bad\n```"),
+      ("layers.md", "# Bad\n\n" + "```layers\nmissing separator\n```"),
+      ("draft.md", "---\ndraft: true\n---\n# Draft"),
+    ] {
     let root = fixture()
-    defer remove_fixture(root)
+    defer @async.protect_from_cancel(() => remove_fixture(root))
     write(root, "docs/" + file, body)
     let config = effective_configuration(root, @policy.TreePrefix::parse(""))
     let problems = try {
       ignore(build(root, config, root + "/out", main_build=true))
       []
-    } catch { @model.Invalid(problems) => problems; error => fail("unexpected error: \{error}") }
-    if problems.is_empty() { fail("expected a build failure for \{file}") }
+    } catch {
+      @model.Invalid(problems) => problems
+      error => fail("unexpected error: \{error}")
+    }
+    if problems.is_empty() {
+      fail("expected a build failure for \{file}")
+    }
     assert_true(problems.iter().any(p => p.file.contains(file)))
   }
 }

@@ -7,24 +7,33 @@ priv type NodeAdapter
 priv type SignalListeners
 
 ///|
-extern "js" fn NodeAdapter::install_signals(self : NodeAdapter) -> SignalListeners =
+extern "js" fn NodeAdapter::install_signals(
+  self : NodeAdapter,
+) -> SignalListeners =
   #|(adapter) => adapter.installSignals()
 
 ///|
-extern "js" fn NodeAdapter::set_exit_code(self : NodeAdapter, code : Int) -> Unit =
+extern "js" fn NodeAdapter::set_exit_code(
+  self : NodeAdapter,
+  code : Int32,
+) -> Unit =
   #|(adapter, code) => adapter.setExitCode(code)
 
 ///|
-extern "js" fn NodeAdapter::exit_after(self : NodeAdapter, code : Int, ms : Int) -> Unit =
+extern "js" fn NodeAdapter::exit_after(
+  self : NodeAdapter,
+  code : Int32,
+  ms : Int32,
+) -> Unit =
   #|(adapter, code, ms) => adapter.exitAfter(code, ms)
 
 ///|
 /// After a graceful signal stop, the time that the event loop has to become
 /// empty before the driver ends the process with `process.exit`.
-let signal_exit_grace : Int = 2000
+let signal_exit_grace : Int32 = 2000
 
 ///|
-extern "js" fn SignalListeners::kind(self : SignalListeners) -> Int =
+extern "js" fn SignalListeners::kind(self : SignalListeners) -> Int32 =
   #|(listeners) => listeners.kind()
 
 ///|
@@ -84,7 +93,11 @@ pub async fn[S] run(
   }
   defer remove()
   errdefer adapter.set_exit_code(1)
-  let outcome = @hosting.run(host, command, signals=@hosting.SignalProbe::new(read))
+  let outcome = @hosting.run(
+    host,
+    command,
+    signals=@hosting.SignalProbe::new(read),
+  )
   let selected = selected_exit_code(outcome, read())
   let finalized = finish(selected, finalize, read)
   let code = report_completion(outcome, finalized, completed, read).to_int()

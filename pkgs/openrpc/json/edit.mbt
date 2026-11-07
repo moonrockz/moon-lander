@@ -2,24 +2,24 @@
 /// A handle to one CST node. It is valid only for a CST with exactly the same
 /// source text as the parse that produced it.
 pub struct NodeId {
-  priv index : Int
+  priv index : Int32
   priv source : String
 }
 
 ///|
-pub impl @debug.Debug for NodeId with to_repr(self) {
+pub impl @debug.Debug for NodeId with fn to_repr(self) {
   @debug.Repr::opaque_("NodeId", @debug.Repr::integer(self.index.to_string()))
 }
 
 ///|
-pub fn NodeId::index(self : NodeId) -> Int {
+pub fn NodeId::index(self : NodeId) -> Int32 {
   self.index
 }
 
 ///|
-pub fn CstDocument::node_id(self : CstDocument, index : Int) -> NodeId? {
+pub fn CstDocument::node_id(self : CstDocument, index : Int32) -> NodeId? {
   if index >= 0 && index < self.nodes.length() {
-    Some({ index, source: self.source })
+    Some({ index, source: self.source, })
   } else {
     None
   }

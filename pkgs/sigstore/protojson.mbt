@@ -29,7 +29,11 @@ fn snake_case(name : String) -> String {
 }
 
 ///|
-fn fields(json : Json, path : String, names : Array[String]) -> Fields raise Shape {
+fn fields(
+  json : Json,
+  path : String,
+  names : Array[String],
+) -> Fields raise Shape {
   guard json is Object(map) else { raise Shape(path, "expected an object") }
   let values : Map[String, Json] = Map([])
   for key, value in map {
@@ -41,13 +45,15 @@ fn fields(json : Json, path : String, names : Array[String]) -> Fields raise Sha
         None => raise Shape(join(path, key), "unknown field")
       }
     }
-    guard !values.contains(name) else { raise Shape(join(path, name), "field is repeated") }
+    guard !values.contains(name) else {
+      raise Shape(join(path, name), "field is repeated")
+    }
     if value is Null {
       continue
     }
     values[name] = value
   }
-  { path, values }
+  { path, values, }
 }
 
 ///|
@@ -130,7 +136,9 @@ fn Fields::bytes(self : Fields, name : String) -> Bytes raise Shape {
 ///|
 fn Fields::require_bytes(self : Fields, name : String) -> Bytes raise Shape {
   let bytes = self.bytes(name)
-  guard !bytes.is_empty() else { raise Shape(self.at(name), "field is required") }
+  guard !bytes.is_empty() else {
+    raise Shape(self.at(name), "field is required")
+  }
   bytes
 }
 

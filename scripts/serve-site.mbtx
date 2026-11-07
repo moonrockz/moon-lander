@@ -40,10 +40,11 @@ let skipped : Array[String] = ["_build", "node_modules", ".mooncakes"]
 
 ///|
 /// The options of the script.
+#derive(Eq, Debug)
 struct Options {
   port : Int32
   watch : Bool
-} derive(Eq, Debug)
+}
 
 ///|
 fn parse_options(args : Array[String]) -> Options raise Failure {

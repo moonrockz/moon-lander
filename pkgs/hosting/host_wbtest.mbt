@@ -5,12 +5,21 @@ fn[S] names(services : Array[HostedService[S]]) -> Array[String] {
 
 ///|
 test "shutdown timeout defaults to the core 30 second limit and later steps replace it" {
-  let first : HostBuilder[Unit] = builder(@lander_core.AppName::parse("timeout"), [])
+  let first : HostBuilder[Unit] = builder(
+    @lander_core.AppName::parse("timeout"),
+    [],
+  )
   let second = first |> shutdown_timeout(@lander_core.TimeLimit::millis(1))
   let third = second |> shutdown_timeout(@lander_core.TimeLimit::seconds(5))
-  @expect.expect((first |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::seconds(30))
-  @expect.expect((second |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::millis(1))
-  @expect.expect((third |> build(_ => ())).shutdown_timeout).to_equal(@lander_core.TimeLimit::seconds(5))
+  @expect.expect((first |> build(_ => ())).shutdown_timeout).to_equal(
+    @lander_core.TimeLimit::seconds(30),
+  )
+  @expect.expect((second |> build(_ => ())).shutdown_timeout).to_equal(
+    @lander_core.TimeLimit::millis(1),
+  )
+  @expect.expect((third |> build(_ => ())).shutdown_timeout).to_equal(
+    @lander_core.TimeLimit::seconds(5),
+  )
   for value in [0, -1] {
     try {
       ignore(@lander_core.TimeLimit::millis(value))
@@ -31,7 +40,9 @@ test "shutdown timeout defaults to the core 30 second limit and later steps repl
 
 ///|
 test "the host keeps the name, the arguments and the registration order" {
-  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), ["build", "--verbose"])
+  let host : Host[Unit] = builder(@lander_core.AppName::parse("acme"), [
+      "build", "--verbose",
+    ])
     |> service(ServiceName::parse("db"), start=_ => ())
     |> service(ServiceName::parse("cache"), stop=_ => ())
     |> build(_ => ())
@@ -46,7 +57,10 @@ test "the host keeps the name, the arguments and the registration order" {
 ///|
 test "a step gives a new builder and does not change the earlier one" {
   let args = ["build"]
-  let first : HostBuilder[Unit] = builder(@lander_core.AppName::parse("acme"), args)
+  let first : HostBuilder[Unit] = builder(
+    @lander_core.AppName::parse("acme"),
+    args,
+  )
   let second = first |> service(ServiceName::parse("db"))
   args.push("--late")
   @expect.expect(names(first.services)).to_equal([])

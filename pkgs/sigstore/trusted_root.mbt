@@ -1,11 +1,12 @@
 ///|
 /// A trusted root text that cannot be read.
+#derive(Debug)
 pub suberror TrustedRootError {
   /// The media type is not a trusted root version that the library reads.
   UnsupportedTrustedRootMediaType(String)
   /// The field at `field` (a dotted JSON path) breaks `rule`.
   InvalidTrustedRoot(field~ : String, rule~ : String)
-} derive(Debug)
+}
 
 ///|
 pub extend TrustedRootError with @debug.Debug::{to_repr}
@@ -27,12 +28,13 @@ pub fn TrustedRootError::message(self : TrustedRootError) -> String {
 
 ///|
 /// Whether the verifier can use a key of the trusted root.
+#derive(Eq, Debug)
 pub enum KeyStatus {
   /// The verifier can use the key.
   Supported
   /// The key type, for example `Ed25519`, that the verifier does not support.
   Unsupported(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend KeyStatus with Eq::{equal, not_equal}
@@ -75,7 +77,7 @@ priv struct TrustedLog {
   key : TrustedKey
   valid : Period
   /// The position of the parsed root that listed the log in a combined root.
-  source : Int
+  source : Int32
 }
 
 ///|
@@ -90,7 +92,7 @@ priv struct Authority {
   /// root. A leaf of the authority needs an SCT from a CT log of the same
   /// root when that root lists CT logs, and a log entry from a transparency
   /// log of the same root when it lists those (design ROOT-1).
-  source : Int
+  source : Int32
 }
 
 ///|
@@ -123,7 +125,7 @@ pub struct TrustedRootSummary {
 /// The logs and authorities of the root, and whether each log key is usable.
 pub fn TrustedRoot::summary(self : TrustedRoot) -> TrustedRootSummary {
   fn log_summary(log : TrustedLog) -> TrustedLogSummary {
-    { base_url: log.base_url, key: log.key.status() }
+    { base_url: log.base_url, key: log.key.status(), }
   }
 
   {
@@ -139,7 +141,9 @@ let trusted_root_media_type : String = "application/vnd.dev.sigstore.trustedroot
 
 ///|
 /// Read a trusted root from its protobuf JSON text, as sigstore-go reads it.
-pub fn TrustedRoot::parse(text : StringView) -> TrustedRoot raise TrustedRootError {
+pub fn TrustedRoot::parse(
+  text : StringView,
+) -> TrustedRoot raise TrustedRootError {
   parse_root(text) catch {
     Shape(field, rule) => raise InvalidTrustedRoot(field~, rule~)
     UnsupportedTrustedRootMediaType(_) as err => raise err
@@ -188,38 +192,41 @@ pub fn TrustedRoot::combine(roots : ArrayView[TrustedRoot]) -> TrustedRoot {
   for root in roots {
     let base = next
     let mut used = 0
-    let retag = (source : Int) => {
+    let retag = (source : Int32) => {
       if source + 1 > used {
         used = source + 1
       }
       base + source
     }
     for log in root.tlogs {
-      tlogs.push({ ..log, source: retag(log.source) })
+      tlogs.push({ ..log, source: retag(log.source), })
     }
     for log in root.ctlogs {
-      ctlogs.push({ ..log, source: retag(log.source) })
+      ctlogs.push({ ..log, source: retag(log.source), })
     }
     for authority in root.authorities {
-      authorities.push({ ..authority, source: retag(authority.source) })
+      authorities.push({ ..authority, source: retag(authority.source), })
     }
     for authority in root.timestamp_authorities {
-      timestamp_authorities.push({ ..authority, source: retag(authority.source) })
+      timestamp_authorities.push({
+        ..authority,
+        source: retag(authority.source),
+      })
     }
     next = base + (if used == 0 { 1 } else { used })
   }
-  { tlogs, authorities, ctlogs, timestamp_authorities }
+  { tlogs, authorities, ctlogs, timestamp_authorities, }
 }
 
 ///|
 /// Whether the root with position `source` lists CT logs.
-fn TrustedRoot::lists_ctlogs(self : TrustedRoot, source : Int) -> Bool {
+fn TrustedRoot::lists_ctlogs(self : TrustedRoot, source : Int32) -> Bool {
   self.ctlogs.iter().any(log => log.source == source)
 }
 
 ///|
 /// Whether the root with position `source` lists transparency logs.
-fn TrustedRoot::lists_tlogs(self : TrustedRoot, source : Int) -> Bool {
+fn TrustedRoot::lists_tlogs(self : TrustedRoot, source : Int32) -> Bool {
   self.tlogs.iter().any(log => log.source == source)
 }
 
@@ -251,14 +258,20 @@ fn parse_root(text : StringView) -> TrustedRoot raise {
     .mapi((index, json) => read_log(json, "\{root.at("tlogs")}[\{index}]", true))
   let ctlogs = root
     .array("ctlogs")
-    .mapi((index, json) => read_log(json, "\{root.at("ctlogs")}[\{index}]", false))
+    .mapi((index, json) => {
+      read_log(json, "\{root.at("ctlogs")}[\{index}]", false)
+    })
   let authorities = root
     .array("certificateAuthorities")
-    .mapi((index, json) => read_authority(json, "\{root.at("certificateAuthorities")}[\{index}]"))
+    .mapi((index, json) => {
+      read_authority(json, "\{root.at("certificateAuthorities")}[\{index}]")
+    })
   let timestamp_authorities = root
     .array("timestampAuthorities")
-    .mapi((index, json) => read_authority(json, "\{root.at("timestampAuthorities")}[\{index}]"))
-  { tlogs, authorities, ctlogs, timestamp_authorities }
+    .mapi((index, json) => {
+      read_authority(json, "\{root.at("timestampAuthorities")}[\{index}]")
+    })
+  { tlogs, authorities, ctlogs, timestamp_authorities, }
 }
 
 ///|
@@ -276,22 +289,31 @@ fn read_period(parent : Fields, name : String) -> Period raise Shape {
         }
       }
 
-      { start: bound("start"), end: bound("end") }
+      { start: bound("start"), end: bound("end"), }
     }
-    None => { start: None, end: None }
+    None => { start: None, end: None, }
   }
 }
 
 ///|
-fn read_log(json : Json, path : String, require_start : Bool) -> TrustedLog raise Shape {
+fn read_log(
+  json : Json,
+  path : String,
+  require_start : Bool,
+) -> TrustedLog raise Shape {
   let log = fields(json, path, [
     "baseUrl", "hashAlgorithm", "publicKey", "logId", "checkpointKeyId", "operator",
   ])
-  let key = log.require_object("publicKey", ["rawBytes", "keyDetails", "validFor"])
+  let key = log.require_object("publicKey", [
+    "rawBytes", "keyDetails", "validFor",
+  ])
   let valid = read_period(key, "validFor")
   if require_start {
     guard valid.start is Some(_) else {
-      raise Shape(key.at("validFor.start"), "the log \{log.string("baseUrl").unwrap_or("")} has no validity start")
+      raise Shape(
+        key.at("validFor.start"),
+        "the log \{log.string("baseUrl").unwrap_or("")} has no validity start",
+      )
     }
   }
   let raw = key.require_bytes("rawBytes")
@@ -300,7 +322,8 @@ fn read_log(json : Json, path : String, require_start : Bool) -> TrustedLog rais
   // is not usable.
   let details = match key.get("keyDetails") {
     Some(String(name)) => Some(name)
-    Some(Number(_, ..)) => Some("key details \{key.get("keyDetails").unwrap().stringify()}")
+    Some(Number(_, ..)) =>
+      Some("key details \{key.get("keyDetails").unwrap().stringify()}")
     _ => None
   }
   let trusted_key = try @signature.PublicKey::from_spki(raw) catch {
@@ -324,7 +347,9 @@ fn read_log(json : Json, path : String, require_start : Bool) -> TrustedLog rais
 
 ///|
 fn read_authority(json : Json, path : String) -> Authority raise Shape {
-  let authority = fields(json, path, ["subject", "uri", "certChain", "validFor", "operator"])
+  let authority = fields(json, path, [
+    "subject", "uri", "certChain", "validFor", "operator",
+  ])
   ignore(authority.object("subject", ["organization", "commonName"]))
   let chain = authority.require_object("certChain", ["certificates"])
   let certificates = chain
@@ -333,7 +358,11 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
       let at = "\{chain.at("certificates")}[\{index}]"
       let raw = fields(item, at, ["rawBytes"]).require_bytes("rawBytes")
       @x509.parse(raw) catch {
-        err => raise Shape(at, "\{err.message()} in \{authority.string("uri").unwrap_or(path)}")
+        err =>
+          raise Shape(
+            at,
+            "\{err.message()} in \{authority.string("uri").unwrap_or(path)}",
+          )
       }
     })
   guard !certificates.is_empty() else {
@@ -348,6 +377,12 @@ fn read_authority(json : Json, path : String) -> Authority raise Shape {
 }
 
 ///|
-fn TrustedRoot::ctlog(self : TrustedRoot, log_id : BytesView, source~ : Int) -> TrustedLog? {
-  self.ctlogs.iter().find_first(log => log.log_id[:] == log_id && log.source == source)
+fn TrustedRoot::ctlog(
+  self : TrustedRoot,
+  log_id : BytesView,
+  source~ : Int32,
+) -> TrustedLog? {
+  self.ctlogs
+  .iter()
+  .find_first(log => log.log_id[:] == log_id && log.source == source)
 }

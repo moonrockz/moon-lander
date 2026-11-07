@@ -10,17 +10,19 @@ import {
 pub fn convert_tree(String, source~ : &TreeFormat, target~ : &TreeFormat) -> String raise
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror TreeError {
   InvalidPath(input~ : String, rule~ : PathRule)
   DuplicatePath(TreePath)
   FileDirectoryConflict(TreePath)
-} derive(Eq, @debug.Debug)
+}
 pub fn TreeError::equal(Self, Self) -> Bool
 pub fn TreeError::not_equal(Self, Self) -> Bool
 pub fn TreeError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-type FileTree derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type FileTree
 pub fn FileTree::directories(Self) -> ReadOnlyArray[TreePath]
 pub fn FileTree::equal(Self, Self) -> Bool
 pub fn FileTree::explicit_directories(Self) -> ReadOnlyArray[TreePath]
@@ -30,6 +32,7 @@ pub fn FileTree::new(ReadOnlyArray[TextFile], directories? : ReadOnlyArray[TreeP
 pub fn FileTree::not_equal(Self, Self) -> Bool
 pub fn FileTree::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PathRule {
   Empty
   Absolute
@@ -37,12 +40,13 @@ pub(all) enum PathRule {
   ControlCharacter
   EmptySegment
   DotSegment
-} derive(Eq, @debug.Debug)
+}
 pub fn PathRule::equal(Self, Self) -> Bool
 pub fn PathRule::not_equal(Self, Self) -> Bool
 pub fn PathRule::to_repr(Self) -> @debug.Repr
 
-type TextFile derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type TextFile
 pub fn TextFile::equal(Self, Self) -> Bool
 pub fn TextFile::kernel(Self) -> @dib.KernelName
 pub fn TextFile::new(TreePath, String, kernel~ : @dib.KernelName) -> Self
@@ -51,7 +55,8 @@ pub fn TextFile::path(Self) -> TreePath
 pub fn TextFile::source(Self) -> String
 pub fn TextFile::to_repr(Self) -> @debug.Repr
 
-type TreePath derive(Eq, Hash, @debug.Debug)
+#derive(Eq, Hash, @debug.Debug)
+type TreePath
 pub fn TreePath::equal(Self, Self) -> Bool
 pub fn TreePath::hash(Self) -> Int32
 pub fn TreePath::hash_combine(Self, Hasher) -> Unit

@@ -23,7 +23,7 @@ fn segment_matches(pattern : String, name : String) -> Bool {
   let name : Array[Char] = name.iter().collect()
   let mut at_pattern = 0
   let mut at_name = 0
-  let mut star : Int? = None
+  let mut star : Int32? = None
   let mut retry = 0
   while at_name < name.length() {
     if at_pattern < pattern.length() && pattern[at_pattern] == '*' {
@@ -49,7 +49,10 @@ fn segment_matches(pattern : String, name : String) -> Bool {
 ///|
 /// Whether the path segments `path` match the pattern segments `pattern`. A
 /// `**` segment matches zero or more whole segments.
-fn segments_match(pattern : ArrayView[String], path : ArrayView[String]) -> Bool {
+fn segments_match(
+  pattern : ArrayView[String],
+  path : ArrayView[String],
+) -> Bool {
   match pattern {
     [] => path.is_empty()
     ["**", .. rest] => {
@@ -310,7 +313,8 @@ fn Scan::children(self : Scan, dir : @config.FileTreePath) -> Array[String]? {
       Some(
         entries
         .filter(entry => {
-          entry.kind is (Directory | Inaccessible) && !entry.name.has_prefix(".")
+          entry.kind is (Directory | Inaccessible) &&
+          !entry.name.has_prefix(".")
         })
         .map(entry => entry.name),
       )
@@ -357,15 +361,15 @@ fn Scan::enclosing(
     dir = parent
     // Ordered groups report ambiguity as an error instead of Several. The
     // enclosing search still passes over that location under NearestFile.
-    let candidate = try self.config_at(dir) catch {
+    let candidate = self.config_at(dir) catch {
       @config.Ambiguous(..) => continue
       error => raise error
     }
     let file = match candidate {
       NotKnown => return None
       NoFile | Several => continue
-      OneFile(path) => { path, root: dir, kind: Discovered }
-      LegacyAt(path) => { path, root: dir, kind: LegacyFile }
+      OneFile(path) => { path, root: dir, kind: Discovered, }
+      LegacyAt(path) => { path, root: dir, kind: LegacyFile, }
     }
     // A file that does not parse, or is not a workspace, is passed over.
     let value = try self.value_of(file) catch {
@@ -416,10 +420,11 @@ fn Scan::root_value(
     let layer = if self.conventions.layers is Some(_) {
       self.read_document(path)
     } else {
-      self.value_of({ path, root: parent_of(path), kind: Discovered })
+      self.value_of({ path, root: parent_of(path), kind: Discovered, })
     }
     match layer {
-      Found(layer) => value = @config.merge(value, layer, source=path.to_string())
+      Found(layer) =>
+        value = @config.merge(value, layer, source=path.to_string())
       Missing => ()
       Unknown => known = false
     }
@@ -445,8 +450,7 @@ fn Scan::automatic_member(
 ) -> @config.FileTreePath?? raise @config.ConfigError {
   guard self.members(root, declaration) is Some(members) else { return None }
   if start is Some(start) &&
-    members.iter().find_first(dir => start.is_within(dir))
-    is Some(dir) {
+    members.iter().find_first(dir => start.is_within(dir)) is Some(dir) {
     return Some(Some(dir))
   }
   if declaration.default_member is Some(entry) {
@@ -506,8 +510,8 @@ fn Scan::selected_project(
         continue
       }
       NoFile | Several => continue
-      OneFile(path) => { path, root: dir, kind: Discovered }
-      LegacyAt(path) => { path, root: dir, kind: LegacyFile }
+      OneFile(path) => { path, root: dir, kind: Discovered, }
+      LegacyAt(path) => { path, root: dir, kind: LegacyFile, }
     }
     match self.value_of(file) {
       Found(value) =>
@@ -525,10 +529,11 @@ fn Scan::selected_project(
     _ =>
       raise AmbiguousProject(
         selector~,
-        matches=matches.map(found => match found {
-          Some(dir) =>
-            relative_segments(root, dir).unwrap_or([]).join("/")
-          None => "."
+        matches=matches.map(found => {
+          match found {
+            Some(dir) => relative_segments(root, dir).unwrap_or([]).join("/")
+            None => "."
+          }
         }),
       )
   }

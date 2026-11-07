@@ -1,5 +1,6 @@
 ///|
 /// How the YAML format treats anchors, aliases, tags, and null.
+#derive(Eq)
 pub(all) enum Profile {
   /// Expand aliases, allow null, keep core-schema tags, reject merge keys and
   /// more than one document.
@@ -7,7 +8,7 @@ pub(all) enum Profile {
   /// Reject anchors, aliases, non-core tags, null, merge keys, and more than
   /// one document.
   Strict
-} derive(Eq)
+}
 
 ///|
 pub extend Profile with Eq::{equal, not_equal}
@@ -40,9 +41,7 @@ pub fn parse(
     documents: 0,
     error: None,
   }
-  try {
-    @yaml_lib.Parser(text[:]).load(builder, true)
-  } catch {
+  @yaml_lib.Parser(text[:]).load(builder, true) catch {
     @yaml_lib.YamlError(mark~, info~) =>
       raise parse_error(origin, info, Some(mark.line), Some(mark.col))
   }
@@ -59,8 +58,8 @@ pub fn parse(
 
 ///|
 priv enum Frame {
-  Sequence(Array[@ion.Ion], Int)
-  Mapping(Array[(String, @ion.Ion)], Int)
+  Sequence(Array[@ion.Ion], Int32)
+  Mapping(Array[(String, @ion.Ion)], Int32)
   /// A finished root node waiting for `DocumentEnd`.
   Root(@ion.Ion)
 }
@@ -74,8 +73,8 @@ priv struct Builder {
   /// `None` means the next mapping entry is a key; `Some(name)` means the next
   /// entry is the value for that key (including an empty-string key).
   pending_keys : Array[String?]
-  anchors : Map[Int, @ion.Ion]
-  mut documents : Int
+  anchors : Map[Int32, @ion.Ion]
+  mut documents : Int32
   mut error : @config.ConfigError?
 }
 
@@ -199,9 +198,7 @@ fn Builder::on_event_impl(
         )
       }
       self.insert(
-        @ion.Ion::from_fields(
-          fields.map(field => @ion.field(field.0, field.1)),
-        ),
+        @ion.Ion::from_fields(fields.map(field => @ion.field(field.0, field.1))),
         id,
         mark,
       )
@@ -228,7 +225,7 @@ fn Builder::reject_complex_key(
 ///|
 fn Builder::check_anchor(
   self : Builder,
-  id : Int,
+  id : Int32,
   mark : @yaml_lib.Marker,
 ) -> Unit raise @config.ConfigError {
   if self.profile is Strict && id > 0 {
@@ -244,7 +241,7 @@ fn Builder::check_tag(
 ) -> Unit raise @config.ConfigError {
   if self.profile is Strict && !is_core_tag(tag) {
     let feature = match tag {
-      Some({ handle, suffix }) => handle + suffix
+      Some({ handle, suffix, }) => handle + suffix
       None => "tag"
     }
     raise unsupported(self.origin, feature, mark)
@@ -263,7 +260,7 @@ fn Builder::null_feature(self : Builder) -> String {
 fn Builder::insert(
   self : Builder,
   node : @ion.Ion,
-  id : Int,
+  id : Int32,
   mark : @yaml_lib.Marker,
 ) -> Unit raise @config.ConfigError {
   if id > 0 {
@@ -325,7 +322,7 @@ fn Builder::insert(
 fn is_core_tag(tag : @yaml_lib.Tag?) -> Bool {
   match tag {
     None => true
-    Some({ handle, suffix }) =>
+    Some({ handle, suffix, }) =>
       handle == "tag:yaml.org,2002:" &&
       ["bool", "int", "float", "null", "str", "seq", "map"].contains(suffix)
   }
@@ -345,7 +342,7 @@ fn resolve_scalar(
   if !(style is Plain) {
     return @ion.Ion::string(value)
   }
-  if tag is Some({ handle, suffix }) {
+  if tag is Some({ handle, suffix, }) {
     if handle == "tag:yaml.org,2002:" {
       return match suffix {
         "bool" =>
@@ -445,9 +442,7 @@ fn parse_radix_integer(value : String) -> @ion.Ion? {
   while i < chars.length() {
     let c = chars[i]
     let ok = if radix == 16 {
-      (c >= '0' && c <= '9') ||
-      (c >= 'a' && c <= 'f') ||
-      (c >= 'A' && c <= 'F')
+      (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
     } else {
       c >= '0' && c <= '7'
     }
@@ -535,9 +530,7 @@ fn parse_tagged_radix_integer(value : String) -> @ion.Ion? {
   while i < chars.length() {
     let c = chars[i]
     let ok = if radix == 16 {
-      (c >= '0' && c <= '9') ||
-      (c >= 'a' && c <= 'f') ||
-      (c >= 'A' && c <= 'F')
+      (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
     } else {
       c >= '0' && c <= '7'
     }
@@ -559,12 +552,8 @@ fn parse_tagged_radix_integer(value : String) -> @ion.Ion? {
 }
 
 ///|
-fn integer_ion_base(digits : String, radix : Int) -> @ion.Ion {
-  let parsed = try {
-    Some(@string.parse_int64(digits, base=radix))
-  } catch {
-    _ => None
-  }
+fn integer_ion_base(digits : String, radix : Int32) -> @ion.Ion {
+  let parsed = Some(@string.parse_int64(digits, base=radix)) catch { _ => None }
   match parsed {
     Some(integer) => @ion.Ion::big_int(@bigint.BigInt::from_int64(integer))
     None => @ion.Ion::big_int(@bigint.BigInt::from_string(digits, radix~))
@@ -612,8 +601,8 @@ fn parse_double(v : StringView) -> Double? {
 fn parse_error(
   origin : String,
   message : String,
-  line : Int?,
-  column : Int?,
+  line : Int32?,
+  column : Int32?,
 ) -> @config.ConfigError {
   Parse(format="YAML", origin~, message~, line~, column~)
 }

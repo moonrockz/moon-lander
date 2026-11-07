@@ -121,13 +121,16 @@ test "a day with two size rolls" {
     }
     state = state.wrote(bytes)
   }
-  inspect(names.join("\n"), content=(
-    #|open acme-20261027.jsonl
-    #|append acme-20261027.jsonl
-    #|roll acme-20261027_001.jsonl
-    #|append acme-20261027_001.jsonl
-    #|roll acme-20261027_002.jsonl
-  ))
+  inspect(
+    names.join("\n"),
+    content=(
+      #|open acme-20261027.jsonl
+      #|append acme-20261027.jsonl
+      #|roll acme-20261027_001.jsonl
+      #|append acme-20261027_001.jsonl
+      #|roll acme-20261027_002.jsonl
+    ),
+  )
 }
 ```
 
@@ -141,9 +144,17 @@ test "a restart appends to the newest file of the day" {
   let set = @rolling.FileSet::new(stem, Text, @rolling.RollingPolicy::default())
   let now = @formatting.LogTimestamp::from_epoch_millis(1793110987024L)
   let listing : Array[@rolling.ListedFile] = [
-    { name: "acme-20261027.log", size: @rolling.ByteCount::of(10485760L), regular: true },
-    { name: "acme-20261027_001.log", size: @rolling.ByteCount::of(2048L), regular: true },
-    { name: "acme.log.lock", size: @rolling.ByteCount::zero(), regular: true },
+    {
+      name: "acme-20261027.log",
+      size: @rolling.ByteCount::of(10485760L),
+      regular: true,
+    },
+    {
+      name: "acme-20261027_001.log",
+      size: @rolling.ByteCount::of(2048L),
+      regular: true,
+    },
+    { name: "acme.log.lock", size: @rolling.ByteCount::zero(), regular: true, },
   ]
   let plan = @rolling.RollingState::new(set).plan(
     now,
@@ -185,7 +196,10 @@ test "keep the newest three files" {
   let retention = @rolling.Retention::KeepNewest(
     @rolling.RetainedFileCount::count(3),
   )
-  assert_eq(set.retention(retention, listing, active).map(name => name.to_string()), ["acme-20261024.log"])
+  assert_eq(
+    set.retention(retention, listing, active).map(name => name.to_string()),
+    ["acme-20261024.log"],
+  )
 }
 ```
 

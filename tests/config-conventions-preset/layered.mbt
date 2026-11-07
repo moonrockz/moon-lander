@@ -4,14 +4,23 @@
 pub fn layered_morphir() -> @conventions.Conventions raise @config.ConfigError {
   let json = @conventions.Extension::parse("json")
   let layers = @conventions.FormatLayers::new([
-    @conventions.FormatGroup::new([json, @conventions.Extension::parse("json5")],
-      supplemental=@conventions.SupplementalFile::new("morphir-workspace.json", json,
-        transform=value => @config.fields([("workspace", value)]))),
-    @conventions.FormatGroup::new(["yaml", "yml"].map(@conventions.Extension::parse)),
+    @conventions.FormatGroup::new(
+      [json, @conventions.Extension::parse("json5")],
+      supplemental=@conventions.SupplementalFile::new(
+        "morphir-workspace.json",
+        json,
+        transform=value => @config.fields([("workspace", value)]),
+      ),
+    ),
+    @conventions.FormatGroup::new(
+      ["yaml", "yml"].map(@conventions.Extension::parse),
+    ),
     @conventions.FormatGroup::new([@conventions.Extension::parse("toml")]),
   ])
   morphir()
-  |> @conventions.root_policy(WorkspaceFirst(@config.KeyPath::parse("workspace")))
+  |> @conventions.root_policy(
+    WorkspaceFirst(@config.KeyPath::parse("workspace")),
+  )
   |> @conventions.member_loading(ExplicitOnly)
   |> @conventions.format_layers(layers)
   |> @conventions.selected_file_policy(Overlay)

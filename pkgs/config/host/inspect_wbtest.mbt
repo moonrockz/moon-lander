@@ -19,7 +19,7 @@ fn unbounded(start : String) -> @config.ConfigBuilder {
 
 ///|
 /// Fail unless `load` raises the error of the host for a file call.
-async fn expect_host_error(load : async () -> @config.Config raise) -> Unit raise {
+async fn expect_host_error(load : async () -> @config.Config) -> Unit {
   try load() catch {
     error if is_host_error(error) => ()
     error => fail("expected the error of the locked entry, got \{error}")
@@ -31,7 +31,9 @@ async fn expect_host_error(load : async () -> @config.Config raise) -> Unit rais
 ///|
 async test "Locked entry next to a configuration file" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "a = 1")
   write("\{dir}/gone.txt", "")
   write("\{dir}/pagefile.sys", "")
@@ -49,9 +51,9 @@ async test "Locked entry next to a configuration file" {
   // strings by length first.
   entries.sort_by_key(entry => entry.name)
   @expect.expect(entries).to_equal([
-    { name: "src", kind: Directory },
-    { name: "acme.toml", kind: File },
-    { name: "pagefile.sys", kind: Inaccessible },
+    { name: "src", kind: Directory, },
+    { name: "acme.toml", kind: File, },
+    { name: "pagefile.sys", kind: Inaccessible, },
   ])
   let config = @config.builder()
     |> @config.working_dir(dir)
@@ -69,7 +71,9 @@ async test "Locked entry next to a configuration file" {
 ///|
 async test "an inspection error that is not a system error passes out" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "a = 1")
   write("\{dir}/odd.bin", "")
   try
@@ -89,7 +93,9 @@ async test "an inspection error that is not a system error passes out" {
 ///|
 async test "Unbounded search passes over a locked entry" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "project.name = \"found\"")
   write("\{dir}/pagefile.sys", "")
   write("\{dir}/src/pagefile.sys", "")
@@ -101,7 +107,9 @@ async test "Unbounded search passes over a locked entry" {
 ///|
 async test "a locked entry keeps the workspace and member selection" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write(
     "\{dir}/acme.toml",
     "workspace.members = [\"packages/*\"]\nui.theme = \"workspace\"",
@@ -129,7 +137,9 @@ async test "a locked entry keeps the workspace and member selection" {
 ///|
 async test "a locked candidate is an error" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "a = 1")
   expect_host_error(() => {
     unbounded(dir) |> faulty_load(locked=["\{dir}/acme.toml"])
@@ -139,7 +149,9 @@ async test "a locked candidate is an error" {
 ///|
 async test "a locked explicit file is an error" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/app.toml", "a = 1")
   expect_host_error(() => {
     @config.builder()
@@ -152,7 +164,9 @@ async test "a locked explicit file is an error" {
 ///|
 async test "a locked selected overlay retains the host error" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "base=true")
   write("\{dir}/custom.toml", "selected=true")
   expect_host_error(() => {
@@ -174,7 +188,9 @@ async test "a locked selected overlay retains the host error" {
 ///|
 async test "a locked member directory is an error" {
   let dir = temp_dir()
-  defer remove_dir(from_slash(dir, running_platform()))
+  defer @async.protect_from_cancel(() => {
+    remove_dir(from_slash(dir, running_platform()))
+  })
   write("\{dir}/acme.toml", "workspace.members = [\"packages/*\"]")
   write("\{dir}/packages/billing/acme.toml", "a = 1")
   write("\{dir}/packages/orders/acme.toml", "b = 1")

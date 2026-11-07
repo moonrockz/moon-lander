@@ -1,9 +1,10 @@
 ///|
 /// An immutable Jupyter cell identifier containing 1 to 64 ASCII letters,
 /// digits, hyphens or underscores. Notebook construction checks uniqueness.
+#derive(Eq, Debug)
 struct CellId {
   value : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CellId with Eq::{equal, not_equal}
@@ -53,9 +54,10 @@ pub fn CellId::to_string(self : CellId) -> String {
 /// A nonnegative integral JSON number. Preserve its available JSON
 /// representation instead of converting large counts to a machine integer.
 /// Use None, rather than an ExecutionCount value, for an unexecuted cell.
+#derive(Eq, Debug)
 struct ExecutionCount {
   value : Json
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ExecutionCount with Eq::{equal, not_equal}
@@ -103,6 +105,7 @@ pub fn ExecutionCount::to_json(self : ExecutionCount) -> Json {
 /// The typed payload of a Jupyter output. Rich display and execution results
 /// carry MIME bundles and metadata; None denotes a null execution count.
 /// Unknown preserves an unrecognized output type and its additional fields.
+#derive(Eq, Debug)
 pub(all) enum OutputContent {
   /// Text written to a named stream, commonly stdout or stderr.
   Stream(name~ : String, text~ : String)
@@ -118,7 +121,7 @@ pub(all) enum OutputContent {
   Error(ename~ : String, evalue~ : String, traceback~ : ReadOnlyArray[String])
   /// An unrecognized type and its fields, excluding output_type itself.
   Unknown(output_type~ : String, fields~ : JsonObject)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend OutputContent with Eq::{equal, not_equal}
@@ -129,10 +132,11 @@ pub extend OutputContent with @debug.Debug::{to_repr}
 ///|
 /// An immutable validated output, including preserved extension fields.
 /// Construct with Output(content), or obtain outputs from a parsed code cell.
+#derive(Eq, Debug)
 struct Output {
   content : OutputContent
   extensions : JsonObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Output with Eq::{equal, not_equal}
@@ -190,6 +194,7 @@ pub fn Output::output_type(self : Output) -> String {
 /// The source and format-specific payload of a cell. Only code cells carry
 /// outputs and execution counts; only Markdown and raw cells carry attachments.
 /// Unknown preserves the original cell type and its additional JSON fields.
+#derive(Eq, Debug)
 pub(all) enum CellContent {
   /// Markdown source with optional filename-keyed attachments.
   Markdown(source~ : String, attachments~ : Attachments?)
@@ -203,7 +208,7 @@ pub(all) enum CellContent {
   )
   /// An unrecognized type and fields excluding cell_type, id and metadata.
   Unknown(cell_type~ : String, fields~ : JsonObject)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CellContent with Eq::{equal, not_equal}
@@ -214,12 +219,13 @@ pub extend CellContent with @debug.Debug::{to_repr}
 ///|
 /// An immutable validated Jupyter cell. IDs may be absent in pre-4.5 files;
 /// the containing notebook enforces version-specific ID presence and uniqueness.
+#derive(Eq, Debug)
 struct Cell {
   id : CellId?
   metadata : Metadata
   content : CellContent
   extensions : JsonObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Cell with Eq::{equal, not_equal}
@@ -310,12 +316,13 @@ pub fn Cell::outputs(self : Cell) -> ReadOnlyArray[Output] {
 ///|
 /// An immutable Jupyter v4 document with metadata, ordered cells and
 /// preserved extension fields. The file's minor version is retained.
+#derive(Eq, Debug)
 struct Notebook {
   minor : Int32
   metadata : Metadata
   cells : ReadOnlyArray[Cell]
   extensions : JsonObject
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Notebook with Eq::{equal, not_equal}

@@ -2,9 +2,10 @@
 struct Order(String)
 
 ///|
+#derive(Debug)
 suberror OrderError {
   Rejected(String)
-} derive(Debug)
+}
 
 ///|
 async test "a wrapped core sender runs the core middleware and handler" {
@@ -133,12 +134,18 @@ async test "middleware preserves wrapped core failures on both publish paths" {
   )
   try wrapped.publish((), Order("a")) catch {
     error => expect_core_failure(error)
-  } noraise { _ => fail("expected failure") }
+  } noraise {
+    _ => fail("expected failure")
+  }
   try wrapped.publish_concurrent((), Order("a")) catch {
     error => expect_core_failure(error)
-  } noraise { _ => fail("expected failure") }
+  } noraise {
+    _ => fail("expected failure")
+  }
   assert_eq(wraps.val, 2)
-  assert_eq(log, ["core one", "core two", "core three", "core one", "core two", "core three"])
+  assert_eq(log, [
+    "core one", "core two", "core three", "core one", "core two", "core three",
+  ])
 }
 
 ///|
@@ -155,16 +162,22 @@ async test "concurrent add preserves the original core wrapper and nested failur
       assert_eq(handlers, 2)
       assert_eq(failures.to_array().map(failure => failure.position), [1, 2])
       guard failures.get(0) is Some(first) else { fail("missing core failure") }
-      guard failures.get(1) is Some(second) else { fail("missing async failure") }
+      guard failures.get(1) is Some(second) else {
+        fail("missing async failure")
+      }
       expect_core_failure(first.error)
       assert_true(second.error is Rejected("late"))
     }
     other => fail("unexpected error: \{other}")
-  } noraise { _ => fail("expected failure") }
+  } noraise {
+    _ => fail("expected failure")
+  }
   assert_true(log.contains("async two"))
   log.clear()
   try wrapped.publish_concurrent((), Order("a")) catch {
     error => expect_core_failure(error)
-  } noraise { _ => fail("expected failure") }
+  } noraise {
+    _ => fail("expected failure")
+  }
   assert_eq(log, ["core one", "core two", "core three"])
 }

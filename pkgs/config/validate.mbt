@@ -1,10 +1,11 @@
 ///|
 /// A broken validation rule: the paths of the values it names, relative to
 /// the bound section, and a detail text. An empty `at` names the section.
+#derive(Eq, Debug)
 pub(all) struct Violation {
   at : Array[Array[DecodeStep]]
   detail : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Violation with Eq::{equal, not_equal}
@@ -17,11 +18,11 @@ pub extend Violation with @debug.Debug::{to_repr}
 /// every broken rule and never raises. A type with no rules uses the default,
 /// which returns no violations.
 pub(open) trait Validate {
-  validate(Self) -> Array[Violation] = _
+  fn validate(Self) -> Array[Violation] = _
 }
 
 ///|
-impl Validate with validate(_) {
+impl Validate with fn validate(_) {
   []
 }
 
@@ -30,7 +31,7 @@ impl Validate with validate(_) {
 /// `fields`, or the section itself when `fields` is empty. A rule over two
 /// fields names both, so the error shows the source of each value.
 pub fn violation(fields : Array[String], detail : String) -> Violation {
-  { at: fields.map(field => [Field(field)]), detail }
+  { at: fields.map(field => [Field(field)]), detail, }
 }
 
 ///|
@@ -48,13 +49,13 @@ fn below(step : DecodeStep, found : Array[Violation]) -> Array[Violation] {
     } else {
       violation.at.map(path => [step, ..path])
     }
-    { ..violation, at }
+    { ..violation, at, }
   })
 }
 
 ///|
 /// The violations of each value, below its key.
-pub impl[T : Validate] Validate for Map[String, T] with validate(self) {
+pub impl[T : Validate] Validate for Map[String, T] with fn validate(self) {
   let found = []
   for key, value in self {
     found.append(below(Field(key), T::validate(value)))
@@ -64,7 +65,7 @@ pub impl[T : Validate] Validate for Map[String, T] with validate(self) {
 
 ///|
 /// The violations of each item, below its list index.
-pub impl[T : Validate] Validate for Array[T] with validate(self) {
+pub impl[T : Validate] Validate for Array[T] with fn validate(self) {
   let found = []
   for index, item in self {
     found.append(below(Index(index), T::validate(item)))
@@ -74,7 +75,7 @@ pub impl[T : Validate] Validate for Array[T] with validate(self) {
 
 ///|
 /// The violations of the value, or none for `None`.
-pub impl[T : Validate] Validate for T? with validate(self) {
+pub impl[T : Validate] Validate for T? with fn validate(self) {
   match self {
     Some(value) => T::validate(value)
     None => []
@@ -106,16 +107,18 @@ pub fn[T : Validate] validated(
   let path = KeyPath::parse(key)
   let found = T::validate(value)
   if !found.is_empty() {
-    raise Validation(failures=found.map(violation => {
-      let paths = if violation.at.is_empty() { [[]] } else { violation.at }
-      let at = paths.map(steps => {
-        let path = decode_path_below(Some(path), steps)
-        { path, blame: config.blame(path) }
-      })
-      { at, detail: violation.detail }
-    }))
+    raise Validation(
+      failures=found.map(violation => {
+        let paths = if violation.at.is_empty() { [[]] } else { violation.at }
+        let at = paths.map(steps => {
+          let path = decode_path_below(Some(path), steps)
+          { path, blame: config.blame(path), }
+        })
+        { at, detail: violation.detail, }
+      }),
+    )
   }
-  { value, key: path, name }
+  { value, key: path, name, }
 }
 
 ///|

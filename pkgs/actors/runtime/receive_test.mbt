@@ -1,10 +1,11 @@
 ///|
 /// The login protocol of the design (RECV-1, TEST-1).
+#derive(Eq, Debug)
 enum Login {
   Hello(String)
-  Credentials(Int)
+  Credentials(Int32)
   Noise(String)
-} derive(Eq, Debug)
+}
 
 ///|
 fn hello(message : Login) -> String? {
@@ -15,7 +16,7 @@ fn hello(message : Login) -> String? {
 }
 
 ///|
-fn credentials(message : Login) -> Int? {
+fn credentials(message : Login) -> Int32? {
   match message {
     Credentials(pin) => Some(pin)
     _ => None
@@ -23,7 +24,7 @@ fn credentials(message : Login) -> Int? {
 }
 
 ///|
-fn limit(milliseconds : Int) -> @lander_core.TimeLimit {
+fn limit(milliseconds : Int32) -> @lander_core.TimeLimit {
   @lander_core.TimeLimit::millis(milliseconds) catch {
     _ => panic()
   }
@@ -65,20 +66,32 @@ async test "RECV-1: receive takes messages in admission order" {
   let three = @actors.receive()
     .zip(@actors.receive())
     .zip_with(@actors.receive(), (pair, last) => [pair.0, pair.1, last])
-  assert_eq(three |> @actors.run_messages(["A", "B", "C"]), Some(["A", "B", "C"]))
+  assert_eq(
+    three |> @actors.run_messages(["A", "B", "C"]),
+    Some(["A", "B", "C"]),
+  )
 }
 
 ///|
 async test "RECV-1: a select skips an earlier message, and later receives keep the order" {
-  let receive = @actors.select(message => if message == "B" { Some(1) } else { None })
+  let receive = @actors.select(message => {
+      if message == "B" {
+        Some(1)
+      } else {
+        None
+      }
+    })
     .zip(@actors.receive())
     .zip_with(@actors.receive(), (pair, last) => (pair.0, pair.1, last))
-  assert_eq(receive |> @actors.run_messages(["A", "B", "C"]), Some((1, "A", "C")))
+  assert_eq(
+    receive |> @actors.run_messages(["A", "B", "C"]),
+    Some((1, "A", "C")),
+  )
 }
 
 ///|
 async test "RECV-1: done, map and then give results without a message" {
-  let receive : @actors.Receive[String, Int] = @actors.done(20).map(value => {
+  let receive : @actors.Receive[String, Int32] = @actors.done(20).map(value => {
     value + 1
   })
   assert_eq(receive |> @actors.run_messages([]), Some(21))
@@ -97,7 +110,7 @@ async test "RECV-1: bind does async work between two receives" {
 
 ///|
 async test "RECV-1: a state loop adds values until a stop message" {
-  let sum = @actors.receive_loop(0, (total, message : Int?) => {
+  let sum = @actors.receive_loop(0, (total, message : Int32?) => {
     match message {
       Some(value) => @actors.Continue(total + value)
       None => @actors.Stop
@@ -110,7 +123,7 @@ async test "RECV-1: a state loop adds values until a stop message" {
 
 ///|
 async test "RECV-1: a state loop ends with its state when the mailbox closes" {
-  let sum = @actors.receive_loop(0, (total, value : Int) => {
+  let sum = @actors.receive_loop(0, (total, value : Int32) => {
     @actors.Continue(total + value)
   })
   assert_eq(@actors.run_test(sum, [1, 2], at_end=Close).result(), Some(3))
@@ -157,7 +170,9 @@ async test "RECV-1: poll on a closed empty mailbox continues as closed" {
   })
   assert_eq(@actors.run_test(polled, [], at_end=Close).result(), Some("closed"))
   let bare = @actors.poll(on_empty=() => @actors.done("empty"))
-  assert_true(@actors.run_test(bare, [], at_end=Close).outcome() is MailboxClosed)
+  assert_true(
+    @actors.run_test(bare, [], at_end=Close).outcome() is MailboxClosed,
+  )
 }
 
 ///|
@@ -198,9 +213,10 @@ async test "RECV-1: the shorter of two nested time limits expires first" {
 }
 
 ///|
+#derive(Debug)
 suberror Unreadable {
   Unreadable(String)
-} derive(Debug)
+}
 
 ///|
 async test "RECV-1: recover continues after a step error" {
@@ -267,7 +283,7 @@ async test "RECV-1: a recover frame ends with its receive" {
 
 ///|
 async test "RECV-1: a loop handler error leaves the loop for recover" {
-  let summing = @actors.receive_loop(0, (total, value : Int) => {
+  let summing = @actors.receive_loop(0, (total, value : Int32) => {
     if value < 0 {
       raise Unreadable("negative")
     }
@@ -282,7 +298,7 @@ async test "RECV-1: a loop handler error leaves the loop for recover" {
 ///|
 async test "RECV-1: one receive value runs more than once" {
   let pair = @actors.receive().zip(@actors.receive())
-  let sum = @actors.receive_loop(0, (total, value : Int) => {
+  let sum = @actors.receive_loop(0, (total, value : Int32) => {
     @actors.Continue(total + value)
   })
   assert_eq(pair |> @actors.run_messages([1, 2]), Some((1, 2)))

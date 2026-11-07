@@ -2,9 +2,10 @@
 struct Entered(String)
 
 ///|
+#derive(Debug)
 suberror JoinError {
   Full(String)
-} derive(Debug)
+}
 
 ///|
 test "publish runs each handler one time in add order" {
@@ -39,12 +40,14 @@ fn expect_publish_failed(
     fail("publish raised another error: \{error}")
   }
   assert_eq(count, handlers)
-  let seen = got.to_array().map(failure => {
-    guard failure.error is Full(name) else {
-      fail("a failure holds another error: \{failure.error}")
-    }
-    (failure.position, name)
-  })
+  let seen = got
+    .to_array()
+    .map(failure => {
+      guard failure.error is Full(name) else {
+        fail("a failure holds another error: \{failure.error}")
+      }
+      (failure.position, name)
+    })
   assert_eq(seen, failures)
 }
 

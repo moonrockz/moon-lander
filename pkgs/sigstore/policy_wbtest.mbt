@@ -41,13 +41,14 @@ fn release_policy() -> Policy raise {
 
 ///|
 fn with_san(san : String) -> CertificateClaims {
-  { ..rust_claims, subject_names: [san] }
+  { ..rust_claims, subject_names: [san], }
 }
 
 ///|
 test "the claims of the real certificate are the claims of these tests" {
   let case_bundle = "morphir-rust-provider-snapshot-0.2.0.sigstore.json"
-  let text = match @fixtures.github.iter().find_first(file => file.0 == case_bundle) {
+  let text = match
+    @fixtures.github.iter().find_first(file => file.0 == case_bundle) {
     Some(file) => file.1
     None => fail("no \{case_bundle}")
   }
@@ -67,8 +68,14 @@ test "the claims of the real certificate are the claims of these tests" {
   assert_eq(claims.runner_environment, rust_claims.runner_environment)
   assert_eq(claims.source_repository_uri, rust_claims.source_repository_uri)
   assert_eq(claims.source_repository_ref, rust_claims.source_repository_ref)
-  assert_eq(claims.source_repository_identifier, rust_claims.source_repository_identifier)
-  assert_eq(claims.source_repository_owner_uri, rust_claims.source_repository_owner_uri)
+  assert_eq(
+    claims.source_repository_identifier,
+    rust_claims.source_repository_identifier,
+  )
+  assert_eq(
+    claims.source_repository_owner_uri,
+    rust_claims.source_repository_owner_uri,
+  )
   assert_eq(
     claims.source_repository_owner_identifier,
     rust_claims.source_repository_owner_identifier,
@@ -78,7 +85,7 @@ test "the claims of the real certificate are the claims of these tests" {
 
 ///|
 test "scenario: other issuer" {
-  let google = { ..rust_claims, issuer: Some("https://accounts.google.com") }
+  let google = { ..rust_claims, issuer: Some("https://accounts.google.com"), }
   let mismatch = rust_workflow().check_claims(google)
   assert_eq(
     mismatch,
@@ -95,8 +102,13 @@ test "scenario: other issuer" {
   )
   // A certificate without an issuer claim.
   assert_eq(
-    rust_workflow().check_claims({ ..rust_claims, issuer: None }),
-    Some(IssuerMismatch(expected="https://token.actions.githubusercontent.com", actual=None)),
+    rust_workflow().check_claims({ ..rust_claims, issuer: None, }),
+    Some(
+      IssuerMismatch(
+        expected="https://token.actions.githubusercontent.com",
+        actual=None,
+      ),
+    ),
   )
   // A policy for the other issuer matches it.
   let policy = Policy::signer_workflow(
@@ -133,7 +145,9 @@ test "a signer workflow matches the whole SAN form" {
   let base = "https://github.com/finos/morphir-rust/.github/workflows/release.yml"
   let refused = [
     // No ref, or a ref without refs/.
-    base + "@", base + "@main", base,
+    base + "@",
+    base + "@main",
+    base,
     // A repository whose name starts with the policy repository.
     "https://github.com/finos/morphir-rust-evil/.github/workflows/release.yml@refs/heads/main",
     // Another owner, host or scheme.
@@ -144,18 +158,25 @@ test "a signer workflow matches the whole SAN form" {
     "https://github.com/finos/morphir-rust/.github/workflows/x/release.yml@refs/heads/main",
   ]
   for san in refused {
-    assert_true(release_policy().check_claims(with_san(san)) is Some(IdentityMismatch(..)), msg=san)
+    assert_true(
+      release_policy().check_claims(with_san(san)) is Some(IdentityMismatch(..)),
+      msg=san,
+    )
   }
   // Owner and repository ignore case; path and ref do not.
   assert_eq(
     release_policy().check_claims(
-      with_san("https://github.com/FINOS/Morphir-Rust/.github/workflows/release.yml@refs/heads/main"),
+      with_san(
+        "https://github.com/FINOS/Morphir-Rust/.github/workflows/release.yml@refs/heads/main",
+      ),
     ),
     None,
   )
   assert_true(
     release_policy().check_claims(
-      with_san("https://github.com/finos/morphir-rust/.github/workflows/Release.yml@refs/heads/main"),
+      with_san(
+        "https://github.com/finos/morphir-rust/.github/workflows/Release.yml@refs/heads/main",
+      ),
     )
     is Some(IdentityMismatch(..)),
   )
@@ -165,18 +186,27 @@ test "a signer workflow matches the whole SAN form" {
     git_ref=GitRef::parse("refs/heads/main"),
   )
   assert_eq(pinned.check_claims(with_san(base + "@refs/heads/main")), None)
-  assert_true(pinned.check_claims(with_san(base + "@refs/heads/Main")) is Some(IdentityMismatch(..)))
   assert_true(
-    pinned.check_claims(with_san(base + "@refs/heads/main2")) is Some(IdentityMismatch(..)),
+    pinned.check_claims(with_san(base + "@refs/heads/Main"))
+    is Some(IdentityMismatch(..)),
+  )
+  assert_true(
+    pinned.check_claims(with_san(base + "@refs/heads/main2"))
+    is Some(IdentityMismatch(..)),
   )
   // One of several SANs is enough.
-  let two = { ..rust_claims, subject_names: ["mailto:a@example.com", base + "@refs/heads/main"] }
+  let two = {
+    ..rust_claims,
+    subject_names: ["mailto:a@example.com", base + "@refs/heads/main"],
+  }
   assert_eq(pinned.check_claims(two), None)
 }
 
 ///|
 test "scenario: source repository" {
-  let policy = rust_workflow().source_repository(GitHubRepository::parse("finos/morphir-rust"))
+  let policy = rust_workflow().source_repository(
+    GitHubRepository::parse("finos/morphir-rust"),
+  )
   assert_eq(policy.check_claims(rust_claims), None)
   assert_eq(
     policy.check_claims({
@@ -186,7 +216,7 @@ test "scenario: source repository" {
     None,
   )
   assert_eq(
-    policy.check_claims({ ..rust_claims, source_repository_uri: None }),
+    policy.check_claims({ ..rust_claims, source_repository_uri: None, }),
     Some(
       ClaimMismatch(
         claim=SourceRepository,
@@ -201,16 +231,25 @@ test "scenario: source repository" {
 test "scenario: recreated repository" {
   let policy = rust_workflow().repository_id(GitHubId::parse("513894754"))
   assert_eq(policy.check_claims(rust_claims), None)
-  let recreated = { ..rust_claims, source_repository_identifier: Some("999") }
+  let recreated = { ..rust_claims, source_repository_identifier: Some("999"), }
   let mismatch = policy.check_claims(recreated)
   assert_eq(
     mismatch,
-    Some(ClaimMismatch(claim=RepositoryId, expected="513894754", actual=Some("999"))),
+    Some(
+      ClaimMismatch(
+        claim=RepositoryId,
+        expected="513894754",
+        actual=Some("999"),
+      ),
+    ),
   )
-  assert_eq(mismatch.unwrap().message(), "the repository ID is \"999\", not \"513894754\"")
+  assert_eq(
+    mismatch.unwrap().message(),
+    "the repository ID is \"999\", not \"513894754\"",
+  )
   // A missing extension fails a required claim.
   assert_eq(
-    policy.check_claims({ ..rust_claims, source_repository_identifier: None }),
+    policy.check_claims({ ..rust_claims, source_repository_identifier: None, }),
     Some(ClaimMismatch(claim=RepositoryId, expected="513894754", actual=None)),
   )
 }
@@ -220,7 +259,10 @@ test "owner and owner ID claims" {
   let owner = rust_workflow().source_owner(GitHubOwner::parse("FINOS"))
   assert_eq(owner.check_claims(rust_claims), None)
   assert_eq(
-    owner.check_claims({ ..rust_claims, source_repository_owner_uri: Some("https://github.com/cli") }),
+    owner.check_claims({
+      ..rust_claims,
+      source_repository_owner_uri: Some("https://github.com/cli"),
+    }),
     Some(
       ClaimMismatch(
         claim=SourceOwner,
@@ -232,7 +274,10 @@ test "owner and owner ID claims" {
   let owner_id = rust_workflow().owner_id(GitHubId::parse("35377814"))
   assert_eq(owner_id.check_claims(rust_claims), None)
   assert_eq(
-    owner_id.check_claims({ ..rust_claims, source_repository_owner_identifier: None }),
+    owner_id.check_claims({
+      ..rust_claims,
+      source_repository_owner_identifier: None,
+    }),
     Some(ClaimMismatch(claim=OwnerId, expected="35377814", actual=None)),
   )
 }
@@ -250,14 +295,16 @@ test "scenario: source ref" {
       ),
     ),
   )
-  let tag = rust_workflow().source_ref(GitRef::parse("refs/tags/provider-snapshot/v0.2.0"))
+  let tag = rust_workflow().source_ref(
+    GitRef::parse("refs/tags/provider-snapshot/v0.2.0"),
+  )
   assert_eq(tag.check_claims(rust_claims), None)
 }
 
 ///|
 test "scenario: self-hosted runner" {
   let policy = rust_workflow().hosted_runners_only()
-  let self_hosted = { ..rust_claims, runner_environment: Some("self-hosted") }
+  let self_hosted = { ..rust_claims, runner_environment: Some("self-hosted"), }
   let mismatch = policy.check_claims(self_hosted)
   assert_eq(mismatch, Some(RunnerEnvironment(actual=Some("self-hosted"))))
   assert_eq(
@@ -266,7 +313,7 @@ test "scenario: self-hosted runner" {
   )
   // No runner environment extension fails too.
   assert_eq(
-    policy.check_claims({ ..rust_claims, runner_environment: None }),
+    policy.check_claims({ ..rust_claims, runner_environment: None, }),
     Some(RunnerEnvironment(actual=None)),
   )
   // Without the requirement, a self-hosted runner matches.
@@ -275,14 +322,22 @@ test "scenario: self-hosted runner" {
 
 ///|
 test "scenario: GitHub-hosted runner" {
-  assert_eq(rust_workflow().hosted_runners_only().check_claims(rust_claims), None)
+  assert_eq(
+    rust_workflow().hosted_runners_only().check_claims(rust_claims),
+    None,
+  )
   let policy = Policy::github_workflow(
     GitHubRepository::parse("finos/morphir-rust"),
-    workflow=WorkflowPath::parse(".github/workflows/release-provider-snapshot.yml"),
+    workflow=WorkflowPath::parse(
+      ".github/workflows/release-provider-snapshot.yml",
+    ),
   )
   assert_eq(policy.check_claims(rust_claims), None)
   assert_true(
-    policy.check_claims({ ..rust_claims, runner_environment: Some("self-hosted") })
+    policy.check_claims({
+      ..rust_claims,
+      runner_environment: Some("self-hosted"),
+    })
     is Some(RunnerEnvironment(..)),
   )
 }
@@ -293,9 +348,16 @@ test "a policy reports the first claim that does not match" {
     .repository_id(GitHubId::parse("1"))
     .source_ref(GitRef::parse("refs/heads/main"))
     .hosted_runners_only()
-  assert_true(policy.check_claims(rust_claims) is Some(ClaimMismatch(claim=RepositoryId, ..)))
   assert_true(
-    policy.check_claims({ ..rust_claims, issuer: None, runner_environment: None })
+    policy.check_claims(rust_claims)
+    is Some(ClaimMismatch(claim=RepositoryId, ..)),
+  )
+  assert_true(
+    policy.check_claims({
+      ..rust_claims,
+      issuer: None,
+      runner_environment: None,
+    })
     is Some(IssuerMismatch(..)),
   )
 }
@@ -307,7 +369,11 @@ test "a mismatch message names both values" {
     "the certificate identity \"https://b\", \"https://c\" does not match \"https://a@*\"",
   )
   assert_eq(
-    ClaimMismatch(claim=SourceOwner, expected="https://github.com/a", actual=None).message(),
+    ClaimMismatch(
+      claim=SourceOwner,
+      expected="https://github.com/a",
+      actual=None,
+    ).message(),
     "the source repository owner is nothing, not \"https://github.com/a\"",
   )
   assert_eq(
@@ -319,7 +385,10 @@ test "a mismatch message names both values" {
 ///|
 /// The mismatch of `claims` with a statement of SLSA provenance v1, the
 /// predicate type that `Policy::github_workflow` requires by default.
-fn Policy::check_claims(self : Policy, claims : CertificateClaims) -> PolicyMismatch? {
+fn Policy::check_claims(
+  self : Policy,
+  claims : CertificateClaims,
+) -> PolicyMismatch? {
   self.mismatch(claims, Some(statement_of("https://slsa.dev/provenance/v1")))
 }
 
@@ -328,7 +397,12 @@ fn statement_of(predicate_type : String) -> Statement {
   let parsed = PredicateType::parse(predicate_type) catch {
     _ => abort("bad predicate type \{predicate_type}")
   }
-  { predicate_type: parsed, predicate: Json::null(), subjects: [], payload: b"" }
+  {
+    predicate_type: parsed,
+    predicate: Json::null(),
+    subjects: [],
+    payload: b"",
+  }
 }
 
 ///|
@@ -336,22 +410,40 @@ test "a GitHub workflow policy requires SLSA provenance by default" {
   let claims = rust_claims
   let policy = Policy::github_workflow(
     GitHubRepository::parse("finos/morphir-rust"),
-    workflow=WorkflowPath::parse(".github/workflows/release-provider-snapshot.yml"),
+    workflow=WorkflowPath::parse(
+      ".github/workflows/release-provider-snapshot.yml",
+    ),
   )
-  assert_eq(policy.mismatch(claims, Some(statement_of("https://slsa.dev/provenance/v1"))), None)
   assert_eq(
-    policy.mismatch(claims, Some(statement_of("https://spdx.dev/Document/v2.3"))),
+    policy.mismatch(
+      claims,
+      Some(statement_of("https://slsa.dev/provenance/v1")),
+    ),
+    None,
+  )
+  assert_eq(
+    policy.mismatch(
+      claims,
+      Some(statement_of("https://spdx.dev/Document/v2.3")),
+    ),
     Some(
       PredicateTypeMismatch(
         expected=PredicateType::slsa_provenance_v1(),
-        actual=Some(statement_of("https://spdx.dev/Document/v2.3").predicate_type),
+        actual=Some(
+          statement_of("https://spdx.dev/Document/v2.3").predicate_type,
+        ),
       ),
     ),
   )
   // A message-signature bundle has no statement.
   assert_eq(
     policy.mismatch(claims, None),
-    Some(PredicateTypeMismatch(expected=PredicateType::slsa_provenance_v1(), actual=None)),
+    Some(
+      PredicateTypeMismatch(
+        expected=PredicateType::slsa_provenance_v1(),
+        actual=None,
+      ),
+    ),
   )
 }
 
@@ -364,29 +456,51 @@ test "a policy can require another predicate type, or none" {
   let repository = GitHubRepository::parse("finos/morphir-rust") catch {
     _ => fail("parse")
   }
-  let workflow = WorkflowPath::parse(".github/workflows/release-provider-snapshot.yml") catch {
+  let workflow = WorkflowPath::parse(
+    ".github/workflows/release-provider-snapshot.yml",
+  ) catch {
     _ => fail("parse")
   }
-  let sbom_policy = Policy::github_workflow(repository, workflow~, predicate_type=sbom)
-  assert_eq(sbom_policy.mismatch(claims, Some(statement_of("https://spdx.dev/Document/v2.3"))), None)
+  let sbom_policy = Policy::github_workflow(
+    repository,
+    workflow~,
+    predicate_type=sbom,
+  )
+  assert_eq(
+    sbom_policy.mismatch(
+      claims,
+      Some(statement_of("https://spdx.dev/Document/v2.3")),
+    ),
+    None,
+  )
   // Policy::signer_workflow alone does not require a predicate type.
-  assert_eq(Policy::signer_workflow(repository, workflow).mismatch(claims, None), None)
+  assert_eq(
+    Policy::signer_workflow(repository, workflow).mismatch(claims, None),
+    None,
+  )
 }
 
 ///|
-fn release_statement(repository : String, tag : String, purl : String) -> Statement {
+fn release_statement(
+  repository : String,
+  tag : String,
+  purl : String,
+) -> Statement {
   let parsed = PredicateType::github_release_v0_2()
   let predicate = Json::object({
     "repository": Json::string(repository),
     "tag": Json::string(tag),
     "purl": Json::string(purl),
   })
-  { predicate_type: parsed, predicate, subjects: [], payload: b"" }
+  { predicate_type: parsed, predicate, subjects: [], payload: b"", }
 }
 
 ///|
 fn cli_release() -> Policy raise {
-  Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v2.103.3"))
+  Policy::github_release(
+    GitHubRepository::parse("cli/cli"),
+    tag=ReleaseTag::parse("v2.103.3"),
+  )
 }
 
 ///|
@@ -401,40 +515,70 @@ let release_claims : CertificateClaims = {
 
 ///|
 test "a release policy fails closed" {
-  let statement = Some(release_statement("cli/cli", "v2.103.3", "pkg:github/cli/cli@v2.103.3"))
+  let statement = Some(
+    release_statement("cli/cli", "v2.103.3", "pkg:github/cli/cli@v2.103.3"),
+  )
   assert_eq(cli_release().mismatch(release_claims, statement), None)
   // A certificate with an OIDC issuer is not a release certificate, even with
   // the release SAN.
   assert_true(
-    cli_release().mismatch({ ..release_claims, issuer: Some("https://token.actions.githubusercontent.com") }, statement)
+    cli_release().mismatch(
+      {
+        ..release_claims,
+        issuer: Some("https://token.actions.githubusercontent.com"),
+      },
+      statement,
+    )
     is Some(ReleaseMismatch(field=Issuer, ..)),
   )
   // Workflow claims that a release certificate cannot give fail.
   let with_ref = cli_release().source_ref(GitRef::parse("refs/heads/main"))
-  assert_true(with_ref.mismatch(release_claims, statement) is Some(ClaimMismatch(claim=SourceRef, actual=None, ..)))
   assert_true(
-    cli_release().hosted_runners_only().mismatch(release_claims, statement) is Some(RunnerEnvironment(actual=None)),
+    with_ref.mismatch(release_claims, statement)
+    is Some(ClaimMismatch(claim=SourceRef, actual=None, ..)),
+  )
+  assert_true(
+    cli_release().hosted_runners_only().mismatch(release_claims, statement)
+    is Some(RunnerEnvironment(actual=None)),
   )
   // Without a statement, the release does not match.
-  assert_true(cli_release().mismatch(release_claims, None) is Some(PredicateTypeMismatch(actual=None, ..)))
+  assert_true(
+    cli_release().mismatch(release_claims, None)
+    is Some(PredicateTypeMismatch(actual=None, ..)),
+  )
 }
 
 ///|
 test "the purl version is the percent-decoded exact tag" {
-  let policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("release/1.0"))
+  let policy = Policy::github_release(
+    GitHubRepository::parse("cli/cli"),
+    tag=ReleaseTag::parse("release/1.0"),
+  )
   let mismatch = (purl : String) => {
-    let statement = { ..release_statement("cli/cli", "release/1.0", purl), predicate_type: PredicateType::github_release_v0_2() }
+    let statement = {
+      ..release_statement("cli/cli", "release/1.0", purl),
+      predicate_type: PredicateType::github_release_v0_2(),
+    }
     policy.mismatch(release_claims, Some(statement))
   }
   assert_eq(mismatch("pkg:github/cli/cli@release%2F1.0"), None)
   assert_eq(mismatch("pkg:github/cli/cli@release/1.0"), None)
   assert_eq(mismatch("PKG:GITHUB/CLI/CLI@release%2f1.0"), None)
-  for bad in ["pkg:github/cli/cli@release%2F1.1", "pkg:github/cli/cli@release%G0", "pkg:github/cli/cli", "pkg:github/cli/go-gh@release/1.0"] {
+  for
+    bad in [
+      "pkg:github/cli/cli@release%2F1.1", "pkg:github/cli/cli@release%G0", "pkg:github/cli/cli",
+      "pkg:github/cli/go-gh@release/1.0",
+    ] {
     assert_true(mismatch(bad) is Some(ReleaseMismatch(field=Purl, ..)), msg=bad)
   }
   // A tag with '@' is split after the repository, not at the last '@'.
-  let at_policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v1@x"))
-  let at_statement = release_statement("cli/cli", "v1@x", "pkg:github/cli/cli@v1%40x")
+  let at_policy = Policy::github_release(
+    GitHubRepository::parse("cli/cli"),
+    tag=ReleaseTag::parse("v1@x"),
+  )
+  let at_statement = release_statement(
+    "cli/cli", "v1@x", "pkg:github/cli/cli@v1%40x",
+  )
   assert_eq(at_policy.mismatch(release_claims, Some(at_statement)), None)
   assert_eq(percent_decode("a%2"), None)
 }
@@ -445,7 +589,12 @@ test "a percent-encoded tag is decoded as UTF-8" {
   assert_eq(percent_decode("v1-é"), Some("v1-é"))
   assert_eq(percent_decode("v1-%C3"), None)
   assert_eq(percent_decode("v1-%FF"), None)
-  let policy = Policy::github_release(GitHubRepository::parse("cli/cli"), tag=ReleaseTag::parse("v1-é"))
-  let statement = release_statement("cli/cli", "v1-é", "pkg:github/cli/cli@v1-%C3%A9")
+  let policy = Policy::github_release(
+    GitHubRepository::parse("cli/cli"),
+    tag=ReleaseTag::parse("v1-é"),
+  )
+  let statement = release_statement(
+    "cli/cli", "v1-é", "pkg:github/cli/cli@v1-%C3%A9",
+  )
   assert_eq(policy.mismatch(release_claims, Some(statement)), None)
 }

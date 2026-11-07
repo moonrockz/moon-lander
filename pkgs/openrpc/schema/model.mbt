@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 pub(all) enum SimpleType {
   ArrayType
   BooleanType
@@ -7,7 +8,7 @@ pub(all) enum SimpleType {
   NumberType
   ObjectType
   StringType
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn SimpleType::to_string(self : SimpleType) -> String {
@@ -23,10 +24,11 @@ pub fn SimpleType::to_string(self : SimpleType) -> String {
 }
 
 ///|
+#derive(Debug)
 pub struct TypeConstraint {
   types : Array[SimpleType]
   union : Bool
-} derive(Debug)
+}
 
 ///|
 pub fn TypeConstraint::one(type_ : SimpleType) -> TypeConstraint {
@@ -78,9 +80,10 @@ pub fn TypeConstraint::to_json(self : TypeConstraint) -> @json.Value {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct NonNegativeInteger {
   number : @json.Number
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn NonNegativeInteger::from_number(
@@ -115,9 +118,10 @@ pub fn NonNegativeInteger::number(self : NonNegativeInteger) -> @json.Number {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct PositiveNumber {
   number : @json.Number
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn PositiveNumber::from_number(
@@ -148,18 +152,21 @@ pub fn PositiveNumber::number(self : PositiveNumber) -> @json.Number {
 }
 
 ///|
+#derive(Debug)
 pub(all) enum Items {
   SingleItems(Schema)
   TupleItems(Array[Schema])
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum Dependency {
   SchemaDependency(Schema)
   PropertyDependencies(Array[String])
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub(all) enum Keyword {
   Id(@reference.UriReference)
   Dialect(@reference.UriReference)
@@ -207,7 +214,7 @@ pub(all) enum Keyword {
   AnyOf(Array[Schema])
   OneOf(Array[Schema])
   Not(Schema)
-} derive(Debug)
+}
 
 ///|
 pub fn Keyword::name(self : Keyword) -> String {
@@ -346,15 +353,17 @@ pub fn Keyword::to_json(
 }
 
 ///|
+#derive(Debug)
 pub struct SchemaObject {
   value : @json.Value
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct ReferenceObject {
   reference : @reference.Reference
   siblings : @json.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ReferenceObject::reference(
@@ -369,12 +378,13 @@ pub fn ReferenceObject::siblings(self : ReferenceObject) -> @json.Value {
 }
 
 ///|
+#derive(Debug)
 pub(all) enum SchemaKind {
   BooleanSchema(Bool)
   ObjectSchema(SchemaObject)
   ReferenceSchema(ReferenceObject)
   UnsupportedDialectSchema(@reference.UriReference, @json.Value)
-} derive(Debug)
+}
 
 ///|
 fn draft07(text : String) -> Bool {

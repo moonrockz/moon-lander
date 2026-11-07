@@ -1,6 +1,6 @@
 ///|
 /// A destination that records each event with its label.
-fn recorder(label : String, log : Array[String]) -> @actors.Subject[Int] {
+fn recorder(label : String, log : Array[String]) -> @actors.Subject[Int32] {
   @actors.Subject::new(
     send=event => {
       log.push("\{label} \{event}")
@@ -17,7 +17,7 @@ fn recorder(label : String, log : Array[String]) -> @actors.Subject[Int] {
 async test "TOPIC-1: publish delivers to the subscribers in subscription order" {
   let log = []
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
     ignore(scope.subscribe(topic, recorder("a", log)))
     ignore(scope.subscribe(topic, recorder("b", log)))
     topic.publish(1)
@@ -30,12 +30,12 @@ async test "TOPIC-1: publish delivers to the subscribers in subscription order" 
 async test "TOPIC-1: two actors each get one event in their own mailbox" {
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
-    let slow = scope.start(0, (sum, event : Int) => {
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
+    let slow = scope.start(0, (sum, event : Int32) => {
       gate.get()
       Continue(sum + event)
     })
-    let fast = scope.start(0, (sum, event : Int) => Continue(sum + event))
+    let fast = scope.start(0, (sum, event : Int32) => Continue(sum + event))
     ignore(scope.subscribe(topic, slow.to_ref().to_subject()))
     ignore(scope.subscribe(topic, fast.to_ref().to_subject()))
     // Publish returns at admission, while the slow handler still waits.
@@ -53,8 +53,8 @@ async test "TOPIC-1: a publication uses the snapshot taken when it starts" {
   let started : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
-    let blocking : @actors.Subject[Int] = @actors.Subject::new(
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
+    let blocking : @actors.Subject[Int32] = @actors.Subject::new(
       send=event => {
         log.push("blocking \{event}")
         started.put(())
@@ -84,8 +84,8 @@ async test "TOPIC-1: a publication uses the snapshot taken when it starts" {
 async test "TOPIC-1: a closed destination is removed and the others still get the event" {
   let log = []
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
-    let ended = scope.start((), (_, _ : Int) => Stop)
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
+    let ended = scope.start((), (_, _ : Int32) => Stop)
     ended.send(0)
     ended.join()
     ignore(scope.subscribe(topic, ended.to_ref().to_subject()))
@@ -104,8 +104,8 @@ async test "TOPIC-1: a full subscriber applies backpressure, and a cancelled pub
   let gate : @aio.Queue[Unit] = @aio.Queue(kind=Unbounded)
   let one = @actors.MailboxCapacity::from_int(1)
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
-    let full = scope.start((), mailbox=Bounded(one), (_, event : Int) => {
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
+    let full = scope.start((), mailbox=Bounded(one), (_, event : Int32) => {
       log.push("full got \{event}")
       started.put(())
       gate.get()
@@ -139,7 +139,7 @@ async test "TOPIC-1: a full subscriber applies backpressure, and a cancelled pub
 async test "TOPIC-1: the end of the subscriber's scope removes its subscription" {
   let log = []
   @actors.scope(outer => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
     ignore(outer.subscribe(topic, recorder("outer", log)))
     @actors.scope(inner => {
       ignore(inner.subscribe(topic, recorder("inner", log)))
@@ -154,7 +154,7 @@ async test "TOPIC-1: the end of the subscriber's scope removes its subscription"
 ///|
 async test "TOPIC-1: close rejects later publications and subscriptions" {
   @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
     ignore(scope.subscribe(topic, recorder("a", [])))
     topic.close()
     assert_eq(topic.subscriber_count(), 0)
@@ -177,15 +177,16 @@ async test "TOPIC-1: close rejects later publications and subscriptions" {
 }
 
 ///|
+#derive(Debug)
 suberror Unwritable {
   Unwritable
-} derive(Debug)
+}
 
 ///|
 async test "TOPIC-1: a custom destination error stops the publication after earlier admissions" {
   let log = []
   let outcome = @actors.scope(scope => {
-    let topic : @actors.Topic[Int] = @actors.Topic::new()
+    let topic : @actors.Topic[Int32] = @actors.Topic::new()
     ignore(scope.subscribe(topic, recorder("first", log)))
     ignore(
       scope.subscribe(

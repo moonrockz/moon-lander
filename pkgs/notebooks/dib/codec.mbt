@@ -1,8 +1,6 @@
 ///|
 fn normalize_line_endings(source : String) -> String {
-  source
-  .replace_all(old="\r\n", new="\n")
-  .replace_all(old="\r", new="\n")
+  source.replace_all(old="\r\n", new="\n").replace_all(old="\r", new="\n")
 }
 
 ///|
@@ -245,7 +243,9 @@ pub fn Notebook::to_string(
   let output = []
   let contains_metadata_directive = self.cells
     .iter()
-    .any(cell => lines(cell.source).iter().any(line => metadata_format(line) is Some(_)))
+    .any(cell => {
+      lines(cell.source).iter().any(line => metadata_format(line) is Some(_))
+    })
   if !self.metadata.is_empty() || contains_metadata_directive {
     output.push(write_metadata(self.metadata, metadata_output))
   }

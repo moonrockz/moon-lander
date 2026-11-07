@@ -43,7 +43,9 @@ impl @moonspec.World for NotebookWorld with fn configure(self, setup) {
     expected : String,
   ) => {
     @expect.expect(
-      self.notebook().cells_by_mime_type(mime_type)
+      self
+      .notebook()
+      .cells_by_mime_type(mime_type)
       .map(cell => cell.id().map(id => id.to_string()).unwrap_or(""))
       .join(","),
     ).to_equal(expected)

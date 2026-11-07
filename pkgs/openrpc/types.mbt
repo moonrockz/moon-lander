@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Debug)
 pub struct DocumentVersion {
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn DocumentVersion::parse(
@@ -33,9 +34,10 @@ pub fn DocumentVersion::to_string(self : DocumentVersion) -> String {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct MethodName {
   text : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn MethodName::parse(
@@ -56,11 +58,12 @@ pub fn MethodName::to_string(self : MethodName) -> String {
 }
 
 ///|
+#derive(Debug)
 pub struct Info {
   title : String
   version : String
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Info::title(self : Info) -> String {
@@ -78,12 +81,13 @@ pub fn Info::to_json(self : Info) -> @exact.Value {
 }
 
 ///|
+#derive(Debug)
 pub struct ContentDescriptor {
   name : String
   schema : @schema.Schema
   required : Bool?
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn ContentDescriptor::name(self : ContentDescriptor) -> String {
@@ -106,26 +110,29 @@ pub fn ContentDescriptor::to_json(self : ContentDescriptor) -> @exact.Value {
 }
 
 ///|
+#derive(Debug)
 pub(all) enum InlineOrReference[T] {
   Inline(T)
   Reference(@reference.Reference)
-} derive(Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ParamStructure {
   ByName
   ByPosition
   Either
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct Method {
   name : MethodName
   params : Array[InlineOrReference[ContentDescriptor]]
   result : InlineOrReference[ContentDescriptor]?
   param_structure : ParamStructure?
   value : @exact.Value
-} derive(Debug)
+}
 
 ///|
 pub fn Method::name(self : Method) -> MethodName {
@@ -155,6 +162,7 @@ pub fn Method::to_json(self : Method) -> @exact.Value {
 }
 
 ///|
+#derive(Debug)
 pub struct Document {
   version : DocumentVersion
   info : Info
@@ -164,7 +172,7 @@ pub struct Document {
   servers : Array[Server]?
   components : Components?
   external_docs : ExternalDocumentation?
-} derive(Debug)
+}
 
 ///|
 pub fn Document::version(self : Document) -> DocumentVersion {
@@ -187,11 +195,12 @@ pub fn Document::to_json(self : Document) -> @exact.Value {
 }
 
 ///|
+#derive(Debug)
 pub struct ReadResult {
   cst : @exact.CstDocument?
   document : Document?
   diagnostics : Array[@exact.Diagnostic]
-} derive(Debug)
+}
 
 ///|
 pub fn ReadResult::cst(self : ReadResult) -> @exact.CstDocument? {

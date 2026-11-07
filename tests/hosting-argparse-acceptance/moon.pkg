@@ -6,7 +6,7 @@ import {
   // Vendored moonbitlang/core/argparse until a pinned MoonBit has
   // Command::try_parse (lander-4us.5.18). The alias stays, so the return changes
   // only this line.
-  "moonrockz/moon-lander-hosting/vendor/argparse" @argparse,
+  "moonrockz/moon-lander-hosting/vendor/argparse",
   "moonrockz/expect",
   "moonbitlang/async",
   "moonbitlang/async/process",
@@ -15,8 +15,10 @@ import {
 
 // The driver uses the async runtime. Pure parsing tests in hosting run on all
 // four targets; driver acceptance tests run on native and js.
+
 supported_targets = "native+js"
 
 // `async/process` has no js process functions. Process-exit assertions run on
 // native; its import is unused on js. Remove when target imports are supported.
+
 warnings = "-29"

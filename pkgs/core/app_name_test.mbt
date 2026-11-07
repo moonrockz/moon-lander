@@ -43,21 +43,24 @@ test "a later character must be an ASCII letter, a digit, - or _" {
     char in [
       '/', ':', ',', '.', '^', '`', '@', '[', '{', ' ', '\\', 'é', '\n', '\u{00A0}',
     ] {
-    assert_true(broken_rule("a\{char}b") is Some(CharNotAllowed(found)) && found == char)
+    assert_true(
+      broken_rule("a\{char}b") is Some(CharNotAllowed(found)) && found == char,
+    )
   }
 }
 
 ///|
 test "the error message names the text and the rule" {
-  let messages = ["", "9tool", "my tool"].map(text => try {
-    ignore(@lander_core.AppName::parse(text))
-    "ok"
-  } catch {
-    err => err.message()
+  let messages = ["", "9tool", "my tool"].map(text => {
+    try {
+      ignore(@lander_core.AppName::parse(text))
+      "ok"
+    } catch {
+      err => err.message()
+    }
   })
   assert_eq(messages, [
-    "Invalid application name \"\": the name is empty",
-    "Invalid application name \"9tool\": the name must start with an ASCII letter",
+    "Invalid application name \"\": the name is empty", "Invalid application name \"9tool\": the name must start with an ASCII letter",
     "Invalid application name \"my tool\": the character \" \" is not allowed; use ASCII letters, digits, '-' and '_'",
   ])
 }

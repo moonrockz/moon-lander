@@ -36,6 +36,8 @@ jobs:
         run: mise run check:browser-adapter
       - name: Validate workspace
         run: mise run validate
+      - name: Check the shared OpenSpec bundle
+        run: mission-control-tools openspec check --bundle
       - name: Verify frozen Moonx runtime provenance
         run: mise run check:moonx-runtime
       - name: Verify frozen Moonx drift rejection
@@ -93,10 +95,10 @@ jobs:
       - name: Test using the external zig-cross tool
         run: mise run test:native-zig
 
-  # Cross-build from Linux with zig-cross, for the targets that no CI machine builds: linux-arm64
-  # with the full runtime (the hosting program and the async-free programs), and darwin-x64 with
-  # the experimental sync runtime (the async-free programs). The macOS job builds darwin-arm64 and
-  # the Windows job builds windows-x64 natively, so this job does not cross-build them. The task
+  # Cross-build from Linux with zig-cross, for the target that no CI machine builds: linux-arm64
+  # with the full runtime (the hosting program and the async-free programs). The darwin-x64 sync
+  # runtime plan is removed until zig-cross assesses it on the primary pin. The macOS job builds
+  # darwin-arm64 and the Windows job builds windows-x64 natively. The task
   # runs zig-cross doctor first and stops on a blocker. This is a compile, link and header check;
   # it does not run the programs. See "Cross-builds with zig-cross" in README.md.
   cross-build:
@@ -111,8 +113,8 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run doctor and cross-build linux-arm64 and darwin-x64
-        run: mise run build:cross -- linux-arm64 darwin-x64
+      - name: Run doctor and cross-build linux-arm64
+        run: mise run build:cross -- linux-arm64
       - name: Keep the doctor reports of a failed cross-build
         if: failure()
         uses: actions/upload-artifact@v7
@@ -145,10 +147,8 @@ jobs:
         run: mise run check:openrpc
       - name: Test the console drivers with native and js children, and a consumer outside the workspace
         run: mise run check:console
-      - name: Qualify the Moonx launcher on stock 0.10.17
+      - name: Qualify the Moonx launcher on the stock primary pin
         run: mise run check:moonx
-      - name: Qualify the Moonx launcher on stock 0.10.16
-        run: mise run check:moonx-stock16
       - name: Run retained Moonx runtime tests sequentially
         run: mise run check:moonx-retained
       - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
@@ -261,12 +261,9 @@ jobs:
       - name: Test the console drivers with native and js children
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:console -- --no-consumer
-      - name: Qualify Moonx finite and isolated console behavior on stock 0.10.17
+      - name: Qualify Moonx finite and isolated console behavior on the stock primary pin
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
         run: mise run check:moonx
-      - name: Qualify Moonx finite and isolated console behavior on stock 0.10.16
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        run: mise run check:moonx-stock16
       # Real console, file, drain and CTRL_BREAK_EVENT behavior of the logging sinks in native,
       # Node.js and Bun children, and the isolated consumers.
       - name: Test the logging sinks with native, Node.js and Bun children
@@ -307,10 +304,8 @@ jobs:
         run: mise run check:console
       - name: Test the logging sinks with native, Node.js and Bun children, and isolated consumers
         run: mise run check:logging-sinks
-      - name: Qualify the Moonx launcher on stock 0.10.17
+      - name: Qualify the Moonx launcher on the stock primary pin
         run: mise run check:moonx
-      - name: Qualify the Moonx launcher on stock 0.10.16
-        run: mise run check:moonx-stock16
       - name: Retain source-bound Moonx qualification evidence
         if: always()
         uses: actions/upload-artifact@v7

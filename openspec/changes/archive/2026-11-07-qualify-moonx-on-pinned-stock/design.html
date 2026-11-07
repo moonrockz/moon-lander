@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qualify-moonx-on-pinned-stock: design</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #18212f; --muted: #526071;
+  --line: #cbd5e1; --panel: #eef2f6; --link: #075caa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111827; --fg: #e5e7eb; --muted: #b0bdce;
+    --line: #475569; --panel: #1e293b; --link: #8cc8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 1rem/1.6 system-ui, sans-serif; }
+main { max-width: 70rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h2 { margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: .4rem; }
+a { color: var(--link); }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 3px; }
+.meta { color: var(--muted); }
+.toc, pre, details { background: var(--panel); border: 1px solid var(--line);
+  border-radius: .4rem; padding: 1rem; }
+code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { overflow-x: auto; } pre code { overflow-wrap: normal; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .6rem; text-align: left;
+  overflow-wrap: anywhere; }
+svg { max-width: 100%; height: auto; }
+@media print { main { max-width: none; padding: 0; } pre, tr { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>qualify-moonx-on-pinned-stock: design</h1>
+<p class="meta">OpenSpec change | 2026-11-07 | lands with the MoonBit 0.10.20 upgrade</p>
+
+<nav class="toc" aria-label="Contents">
+<ul>
+<li><a href="#context">Context</a></li>
+<li><a href="#goals">Goals and non-goals</a></li>
+<li><a href="#decisions">Decisions</a></li>
+<li><a href="#risks">Risks and trade-offs</a></li>
+<li><a href="#migration">Migration plan</a></li>
+</ul>
+</nav>
+
+<h2 id="context">Context</h2>
+<p>See <a href="proposal.md">proposal.md</a> for the reason. The repository pins one
+primary MoonBit toolchain in <code>.config/mise/config.toml</code>. Before this change,
+<code>check:moonx</code> and <code>check:moonx-stock16</code> installed stock
+<code>0.10.17+d971670cd</code> and <code>0.10.16+b1a0e846e</code> as task-scoped tools
+and qualified a copied Moonx module with each one. <code>scripts/check-moonx.mbtx</code>
+identifies a stock toolchain by its <code>moonc</code> version and the commit of
+<code>moon</code> and <code>moonrun</code>.</p>
+<table>
+<thead><tr><th>Probe (2026-11-07)</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Formatted <code>pkgs/moonx</code>, <code>moon check --target native</code>, stock 0.10.17</td><td>28 errors: <code>#derive</code> is an unknown attribute, so the derived traits are missing</td></tr>
+<tr><td>Old <code>pkgs/moonx</code> syntax, <code>moon check --deny-warn</code>, 0.10.20</td><td>21 <code>deprecated_syntax</code> errors</td></tr>
+<tr><td><code>moonfmt</code> 0.10.20 options</td><td>No option keeps the old derive syntax</td></tr>
+</tbody>
+</table>
+
+<h2 id="goals">Goals and non-goals</h2>
+<p><strong>Goals:</strong> one Moonx source that the pinned formatter, <code>--deny-warn</code>
+and the qualification all accept, with the same evidence kinds as before.</p>
+<p><strong>Non-goals:</strong> a qualification matrix of several stock toolchains; changes to
+the launcher API or to the frozen upstream inputs.</p>
+
+<h2 id="decisions">Decisions</h2>
+<h3 id="stock-1">STOCK-1. Qualify the stock toolchain of the primary pin (Owner)</h3>
+<p>The owner chose this on 2026-11-07. <code>check:moonx</code> runs
+<code>qualify-moonx-stock.mbtx 0.10.20+65efd5b93</code>. The script still completes the
+installation with the official installer when its core or <code>moonx</code> is missing,
+so the qualified toolchain stays a stock installation, not a source build. The
+identity check accepts <code>moonc v0.10.20+65efd5b93</code> with <code>moon</code> and
+<code>moonrun</code> at commit <code>940aa18</code>, and refuses every other identity.</p>
+<p>Alternatives: keep <code>pkgs/moonx</code> on the old syntax with a
+<code>warnings</code> override and a formatter exclusion (rejected: a deprecated syntax,
+a second formatter for the frozen runtime and an exception in every lint path); hand-written
+trait implementations instead of derives (rejected: it changes frozen upstream files and
+<code>ToJson</code> moved to <code>moonbitlang/core/json</code> in 0.10.20, so the same
+source still differs between the toolchains).</p>
+<h3 id="stock-2">STOCK-2. The stock pin follows the primary pin (Call)</h3>
+<p>A later MoonBit upgrade changes the primary pin, the <code>StockPin</code> and
+<code>StockVersion</code> values and the spec scenario together. There is no separate
+stock pin to keep in step.</p>
+<h3 id="stock-3">STOCK-3. Regenerate the frozen runtime with the pinned formatter (Call)</h3>
+<p><code>mise run moonx-runtime:generate</code> formats the reconstructed files with the
+pinned <code>moon fmt</code>. The upstream digests in <code>provenance.json</code> do not
+change; only the generated digests change.</p>
+
+<h2 id="risks">Risks and trade-offs</h2>
+<table>
+<thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>Consumers on stock 0.10.16 or 0.10.17 cannot use the next Moonx release.</td><td>Published 0.11.0 stays on the registry. The release notes mark the change as breaking.</td></tr>
+<tr><td>The Windows Ctrl-C to Ctrl-Break behavior of Moonrun <code>940aa18</code> can differ from <code>2284bd2</code> and <code>3778465</code>.</td><td>The Windows CI job runs <code>check:moonx</code> on the new stock. A difference that needs Windows work goes to its own bead.</td></tr>
+</tbody>
+</table>
+
+<h2 id="migration">Migration plan</h2>
+<p>Land with the MoonBit 0.10.20 upgrade. To roll back, revert that pull request; the stock
+0.10.16 and 0.10.17 tasks and the old frozen digests come back with it.</p>
+
+</main>
+</body>
+</html>

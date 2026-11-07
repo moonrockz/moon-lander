@@ -15,8 +15,10 @@ struct Sender[C, Req, Res] {
 ///|
 /// Build an async sender from its one handler. The handler takes the context
 /// value and the request, can wait, and gives the reply or raises an error.
-pub fn[C, Req, Res] sender(handle : async (C, Req) -> Res) -> Sender[C, Req, Res] {
-  { handle, middleware: [] }
+pub fn[C, Req, Res] sender(
+  handle : async (C, Req) -> Res,
+) -> Sender[C, Req, Res] {
+  { handle, middleware: [], }
 }
 
 ///|
@@ -39,7 +41,7 @@ pub fn[C, Req, Res] Sender::use_(
 ) -> Sender[C, Req, Res] {
   let steps = self.middleware.copy()
   steps.push(middleware)
-  { handle: self.handle, middleware: steps }
+  { handle: self.handle, middleware: steps, }
 }
 
 ///|
@@ -58,7 +60,7 @@ pub async fn[C, Req, Res] Sender::send(
 /// Run the middleware from `index` to the end, then the handler.
 async fn[C, Req, Res] run(
   steps : Array[Middleware[C, Req, Res]],
-  index : Int,
+  index : Int32,
   handle : async (C, Req) -> Res,
   ctx : C,
   req : Req,

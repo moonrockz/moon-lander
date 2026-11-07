@@ -11,11 +11,13 @@ idempotent. Duplicate file paths and file/directory conflicts raise `TreeError`.
 test "example: construct a virtual text tree" {
   let path = @files.TreePath::parse("src/main.mbt")
   let file = @files.TextFile::new(
-    path, "let answer = 42\n", kernel=@dib.KernelName("moonbit"),
+    path,
+    "let answer = 42\n",
+    kernel=@dib.KernelName("moonbit"),
   )
-  let tree = @files.FileTree::new([
-    file,
-  ], directories=[@files.TreePath::parse("fixtures/empty")])
+  let tree = @files.FileTree::new([file], directories=[
+    @files.TreePath::parse("fixtures/empty"),
+  ])
   assert_eq(tree.file(path), Some(file))
   assert_true(tree.directories().contains(@files.TreePath::parse("src")))
 }

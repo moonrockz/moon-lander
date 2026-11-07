@@ -16,7 +16,10 @@ test "example: convert notebook source with an explicit loss policy" {
   let restored = converter.to_dib(jupyter.notebook())
   assert_eq(restored.notebook().cells(), original.cells())
   assert_eq(restored.losses().length(), 2) // Jupyter cell IDs have no DIB equivalent.
-  assert_eq(@dib.parse(restored.text(), source_mode=@dib.Lossless).cells(), original.cells())
+  assert_eq(
+    @dib.parse(restored.text(), source_mode=@dib.Lossless).cells(),
+    original.cells(),
+  )
 }
 ```
 

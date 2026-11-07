@@ -1,10 +1,11 @@
 ///|
 /// Output layout. `Compact` is canonical; `Pretty` adds two-space indentation
 /// and changes nothing else.
+#derive(Eq, Debug)
 pub(all) enum Format {
   Compact
   Pretty
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Format with Eq::{equal, not_equal}
@@ -13,6 +14,7 @@ pub extend Format with Eq::{equal, not_equal}
 pub extend Format with @debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum Code {
   Syntax
   DuplicateKey
@@ -37,13 +39,14 @@ pub(all) enum Code {
   UnknownField
   InvalidValue
   StaleNode
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Span {
   start : Int32
   end : Int32
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Span::new(start : Int32, end : Int32) -> Span? {
@@ -65,13 +68,14 @@ pub fn Span::end(self : Span) -> Int32 {
 }
 
 ///|
+#derive(Debug)
 pub struct Diagnostic {
   code : Code
   message : String
   path : Array[String]
   span : Span?
   related : Array[Span]
-} derive(Debug)
+}
 
 ///|
 pub fn Diagnostic::new(
@@ -110,13 +114,14 @@ pub fn Diagnostic::related(self : Diagnostic) -> Array[Span] {
 }
 
 ///|
+#derive(Debug)
 pub struct Limits {
   max_depth : Int32
   max_nodes : Int32
   max_source : Int32
   max_number : Int32
   max_findings : Int32
-} derive(Debug)
+}
 
 ///|
 pub fn Limits::new(
@@ -143,9 +148,10 @@ pub fn Limits::unlimited() -> Limits {
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct Number {
   token : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Number::token(self : Number) -> String {
@@ -153,6 +159,7 @@ pub fn Number::token(self : Number) -> String {
 }
 
 ///|
+#derive(Debug)
 pub(all) enum Kind {
   Null
   Boolean(Bool)
@@ -160,12 +167,13 @@ pub(all) enum Kind {
   Numeric(Number)
   Array(Array[Value])
   Object(Array[(String, Value)])
-} derive(Debug)
+}
 
 ///|
+#derive(Debug)
 pub struct Value {
   priv kind : Kind
-} derive(Debug)
+}
 
 ///|
 pub fn Value::kind(self : Value) -> Kind {

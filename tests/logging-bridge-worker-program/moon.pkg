@@ -6,5 +6,7 @@ import {
 }
 
 // Shared-memory worker fixture; the existing parent launcher runs on Node.js.
+
 supported_targets = "js"
-options("is-main": true)
+
+pkgtype(kind: "executable")

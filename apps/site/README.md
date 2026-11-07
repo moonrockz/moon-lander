@@ -1,7 +1,7 @@
 # Moon-Lander docs site
 
 `moonrockz/moon-lander-site` is a private native consumer of the published
-`moonrockz/telescope@0.5.1` package. Telescope supplies the shell, Smithy palette,
+`moonrockz/telescope@0.6.0` package. Telescope supplies the shell, Smithy palette,
 Markdown planner, API pages, search, browser controls, checks, serving and version
 assembly. The published framework has no site or UI dependency.
 
@@ -116,3 +116,8 @@ Telescope 0.5.1 repairs Windows canonical paths and sibling staging. The site
 source preflight compares canonical paths with native separators, and test
 cleanup restores write access to Git fixture files. The Windows workspace job
 verifies this consumer against the actual published dependency.
+
+Telescope 0.6.0 needs MoonBit 0.10.20 or later. On the js target of 0.10.20, a
+MoonBit `Array` is no longer a raw JavaScript array, and 0.6.0 changes its search
+and version-switcher islands for that. Its public API does not change for this
+site.

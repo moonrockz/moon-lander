@@ -19,7 +19,10 @@ pub fn[T : FromJson] bind(config : Config, key : String) -> T raise ConfigError 
 
 ///|
 /// Decode the section at `key` into a `T`, as `bind` does.
-pub fn[T : FromJson] Config::bind(self : Config, key : String) -> T raise ConfigError {
+pub fn[T : FromJson] Config::bind(
+  self : Config,
+  key : String,
+) -> T raise ConfigError {
   bind(self, key)
 }
 
@@ -49,7 +52,7 @@ fn Config::check_no_secret(
   guard secret_steps(value, self.secret_syntax) is Some(steps) else { return }
   let path = at.below(steps)
   raise Decode(failure={
-    at: [{ path, blame: self.blame(path) }],
+    at: [{ path, blame: self.blame(path), }],
     detail: secret_detail,
   })
 }
@@ -68,13 +71,13 @@ fn secret_steps(
     Struct(fields) =>
       for field in fields {
         guard field.name().text() is Some(name) else { continue }
-        if secret_steps({ ion: field.value() }, syntax) is Some(steps) {
+        if secret_steps({ ion: field.value(), }, syntax) is Some(steps) {
           return Some([Field(name), ..steps])
         }
       }
     List(items) | Sexp(items) =>
       for index, item in items {
-        if secret_steps({ ion: item }, syntax) is Some(steps) {
+        if secret_steps({ ion: item, }, syntax) is Some(steps) {
           return Some([Index(index), ..steps])
         }
       }
@@ -86,7 +89,7 @@ fn secret_steps(
 ///|
 /// The decode path of the section at `key`, or of the root for `None`.
 fn section_path(key : KeyPath?) -> DecodePath {
-  { key, suffix: [] }
+  { key, suffix: [], }
 }
 
 ///|
@@ -99,7 +102,10 @@ fn decode_path_below(key : KeyPath?, steps : Array[DecodeStep]) -> DecodePath {
 /// The decode path of `steps` below this path. Before the first list index,
 /// field steps join the key path; the steps from the first list index on go
 /// to the suffix.
-fn DecodePath::below(self : DecodePath, steps : Array[DecodeStep]) -> DecodePath {
+fn DecodePath::below(
+  self : DecodePath,
+  steps : Array[DecodeStep],
+) -> DecodePath {
   let names = match self.key {
     Some(key) => key.names.copy()
     None => []
@@ -111,7 +117,7 @@ fn DecodePath::below(self : DecodePath, steps : Array[DecodeStep]) -> DecodePath
       _ => suffix.push(step)
     }
   }
-  { key: if names.is_empty() { None } else { Some({ names, }) }, suffix }
+  { key: if names.is_empty() { None } else { Some({ names, }) }, suffix, }
 }
 
 ///|
@@ -125,7 +131,7 @@ fn section_json(
   @ion_json.to_json(value.ion) catch {
     error =>
       raise Decode(failure={
-        at: [{ path: at, blame: config.blame(at) }],
+        at: [{ path: at, blame: config.blame(at), }],
         detail: "the value has no JSON form: \{error.message()}",
       })
   }
@@ -144,7 +150,7 @@ fn[T : FromJson] decode(
   @json.from_json(json) catch {
     JsonDecodeError((pointer, detail)) => {
       let path = decode_path(at, pointer.to_string(), json)
-      raise Decode(failure={ at: [{ path, blame: blame(path) }], detail })
+      raise Decode(failure={ at: [{ path, blame: blame(path), }], detail, })
     }
   }
 }
@@ -168,12 +174,14 @@ pub fn[T : FromJson + ToJson] bind_or(
   config : Config,
   key : String,
   default : T,
-  unknown? : UnknownKeys = Allow,
+  unknown~ : UnknownKeys = Allow,
 ) -> T raise ConfigError {
   let path = KeyPath::parse(key)
   // Synthetic roots keep the rule that a tree root is a struct, so a scalar or
   // list default works too.
-  let default_root = fields([("value", { ion: @ion.Ion::Ion(ToJson::to_json(default)) })])
+  let default_root = fields([
+    ("value", { ion: @ion.Ion::Ion(ToJson::to_json(default)), }),
+  ])
   let section = config.get(path)
   let merged = match section {
     Some(section) => {
@@ -182,7 +190,9 @@ pub fn[T : FromJson + ToJson] bind_or(
     }
     None => default_root
   }
-  let value = merged.field("value").unwrap_or({ ion: @ion.Ion::Ion(Json::null()) })
+  let value = merged
+    .field("value")
+    .unwrap_or({ ion: @ion.Ion::Ion(Json::null()), })
   let json = section_json(config, section_path(Some(path)), value)
   let result : T = decode(config, section_path(Some(path)), json, blame=decode_path => {
     match config.blame(decode_path) {
@@ -212,7 +222,7 @@ pub fn[T : FromJson + ToJson] Config::bind_or(
   self : Config,
   key : String,
   default : T,
-  unknown? : UnknownKeys = Allow,
+  unknown~ : UnknownKeys = Allow,
 ) -> T raise ConfigError {
   bind_or(self, key, default, unknown~)
 }
@@ -262,7 +272,7 @@ fn pointer_segments(pointer : String) -> Array[String] {
 
 ///|
 /// The list index that `segment` names, when it is a decimal number.
-fn list_index(segment : String) -> Int? {
+fn list_index(segment : String) -> Int32? {
   guard !segment.is_empty() && segment.length() <= 9 else { return None }
   let mut index = 0
   for char in segment {

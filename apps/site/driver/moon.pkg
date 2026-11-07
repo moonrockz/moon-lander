@@ -7,5 +7,7 @@ import {
   "moonbitlang/x/sys",
 }
 // The executable delegates filesystem and process I/O to the native Telescope host.
+
 supported_targets = "native"
+
 pkgtype(kind: "executable")

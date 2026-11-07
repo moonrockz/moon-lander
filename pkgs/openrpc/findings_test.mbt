@@ -1,4 +1,3 @@
-
 ///|
 test "findings are ordered by resource, pointer tokens, code and occurrence" {
   let methods = []
@@ -37,9 +36,7 @@ test "source map spans locate input findings in UTF-16 units" {
     read.document().unwrap(),
     source_map=Some(source_map),
   )
-  let duplicate = report
-    .findings()
-    .filter(f => f.phase() == @openrpc.Normative)[0]
+  let duplicate = report.findings().filter(f => f.phase() == @openrpc.Normative)[0]
   let location = duplicate.location()
   assert_eq(location.path(), ["methods", "1", "name"])
   assert_eq(location.span().map(s => (s.start(), s.end())), Some((100, 103)))
@@ -54,10 +51,7 @@ test "source map spans locate input findings in UTF-16 units" {
 
 ///|
 test "generated documents have no source locations" {
-  let method_ = @openrpc.Method::new(
-    @openrpc.MethodName::parse("a").unwrap(),
-    [],
-  ).unwrap()
+  let method_ = @openrpc.Method::new(@openrpc.MethodName::parse("a").unwrap(), []).unwrap()
   let document = @openrpc.Document::new(
     @openrpc.DocumentVersion::parse("1.4.0").unwrap(),
     @openrpc.Info::new("T", "1").unwrap(),
@@ -104,9 +98,7 @@ test "external findings keep their resource and take no input spans" {
     ],
   )
   assert_true(schema_errors.all(f => f.location().span() is None))
-  let duplicate = report
-    .findings()
-    .filter(f => f.phase() == @openrpc.Normative)[0]
+  let duplicate = report.findings().filter(f => f.phase() == @openrpc.Normative)[0]
   assert_eq(
     duplicate.location().resource().map(u => u.text()),
     Some("https://b.test/m.json"),
@@ -127,12 +119,8 @@ test "broken pointer findings point at the reference site" {
     .filter(f => f.phase() == @openrpc.References)
   assert_eq(broken.length(), 1)
   assert_eq(broken[0].diagnostic().code(), @exact.UnresolvedReference)
-  assert_eq(broken[0].location().path(), [
-    "components", "schemas", "S", "$ref",
-  ])
-  let methods = doc(
-    "\"methods\":[{\"$ref\":\"#/components/missing/m\"}]",
-  )
+  assert_eq(broken[0].location().path(), ["components", "schemas", "S", "$ref"])
+  let methods = doc("\"methods\":[{\"$ref\":\"#/components/missing/m\"}]")
   let unresolved = @openrpc.validate(methods)
     .findings()
     .filter(f => f.phase() == @openrpc.References)
@@ -222,9 +210,7 @@ test "a base naming different registered content keeps the input authoritative" 
     source_map=read.source_map(),
   )
   assert_false(
-    report
-    .findings()
-    .any(f => f.diagnostic().code() == @exact.UnknownField),
+    report.findings().any(f => f.diagnostic().code() == @exact.UnknownField),
   )
   let conflict = report
     .findings()

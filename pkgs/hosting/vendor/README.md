@@ -13,11 +13,15 @@ copy goes away (bead `lander-4us.5.18`).
 ## Source
 
 - Base: `moonbitlang/core` of MoonBit `0.10.17+d971670cd`, the release that
-  `.config/mise/config.toml` pins.
+  `.config/mise/config.toml` pinned when the copy was made.
 - Patch: moonbitlang/core#4487 (issue moonbitlang/core#4486), unchanged. It adds
   `ParseOutcome` and `Command::try_parse`, and `parse` calls `try_parse`.
 - Local change: one line. `argparse/moon.pkg` imports `edit_distance` from this
   folder, because a package outside core cannot import a core `internal` package.
+- Formatter change: the `moon fmt` of MoonBit `0.10.20+65efd5b93` rewrites each
+  trailing `derive(...)` to a `#derive(...)` attribute before the declaration.
+  Only that syntax changes. To check the copy, format the base with the patch
+  with that `moon fmt` before you compare.
 - `pkg.generated.mbti` files: `moon info` writes them.
 - License: Apache-2.0, as the upstream files say. `LICENSE` and `NOTICE` are the
   upstream files.
@@ -25,7 +29,7 @@ copy goes away (bead `lander-4us.5.18`).
 ## Rules
 
 - Do not edit these files. They stay byte-for-byte equal to the base with the
-  patch, except for the one line above. To check, copy the base into an empty
+  patch, except for the one line and the formatter change above. To check, copy the base into an empty
   folder, apply the diff of moonbitlang/core#4487 with `git apply`, and compare.
 - The Moon-Lander rules for domain types and for public APIs do not apply here.
   Review only the difference from upstream.
@@ -36,7 +40,11 @@ copy goes away (bead `lander-4us.5.18`).
 
 ## Return to upstream
 
-When a pinned MoonBit release has `Command::try_parse`:
+MoonBit `0.10.20+65efd5b93` has the upstream form of the patch,
+`Command::parse_outcome` and `ParseOutcome`, with a different name and shape.
+The return then also changes the host calls (bead `lander-4us.5.18`).
+
+When a pinned MoonBit release has `Command::try_parse` or its upstream form:
 
 1. Change the MoonBit pin in `.config/mise/config.toml`.
 2. In each `moon.pkg` that imports `moonrockz/moon-lander-hosting/vendor/argparse`,

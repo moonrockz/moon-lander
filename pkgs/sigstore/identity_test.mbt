@@ -73,7 +73,7 @@ fn kind_name(kind : @sigstore.IdentityKind) -> String {
 
 ///|
 /// A text of `count` copies of `char`.
-fn repeat(char : Char, count : Int) -> String {
+fn repeat(char : Char, count : Int32) -> String {
   let out = StringBuilder()
   for _ in 0..<count {
     out.write_char(char)
@@ -83,13 +83,18 @@ fn repeat(char : Char, count : Int) -> String {
 
 ///|
 test "scenario: repository without owner" {
-  refuses(parse_repository, "morphir-rust", "Repository", "use the form owner/repo")
+  refuses(
+    parse_repository, "morphir-rust", "Repository", "use the form owner/repo",
+  )
   let err = try @sigstore.GitHubRepository::parse("morphir-rust") catch {
     err => err
   } noraise {
     _ => fail("parsed")
   }
-  assert_eq(err.message(), "Invalid repository \"morphir-rust\": use the form owner/repo")
+  assert_eq(
+    err.message(),
+    "Invalid repository \"morphir-rust\": use the form owner/repo",
+  )
 }
 
 ///|
@@ -101,12 +106,16 @@ test "scenario: issuer without https" {
 
 ///|
 test "scenario: ref without prefix" {
-  refuses(parse_git_ref, "v0.2.0", "Ref", "a ref starts with refs/ and has a name")
+  refuses(
+    parse_git_ref, "v0.2.0", "Ref", "a ref starts with refs/ and has a name",
+  )
 }
 
 ///|
 test "Issuer: an https URL with a host and no spaces" {
-  let issuer = @sigstore.Issuer::parse("https://token.actions.githubusercontent.com")
+  let issuer = @sigstore.Issuer::parse(
+    "https://token.actions.githubusercontent.com",
+  )
   assert_eq(issuer, @sigstore.Issuer::github_actions())
   assert_eq(issuer.to_string(), "https://token.actions.githubusercontent.com")
   // The shortest host.
@@ -126,7 +135,9 @@ test "Issuer: an https URL with a host and no spaces" {
 test "SubjectName: a non-empty text with no spaces" {
   parse_subject_name("a")
   assert_eq(
-    @sigstore.SubjectName::parse("https://github.com/o/r/.github/workflows/w.yml@refs/heads/main").to_string(),
+    @sigstore.SubjectName::parse(
+      "https://github.com/o/r/.github/workflows/w.yml@refs/heads/main",
+    ).to_string(),
     "https://github.com/o/r/.github/workflows/w.yml@refs/heads/main",
   )
   refuses(parse_subject_name, "", "SubjectName", "the identity is empty")
@@ -189,9 +200,15 @@ test "GitHubRepository: owner/repo with a valid owner and name" {
   refuses(parse_repository, "a/.", "Repository", dots)
   refuses(parse_repository, "a/..", "Repository", dots)
   // The owner rules apply, with the repository kind.
-  refuses(parse_repository, "/b", "Repository", "an owner has 1 to 39 characters")
-  refuses(parse_repository, "-a/b", "Repository", "an owner cannot start or end with '-'")
-  refuses(parse_repository, "a_b/c", "Repository", "an owner has only ASCII letters, digits and '-'")
+  refuses(
+    parse_repository, "/b", "Repository", "an owner has 1 to 39 characters",
+  )
+  refuses(
+    parse_repository, "-a/b", "Repository", "an owner cannot start or end with '-'",
+  )
+  refuses(
+    parse_repository, "a_b/c", "Repository", "an owner has only ASCII letters, digits and '-'",
+  )
 }
 
 ///|
@@ -228,7 +245,9 @@ test "WorkflowPath: a .yml or .yaml file directly in .github/workflows/" {
   refuses(parse_workflow, "release.yml", "Workflow", prefix)
   refuses(parse_workflow, "github/workflows/release.yml", "Workflow", prefix)
   refuses(parse_workflow, "/.github/workflows/release.yml", "Workflow", prefix)
-  refuses(parse_workflow, ".github/workflows/sub/release.yml", "Workflow", folder)
+  refuses(
+    parse_workflow, ".github/workflows/sub/release.yml", "Workflow", folder,
+  )
   refuses(parse_workflow, ".github/workflows/release.json", "Workflow", suffix)
   refuses(parse_workflow, ".github/workflows/release.YML", "Workflow", suffix)
   refuses(parse_workflow, ".github/workflows/", "Workflow", suffix)
@@ -242,7 +261,10 @@ test "WorkflowPath: a .yml or .yaml file directly in .github/workflows/" {
 test "GitRef: refs/ and a name, with no '..' or spaces" {
   let prefix = "a ref starts with refs/ and has a name"
   let chars = "a ref has no '..', space or control character"
-  assert_eq(@sigstore.GitRef::parse("refs/heads/main").to_string(), "refs/heads/main")
+  assert_eq(
+    @sigstore.GitRef::parse("refs/heads/main").to_string(),
+    "refs/heads/main",
+  )
   parse_git_ref("refs/x")
   parse_git_ref("refs/tags/provider-snapshot/v0.2.0")
   parse_git_ref("refs/heads/a.b")

@@ -1,9 +1,10 @@
 ///|
 /// A certificate that cannot be read.
+#derive(Debug)
 pub suberror X509Error {
   /// The certificate breaks the rule that the text names.
   BadCertificate(String)
-} derive(Debug)
+}
 
 ///|
 pub extend X509Error with @debug.Debug::{to_repr}
@@ -27,7 +28,7 @@ pub struct Extension {
 /// The basic constraints of a certificate.
 pub struct BasicConstraints {
   is_ca : Bool
-  path_length : Int?
+  path_length : Int32?
 }
 
 ///|
@@ -52,7 +53,7 @@ pub struct Certificate {
   extensions : Array[Extension]
   basic_constraints : BasicConstraints?
   /// The key usage bits, bit 0 first, when the extension is present.
-  key_usage : Int?
+  key_usage : Int32?
   /// The extended key usage OIDs, when the extension is present.
   extended_key_usage : Array[String]?
   /// The URI subject alternative names.
@@ -64,10 +65,10 @@ pub struct Certificate {
 }
 
 ///|
-pub const KEY_USAGE_DIGITAL_SIGNATURE : Int = 1
+pub const KEY_USAGE_DIGITAL_SIGNATURE : Int32 = 1
 
 ///|
-pub const KEY_USAGE_CERT_SIGN : Int = 32
+pub const KEY_USAGE_CERT_SIGN : Int32 = 32
 
 ///|
 pub const EKU_CODE_SIGNING : String = "1.3.6.1.5.5.7.3.3"
@@ -80,7 +81,7 @@ pub const EKU_TIME_STAMPING : String = "1.3.6.1.5.5.7.3.8"
 
 ///|
 /// Key usage contentCommitment (bit 1), which a timestamping leaf may have.
-pub const KEY_USAGE_CONTENT_COMMITMENT : Int = 2
+pub const KEY_USAGE_CONTENT_COMMITMENT : Int32 = 2
 
 ///|
 pub const SCT_LIST_OID : String = "1.3.6.1.4.1.11129.2.4.2"
@@ -125,7 +126,9 @@ fn parse_der(raw : BytesView) -> Certificate raise {
     }
     None => 0
   }
-  guard version == 2 else { raise BadCertificate("not an X.509 v3 certificate") }
+  guard version == 2 else {
+    raise BadCertificate("not an X.509 v3 certificate")
+  }
   let serial = fields.expect(@der.INTEGER).content.to_owned()
   // RFC 5280, section 4.1.1.2: the same AlgorithmIdentifier, parameters too.
   let inner_algorithm = fields.expect(@der.SEQUENCE)
@@ -195,7 +198,9 @@ fn read_extensions(element : @der.Element) -> Array[Extension] raise {
       Some(flag) => {
         let value = flag.boolean()
         // DER omits a default value.
-        guard value else { raise BadCertificate("critical is encoded as false") }
+        guard value else {
+          raise BadCertificate("critical is encoded as false")
+        }
         value
       }
       None => false
@@ -205,7 +210,7 @@ fn read_extensions(element : @der.Element) -> Array[Extension] raise {
     guard !extensions.iter().any(e => e.oid == oid) else {
       raise BadCertificate("the extension \{oid} is repeated")
     }
-    extensions.push({ oid, critical, value })
+    extensions.push({ oid, critical, value, })
   }
   extensions
 }
@@ -233,7 +238,7 @@ fn decode_extensions(certificate : Certificate) -> Certificate raise {
           None => None
         }
         reader.finish()
-        result = { ..result, basic_constraints: Some({ is_ca, path_length }) }
+        result = { ..result, basic_constraints: Some({ is_ca, path_length, }), }
       }
       "2.5.29.15" =>
         result = {
@@ -246,7 +251,7 @@ fn decode_extensions(certificate : Certificate) -> Certificate raise {
         while !reader.is_empty() {
           usages.push(reader.expect(@der.OID).oid())
         }
-        result = { ..result, extended_key_usage: Some(usages) }
+        result = { ..result, extended_key_usage: Some(usages), }
       }
       "2.5.29.17" => {
         let reader = @der.parse_tag(value, @der.SEQUENCE).children()
@@ -260,12 +265,16 @@ fn decode_extensions(certificate : Certificate) -> Certificate raise {
             emails.push(ascii(name.content))
           }
         }
-        result = { ..result, san_uris: uris, san_emails: emails }
+        result = { ..result, san_uris: uris, san_emails: emails, }
       }
       "2.5.29.35" => {
         let reader = @der.parse_tag(value, @der.SEQUENCE).children()
         match reader.optional(@der.context_primitive(0)) {
-          Some(id) => result = { ..result, authority_key_id: Some(id.content.to_owned()) }
+          Some(id) =>
+            result = {
+              ..result,
+              authority_key_id: Some(id.content.to_owned()),
+            }
           None => ()
         }
       }
@@ -305,7 +314,7 @@ pub fn Certificate::extension(self : Certificate, oid : String) -> Extension? {
 /// understand, ignoring the OIDs in `allowed`.
 pub fn Certificate::unhandled_critical(
   self : Certificate,
-  allowed? : Array[String] = [],
+  allowed~ : Array[String] = [],
 ) -> String? {
   for extension in self.extensions {
     if extension.critical &&
@@ -336,9 +345,14 @@ pub fn signature_hash(algorithm : String) -> @signature.HashAlgorithm? {
 
 ///|
 /// True when `issuer` names this certificate's issuer and its key signed it.
-pub fn Certificate::is_issued_by(self : Certificate, issuer : Certificate) -> Bool {
+pub fn Certificate::is_issued_by(
+  self : Certificate,
+  issuer : Certificate,
+) -> Bool {
   guard self.issuer == issuer.subject else { return false }
-  guard signature_hash(self.signature_algorithm) is Some(hash) else { return false }
+  guard signature_hash(self.signature_algorithm) is Some(hash) else {
+    return false
+  }
   let key = @signature.PublicKey::from_spki(issuer.spki) catch {
     _ => return false
   }
@@ -358,7 +372,10 @@ pub fn fulcio_value(extension : Extension) -> String raise X509Error {
   }
   if arc <= 6 {
     @utf8.decode(extension.value) catch {
-      _ => raise BadCertificate("the Fulcio extension \{extension.oid} is not UTF-8")
+      _ =>
+        raise BadCertificate(
+          "the Fulcio extension \{extension.oid} is not UTF-8",
+        )
     }
   } else {
     let element = @der.parse_tag(extension.value, @der.UTF8_STRING) catch {
@@ -384,21 +401,29 @@ pub fn decode_pem(text : String) -> Array[Bytes] raise X509Error {
     }
     let body = after[:stop]
     let der = @encoding.decode_base64(
-      body.to_owned().replace_all(old="\n", new="").replace_all(old="\r", new=""),
+      body
+      .to_owned()
+      .replace_all(old="\n", new="")
+      .replace_all(old="\r", new=""),
     ) catch {
       _ => raise BadCertificate("PEM block is not base64")
     }
     certificates.push(der)
     rest = after[stop + end.length():]
   }
-  guard !certificates.is_empty() else { raise BadCertificate("no PEM certificate") }
+  guard !certificates.is_empty() else {
+    raise BadCertificate("no PEM certificate")
+  }
   certificates
 }
 
 ///|
 /// The TBSCertificate without the extension `oid`, as a CT precertificate
 /// signs it (RFC 6962, section 3.2).
-pub fn Certificate::tbs_without(self : Certificate, oid : String) -> Bytes raise X509Error {
+pub fn Certificate::tbs_without(
+  self : Certificate,
+  oid : String,
+) -> Bytes raise X509Error {
   rebuild(self.tbs, oid) catch {
     @der.Malformed(_) as err => raise bad(err)
   }
@@ -445,7 +470,9 @@ pub fn Certificate::timestamp_signer_problem(self : Certificate) -> String? {
   guard self.extension("2.5.29.37") is Some(eku) &&
     eku.critical &&
     self.extended_key_usage == Some([EKU_TIME_STAMPING]) else {
-    return Some("the signer does not have a critical extended key usage of only timeStamping")
+    return Some(
+      "the signer does not have a critical extended key usage of only timeStamping",
+    )
   }
   if self.key_usage is Some(bits) &&
     (bits & (KEY_USAGE_DIGITAL_SIGNATURE | KEY_USAGE_CONTENT_COMMITMENT)) == 0 {

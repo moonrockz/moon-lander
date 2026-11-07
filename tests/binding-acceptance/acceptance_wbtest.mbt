@@ -1,60 +1,69 @@
 ///|
+#derive(FromJson, ToJson)
 priv struct IrOptions {
   layout : String
   strict_mode : Bool
-} derive(FromJson, ToJson)
+}
 
 ///|
+#derive(FromJson, ToJson)
 priv struct PipelineOptions {
   components : Array[String]
-} derive(FromJson, ToJson)
+}
 
 ///|
 /// A default whose JSON form does not decode: `level` is text.
+#derive(FromJson)
 priv struct Mode {
-  level : Int
-} derive(FromJson)
+  level : Int32
+}
 
 ///|
-impl ToJson for Mode with to_json(_) {
+impl ToJson for Mode with fn to_json(_) {
   { "level": "high" }
 }
 
 ///|
+#derive(FromJson)
 priv struct Pipeline {
   target : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 priv struct AppConfig {
   ir : IrOptions
   pipeline : Pipeline
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 priv struct Target {
-  level : Int
-} derive(FromJson)
+  level : Int32
+}
 
 ///|
+#derive(FromJson)
 priv struct Service {
   url : String
   token : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 priv struct ApiService {
   api_token : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 priv struct PipelineRules {
   target : String
   validation : String
-} derive(FromJson)
+}
 
 ///|
-impl @config.Validate for PipelineRules with validate(self) {
+impl @config.Validate for PipelineRules with fn validate(self) {
   let found = []
   if self.target == "" {
     found.push(@config.violation(["target"], "must not be empty"))
@@ -67,13 +76,14 @@ impl @config.Validate for PipelineRules with validate(self) {
 
 ///|
 /// The IR record with the rule that a split layout needs strict mode.
+#derive(FromJson)
 priv struct IrRules {
   layout : String
   strict_mode : Bool
-} derive(FromJson)
+}
 
 ///|
-impl @config.Validate for IrRules with validate(self) {
+impl @config.Validate for IrRules with fn validate(self) {
   if self.layout == "split" && !self.strict_mode {
     [
       @config.violation(
@@ -88,21 +98,23 @@ impl @config.Validate for IrRules with validate(self) {
 
 ///|
 /// A record with no validation rules.
+#derive(FromJson)
 priv struct Telemetry {
   endpoint : String
-} derive(FromJson)
+}
 
 ///|
 impl @config.Validate for Telemetry
 
 ///|
 /// One named backend: each child of `backends` is an instance.
+#derive(FromJson, ToJson)
 priv struct Backend {
-  level : Int
-} derive(FromJson, ToJson)
+  level : Int32
+}
 
 ///|
-impl @config.Validate for Backend with validate(self) {
+impl @config.Validate for Backend with fn validate(self) {
   if self.level > 0 {
     []
   } else {
@@ -113,18 +125,21 @@ impl @config.Validate for Backend with validate(self) {
 ///|
 /// A server whose decoder accepts `port` as an alias of `endpoint`, but whose
 /// encoder writes only `endpoint`.
+#derive(ToJson)
 priv struct Endpoint {
-  endpoint : Int
-} derive(ToJson)
+  endpoint : Int32
+}
 
 ///|
-impl FromJson for Endpoint with from_json(json, path) {
+impl FromJson for Endpoint with fn from_json(json, path) {
   guard json is Object(fields) else {
     raise @json.JsonDecodeError((path, "Expected object"))
   }
   match (fields.get("port"), fields.get("endpoint")) {
-    (Some(value), _) | (None, Some(value)) => { endpoint: @json.from_json(value) }
-    (None, None) => raise @json.JsonDecodeError((path, "Missing field endpoint"))
+    (Some(value), _) | (None, Some(value)) =>
+      { endpoint: @json.from_json(value), }
+    (None, None) =>
+      raise @json.JsonDecodeError((path, "Missing field endpoint"))
   }
 }
 
@@ -135,8 +150,8 @@ priv struct Billing {
 }
 
 ///|
-impl @config.FromConfig for Billing with from_config(node) {
-  { rate: node.get("rate") }
+impl @config.FromConfig for Billing with fn from_config(node) {
+  { rate: node.get("rate"), }
 }
 
 ///|
@@ -145,8 +160,8 @@ priv struct Release {
 }
 
 ///|
-impl @config.FromConfig for Release with from_config(node) {
-  { at: node.get("at") }
+impl @config.FromConfig for Release with fn from_config(node) {
+  { at: node.get("at"), }
 }
 
 ///|
@@ -155,18 +170,18 @@ priv struct Limits {
 }
 
 ///|
-impl @config.FromConfig for Limits with from_config(node) {
-  { max: node.get("max") }
+impl @config.FromConfig for Limits with fn from_config(node) {
+  { max: node.get("max"), }
 }
 
 ///|
 priv struct ExactServer {
-  port : Int
+  port : Int32
 }
 
 ///|
-impl @config.FromConfig for ExactServer with from_config(node) {
-  { port: node.get("port") }
+impl @config.FromConfig for ExactServer with fn from_config(node) {
+  { port: node.get("port"), }
 }
 
 ///|
@@ -175,8 +190,8 @@ priv struct Metadata {
 }
 
 ///|
-impl @config.FromConfig for Metadata with from_config(node) {
-  { lock: node.get("lock") }
+impl @config.FromConfig for Metadata with fn from_config(node) {
+  { lock: node.get("lock"), }
 }
 
 ///|
@@ -186,8 +201,8 @@ priv struct SecretService {
 }
 
 ///|
-impl @config.FromConfig for SecretService with from_config(node) {
-  { url: node.get("url"), token: node.get("token") }
+impl @config.FromConfig for SecretService with fn from_config(node) {
+  { url: node.get("url"), token: node.get("token"), }
 }
 
 ///|
@@ -201,13 +216,14 @@ fn locations(blame : @config.Blame) -> String {
 }
 
 ///|
+#derive(FromJson, ToJson)
 priv struct MorphirIr {
   layout : String
   strict_mode : Bool
-} derive(FromJson, ToJson)
+}
 
 ///|
-impl @config.Validate for MorphirIr with validate(self) {
+impl @config.Validate for MorphirIr with fn validate(self) {
   if self.layout == "split" && !self.strict_mode {
     [
       @config.violation(
@@ -221,16 +237,18 @@ impl @config.Validate for MorphirIr with validate(self) {
 }
 
 ///|
+#derive(FromJson, ToJson)
 priv struct MorphirPipeline {
   target : String
   components : Array[String]
-} derive(FromJson, ToJson)
+}
 
 ///|
+#derive(FromJson)
 priv struct MorphirWorkspace {
   members : Array[String]
   out_dir : String
-} derive(FromJson)
+}
 
 ///|
 priv struct MorphirMetadata {
@@ -239,8 +257,8 @@ priv struct MorphirMetadata {
 }
 
 ///|
-impl @config.FromConfig for MorphirMetadata with from_config(node) {
-  { provider: node.get("provider"), lock: node.get("lock") }
+impl @config.FromConfig for MorphirMetadata with fn from_config(node) {
+  { provider: node.get("provider"), lock: node.get("lock"), }
 }
 
 ///|
@@ -256,11 +274,12 @@ fn attempt(bind : () -> Unit raise @config.ConfigError) -> String {
 ///|
 /// Bind each section of a Morphir-shaped configuration and give one text with
 /// the bound values and the error texts. Each target must give the same text.
-fn bind_morphir(
-  config : @config.Config,
-) -> String raise @config.ConfigError {
+fn bind_morphir(config : @config.Config) -> String raise @config.ConfigError {
   let ir = config
-    |> @config.bind_or("ir", ({ layout: "single-file", strict_mode: false } : MorphirIr))
+    |> @config.bind_or(
+      "ir",
+      ({ layout: "single-file", strict_mode: false, } : MorphirIr),
+    )
     |> @config.validated(config, "ir")
   let pipeline_default : MorphirPipeline = {
     target: "wasm",
@@ -304,7 +323,7 @@ priv struct BindingWorld {
 
 ///|
 fn BindingWorld::BindingWorld() -> BindingWorld {
-  { files: [], appends: {}, vars: {}, result: None, error: None }
+  { files: [], appends: {}, vars: {}, result: None, error: None, }
 }
 
 ///|
@@ -379,185 +398,237 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
     self.files.push((path, role(role_name), source.content))
     self.appends[path] = key
   })
-  setup.when0("the application binds the Morphir configuration", () => self.run(config => {
-    bind_morphir(config)
-  }))
-  setup.when1("the application binds {string} to the IR record", (
-    key : String,
-  ) => self.run(config => {
-    let ir : IrOptions = config |> @config.bind(key)
-    "\{ir.layout} \{ir.strict_mode}"
-  }))
+  setup.when0("the application binds the Morphir configuration", () => {
+    self.run(config => bind_morphir(config))
+  })
+  setup.when1("the application binds {string} to the IR record", (key : String) => {
+    self.run(config => {
+      let ir : IrOptions = config |> @config.bind(key)
+      "\{ir.layout} \{ir.strict_mode}"
+    })
+  })
   setup.when1("the application binds {string} to an optional IR record", (
     key : String,
-  ) => self.run(config => {
-    let ir : IrOptions? = config |> @config.bind(key)
-    if ir is None {
-      "none"
-    } else {
-      "some"
-    }
-  }))
+  ) => {
+    self.run(config => {
+      let ir : IrOptions? = config |> @config.bind(key)
+      if ir is None {
+        "none"
+      } else {
+        "some"
+      }
+    })
+  })
   setup.when1("the application binds {string} to a list of targets", (
     key : String,
-  ) => self.run(config => {
-    let targets : Array[Target] = config |> @config.bind(key)
-    targets.map(target => target.level.to_string()).join(",")
-  }))
-  setup.when0("the application binds the full configuration", () => self.run(config => {
-    let app : AppConfig = config |> @config.bind_root()
-    "\{app.ir.layout} \{app.pipeline.target}"
-  }))
+  ) => {
+    self.run(config => {
+      let targets : Array[Target] = config |> @config.bind(key)
+      targets.map(target => target.level.to_string()).join(",")
+    })
+  })
+  setup.when0("the application binds the full configuration", () => {
+    self.run(config => {
+      let app : AppConfig = config |> @config.bind_root()
+      "\{app.ir.layout} \{app.pipeline.target}"
+    })
+  })
   setup.given2("the environment variable {string} is {string}", (
     name : String,
     value : String,
   ) => self.vars[name] = value)
   setup.when1("the application binds {string} over the IR default", (
     key : String,
-  ) => self.run(config => {
-    let ir = config
-      |> @config.bind_or(key, ({ layout: "single-file", strict_mode: false } : IrOptions))
-    "\{ir.layout} \{ir.strict_mode}"
-  }))
+  ) => {
+    self.run(config => {
+      let ir = config
+        |> @config.bind_or(
+          key,
+          ({ layout: "single-file", strict_mode: false, } : IrOptions),
+        )
+      "\{ir.layout} \{ir.strict_mode}"
+    })
+  })
   setup.when2("the application binds {string} over the text default {string}", (
     key : String,
     default : String,
   ) => self.run(config => config |> @config.bind_or(key, default)))
   setup.when1("the application binds {string} over the component default", (
     key : String,
-  ) => self.run(config => {
-    let pipeline = config
-      |> @config.bind_or(key, ({ components: ["parse", "typecheck"] } : PipelineOptions))
-    pipeline.components.join(",")
-  }))
-  setup.when1("the application binds {string} to an integer", (key : String) => self.run(config => {
-    let value : Int = config |> @config.bind(key)
-    value.to_string()
-  }))
-  setup.when1("the application binds {string} over a default that does not decode", (
-    key : String,
-  ) => self.run(config => {
-    let mode = config |> @config.bind_or(key, ({ level: 1 } : Mode))
-    mode.level.to_string()
-  }))
+  ) => {
+    self.run(config => {
+      let pipeline = config
+        |> @config.bind_or(
+          key,
+          ({ components: ["parse", "typecheck"], } : PipelineOptions),
+        )
+      pipeline.components.join(",")
+    })
+  })
+  setup.when1("the application binds {string} to an integer", (key : String) => {
+    self.run(config => {
+      let value : Int32 = config |> @config.bind(key)
+      value.to_string()
+    })
+  })
+  setup.when1(
+    "the application binds {string} over a default that does not decode",
+    (key : String) => {
+      self.run(config => {
+        let mode = config |> @config.bind_or(key, ({ level: 1, } : Mode))
+        mode.level.to_string()
+      })
+    },
+  )
   setup.when1("the application binds {string} to the service record", (
     key : String,
-  ) => self.run(config => {
-    let service : Service = config |> @config.bind(key)
-    "\{service.url} \{service.token}"
-  }))
-  setup.when1("the application binds {string} to the API record", (
-    key : String,
-  ) => self.run(config => {
-    let service : ApiService = config |> @config.bind(key)
-    service.api_token
-  }))
-  setup.when1("the application gets the options of {string} with pipeline rules", (
-    key : String,
-  ) => self.run(config => {
-    let options : @config.Options[PipelineRules] = @config.options(config, key)
-    options.value.target
-  }))
+  ) => {
+    self.run(config => {
+      let service : Service = config |> @config.bind(key)
+      "\{service.url} \{service.token}"
+    })
+  })
+  setup.when1("the application binds {string} to the API record", (key : String) => {
+    self.run(config => {
+      let service : ApiService = config |> @config.bind(key)
+      service.api_token
+    })
+  })
+  setup.when1(
+    "the application gets the options of {string} with pipeline rules",
+    (key : String) => {
+      self.run(config => {
+        let options : @config.Options[PipelineRules] = @config.options(
+          config, key,
+        )
+        options.value.target
+      })
+    },
+  )
   setup.when1("the application gets the options of {string} with IR rules", (
     key : String,
-  ) => self.run(config => {
-    let options : @config.Options[IrRules] = @config.options(config, key)
-    "\{options.key} \{options.value.layout} \{options.value.strict_mode}"
-  }))
+  ) => {
+    self.run(config => {
+      let options : @config.Options[IrRules] = @config.options(config, key)
+      "\{options.key} \{options.value.layout} \{options.value.strict_mode}"
+    })
+  })
   setup.when1("the application gets the options of {string} with no rules", (
     key : String,
-  ) => self.run(config => {
-    let options : @config.Options[Telemetry] = @config.options(config, key)
-    options.value.endpoint
-  }))
+  ) => {
+    self.run(config => {
+      let options : @config.Options[Telemetry] = @config.options(config, key)
+      options.value.endpoint
+    })
+  })
   setup.when1("the application binds the named backends of {string}", (
     key : String,
-  ) => self.run(config => {
-    let backends : @config.NamedOptions[Backend] = config
-      |> @config.named(key, (config, key) => {
-        config
-        |> @config.bind_or(key, ({ level: 1 } : Backend))
-        |> @config.validated(config, key)
+  ) => {
+    self.run(config => {
+      let backends : @config.NamedOptions[Backend] = config
+        |> @config.named(key, (config, key) => {
+          config
+          |> @config.bind_or(key, ({ level: 1, } : Backend))
+          |> @config.validated(config, key)
+        })
+      backends
+      .names()
+      .map(name => {
+        guard backends.get(name) is Some(options) else { abort("no \{name}") }
+        let instance = options.name.unwrap_or("(none)")
+        "\{instance} at \{options.key} level \{options.value.level}"
       })
-    backends
-    .names()
-    .map(name => {
-      guard backends.get(name) is Some(options) else { abort("no \{name}") }
-      let instance = options.name.unwrap_or("(none)")
-      "\{instance} at \{options.key} level \{options.value.level}"
+      .join(", ")
     })
-    .join(", ")
-  }))
-  setup.when1("the application binds {string} over the IR default with unknown keys rejected", (
-    key : String,
-  ) => self.run(config => {
-    let ir = config
-      |> @config.bind_or(
-        key,
-        ({ layout: "single-file", strict_mode: false } : IrOptions),
-        unknown=Reject,
-      )
-    "\{ir.layout} \{ir.strict_mode}"
-  }))
-  setup.when2("the application binds {string} over the endpoint default and accepts {string}", (
-    key : String,
-    accepted : String,
-  ) => self.run(config => {
-    let server = config
-      |> @config.bind_or(
-        key,
-        ({ endpoint: 80 } : Endpoint),
-        unknown=RejectExcept([accepted]),
-      )
-    server.endpoint.to_string()
-  }))
+  })
+  setup.when1(
+    "the application binds {string} over the IR default with unknown keys rejected",
+    (key : String) => {
+      self.run(config => {
+        let ir = config
+          |> @config.bind_or(
+            key,
+            ({ layout: "single-file", strict_mode: false, } : IrOptions),
+            unknown=Reject,
+          )
+        "\{ir.layout} \{ir.strict_mode}"
+      })
+    },
+  )
+  setup.when2(
+    "the application binds {string} over the endpoint default and accepts {string}",
+    (key : String, accepted : String) => {
+      self.run(config => {
+        let server = config
+          |> @config.bind_or(
+            key,
+            ({ endpoint: 80, } : Endpoint),
+            unknown=RejectExcept([accepted]),
+          )
+        server.endpoint.to_string()
+      })
+    },
+  )
   setup.when1("the application binds {string} to the exact billing record", (
     key : String,
-  ) => self.run(config => {
-    let billing : Billing = config |> @config.bind_with(key)
-    "coefficient \{billing.rate.coefficient()} exponent \{billing.rate.exponent()}"
-  }))
+  ) => {
+    self.run(config => {
+      let billing : Billing = config |> @config.bind_with(key)
+      "coefficient \{billing.rate.coefficient()} exponent \{billing.rate.exponent()}"
+    })
+  })
   setup.when1("the application binds {string} to the exact release record", (
     key : String,
-  ) => self.run(config => {
-    let release : Release = config |> @config.bind_with(key)
-    let digits = match release.at.fraction() {
-      Some(fraction) => (-fraction.exponent()).to_string()
-      None => "0"
-    }
-    let offset = match release.at.offset() {
-      Some(Known(minutes)) => "\{minutes} minutes"
-      _ => "unknown"
-    }
-    "fraction digits \{digits} offset \{offset}"
-  }))
+  ) => {
+    self.run(config => {
+      let release : Release = config |> @config.bind_with(key)
+      let digits = match release.at.fraction() {
+        Some(fraction) => (-fraction.exponent()).to_string()
+        None => "0"
+      }
+      let offset = match release.at.offset() {
+        Some(Known(minutes)) => "\{minutes} minutes"
+        _ => "unknown"
+      }
+      "fraction digits \{digits} offset \{offset}"
+    })
+  })
   setup.when1("the application binds {string} to the exact limits record", (
     key : String,
-  ) => self.run(config => {
-    let limits : Limits = config |> @config.bind_with(key)
-    limits.max.to_string()
-  }))
+  ) => {
+    self.run(config => {
+      let limits : Limits = config |> @config.bind_with(key)
+      limits.max.to_string()
+    })
+  })
   setup.when1("the application binds {string} to the exact server record", (
     key : String,
-  ) => self.run(config => {
-    let server : ExactServer = config |> @config.bind_with(key)
-    server.port.to_string()
-  }))
-  setup.when1("the application binds {string} to the metadata record with origins", (
-    key : String,
-  ) => self.run(config => {
-    let metadata : Metadata = config |> @config.bind_with(key)
-    "\{metadata.lock.value} from \{locations(metadata.lock.blame)}"
-  }))
+  ) => {
+    self.run(config => {
+      let server : ExactServer = config |> @config.bind_with(key)
+      server.port.to_string()
+    })
+  })
+  setup.when1(
+    "the application binds {string} to the metadata record with origins",
+    (key : String) => {
+      self.run(config => {
+        let metadata : Metadata = config |> @config.bind_with(key)
+        "\{metadata.lock.value} from \{locations(metadata.lock.blame)}"
+      })
+    },
+  )
   setup.when1("the application binds {string} to the exact service record", (
     key : String,
-  ) => self.run(config => {
-    let service : SecretService = config |> @config.bind_with(key)
-    match service.token {
-      Env(name) => "\{service.url} env \{name}"
-      _ => "\{service.url} other"
-    }
-  }))
+  ) => {
+    self.run(config => {
+      let service : SecretService = config |> @config.bind_with(key)
+      match service.token {
+        Env(name) => "\{service.url} env \{name}"
+        _ => "\{service.url} other"
+      }
+    })
+  })
   setup.then1("the result does not contain the value of {string}", (
     variable : String,
   ) => {
@@ -578,9 +649,7 @@ impl @moonspec.World for BindingWorld with fn configure(self, setup) {
       fail("expected the key path error")
     }
   })
-  setup.then1("binding fails with a decode error at {string}", (
-    path : String,
-  ) => {
+  setup.then1("binding fails with a decode error at {string}", (path : String) => {
     guard self.error is Some(Decode(failure~)) else {
       fail("expected a decode error")
     }

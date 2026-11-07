@@ -32,8 +32,10 @@ test "a trailing slash goes, except at a root" {
 
 ///|
 test "discovery applies the parent names of the paths that a run gives" {
-  let normal = (text : String) => normalize(wp(text)).to_string() catch {
-    _ => abort("normalize failed")
+  let normal = (text : String) => {
+    normalize(wp(text)).to_string() catch {
+      _ => abort("normalize failed")
+    }
   }
   assert_eq(normal("/w/a/b/."), "/w/a/b")
   assert_eq(normal("/w/a/b/../c/"), "/w/a/c")
